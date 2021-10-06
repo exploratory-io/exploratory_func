@@ -591,7 +591,6 @@ exp_topic_model <- function(df, text,
     model$model <- lda_model
     # model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     # model$docs_sample_index <- docs_sample_index
-    model$df <- df # Keep original df for showing it with LDA result.
     model$doc_df <- doc_df
     model$doc_word_df <- doc_word_df
     model$text_col <- text_col
@@ -636,7 +635,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% ungroup()
-    res <- x$df %>% rename(text=!!x$text_col) %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
+    res <- x$doc_df %>% rename(text=!!x$text_col) %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
         for (i in 1:nrow(dat)) {
@@ -651,19 +650,16 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
         txt
       }
     })))
-    # Add topics of documents.
-    docs_topics_df <- as.data.frame(x$model$theta)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
-    res <- res %>% dplyr::bind_cols(docs_topics_df)
   }
-  else if (type == "doc_topics_mds") {
-    res <- x$df[x$docs_sample_index,]
-    docs_topics_sampled <- x$model$theta[x$docs_sample_index,]
-    docs_topics_df <- as.data.frame(docs_topics_sampled)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max))
-    res <- res %>% dplyr::bind_cols(docs_topics_df)
-    docs_coordinates_df <- as.data.frame(x$docs_coordinates)
-    res <- res %>% dplyr::bind_cols(docs_coordinates_df)
-  }
+  # # Unused MDS code. Keeping it for now.
+  # else if (type == "doc_topics_mds") {
+  #   res <- x$df[x$docs_sample_index,]
+  #   docs_topics_sampled <- x$model$theta[x$docs_sample_index,]
+  #   docs_topics_df <- as.data.frame(docs_topics_sampled)
+  #   docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max))
+  #   res <- res %>% dplyr::bind_cols(docs_topics_df)
+  #   docs_coordinates_df <- as.data.frame(x$docs_coordinates)
+  #   res <- res %>% dplyr::bind_cols(docs_coordinates_df)
+  # }
   res
 }
