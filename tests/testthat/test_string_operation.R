@@ -213,7 +213,7 @@ test_that("do_tokenize with URLs and twitter social tags", {
   result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE)
   expect_equal(result$token, c("and", "see"))
   result <- test_df %>% do_tokenize(input) # By default, tokenize_words rather than tokenize_tweets is used for speed.
-  expect_equal(result$token, c("exploratorydata", "and", "rstats", "see", "https", "cran.r", "project.org"))
+  expect_equal(result$token, c("exploratorydata", "and", "rstats", "see"))
 })
 
 test_that("do_tokenize with remove_numbers", {
