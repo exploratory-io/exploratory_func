@@ -2531,7 +2531,7 @@ download_data_file <- function(url, type){
   filepath <- NULL
   hash <- digest::digest(url, "md5", serialize = FALSE)
   tryCatch({
-    filepath <- eval(as.name(hash))
+    filepath <- getDownloadedFilePath(hash)
   }, error = function(e){
     # if url hash is not set as global vaiarlbe yet, it raises error that says object not found
     # which can be ignored
@@ -2585,7 +2585,7 @@ download_data_file <- function(url, type){
     })
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
-      assign(hash, tmp, envir = .GlobalEnv)
+      setDownloadedFilePath(hash, tmp)
     }
     tmp
   }
