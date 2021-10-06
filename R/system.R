@@ -3,7 +3,7 @@ user_env <- new.env()
 # environment to keep values to create connection
 user_env$token_info <- new.env()
 
-# environment to keep downloaded remote files
+# environment to keep location of downloaded remote files.
 user_env$downloads <- new.env()
 
 #' get oauth token info from key
