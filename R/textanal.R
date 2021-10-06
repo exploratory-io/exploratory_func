@@ -555,6 +555,10 @@ exp_topic_model <- function(df, text,
     lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics, max_iter=max_iter, alpha=alpha, beta=beta)
     docs_topics <- lda_model$theta # theta is the documents-topics matrix.
 
+    # Create a data frame whose row represents a document, with topic info.
+    docs_topics_df <- as.data.frame(lda_model$theta)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
+    doc_df <- df %>% dplyr::bind_cols(docs_topics_df) # TODO: What if df already has columns like topic_max??
 
     # Create a data frame whose row represents a word in a document, from quanteda tokens (x$tokens).
     doc_word_df <- tibble::tibble(document=seq(length(as.list(tokens))), lst=as.list(tokens))
@@ -588,6 +592,7 @@ exp_topic_model <- function(df, text,
     # model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     # model$docs_sample_index <- docs_sample_index
     model$df <- df # Keep original df for showing it with LDA result.
+    model$doc_df <- doc_df
     model$doc_word_df <- doc_word_df
     model$text_col <- text_col
     model$sampled_nrow <- sampled_nrow
@@ -624,10 +629,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
   }
   else if (type == "doc_topics") {
-    res <- x$df
-    docs_topics_df <- as.data.frame(x$model$theta)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
-    res <- res %>% dplyr::bind_cols(docs_topics_df)
+    res <- x$doc_df
   }
   else if (type == "doc_word_topics") {
     words_to_tag_df <- x$doc_word_df %>% distinct(document, word, .keep_all = TRUE)
