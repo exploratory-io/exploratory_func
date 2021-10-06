@@ -630,7 +630,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
   else if (type == "doc_topics") {
     res <- x$doc_df
   }
-  else if (type == "doc_word_topics") {
+  else if (type == "doc_topics_tagged") {
     words_to_tag_df <- x$doc_word_df %>% distinct(document, word, .keep_all = TRUE)
     words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
