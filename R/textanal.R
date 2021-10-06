@@ -624,8 +624,10 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     names(feats_index) <- feat_names
     word_ids <- feats_index[doc_word_df$word]
 
+    # Probability of the word to appear in the doc.
     word_topic_probability_matrix <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
 
+    # Bind the probability matrix to the doc-word data frame.
     doc_word_df <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(word_topic_probability_matrix))
 
     words_to_tag_df <- doc_word_df %>% distinct(document, word, .keep_all = TRUE)
