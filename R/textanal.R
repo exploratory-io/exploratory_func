@@ -614,16 +614,21 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- res %>% dplyr::bind_cols(docs_topics_df)
   }
   else if (type == "doc_word_topics") {
+    # Create a data frame whose row represents a word in a document, from quanteda tokens (x$tokens).
     doc_word_df <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
     doc_word_df <- doc_word_df %>% tidyr::unnest_longer(lst, values_to = "word")
+
+    # Get IDs of the words used in the model.
     feat_names <- attr(x$model$data, "Dimnames")$features
     feats_index <- 1:length(feat_names)
     names(feats_index) <- feat_names
-    word_ids <- feats_index[doc_word_df$word] # TODO: Normalize the words better than just str_to_lower.
+    word_ids <- feats_index[doc_word_df$word]
 
-    words_to_tag_df <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
-    words_to_tag_df <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(words_to_tag_df))
-    words_to_tag_df <- words_to_tag_df %>% distinct(document, word, .keep_all = TRUE)
+    word_topic_probability_matrix <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
+
+    doc_word_df <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(word_topic_probability_matrix))
+
+    words_to_tag_df <- doc_word_df %>% distinct(document, word, .keep_all = TRUE)
     words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% ungroup()
