@@ -57,6 +57,7 @@ guess_lang_for_stopwords <- function(text) {
 
 tokenize_with_postprocess <- function(text, 
                                       remove_punct = TRUE, remove_numbers = TRUE,
+                                      remove_alphabets = FALSE,
                                       tokenize_tweets = FALSE,
                                       remove_url = TRUE, remove_twitter = TRUE,
                                       stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -83,6 +84,9 @@ tokenize_with_postprocess <- function(text,
     })
   }
   else {
+    if (remove_url) { # For tokenizers::tokenize_words, we remove urls ourselves beforehand.
+      text <- str_remove_url(text)
+    }
     tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL,
                                             strip_punct = remove_punct, simplify = FALSE)
   }
@@ -104,8 +108,14 @@ tokenize_with_postprocess <- function(text,
     # Handle ones that are not separated by spaces.
     if (length(compound_tokens_without_space) > 0) {
       # Tokenize those words with the same options with the original tokinizing, to know where such word would have been splitted.
-      compound_tokens_list <- tokenizers::tokenize_tweets(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL,
-                                                          strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+      if (tokenize_tweets) {
+        compound_tokens_list <- tokenizers::tokenize_tweets(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL,
+                                                            strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+      }
+      else {
+        compound_tokens_list <- tokenizers::tokenize_words(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL,
+                                                           strip_punct = remove_punct, simplify = FALSE)
+      }
       # Create space-separated expression of the word, which can be used with quanteda::tokens_compound.
       compound_tokens_with_space_inserted <- purrr::flatten_chr(purrr::map(compound_tokens_list, function(x){stringr::str_c(x, collapse=' ')}))
       tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens_with_space_inserted), concatenator = '')
@@ -128,7 +138,16 @@ tokenize_with_postprocess <- function(text,
   }
   if (remove_numbers) {
     # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
-    tokens <- tokens %>% quanteda::tokens_remove("^[0-9\uff10-\uff19]+$", valuetype = "regex")
+    if (remove_alphabets) { # Remove alphanumeric words.
+      # \uff10-\uff19 are fullwidth numbers. https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block)
+      tokens <- tokens %>% quanteda::tokens_remove("^[a-zA-Z0-9\uff10-\uff19]+$", valuetype = "regex")
+    }
+    else { # Remove only numeric words.
+      tokens <- tokens %>% quanteda::tokens_remove("^[0-9\uff10-\uff19]+$", valuetype = "regex")
+    }
+  }
+  else if (remove_alphabets) { # Remove only alphabet-only words.
+    tokens <- tokens %>% quanteda::tokens_remove("^[a-zA-Z]+$", valuetype = "regex")
   }
   # Results from tokenizers::tokenize_tweets seems to include emojis unlike tokenizers::tokenize_words.
   # For now, strip all-emoji-tokens here since they can't be displayed on word cloud.
@@ -148,6 +167,7 @@ tokenize_with_postprocess <- function(text,
 #' @export
 exp_textanal <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         remove_alphabets = FALSE,
                          tokenize_tweets = FALSE,
                          remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -177,6 +197,7 @@ exp_textanal <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_alphabets = remove_alphabets,
                                         tokenize_tweets = tokenize_tweets,
                                         remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
@@ -349,6 +370,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
 #' @export
 exp_text_cluster <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         remove_alphabets = FALSE,
                          tokenize_tweets = FALSE,
                          remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -387,6 +409,7 @@ exp_text_cluster <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_alphabets = remove_alphabets,
                                         tokenize_tweets = tokenize_tweets,
                                         remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
@@ -509,6 +532,7 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 #' @export
 exp_topic_model <- function(df, text,
                             remove_punct = TRUE, remove_numbers = TRUE,
+                            remove_alphabets = FALSE,
                             tokenize_tweets = FALSE,
                             remove_url = TRUE, remove_twitter = TRUE,
                             stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -543,6 +567,7 @@ exp_topic_model <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_alphabets = remove_alphabets,
                                         tokenize_tweets = tokenize_tweets,
                                         remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
