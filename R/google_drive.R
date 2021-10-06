@@ -251,7 +251,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
     filepath <- NULL
     hash <- digest::digest(stringr::str_c(fileId, type), "md5", serialize = FALSE)
     tryCatch({
-      filepath <- eval(as.name(hash))
+      filepath <- getDownloadedFilePath(hash)
     }, error = function(e){
       # if filePath hash is not set as global variable yet, it raises error that says object not found
       # which can be ignored
@@ -280,7 +280,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
       googledrive::drive_download(googledrive::as_id(fileId), overwrite = TRUE, path = tmp)
       # cache file
       if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)) {
-        assign(hash, tmp, envir = .GlobalEnv)
+        setDownloadedFilePath(hash, tmp)
       }
       tmp
     }
