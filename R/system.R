@@ -3,6 +3,9 @@ user_env <- new.env()
 # environment to keep values to create connection
 user_env$token_info <- new.env()
 
+# environment to keep location of downloaded remote files.
+user_env$downloads <- new.env()
+
 #' get oauth token info from key
 #' @export
 getTokenInfo <- function(token_key){
@@ -13,6 +16,14 @@ getTokenInfo <- function(token_key){
 #' @export
 setTokenInfo <- function(token_key, value) {
   user_env$token_info[[token_key]] <- value
+}
+
+setDownloadedFilePath <- function(hash, filePath){
+  user_env$downloads[[hash]] <- filePath
+}
+
+getDownloadedFilePath <- function(hash){
+ user_env$downloads[[hash]]
 }
 
 # hashmap in which we keep active connections to databases etc.
@@ -2520,7 +2531,7 @@ download_data_file <- function(url, type){
   filepath <- NULL
   hash <- digest::digest(url, "md5", serialize = FALSE)
   tryCatch({
-    filepath <- eval(as.name(hash))
+    filepath <- getDownloadedFilePath(hash)
   }, error = function(e){
     # if url hash is not set as global vaiarlbe yet, it raises error that says object not found
     # which can be ignored
@@ -2574,7 +2585,7 @@ download_data_file <- function(url, type){
     })
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
-      assign(hash, tmp, envir = .GlobalEnv)
+      setDownloadedFilePath(hash, tmp)
     }
     tmp
   }
@@ -2940,57 +2951,77 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
+#'API that search and imports multiple same structure parquet files and merge it to a single data frame
+#'@export
+searchAndReadParquetFiles <- function(folder, pattern, files, col_select = NULL){
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  if (!dir.exists(folder)) {
+    stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
+  }
+  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
+  if (length(files) == 0) {
+    stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
+  }
+  read_parquet_files(files, col_select = col_select)
+}
+
+#'API that imports multiple same structure parquet files and merge it to a single data frame
+#'@export
+read_parquet_files <- function(files, col_select = NULL) {
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::read_parquet_file, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+
 #' Wrapper for read_parquet to support remote file.
 #' @export
-read_parquet_file <- function(file){
+read_parquet_file <- function(file, col_select = NULL) {
   loadNamespace("arrow")
-
-  is.win <- Sys.info()['sysname'] == 'Windows'
   tf <- NULL
+  res <- NULL
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
 
-  # Backup the locale info and set English locale for reading parquet issue
-  # on Windows https://issues.apache.org/jira/browse/ARROW-7288
-  if (is.win) {
-    # Backup the current locale info.
-    lc.all<- Sys.getlocale("LC_ALL")
-    lc.collate<- Sys.getlocale("LC_COLLATE")
-    lc.ctype<- Sys.getlocale("LC_CTYPE")
-    lc.monetary<- Sys.getlocale("LC_MONETARY")
-    lc.numeric<- Sys.getlocale("LC_NUMERIC")
-    # Set English.
-    Sys.setlocale("LC_ALL", "English")
-  }
-
-  # Catch errors to guarantee restoring the locale info later.
-  tryCatch({
-
-    if (stringr::str_detect(file, "^https://") ||
-        stringr::str_detect(file, "^http://") ||
-        stringr::str_detect(file, "^ftp://")) {
-
-      # Download the remote parquet file to the local temp file.
-      tf <- tempfile()
-      # Remove on exit.
-      on.exit(unlink(tf))
-      # mode="wb" for binary download
-      utils::download.file(file, tf, mode = "wb")
-      # Read the local parquet file.
-      res <- arrow::read_parquet(tf)
-
+    # Download the remote parquet file to the local temp file.
+    tf <- tempfile()
+    # Remove on exit.
+    on.exit(unlink(tf))
+    # mode="wb" for binary download
+    utils::download.file(file, tf, mode = "wb")
+    # Read the local parquet file.
+    if (is.null(col_select)) {
+      res <- read_parquet_file_internal(tf)
     } else {
-      res <- arrow::read_parquet(file)
+      res <- read_parquet_file_internal(tf, col_select = col_select)
     }
-  }, error=function(e){
 
-  })
+  } else if (is.null(col_select)) {
+    res <- read_parquet_file_internal(file)
+  } else {
+    res <- read_parquet_file_internal(file, col_select = col_select)
+  }
+  res
+}
 
-  # Restore the original locale info.
-  if (is.win) {
-    Sys.setlocale("LC_ALL", lc.all)
-    Sys.setlocale("LC_COLLATE", lc.collate)
-    Sys.setlocale("LC_CTYPE", lc.ctype)
-    Sys.setlocale("LC_MONETARY", lc.monetary)
-    Sys.setlocale("LC_NUMERIC", lc.numeric)
+# Wrapper around arrow::read_parquet to work around https://issues.apache.org/jira/browse/ARROW-13860 by applying group_by column stored in the parquet file
+# as one of the class names.
+read_parquet_file_internal <- function(filepath, col_select = NULL) {
+  res <- NULL
+  if (is.null(col_select)) {
+    res <- arrow::read_parquet(filepath)
+  } else {
+    res <- arrow::read_parquet(filepath, col_select = col_select)
+  }
+  if (stringr::str_starts(class(res)[1], '...grouped_by_')) {
+    group_col <- stringr::str_remove(class(res)[1], '^\\.\\.\\.grouped_by_')
+    res <- res %>% dplyr::group_by(!!rlang::sym(group_col)) # applying group_by seems to remove the ...grouped_by_... class.
   }
   res
 }
@@ -3051,4 +3082,5 @@ load_fred <- function(series_id, date_start = "", date_end = "", password) {
     )
   }
 }
+
 

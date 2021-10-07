@@ -213,7 +213,7 @@ test_that("do_tokenize with URLs and twitter social tags", {
   result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE)
   expect_equal(result$token, c("and", "see"))
   result <- test_df %>% do_tokenize(input) # By default, tokenize_words rather than tokenize_tweets is used for speed.
-  expect_equal(result$token, c("exploratorydata", "and", "rstats", "see", "https", "cran.r", "project.org"))
+  expect_equal(result$token, c("exploratorydata", "and", "rstats", "see"))
 })
 
 test_that("do_tokenize with remove_numbers", {
@@ -225,6 +225,28 @@ test_that("do_tokenize with remove_numbers", {
     do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = TRUE)
   expect_equal(result$token[[1]], "aaa")
   expect_equal(result$token[[2]], "12aabb33")
+})
+
+test_that("do_tokenize with remove_alphabets", {
+  test_df <- data.frame(
+    input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = FALSE, remove_alphabets = TRUE)
+  expect_equal(result$token[[1]], "12345")
+  expect_equal(result$token[[2]], "12aabb33")
+})
+
+test_that("do_tokenize with both remove_numbers and remove_alphabets", {
+  test_df <- data.frame(
+    input = c("\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF 12345 aaa", "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF 12aabb33", "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF 123456 34567 88999"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = TRUE, remove_alphabet = TRUE)
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+  expect_equal(result$token[[2]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
 })
 
 test_that("do_tokenize with remove_punct", {
