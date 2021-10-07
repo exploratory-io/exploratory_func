@@ -606,7 +606,7 @@ exp_topic_model <- function(df, text,
 #' extracts results from textmodel_lda_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
+tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, category_col = NULL, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
     docs_topics_df <- as.data.frame(x$model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max))
@@ -650,6 +650,17 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
         txt
       }
     })))
+  }
+  else if (type == "doc_word_category") {
+    terms_topics_df <- as.data.frame(t(x$model$phi))
+    words <- rownames(terms_topics_df)
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word = words)
+    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
+    top_words_df <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
+    top_words_df <- top_words_df %>% mutate(topic=parse_number(topic))
+    doc_df <- x$doc_df %>% dplyr::mutate(doc_id=row_number()) %>% dplyr::select(doc_id, document_max_topic=max_topic, !!rlang::sym(category_col))
+    doc_word_df <- x$doc_word_df %>% dplyr::select(document, word)
+    res <- doc_word_df %>% dplyr::left_join(doc_df, by=c(document="doc_id")) %>% dplyr::right_join(top_words_df, by=c(document_max_topic="topic", word="word"))
   }
   # # Unused MDS code. Keeping it for now.
   # else if (type == "doc_topics_mds") {
