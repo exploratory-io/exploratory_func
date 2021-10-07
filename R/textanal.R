@@ -256,7 +256,7 @@ fcm_to_df <- function(fcm) {
 #' extracts results from textanal_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, ...) {
+tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, category_col = NULL, ...) {
   if (type == "words") {
     res <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
     res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
@@ -271,6 +271,18 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
       else {
         res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=FALSE) # Set hard limit even with ties.
       }
+    }
+
+    # If there is category_col, create data frame whose row represents a document-word combination with the category column, for bar chart with category color.
+    if (!is.null(category_col) && !is_empty(category_col)) {
+      res2 <- dfm_to_df(x$dfm)
+      if (!is.null(max_words)) { # filter with the top words.
+        res2 <- res2 %>% filter(token %in% res$word)
+      }
+      # Join document info.
+      res2 <- res2 %>% left_join(x$df %>% select(!!rlang::sym(category_col)) %>% mutate(doc_id=row_number()), by=c(document="doc_id")) %>%
+        rename(word = token, count=value) # Align output column names with the case without category_col.
+      res <- res2
     }
   }
   else if (type == "word_pairs") {
