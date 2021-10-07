@@ -263,7 +263,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
   }
   if (type == "word_count") {
     feats <- quanteda::featfreq(x$dfm)
-    res <- tibble::tibble(word=stringr::str_to_title(names(feats)), count=feats)
+    res <- tibble::tibble(word=names(feats), count=feats)
     if (!is.null(max_words)) { # This means it is for bar chart.
       if (max_words < 100) {
         res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
@@ -284,6 +284,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
         rename(word = token, count=value) # Align output column names with the case without category_col.
       res <- res2
     }
+    res <- res %>% dplyr::mutate(word=stringr::str_to_title(word)) # Make it title case for displaying.
   }
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm) %>%
