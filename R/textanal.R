@@ -685,11 +685,16 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- x$doc_df %>% rename(text=!!x$text_col) %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
+        orig_strs <- list()
         for (i in 1:nrow(dat)) {
+          orig_strs_ <- stringr::str_extract_all(txt, stringr::regex(stringr::str_c('\\Q', dat$word[i], '\\E'), ignore_case = TRUE))
+          orig_strs[[i]] <- orig_strs_[[1]]
           txt <- stringr::str_replace_all(txt, stringr::regex(stringr::str_c('\\Q', dat$word[i], '\\E'), ignore_case = TRUE), stringr::str_c('_____', i, '_____'))
         }
         for (i in 1:nrow(dat)) {
-          txt <- stringr::str_replace_all(txt, stringr::str_c('_____', i, '_____'), stringr::str_c('<span topic="', dat$max_topic[i], '">', dat$word[i], '</span>'))
+          for (j in 1:length(orig_strs[[i]])) {
+            txt <- stringr::str_replace(txt, stringr::str_c('_____', i, '_____'), stringr::str_c('<span topic="', dat$max_topic[i], '">', orig_strs[[i]][j], '</span>'))
+          }
         }
         txt
       }
