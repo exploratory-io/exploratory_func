@@ -295,7 +295,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
     res <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
     res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
   }
-  if (type == "word_count") {
+  if (type == "word_count" || type == "category_word_count") {
     feats <- quanteda::featfreq(x$dfm)
     res <- tibble::tibble(word=names(feats), count=feats)
     if (!is.null(max_words)) { # This means it is for bar chart.
@@ -308,7 +308,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
     }
 
     # If there is category_col, create data frame whose row represents a category-word combination, for bar chart with category color.
-    if (!is.null(x$category_col)) {
+    if (type == "category_word_count" && !is.null(x$category_col)) {
       res2 <- dfm_to_df(x$dfm)
       if (!is.null(max_words)) { # filter with the top words.
         res2 <- res2 %>% filter(token %in% res$word)
