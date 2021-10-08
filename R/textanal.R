@@ -556,7 +556,7 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 
 #' Function for Topic Model Analytics View
 #' @export
-exp_topic_model <- function(df, text,
+exp_topic_model <- function(df, text, category = NULL,
                             remove_punct = TRUE, remove_numbers = TRUE,
                             remove_alphabets = FALSE,
                             tokenize_tweets = FALSE,
@@ -573,6 +573,10 @@ exp_topic_model <- function(df, text,
                             seed = 1,
                             ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
+  if (length(category_col) == 0) { # It seems that when no category is specified, category_col becomes character(0).
+    category_col <- NULL
+  }
 
   # Set seed just once.
   if(!is.null(seed)) {
@@ -645,6 +649,7 @@ exp_topic_model <- function(df, text,
     model$doc_df <- doc_df
     model$doc_word_df <- doc_word_df
     model$text_col <- text_col
+    model$category_col <- category_col
     model$sampled_nrow <- sampled_nrow
     model$tokens <- tokens
     class(model) <- 'textmodel_lda_exploratory'
@@ -658,7 +663,7 @@ exp_topic_model <- function(df, text,
 #' extracts results from textmodel_lda_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, category_col = NULL, ...) {
+tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
     docs_topics_df <- as.data.frame(x$model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max.safe))
@@ -723,7 +728,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
     top_words_df <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
     top_words_df <- top_words_df %>% mutate(topic=parse_number(topic))
-    doc_df <- x$doc_df %>% dplyr::mutate(doc_id=row_number()) %>% dplyr::select(doc_id, document_max_topic=max_topic, !!rlang::sym(category_col))
+    doc_df <- x$doc_df %>% dplyr::mutate(doc_id=row_number()) %>% dplyr::select(doc_id, document_max_topic=max_topic, !!rlang::sym(x$category_col))
     doc_word_df <- x$doc_word_df %>% dplyr::select(document, word)
     res <- doc_word_df %>% dplyr::left_join(doc_df, by=c(document="doc_id")) %>% dplyr::right_join(top_words_df, by=c(document_max_topic="topic", word="word"))
   }

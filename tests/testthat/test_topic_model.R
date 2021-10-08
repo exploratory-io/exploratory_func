@@ -5,8 +5,8 @@ context("test topic model function, exp_topic_model")
 twitter_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
 
 test_that("exp_topic_model with Japanese twitter data", {
-  model_df <- twitter_df %>% exp_topic_model(text, stopwords_lang = "japanese")
-  res <- model_df %>% tidy_rowwise(model, type="doc_word_category", category_col="source")
+  model_df <- twitter_df %>% exp_topic_model(text, category=source, stopwords_lang = "japanese")
+  res <- model_df %>% tidy_rowwise(model, type="doc_word_category")
   res <- model_df %>% tidy_rowwise(model, type="doc_topics_tagged")
   res <- model_df %>% tidy_rowwise(model, type="topics_summary")
   expect_equal(colnames(res), c("topic", "n"))
