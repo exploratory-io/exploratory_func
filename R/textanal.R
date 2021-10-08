@@ -687,9 +687,17 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
       if (!is.null(dat)) {
         orig_strs <- list()
         for (i in 1:nrow(dat)) {
-          orig_strs_ <- stringr::str_extract_all(txt, stringr::regex(stringr::str_c('\\Q', dat$word[i], '\\E'), ignore_case = TRUE))
+          if (stringr::str_detect(dat$word[i], '[a-zA-Z]')) { # For alphabet word, char before/after should not be alphabet, to avoid matches within other words.
+            pre_regex <- '(?<![a-zA-Z])\\Q'
+            post_regex <- '\\E(?![a-zA-Z])'
+          }
+          else {
+            pre_regex <- '\\Q'
+            post_regex <- '\\E'
+          }
+          orig_strs_ <- stringr::str_extract_all(txt, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE))
           orig_strs[[i]] <- orig_strs_[[1]]
-          txt <- stringr::str_replace_all(txt, stringr::regex(stringr::str_c('\\Q', dat$word[i], '\\E'), ignore_case = TRUE), stringr::str_c('_____', i, '_____'))
+          txt <- stringr::str_replace_all(txt, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE), stringr::str_c('_____', i, '_____'))
         }
         for (i in 1:nrow(dat)) {
           for (j in 1:length(orig_strs[[i]])) {
