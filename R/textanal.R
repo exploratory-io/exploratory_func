@@ -307,7 +307,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
       }
     }
 
-    # If there is category_col, create data frame whose row represents a document-word combination with the category column, for bar chart with category color.
+    # If there is category_col, create data frame whose row represents a category-word combination, for bar chart with category color.
     if (!is.null(x$category_col)) {
       res2 <- dfm_to_df(x$dfm)
       if (!is.null(max_words)) { # filter with the top words.
@@ -315,8 +315,8 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
       }
       # Join document info.
       res2 <- res2 %>% left_join(x$df %>% select(!!rlang::sym(x$category_col)) %>% mutate(doc_id=row_number()), by=c(document="doc_id")) %>%
-        rename(word = token, count=value) # Align output column names with the case without category_col.
-      res <- res2
+        dplyr::rename(word = token, count=value) # Align output column names with the case without category_col.
+      res <- res2 %>% dplyr::group_by(!!rlang::sym(x$category_col), word) %>% dplyr::summarize(count = sum(count))
     }
     res <- res %>% dplyr::mutate(word=stringr::str_to_title(word)) # Make it title case for displaying.
   }
