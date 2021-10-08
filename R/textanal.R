@@ -173,7 +173,7 @@ tokenize_with_postprocess <- function(text,
 
 #' Function for Text Analysis Analytics View
 #' @export
-exp_textanal <- function(df, text,
+exp_textanal <- function(df, text, category = NULL,
                          remove_punct = TRUE, remove_numbers = TRUE,
                          remove_alphabets = FALSE,
                          tokenize_tweets = FALSE,
@@ -188,6 +188,10 @@ exp_textanal <- function(df, text,
                          seed = 1,
                          ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
+  if (length(category_col) == 0) { # It seems that when no category is specified, category_col becomes character(0).
+    category_col <- NULL
+  }
   each_func <- function(df) {
     # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
@@ -230,6 +234,7 @@ exp_textanal <- function(df, text,
     model$fcm_selected <- fcm_selected
 
     model$df <- df # Keep original df for showing it with clustering result.
+    model$category_col <- category_col
     model$sampled_nrow <- sampled_nrow
     class(model) <- 'textanal_exploratory'
     model
@@ -285,7 +290,7 @@ fcm_to_df <- function(fcm) {
 #' extracts results from textanal_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, category_col = NULL, ...) {
+tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, ...) {
   if (type == "words") {
     res <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
     res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
@@ -303,13 +308,13 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
     }
 
     # If there is category_col, create data frame whose row represents a document-word combination with the category column, for bar chart with category color.
-    if (!is.null(category_col) && !is_empty(category_col)) {
+    if (!is.null(x$category_col)) {
       res2 <- dfm_to_df(x$dfm)
       if (!is.null(max_words)) { # filter with the top words.
         res2 <- res2 %>% filter(token %in% res$word)
       }
       # Join document info.
-      res2 <- res2 %>% left_join(x$df %>% select(!!rlang::sym(category_col)) %>% mutate(doc_id=row_number()), by=c(document="doc_id")) %>%
+      res2 <- res2 %>% left_join(x$df %>% select(!!rlang::sym(x$category_col)) %>% mutate(doc_id=row_number()), by=c(document="doc_id")) %>%
         rename(word = token, count=value) # Align output column names with the case without category_col.
       res <- res2
     }

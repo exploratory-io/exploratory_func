@@ -7,9 +7,9 @@ twitter_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6
 test_that("exp_textanal with Japanese twitter data", {
   lang_res <- exploratory:::guess_lang_for_stopwords(twitter_df$text)
 
-  model_df <- twitter_df %>% exp_textanal(text, stopwords_lang = "japanese") # Testing both lower and upper case for compound_token.
+  model_df <- twitter_df %>% exp_textanal(text, category=source, stopwords_lang = "japanese") # Testing both lower and upper case for compound_token.
   res <- model_df %>% tidy_rowwise(model, type="word_count")
-  res <- model_df %>% tidy_rowwise(model, type="word_count", category_col="source")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
   res <- model_df %>% tidy_rowwise(model, type="words")
   expect_equal(colnames(res), c("document", "word"))
   res <- model_df %>% tidy_rowwise(model, type="word_pairs")
