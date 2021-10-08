@@ -27,6 +27,31 @@ updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
   sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath)
 }
 
+#' API to upload data frame to Google Sheets.
+#'
+#' @export
+#' @param df - data frame
+#' @param type - either "newSpreadSheet", "overrideSpreadSheet", "newWorkSheet", and "appendToWorkSheet"
+#' @param spreadSheetName - name of the spread sheet (when creating a new spread sheet)
+#' @param spreadSheetId - sheet id (when updating an existing spread sheet)
+#' @param workSheet - name of the worksheet
+#'
+uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetName = "", spreadSheetId = "", workSheet = "") {
+  if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
+  token <- getGoogleTokenForSheet("")
+  googlesheets4::sheets_set_token(token)
+  if (type == "newSpreadSheet") {
+    sheetsList <- list(df)
+    names(sheetsList) <- c(workSheet)
+    googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList)
+  } else if (type == "overrideSpreadSheet" || type == "newWorkSheet") {
+    googlesheets4::sheet_write(df, spreadSheetId, sheet = workSheet)
+  } else if (type == "appendToWorkSheet") {
+    googlesheets4::sheet_append(spreadSheetId, df, sheet = workSheet)
+  }
+}
+
+
 #' API to get google sheet data
 #' @export
 #' @param title name of a sheet on Google Sheets.
