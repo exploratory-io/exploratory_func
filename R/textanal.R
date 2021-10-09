@@ -314,7 +314,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
         res2 <- res2 %>% filter(token %in% res$word)
       }
       # Join document info.
-      res2 <- res2 %>% left_join(x$df %>% select(!!rlang::sym(x$category_col)) %>% mutate(doc_id=row_number()), by=c(document="doc_id")) %>%
+      res2 <- res2 %>% dplyr::left_join(x$df %>% dplyr::select(!!rlang::sym(x$category_col)) %>% dplyr::mutate(doc_id=row_number()), by=c(document="doc_id")) %>%
         dplyr::rename(word = token, count=value) # Align output column names with the case without category_col.
       res <- res2 %>% dplyr::group_by(!!rlang::sym(x$category_col), word) %>% dplyr::summarize(count = sum(count))
     }
@@ -327,7 +327,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
       dplyr::rename(word.1 = token.x, word.2 = token.y, count=value)
     if (!is.null(max_word_pairs)) { # This means it is for bar chart.
       if (max_word_pairs < 100) {
-        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=TRUE) %>% dplyr::slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
       }
       else {
         res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=FALSE) # Set hard limit even with ties.
@@ -340,18 +340,18 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 # vertex_size_method - "equal_length" or "equal_freq"
 get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.6, cluster_method="louvain") {
   # Prepare edges data
-  edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
-  edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
+  edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% dplyr::rename(from=token.x,to=token.y) %>% filter(from!=to)
+  edges <- edges %>% dplyr::mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
 
-  edges <- edges %>% mutate(width=log(value+1)) # +1 to avoid 0 width.
-  edges <- edges %>% mutate(width=max_edge_width*width/max(width))
+  edges <- edges %>% dplyr::mutate(width=log(value+1)) # +1 to avoid 0 width.
+  edges <- edges %>% dplyr::mutate(width=max_edge_width*width/max(width))
 
   # Set edge colors based on number of co-occurrence.
   c_scale <- grDevices::colorRamp(c("white","#4A90E2"))
-  edges <- edges %>% mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
+  edges <- edges %>% dplyr::mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
   weights=log(1+edges$value)
   weights <- 5*weights/max(weights)
-  edges <- edges %>% mutate(weights=weights)
+  edges <- edges %>% dplyr::mutate(weights=weights)
 
   # Prepare vertices data
   feat_names <- names(model_df$model[[1]]$feats_selected)
@@ -688,12 +688,12 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- x$doc_df
   }
   else if (type == "doc_topics_tagged") {
-    words_to_tag_df <- x$doc_word_df %>% distinct(document, word, .keep_all = TRUE)
+    words_to_tag_df <- x$doc_word_df %>% dplyr::distinct(document, word, .keep_all = TRUE)
     words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
     words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
-    tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% ungroup()
-    res <- x$doc_df %>% rename(text=!!x$text_col) %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
-    res <- res %>% mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
+    tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% dplyr::ungroup()
+    res <- x$doc_df %>% dplyr::rename(text=!!x$text_col) %>% dplyr::mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
+    res <- res %>% dplyr::mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
         orig_strs <- list()
         for (i in 1:nrow(dat)) {
