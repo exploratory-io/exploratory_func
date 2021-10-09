@@ -55,6 +55,14 @@ guess_lang_for_stopwords <- function(text) {
   lang_name
 }
 
+# which.max can return integer(0) if input vector consists of all NAs.
+# This sometimes happens for the lda output from seededlda. Have not figured out exact condition it happens yet.
+# This function is to work around such a case by returning 1, so that it does not break the rest of the processing.
+which.max.safe <- function(x) {
+  y <- which.max(x)
+  if (length(y) == 0) 1 else y
+}
+
 tokenize_with_postprocess <- function(text, 
                                       remove_punct = TRUE, remove_numbers = TRUE,
                                       remove_alphabets = FALSE,
@@ -165,7 +173,7 @@ tokenize_with_postprocess <- function(text,
 
 #' Function for Text Analysis Analytics View
 #' @export
-exp_textanal <- function(df, text,
+exp_textanal <- function(df, text, category = NULL,
                          remove_punct = TRUE, remove_numbers = TRUE,
                          remove_alphabets = FALSE,
                          tokenize_tweets = FALSE,
@@ -180,6 +188,10 @@ exp_textanal <- function(df, text,
                          seed = 1,
                          ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
+  if (length(category_col) == 0) { # It seems that when no category is specified, category_col becomes character(0).
+    category_col <- NULL
+  }
   each_func <- function(df) {
     # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
@@ -222,6 +234,7 @@ exp_textanal <- function(df, text,
     model$fcm_selected <- fcm_selected
 
     model$df <- df # Keep original df for showing it with clustering result.
+    model$category_col <- category_col
     model$sampled_nrow <- sampled_nrow
     class(model) <- 'textanal_exploratory'
     model
@@ -282,9 +295,9 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
     res <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
     res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
   }
-  if (type == "word_count") {
+  if (type == "word_count" || type == "category_word_count") {
     feats <- quanteda::featfreq(x$dfm)
-    res <- tibble::tibble(word=stringr::str_to_title(names(feats)), count=feats)
+    res <- tibble::tibble(word=names(feats), count=feats)
     if (!is.null(max_words)) { # This means it is for bar chart.
       if (max_words < 100) {
         res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
@@ -293,6 +306,19 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
         res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=FALSE) # Set hard limit even with ties.
       }
     }
+
+    # If there is category_col, create data frame whose row represents a category-word combination, for bar chart with category color.
+    if (type == "category_word_count" && !is.null(x$category_col)) {
+      res2 <- dfm_to_df(x$dfm)
+      if (!is.null(max_words)) { # filter with the top words.
+        res2 <- res2 %>% filter(token %in% res$word)
+      }
+      # Join document info.
+      res2 <- res2 %>% dplyr::left_join(x$df %>% dplyr::select(!!rlang::sym(x$category_col)) %>% dplyr::mutate(doc_id=row_number()), by=c(document="doc_id")) %>%
+        dplyr::rename(word = token, count=value) # Align output column names with the case without category_col.
+      res <- res2 %>% dplyr::group_by(!!rlang::sym(x$category_col), word) %>% dplyr::summarize(count = sum(count))
+    }
+    res <- res %>% dplyr::mutate(word=stringr::str_to_title(word)) # Make it title case for displaying.
   }
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm) %>%
@@ -301,7 +327,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
       dplyr::rename(word.1 = token.x, word.2 = token.y, count=value)
     if (!is.null(max_word_pairs)) { # This means it is for bar chart.
       if (max_word_pairs < 100) {
-        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=TRUE) %>% dplyr::slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
       }
       else {
         res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=FALSE) # Set hard limit even with ties.
@@ -314,18 +340,18 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 # vertex_size_method - "equal_length" or "equal_freq"
 get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.6, cluster_method="louvain") {
   # Prepare edges data
-  edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
-  edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
+  edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% dplyr::rename(from=token.x,to=token.y) %>% filter(from!=to)
+  edges <- edges %>% dplyr::mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
 
-  edges <- edges %>% mutate(width=log(value+1)) # +1 to avoid 0 width.
-  edges <- edges %>% mutate(width=max_edge_width*width/max(width))
+  edges <- edges %>% dplyr::mutate(width=log(value+1)) # +1 to avoid 0 width.
+  edges <- edges %>% dplyr::mutate(width=max_edge_width*width/max(width))
 
   # Set edge colors based on number of co-occurrence.
   c_scale <- grDevices::colorRamp(c("white","#4A90E2"))
-  edges <- edges %>% mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
+  edges <- edges %>% dplyr::mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
   weights=log(1+edges$value)
   weights <- 5*weights/max(weights)
-  edges <- edges %>% mutate(weights=weights)
+  edges <- edges %>% dplyr::mutate(weights=weights)
 
   # Prepare vertices data
   feat_names <- names(model_df$model[[1]]$feats_selected)
@@ -530,7 +556,7 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 
 #' Function for Topic Model Analytics View
 #' @export
-exp_topic_model <- function(df, text,
+exp_topic_model <- function(df, text, category = NULL,
                             remove_punct = TRUE, remove_numbers = TRUE,
                             remove_alphabets = FALSE,
                             tokenize_tweets = FALSE,
@@ -547,6 +573,10 @@ exp_topic_model <- function(df, text,
                             seed = 1,
                             ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
+  if (length(category_col) == 0) { # It seems that when no category is specified, category_col becomes character(0).
+    category_col <- NULL
+  }
 
   # Set seed just once.
   if(!is.null(seed)) {
@@ -580,6 +610,25 @@ exp_topic_model <- function(df, text,
     lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics, max_iter=max_iter, alpha=alpha, beta=beta)
     docs_topics <- lda_model$theta # theta is the documents-topics matrix.
 
+    # Create a data frame whose row represents a document, with topic info.
+    docs_topics_df <- as.data.frame(lda_model$theta)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
+    doc_df <- df %>% dplyr::bind_cols(docs_topics_df) # TODO: What if df already has columns like topic_max??
+
+    # Create a data frame whose row represents a word in a document, from quanteda tokens (x$tokens).
+    doc_word_df <- tibble::tibble(document=seq(length(as.list(tokens))), lst=as.list(tokens))
+    doc_word_df <- doc_word_df %>% tidyr::unnest_longer(lst, values_to = "word")
+    # Get IDs of the words used in the model.
+    feat_names <- attr(lda_model$data, "Dimnames")$features
+    feats_index <- 1:length(feat_names)
+    names(feats_index) <- feat_names
+    word_ids <- feats_index[doc_word_df$word]
+    # Probability of the word to appear in the doc.
+    word_topic_probability_matrix <- t(lda_model$phi[,word_ids]) * lda_model$theta[doc_word_df$document]
+    # Bind the probability matrix to the doc-word data frame. This is for coloring the words in the text
+    # based on the most-likely topic it is coming from.
+    doc_word_df <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(word_topic_probability_matrix))
+
     # MDS for scatter plot. Commented out for now.
     # docs_sample_index <- if (nrow(docs_topics) > mds_sample_size) {
     #   sample(nrow(docs_topics), size=mds_sample_size)
@@ -597,8 +646,12 @@ exp_topic_model <- function(df, text,
     model$model <- lda_model
     # model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     # model$docs_sample_index <- docs_sample_index
-    model$df <- df # Keep original df for showing it with LDA result.
+    model$doc_df <- doc_df
+    model$doc_word_df <- doc_word_df
+    model$text_col <- text_col
+    model$category_col <- category_col
     model$sampled_nrow <- sampled_nrow
+    model$tokens <- tokens
     class(model) <- 'textmodel_lda_exploratory'
     model
   }
@@ -606,13 +659,14 @@ exp_topic_model <- function(df, text,
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
+
 #' extracts results from textmodel_lda_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
 tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
     docs_topics_df <- as.data.frame(x$model$theta)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max))
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max.safe))
     res <- docs_topics_df %>% dplyr::select(topic) %>% dplyr::group_by(topic) %>% dplyr::summarize(n=n())
     # In case some topic do not have any doc that "belongs to" it, we still want to show a row for the topic with n with 0 value.
     res <- res %>% tidyr::complete(topic = 1:x$model$k, fill = list(n=0))
@@ -620,7 +674,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
   else if (type == "word_topics") {
     terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
     terms <- rownames(terms_topics_df)
-    terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
     res <- tibble::tibble(word=terms) %>% dplyr::bind_cols(terms_topics_df)
   }
   else if (type == "topic_words") { # Similar to the above but this is pivotted and sampled. TODO: Organize.
@@ -631,19 +685,63 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
   }
   else if (type == "doc_topics") {
-    res <- x$df
-    docs_topics_df <- as.data.frame(x$model$theta)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
-    res <- res %>% dplyr::bind_cols(docs_topics_df)
+    res <- x$doc_df
   }
-  else if (type == "doc_topics_mds") {
-    res <- x$df[x$docs_sample_index,]
-    docs_topics_sampled <- x$model$theta[x$docs_sample_index,]
-    docs_topics_df <- as.data.frame(docs_topics_sampled)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max))
-    res <- res %>% dplyr::bind_cols(docs_topics_df)
-    docs_coordinates_df <- as.data.frame(x$docs_coordinates)
-    res <- res %>% dplyr::bind_cols(docs_coordinates_df)
+  else if (type == "doc_topics_tagged") {
+    words_to_tag_df <- x$doc_word_df %>% dplyr::distinct(document, word, .keep_all = TRUE)
+    words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
+    words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
+    tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% dplyr::ungroup()
+    res <- x$doc_df %>% dplyr::rename(text=!!x$text_col) %>% dplyr::mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
+    res <- res %>% dplyr::mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
+      if (!is.null(dat)) {
+        orig_strs <- list()
+        for (i in 1:nrow(dat)) {
+          if (stringr::str_detect(dat$word[i], '[a-zA-Z]')) { # For alphabet word, char before/after should not be alphabet, to avoid matches within other words.
+            # \\Q, \\E are to match literally even if regex special characters like . or - are in the word.
+            pre_regex <- '(?<![a-zA-Z])\\Q'
+            post_regex <- '\\E(?![a-zA-Z])'
+          }
+          else {
+            pre_regex <- '\\Q'
+            post_regex <- '\\E'
+          }
+          orig_strs_ <- stringr::str_extract_all(txt, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE))
+          orig_strs[[i]] <- orig_strs_[[1]]
+          txt <- stringr::str_replace_all(txt, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE), stringr::str_c('_____', i, '_____'))
+        }
+        for (i in 1:nrow(dat)) {
+          for (j in 1:length(orig_strs[[i]])) {
+            txt <- stringr::str_replace(txt, stringr::str_c('_____', i, '_____'), stringr::str_c('<span topic="', dat$max_topic[i], '">', orig_strs[[i]][j], '</span>'))
+          }
+        }
+        txt
+      }
+      else {
+        txt
+      }
+    })))
   }
+  else if (type == "doc_word_category") {
+    terms_topics_df <- as.data.frame(t(x$model$phi))
+    words <- rownames(terms_topics_df)
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word = words)
+    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
+    top_words_df <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
+    top_words_df <- top_words_df %>% mutate(topic=parse_number(topic))
+    doc_df <- x$doc_df %>% dplyr::mutate(doc_id=row_number()) %>% dplyr::select(doc_id, document_max_topic=max_topic, !!rlang::sym(x$category_col))
+    doc_word_df <- x$doc_word_df %>% dplyr::select(document, word)
+    res <- doc_word_df %>% dplyr::left_join(doc_df, by=c(document="doc_id")) %>% dplyr::right_join(top_words_df, by=c(document_max_topic="topic", word="word"))
+  }
+  # # Unused MDS code. Keeping it for now.
+  # else if (type == "doc_topics_mds") {
+  #   res <- x$df[x$docs_sample_index,]
+  #   docs_topics_sampled <- x$model$theta[x$docs_sample_index,]
+  #   docs_topics_df <- as.data.frame(docs_topics_sampled)
+  #   docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe))
+  #   res <- res %>% dplyr::bind_cols(docs_topics_df)
+  #   docs_coordinates_df <- as.data.frame(x$docs_coordinates)
+  #   res <- res %>% dplyr::bind_cols(docs_coordinates_df)
+  # }
   res
 }
