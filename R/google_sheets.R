@@ -36,7 +36,7 @@ updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
 #' @param spreadSheetId - sheet id (when updating an existing spread sheet)
 #' @param workSheet - name of the worksheet
 #'
-uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetName = "", spreadSheetId = "", workSheet = "") {
+uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetName = "", workSheet = "") {
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   token <- getGoogleTokenForSheet("")
   googlesheets4::sheets_set_token(token)
@@ -45,9 +45,9 @@ uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetNam
     names(sheetsList) <- c(workSheet)
     googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList)
   } else if (type == "overrideSpreadSheet" || type == "newWorkSheet") {
-    googlesheets4::sheet_write(df, spreadSheetId, sheet = workSheet)
+    googlesheets4::sheet_write(df, spreadSheetName, sheet = workSheet)
   } else if (type == "appendToWorkSheet") {
-    googlesheets4::sheet_append(spreadSheetId, df, sheet = workSheet)
+    googlesheets4::sheet_append(spreadSheetName, df, sheet = workSheet)
   }
 }
 
