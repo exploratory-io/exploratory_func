@@ -698,12 +698,12 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
         for (i in 1:nrow(dat)) {
           if (stringr::str_detect(dat$word[i], '[a-zA-Z]')) { # For alphabet word, char before/after should not be alphabet, to avoid matches within other words.
             # \\Q, \\E are to match literally even if regex special characters like . or - are in the word.
-            pre_regex <- '(?<![a-zA-Z])\\Q'
-            post_regex <- '\\E(?![a-zA-Z])'
+            pre_regex <- '^(.*?[^a-zA-Z])(\\Q'
+            post_regex <- '\\E)([^a-zA-Z].*)$'
           }
           else {
-            pre_regex <- '\\Q'
-            post_regex <- '\\E'
+            pre_regex <- '^(.*?)\\Q'
+            post_regex <- '\\E(.*)$'
           }
           orig_strs_ <- stringr::str_extract_all(txt, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE))
           orig_strs[[i]] <- orig_strs_[[1]]
