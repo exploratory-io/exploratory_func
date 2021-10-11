@@ -695,7 +695,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- x$doc_df %>% dplyr::rename(text=!!x$text_col) %>% dplyr::mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% dplyr::mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
-        res_str <- ''
+        txt_out <- ''
         txt_remaining <- txt
         for (i in 1:nrow(dat)) {
           if (stringr::str_detect(dat$word[i], '[a-zA-Z]')) { # For alphabet word, char before/after should not be alphabet, to avoid matches within other words.
@@ -710,12 +710,12 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
           # dotall = TRUE is necessary to process entire multiline text.
           matches <- stringr::str_match(txt_remaining, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE, dotall = TRUE))
           if (!is.na(matches[1])) {
-            res_str <- stringr::str_c(res_str, matches[2], '<span topic="', dat$max_topic[i], '">', matches[3], '</span>')
+            txt_out <- stringr::str_c(txt_out, matches[2], '<span topic="', dat$max_topic[i], '">', matches[3], '</span>')
             txt_remaining <- matches[4]
           }
         }
-        res_str <- stringr::str_c(res_str, txt_remaining)
-        res_str
+        txt_out <- stringr::str_c(txt_out, txt_remaining)
+        txt_out
       }
       else {
         txt
