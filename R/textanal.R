@@ -689,7 +689,8 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
   }
   else if (type == "doc_topics_tagged") {
     words_to_tag_df <- x$doc_word_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
-    #words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
+    # Filter per document at 70 percentile. Use filter rather than slice_max to preserve the row order.
+    words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::filter(topic_max >= quantile(topic_max, probs=0.7)) %>% dplyr::ungroup()
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% dplyr::ungroup()
     res <- x$doc_df %>% dplyr::rename(text=!!x$text_col) %>% dplyr::mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% dplyr::mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
@@ -706,7 +707,8 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
             pre_regex <- '^(.*?)(\\Q'
             post_regex <- '\\E)(.*)$'
           }
-          matches <- stringr::str_match(txt_remaining, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE))
+          # dotall = TRUE is necessary to process entire multiline text.
+          matches <- stringr::str_match(txt_remaining, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE, dotall = TRUE))
           if (!is.na(matches[1])) {
             res_str <- stringr::str_c(res_str, matches[2], '<span topic="', dat$max_topic[i], '">', matches[3], '</span>')
             txt_remaining <- matches[4]
