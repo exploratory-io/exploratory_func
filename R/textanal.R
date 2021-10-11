@@ -707,8 +707,10 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
             post_regex <- '\\E)(.*)$'
           }
           matches <- stringr::str_match(txt_remaining, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE))
-          res_str <- stringr::str_c(res_str, matches[2], '<span topic="', dat$max_topic[i], '">', matches[3], '</span>')
-          txt_remaining <- matches[4]
+          if (!is.na(matches[1])) {
+            res_str <- stringr::str_c(res_str, matches[2], '<span topic="', dat$max_topic[i], '">', matches[3], '</span>')
+            txt_remaining <- matches[4]
+          }
         }
         res_str <- stringr::str_c(res_str, txt_remaining)
         res_str
