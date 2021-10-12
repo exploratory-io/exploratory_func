@@ -688,34 +688,37 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- x$doc_df
   }
   else if (type == "doc_topics_tagged") {
-    words_to_tag_df <- x$doc_word_df %>% dplyr::distinct(document, word, .keep_all = TRUE)
-    words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
-    words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
+    words_to_tag_df <- x$doc_word_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
+    # Filter per document at 70 percentile. Use filter rather than slice_max to preserve the row order.
+    # na.rm seems to be necessary to avoid error. Not very sure of the condition for it to become NA at this point though.
+    words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::filter(topic_max >= quantile(topic_max, probs=0.7, na.rm=TRUE)) %>% dplyr::ungroup()
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% dplyr::ungroup()
     res <- x$doc_df %>% dplyr::rename(text=!!x$text_col) %>% dplyr::mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% dplyr::mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
-        orig_strs <- list()
+        # dat is a data frame of words to surround with tags. The words in dat are in the order of appearance in the text.
+        # We will find and tag them one by one from the beginning of the text to the end of the text.
+        txt_out <- ''
+        txt_remaining <- txt
         for (i in 1:nrow(dat)) {
           if (stringr::str_detect(dat$word[i], '[a-zA-Z]')) { # For alphabet word, char before/after should not be alphabet, to avoid matches within other words.
             # \\Q, \\E are to match literally even if regex special characters like . or - are in the word.
-            pre_regex <- '(?<![a-zA-Z])\\Q'
-            post_regex <- '\\E(?![a-zA-Z])'
+            pre_regex <- '^(.*?[^a-zA-Z])(\\Q'
+            post_regex <- '\\E)([^a-zA-Z].*)$'
           }
           else {
-            pre_regex <- '\\Q'
-            post_regex <- '\\E'
+            pre_regex <- '^(.*?)(\\Q' # .*? is for the shortest match, since we want to match with the first appearance of the word.
+            post_regex <- '\\E)(.*)$'
           }
-          orig_strs_ <- stringr::str_extract_all(txt, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE))
-          orig_strs[[i]] <- orig_strs_[[1]]
-          txt <- stringr::str_replace_all(txt, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE), stringr::str_c('_____', i, '_____'))
-        }
-        for (i in 1:nrow(dat)) {
-          for (j in 1:length(orig_strs[[i]])) {
-            txt <- stringr::str_replace(txt, stringr::str_c('_____', i, '_____'), stringr::str_c('<span topic="', dat$max_topic[i], '">', orig_strs[[i]][j], '</span>'))
+          # dotall = TRUE is necessary to process entire multiline text.
+          matches <- stringr::str_match(txt_remaining, stringr::regex(stringr::str_c(pre_regex, dat$word[i], post_regex), ignore_case = TRUE, dotall = TRUE))
+          if (!is.na(matches[1])) { # There always should be a match, but if there is no match, we just move on to the next word without proceeding on the text.
+            txt_out <- stringr::str_c(txt_out, matches[2], '<span topic="', dat$max_topic[i], '">', matches[3], '</span>')
+            txt_remaining <- matches[4]
           }
         }
-        txt
+        txt_out <- stringr::str_c(txt_out, txt_remaining)
+        txt_out
       }
       else {
         txt
