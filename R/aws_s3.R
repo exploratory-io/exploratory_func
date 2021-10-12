@@ -43,7 +43,7 @@ downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "
   filepath <- NULL
   hash <- digest::digest(stringr::str_c(region, bucket, fileName, sep = ":"), "md5", serialize = FALSE)
   tryCatch({
-    filepath <- eval(as.name(hash))
+    filepath <- getDownloadedFilePath(hash)
   }, error = function(e){
     # if filePath hash is not set as global variable yet, it raises error that says object not found
     # which can be ignored
@@ -73,7 +73,7 @@ downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "
     aws.s3::save_object(fileName, bucket = bucket, as = as, region = region, key = key, secret = secret, file = tmp)
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
-      assign(hash, tmp, envir = .GlobalEnv)
+      setDownloadedFilePath(hash, tmp)
     }
     tmp
   }
