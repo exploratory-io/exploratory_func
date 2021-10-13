@@ -789,9 +789,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   drv = NULL
   conn = NULL
   key = NULL
-  if (type == "access") { # if type is access, treat it as dbiodbc
-    type = "dbiodbc";
-  }
 
   if (type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
@@ -1034,7 +1031,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connection_pool[[key]] <- conn
       }
     }
-  } else if (type == "dbiodbc" || type == "teradata") {
+  } else if (type == "dbiodbc" || type == "teradata" || type == "access") {
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environment where odbc is not there.
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
@@ -1346,11 +1343,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     }
   }
   else if(type %in% c("odbc","dbiodbc", "teradata", "access")) { # odbc
-    if(type == "dbiodbc" || type == "teradata" || type == "access") {
-      key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
-    } else {
-      key <- paste("odbc", dsn, username, additionalParams, timezone, sep = ":")
-    }
+    key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({ # try to close connection and ignore error
@@ -1633,8 +1626,6 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", ...){
   if(type == "") {
     type <- "odbc"
-  } else if (type == "access") {
-    type <- "dbiodbc"
   }
   # if the type is dbiodbc (i.e. odbc package) and numOfRows is 0, it means it's migrated from RODBC
   # To fetch the all rows, odbc expects -1 instead of 0. So update the numOfRows as -1.
@@ -1648,7 +1639,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
-    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata") {
+    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       reset <- NULL
       resultSet <- DBI::dbSendQuery(conn, query)
@@ -1686,7 +1677,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata") {
+  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
     DBI::dbClearResult(resultSet)
   }
   df
