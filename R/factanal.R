@@ -157,8 +157,9 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # variable    uniqueness     MR1     MR2     MR5      MR3      MR4
     # Here we are ordering the columns so that the levels of factor we set at the end, as well as row order of the end result are sorted well.
     res <- res %>% dplyr::select(colnames(res)[order(as.numeric(stringr::str_extract(colnames(res),"\\d+")))])
-    res <- res %>% tidyr::pivot_longer(cols=c(starts_with(factor_loading_prefix), "uniqueness"), names_to="factor", values_to="value")
-    res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,paste0("^", !!factor_loading_prefix),"Factor "))) # e.g. replaces "MR2" with "Factor 2"
+    res <- res %>% dplyr::mutate(communality=1-uniqueness)
+    res <- res %>% tidyr::pivot_longer(cols=c(starts_with(factor_loading_prefix), "communality", "uniqueness"), names_to="factor", values_to="value")
+    res <- res %>% dplyr::mutate(factor = case_when(factor=="communality"~"Communality", factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,paste0("^", !!factor_loading_prefix),"Factor "))) # e.g. replaces "MR2" with "Factor 2"
     res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
   }
   else if (type == "biplot") {
