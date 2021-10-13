@@ -1,4 +1,7 @@
 #' API to upload local CSV file to Google Sheets
+#'
+#' exploratory::setTokenInfo needs to be called to set OAuth token before using this API.
+#'
 #' @export
 #' @param filepath path of source CSV file that you want to upload to Google Sheet
 #' @param title name of the new sheet on Google Sheets.
