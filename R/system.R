@@ -789,7 +789,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   drv = NULL
   conn = NULL
   key = NULL
-  if(type == "mongodb") {
+
+  if (type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
     if(!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'connectionString')) {
@@ -1030,7 +1031,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connection_pool[[key]] <- conn
       }
     }
-  } else if (type == "dbiodbc" || type == "teradata") {
+  } else if (type == "dbiodbc" || type == "teradata" || type == "access") {
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environment where odbc is not there.
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
@@ -1290,6 +1291,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
                               sslClientCertKey = "") {
+  key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
       # make sure to include collection as a key since connection varies per collection.
@@ -1340,12 +1342,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       })
     }
   }
-  else if(type %in% c("odbc","dbiodbc", "teradata")) { # odbc
-    if(type == "dbiodbc" || type == "teradata") {
-      key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
-    } else {
-      key <- paste("odbc", dsn, username, additionalParams, timezone, sep = ":")
-    }
+  else if(type %in% c("odbc","dbiodbc", "teradata", "access")) { # odbc
+    key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({ # try to close connection and ignore error
@@ -1641,7 +1639,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
-    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata") {
+    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       reset <- NULL
       resultSet <- DBI::dbSendQuery(conn, query)
@@ -1679,7 +1677,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata") {
+  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
     DBI::dbClearResult(resultSet)
   }
   df
