@@ -1,11 +1,15 @@
 #' Wrapper API for riem_measure data soruces
 #' @export
-get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_end = NULL, full_columns = "Yes"){
+get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_end = NULL, full_columns = "Yes", tzone = ""){
   loadNamespace("riem")
   if(is.null(date_end)){
     date_end <- as.character(Sys.Date())
   }
   df <- riem::riem_measures(station = station, date_start = date_start, date_end = date_end)
+  if (tzone != "") {# if timezone for display is specified, convert the timezone with with_tz
+    df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::with_tz(., tzone=tzone)))
+  }
+
   if(full_columns == "Yes") {
     df
   } else {
