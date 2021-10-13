@@ -8,6 +8,7 @@ test_that("do_prcomp", {
   model_df %>% tidy_rowwise(model, type="variances")
   model_df %>% tidy_rowwise(model, type="loadings")
   model_df %>% tidy_rowwise(model, type="biplot")
+  model_df %>% tidy_rowwise(model, type="screeplot")
   res <- model_df %>% tidy_rowwise(model, type="data")
   expect_equal(colnames(res),
                c("mpg","cyl","disp","hp","drat","wt","qsec","vs","am","gear","carb","new_col","PC1","PC2","PC3"))
@@ -21,6 +22,7 @@ test_that("do_prcomp with strange column name", {
   model_df %>% tidy_rowwise(model, type="variances")
   model_df %>% tidy_rowwise(model, type="loadings")
   model_df %>% tidy_rowwise(model, type="biplot")
+  model_df %>% tidy_rowwise(model, type="screeplot")
   res <- model_df %>% tidy_rowwise(model, type="data")
   expect_equal(colnames(res),
                c("mpg","Cy l","disp","hp","drat","wt","qsec","vs","am","gear","carb","new_col","PC1","PC2","PC3"))
