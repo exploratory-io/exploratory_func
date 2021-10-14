@@ -9,7 +9,7 @@
 uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
-
+  # the first argument of getGoogleTokenForSheet is no longer used but pass empty string to make it work.
   token <- getGoogleTokenForSheet("")
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
