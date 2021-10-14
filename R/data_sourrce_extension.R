@@ -18,7 +18,9 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
     # add one day to get the full last date data.
     date_end <- as.character(as.Date(lubridate::with_tz(endDate + lubridate::days(1), tzone = "UTC")))
   } else {
-    startDate <- lubridate::ymd_hms(stringr::str_c(date_start, " 00:00:00"))
+    # default is UTC
+    startDate <- lubridate::ymd_hms(stringr::str_c(date_start, " 00:00:00"), tz = "UTC")
+    endDate <- lubridate::ymd_hms(stringr::str_c(date_end, " 23:59:59"), tz = "UTC")
   }
 
   df <- riem_measures(station = station, date_start = date_start, date_end = date_end)
