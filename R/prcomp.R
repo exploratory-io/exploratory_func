@@ -76,6 +76,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
     }
     # "scale." is an argument name. There is no such operator like ".=". 
     fit <- prcomp(cleaned_df, scale.=normalize_data)
+    fit$correlation <- cor(cleaned_df) # Calculate correlation for screeplot.
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
@@ -168,6 +169,10 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   }
   else if (type == "summary") { # This is only for kmeans case. TODO: We might want to separate PCA code and k-means code.
     res <- broom::tidy(x$kmeans)
+  }
+  else if (type == "screeplot") {
+    eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
+    res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else { # should be data or gathered_data
     res <- x$df
