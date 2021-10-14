@@ -1,4 +1,7 @@
 #' API to upload local CSV file to Google Sheets
+#'
+#' exploratory::setTokenInfo needs to be called to set OAuth token before using this API.
+#'
 #' @export
 #' @param filepath path of source CSV file that you want to upload to Google Sheet
 #' @param title name of the new sheet on Google Sheets.
@@ -6,7 +9,7 @@
 uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
-
+  # the first argument of getGoogleTokenForSheet is no longer used but pass empty string to make it work.
   token <- getGoogleTokenForSheet("")
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
@@ -26,6 +29,31 @@ updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
   googledrive::drive_set_token(token)
   sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath)
 }
+
+#' API to upload data frame to Google Sheets.
+#'
+#' @export
+#' @param df - data frame
+#' @param type - either "newSpreadSheet", "overrideSpreadSheet", "newWorkSheet", and "appendToWorkSheet"
+#' @param spreadSheetName - name of the spread sheet (when creating a new spread sheet)
+#' @param spreadSheetId - sheet id (when updating an existing spread sheet)
+#' @param workSheet - name of the worksheet
+#'
+uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetName = "", workSheet = "") {
+  if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
+  token <- getGoogleTokenForSheet("")
+  googlesheets4::sheets_set_token(token)
+  if (type == "newSpreadSheet") {
+    sheetsList <- list(df)
+    names(sheetsList) <- c(workSheet)
+    googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList)
+  } else if (type == "overrideSpreadSheet" || type == "newWorkSheet") {
+    googlesheets4::sheet_write(df, spreadSheetName, sheet = workSheet)
+  } else if (type == "appendToWorkSheet") {
+    googlesheets4::sheet_append(spreadSheetName, df, sheet = workSheet)
+  }
+}
+
 
 #' API to get google sheet data
 #' @export
