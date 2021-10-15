@@ -11,12 +11,11 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
   endDate <- ""
   if (tzone != "") {
     startDate <- lubridate::ymd_hms(stringr::str_c(date_start, " 00:00:00"), tz = tzone)
-    # Weather date is basically based on UTC time, so convert the startDate to UTC time
-    date_start <- as.character(as.Date(lubridate::with_tz(startDate, tzone = "UTC")))
+    # Get data from a day before from start_date to workaround the timezone difference.
+    date_start <- as.character(as.Date(startDate - lubridate::days(1)))
     endDate <- lubridate::ymd_hms(stringr::str_c(date_end, " 23:59:59"), tz = tzone)
-    # Weather date is basically based on UTC time, so convert the endDate to UTC time and
-    # add one day to get the full last date data.
-    date_end <- as.character(as.Date(lubridate::with_tz(endDate + lubridate::days(1), tzone = "UTC")))
+    # Get data until the day after the end_date to workaround the timezone difference.
+    date_end <- as.character(as.Date(endDate + lubridate::days(1)))
   } else {
     # default is UTC
     startDate <- lubridate::ymd_hms(stringr::str_c(date_start, " 00:00:00"), tz = "UTC")
