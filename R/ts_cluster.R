@@ -122,6 +122,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
       # Complete the time column.
       df <- df %>% complete_date("time", time_unit = time_unit)
+      orig_n_categories <- length(colnames(df)) - 1 # -1 for time column.
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
       df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
       if (length(colnames(df)) <= centers) {
@@ -203,6 +204,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
+      attr(model, "orig_n_categories") <- orig_n_categories
       attr(model, "time_values") <- time_values
       if (!is.null(variables)) {
         attr(model, "variable_cols") <- variables 
@@ -292,6 +294,16 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
     },
     aggregated = { # Return raw aggretated time series data before filling NAs and feeding to the clustering algorithm. This is for Data Validation tab.
       res <- attr(x, "aggregated_data")
+    },
+    summary = {
+      res <- model@clusinfo
+      res <- res %>% dplyr::mutate(cluster = row_number()) %>% select(cluster, everything())
+      orig_n_categories <- attr(x, "orig_n_categories")
+      n_categories <- sum(res$size, na.rm=TRUE)
+      if (!is.null(orig_n_categories) && orig_n_categories > n_categories) { # Add a row for categories removed at preprocessing.
+        tmp_df <- tibble::tibble(size = orig_n_categories - n_categories, Note = "Removed due to high NA ratio.")
+        res <- res %>% dplyr::bind_rows(tmp_df)
+      }
     },
     elbow_method = {
       res <- purrr::map(x$models, function(model) {

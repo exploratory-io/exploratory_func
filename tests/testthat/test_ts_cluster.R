@@ -33,6 +33,7 @@ test_that("exp_ts_cluster model output", {
   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 
+  ret <- model_df %>% tidy_rowwise(model, type="summary")
   ret <- model_df %>% tidy_rowwise(model, type="aggregated")
   expect_equal(colnames(ret), c("category","time","value"))
 })
