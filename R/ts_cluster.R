@@ -296,10 +296,12 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
     elbow_method = {
       res <- purrr::map(x$models, function(model) {
         df <- model@clusinfo
-        df <- df %>% summarize(av_dist=sum(size*av_dist)/sum(size))
-        df$av_dist
+        df <- df %>% dplyr::summarize(av_dist=sum(size*av_dist)/sum(size))
+        df <- df %>% dplyr::mutate(iter=model@iter, converged=model@converged)
+        df
       })
-      res <- tibble::tibble(n_center=x$n_centers, av_dist=purrr::flatten_dbl(res))
+      res <- tibble::tibble(n_center=x$n_centers, data=res)
+      res <- res %>% tidyr::unnest(data)
     }
   )
   res
