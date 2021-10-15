@@ -292,6 +292,14 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
     },
     aggregated = { # Return raw aggretated time series data before filling NAs and feeding to the clustering algorithm. This is for Data Validation tab.
       res <- attr(x, "aggregated_data")
+    },
+    elbow_method = {
+      res <- purrr::map(x$models, function(model) {
+        df <- model@clusinfo
+        df <- df %>% summarize(av_dist=sum(size*av_dist)/sum(size))
+        df$av_dist
+      })
+      res <- tibble::tibble(n_center=x$n_centers, av_dist=purrr::flatten_dbl(res))
     }
   )
   res
