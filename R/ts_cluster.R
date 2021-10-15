@@ -7,7 +7,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
                            normalize = "none",
                            seed = 1,
                            output = "data",
-                           stop_for_no_data = TRUE) {
+                           stop_for_no_data = TRUE,
+                           elbow_method_mode=FALSE,
+                           max_centers = 10) {
   if(!is.null(seed)) {
     set.seed(seed)
   }
@@ -167,13 +169,37 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         if (window_size < 1) { # window.size should be at least 1.
           window_size <- 1L
         }
-        model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
-                                   args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+        if (!elbow_method_mode) {
+          if (!elbow_method_mode) {
+            model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
+                                       args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+            model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
+          }
+          else { # Elbow method mode. Create a list of models.
+            n_centers <- 2:max_centers
+            models <- n_centers %>% purrr::map(function(n_center) {
+              dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
+                                args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+            })
+            model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
+          }
+        }
+        else {
+        }
       }
       else {
-        model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+        if (!elbow_method_mode) {
+          model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+          model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
+        }
+        else { # Elbow method mode. Create a list of models.
+          n_centers <- 2:max_centers
+          models <- n_centers %>% purrr::map(function(n_center) {
+            dtwclust::tsclust(t(as.matrix(df)), k = n_center, distance = distance, centroid = centroid)
+          })
+          model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
+        }
       }
-      model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col

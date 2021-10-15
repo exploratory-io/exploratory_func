@@ -21,6 +21,10 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
+test_that("exp_ts_cluster elbow method mode", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, output="model", elbow_method_mode=TRUE)
+})
+
 test_that("exp_ts_cluster model output", {
   model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, output="model")
   ret <- model_df %>% tidy_rowwise(model)
