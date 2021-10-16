@@ -27,6 +27,12 @@ test_that("exp_ts_cluster elbow method mode", {
   expect_equal(colnames(ret), c("n_center","av_dist","iter","converged"))
 })
 
+test_that("exp_ts_cluster elbow method mode with algorithm that requires window_size", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, distance='dtw_lb', output="model", elbow_method_mode=TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="elbow_method")
+  expect_equal(colnames(ret), c("n_center","av_dist","iter","converged"))
+})
+
 test_that("exp_ts_cluster model output", {
   model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, output="model")
   ret <- model_df %>% tidy_rowwise(model)
