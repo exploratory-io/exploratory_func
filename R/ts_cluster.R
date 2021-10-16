@@ -171,21 +171,17 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
           window_size <- 1L
         }
         if (!elbow_method_mode) {
-          if (!elbow_method_mode) {
-            model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
-                                       args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
-            model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
-          }
-          else { # Elbow method mode. Create a list of models.
-            n_centers <- 2:max_centers
-            models <- n_centers %>% purrr::map(function(n_center) {
-              dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
-                                args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
-            })
-            model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
-          }
+          model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
+                                     args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+          model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
         }
-        else {
+        else { # Elbow method mode. Create a list of models.
+          n_centers <- 2:max_centers
+          models <- n_centers %>% purrr::map(function(n_center) {
+            dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
+                              args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+          })
+          model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
         }
       }
       else {
