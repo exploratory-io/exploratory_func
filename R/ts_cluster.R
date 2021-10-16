@@ -7,7 +7,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
                            normalize = "none",
                            seed = 1,
                            output = "data",
-                           stop_for_no_data = TRUE) {
+                           stop_for_no_data = TRUE,
+                           elbow_method_mode=FALSE,
+                           max_centers = 10) {
   if(!is.null(seed)) {
     set.seed(seed)
   }
@@ -120,6 +122,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
       # Complete the time column.
       df <- df %>% complete_date("time", time_unit = time_unit)
+      orig_n_categories <- length(colnames(df)) - 1 # -1 for time column.
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
       df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
       if (length(colnames(df)) <= centers) {
@@ -167,16 +170,37 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         if (window_size < 1) { # window.size should be at least 1.
           window_size <- 1L
         }
-        model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
-                                   args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+        if (!elbow_method_mode) {
+          model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
+                                     args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+          model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
+        }
+        else { # Elbow method mode. Create a list of models.
+          n_centers <- 2:max_centers
+          models <- n_centers %>% purrr::map(function(n_center) {
+            dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
+                              args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+          })
+          model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
+        }
       }
       else {
-        model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+        if (!elbow_method_mode) {
+          model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+          model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
+        }
+        else { # Elbow method mode. Create a list of models.
+          n_centers <- 2:max_centers
+          models <- n_centers %>% purrr::map(function(n_center) {
+            dtwclust::tsclust(t(as.matrix(df)), k = n_center, distance = distance, centroid = centroid)
+          })
+          model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
+        }
       }
-      model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
+      attr(model, "orig_n_categories") <- orig_n_categories
       attr(model, "time_values") <- time_values
       if (!is.null(variables)) {
         attr(model, "variable_cols") <- variables 
@@ -266,6 +290,26 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
     },
     aggregated = { # Return raw aggretated time series data before filling NAs and feeding to the clustering algorithm. This is for Data Validation tab.
       res <- attr(x, "aggregated_data")
+    },
+    summary = {
+      res <- model@clusinfo
+      res <- res %>% dplyr::mutate(cluster = row_number()) %>% select(cluster, everything())
+      orig_n_categories <- attr(x, "orig_n_categories")
+      n_categories <- sum(res$size, na.rm=TRUE)
+      if (!is.null(orig_n_categories) && orig_n_categories > n_categories) { # Add a row for categories removed at preprocessing.
+        tmp_df <- tibble::tibble(size = orig_n_categories - n_categories, Note = "Removed due to high NA ratio.")
+        res <- res %>% dplyr::bind_rows(tmp_df)
+      }
+    },
+    elbow_method = {
+      res <- purrr::map(x$models, function(model) {
+        df <- model@clusinfo
+        df <- df %>% dplyr::summarize(av_dist=sum(size*av_dist)/sum(size))
+        df <- df %>% dplyr::mutate(iter=model@iter, converged=model@converged)
+        df
+      })
+      res <- tibble::tibble(n_center=x$n_centers, data=res)
+      res <- res %>% tidyr::unnest(data)
     }
   )
   res
