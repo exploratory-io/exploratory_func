@@ -98,10 +98,17 @@ test_that("exp_ts_cluster with other variables to aggregate", {
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 
-test_that("exp_ts_cluster with max_category_na_ratio", {
-  ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0.001) # Setting extremely low max_category_na_ratio for test.
-  expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
-  expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+test_that("exp_ts_cluster with max_category_na_ratio with model output", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0.001, output="model") # Setting extremely low max_category_na_ratio for test.
+  ret <- model_df %>% tidy_rowwise(model, type="summary")
+  expect_equal(colnames(ret), c("cluster","size","av_dist","Note"))
+  ret <- model_df %>% tidy_rowwise(model, type="aggregated")
+})
+
+test_that("exp_ts_cluster with max_category_na_ratio with data frame output", {
+  df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0.001) # Setting extremely low max_category_na_ratio for test.
+  expect_equal(colnames(df), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
+  expect_equal(sort(unique(df$Cluster)), c(1,2,3))
 })
 
 test_that("exp_ts_cluster with max_category_na_ratio for step", {
@@ -113,4 +120,16 @@ test_that("exp_ts_cluster with max_category_na_ratio for step", {
 test_that("exp_ts_cluster with max_category_na_ratio for analytics view", {
   model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0, stop_for_no_data=FALSE, output="model") # Setting zero max_category_na_ratio for test.
   expect_true("data.frame" %in% class(attr(model_df$model[[1]],"aggregated_data")))
+  ret <- model_df %>% tidy_rowwise(model)
+  expect_equal(nrow(ret), 0)
+  ret <- model_df %>% tidy_rowwise(model, type="summary")
+  expect_equal(nrow(ret), 0)
+})
+
+test_that("exp_ts_cluster with elbow method mode with max_category_na_ratio for analytics view", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0, elbow_method_mode=TRUE, stop_for_no_data=FALSE, output="model") # Setting zero max_category_na_ratio for test.
+  ret <- model_df %>% tidy_rowwise(model, type="elbow_method")
+  expect_equal(nrow(ret), 0)
+  ret <- model_df %>% tidy_rowwise(model, type="summary")
+  expect_equal(nrow(ret), 0)
 })
