@@ -292,6 +292,9 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
       res <- attr(x, "aggregated_data")
     },
     summary = {
+      if (is.null(model)) {
+        return(tibble::tibble()) # Return empty data frame to show "No Data" screen.
+      }
       res <- model@clusinfo
       res <- res %>% dplyr::mutate(cluster = row_number()) %>% select(cluster, everything())
       orig_n_categories <- attr(x, "orig_n_categories")
@@ -302,6 +305,9 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
       }
     },
     elbow_method = {
+      if (is.null(model)) {
+        return(tibble::tibble()) # Return empty data frame to show "No Data" screen.
+      }
       res <- purrr::map(x$models, function(model) {
         df <- model@clusinfo
         df <- df %>% dplyr::summarize(av_dist=sum(size*av_dist)/sum(size))
