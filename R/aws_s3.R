@@ -79,6 +79,7 @@ downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "
   }
 }
 
+
 #' API to clear S3 cache file
 #' @param region
 #' @param bucket
@@ -207,6 +208,67 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
                     skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
 
 }
+
+#'API that imports a Parquet file from AWS S3.
+#'@export
+getParquetFileFromS3 <- function(fileName, region, username, password, bucket, col_select = NULL) {
+  tryCatch({
+    filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
+      # or "Not Found (HTTP 404).".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, fileName)), ' :: There is no such file in the AWS S3 bucket.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  exploratory::read_parquet_file(filePath, col_select = col_select)
+}
+
+#'API that imports multiple same structure Parquet files and merge it to a single data frame
+#'
+#'@export
+getParquetFilesFromS3 <- function(files, region, username, password, bucket, col_select = NULL) {
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::getParquetFileFromS3, region = region, username = username, password = password, bucket = bucket, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+#'API that search files by search keyword then imports multiple same structure Parquet files and merge it to a single data frame
+#'
+#'@export
+searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, password, bucket, col_select = NULL) {
+
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  tryCatch({
+    files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
+      filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
+      # or "Not Found (HTTP 404).".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-7 :: ', jsonlite::toJSON(bucket), ' :: The specified AWS S3 bucket does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  if (nrow(files) == 0) {
+    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+  }
+  getParquetFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, col_select = col_select)
+
+}
+
 
 #'API that imports a Excel file from AWS S3.
 #'@export
