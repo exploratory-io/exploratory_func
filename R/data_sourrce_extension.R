@@ -5,10 +5,29 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
   if(is.null(date_end)){
     date_end <- as.character(Sys.Date())
   }
-  df <- riem::riem_measures(station = station, date_start = date_start, date_end = date_end)
+  # Since we cannot use POSIXct for start_date and end_date
+  # We give little bit of buffers for start and end date and use filter to get the exact date range.
+  startDate <- ""
+  endDate <- ""
+  if (tzone != "") {
+    startDate <- lubridate::ymd_hms(stringr::str_c(date_start, " 00:00:00"), tz = tzone)
+    # Get data from a day before from start_date to workaround the timezone difference.
+    date_start <- as.character(as.Date(startDate - lubridate::days(1)))
+    endDate <- lubridate::ymd_hms(stringr::str_c(date_end, " 23:59:59"), tz = tzone)
+    # Get data until the day after the end_date to workaround the timezone difference.
+    date_end <- as.character(as.Date(endDate + lubridate::days(1)))
+  } else {
+    # default is UTC
+    startDate <- lubridate::ymd_hms(stringr::str_c(date_start, " 00:00:00"), tz = "UTC")
+    endDate <- lubridate::ymd_hms(stringr::str_c(date_end, " 23:59:59"), tz = "UTC")
+  }
+
+  df <- riem_measures(station = station, date_start = date_start, date_end = date_end)
   if (tzone != "") {# if timezone for display is specified, convert the timezone with with_tz
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::with_tz(., tzone=tzone)))
   }
+  # make sure to filter the data to the exact date range
+  df <- df %>% dplyr::filter(valid >= startDate & valid <= endDate)
 
   if(full_columns == "Yes") {
     df
