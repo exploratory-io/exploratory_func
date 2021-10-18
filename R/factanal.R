@@ -109,7 +109,8 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
 glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
   # glance.factanal works on psych::fa due to compatibility kept to some degree. TODO: Extract and output more info from psych::fa
   res <- broom:::glance.factanal(x) %>% dplyr::select(-n, -converged, -method) # But converged is NULL.
-  res <- res %>% dplyr::rename(`Number of Factors`=n.factors, `Total Variance`=total.variance, `Chi-Square`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Number of Rows`=nobs)
+  res <- res %>% dplyr::mutate(variance=total.variance*length(x$communality), pct_variance=100*total.variance)
+  res <- res %>% dplyr::select(`Number of Factors`=n.factors, `% Variance`=pct_variance, Variance=variance, `Chi-Square`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Number of Rows`=nobs)
   res
 }
 
