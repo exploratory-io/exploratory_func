@@ -177,7 +177,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     scores_df <- broom:::augment.factanal(x)
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
     # Rename the IDs of the factors so that IDs correspond with the order of importance, which is the order in the augment.factanal output.
-    colnames(scores_df) <- stringr::str_c(factor_loading_prefix, 1:n_factor)
+    colnames(scores_df) <- stringr::str_c(factor_score_prefix, 1:n_factor)
     loadings_df <- broom:::tidy.factanal(x)
     # Rename the IDs of the factors so that IDs correspond with the order of importance, which is the order in the tidy.factanal output.
     colnames(loadings_df) <-c("variable", "uniqueness", stringr::str_c(factor_loading_prefix, 1:n_factor))
@@ -237,7 +237,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
     # Rename the IDs of the factors so that IDs correspond with the order of importance, which is the order in the augment.factanal output.
-    colnames(scores_df) <-stringr::str_c(factor_loading_prefix, 1:n_factor)
+    colnames(scores_df) <-stringr::str_c(factor_score_prefix, 1:n_factor)
     scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,paste0("^", factor_score_prefix), "Factor ")}, starts_with(factor_score_prefix)) #TODO: Make string match condition stricter.
 
     # table of observations. bind original data so that color can be used later.
