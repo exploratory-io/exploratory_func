@@ -150,7 +150,8 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else if (type == "variances") {
-    res <- tibble::as_tibble(t(x$Vaccounted)) %>% dplyr::mutate(Factor=as.factor(1:n()), `% Variance`=100*`Proportion Var`, `Cummulated % Variance`=100*`Cumulative Var`)
+    res <- tibble::as_tibble(t(x$Vaccounted)) %>%
+      dplyr::mutate(Factor=forcats::fct_inorder(stringr::str_replace(colnames(x$Vaccounted),paste0("^", factor_score_prefix), "")), `% Variance`=100*`Proportion Var`, `Cummulated % Variance`=100*`Cumulative Var`)
   }
   else if (type == "loadings") {
     res <- broom:::tidy.factanal(x) # TODO: This just happens to work. Revisit.
