@@ -94,6 +94,7 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
       }
     }
     fit <- psych::fa(cleaned_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
+
     fit$correlation <- cor(cleaned_df) # For creating scree plot later.
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
@@ -144,6 +145,11 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   factor_score_prefix <- factor_score_prefix_mapping[x$fm]
   names(factor_score_prefix) <- NULL
 
+  factor_importance_order <- as.integer(stringr::str_replace(colnames(x$Vaccounted),paste0("^", factor_score_prefix), ""))
+  n_factor <- length(factor_importance_order)
+  factor_mapping <- integer(0)
+  factor_mapping[factor_importance_order] <- 1:n_factor
+
   if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
@@ -156,6 +162,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # Column order of tidy.factanal() can be not ordered well like this.
     # variable    uniqueness     MR1     MR2     MR5      MR3      MR4
     # Here we are ordering the columns so that the levels of factor we set at the end, as well as row order of the end result are sorted well.
+    colnames(res) <-c("variable","uniqueness",stringr::str_c(factor_loading_prefix,1:n_factor))
     res <- res %>% dplyr::select(colnames(res)[order(as.numeric(stringr::str_extract(colnames(res),"\\d+")))])
     # With the way psych::fa code is, x$communalities can have different value, but x$communality should always have this relationship with x$uniqueness,
     # which is the source of uniqueness in the output from tidy.factanal.
