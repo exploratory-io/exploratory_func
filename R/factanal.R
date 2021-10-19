@@ -145,10 +145,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   factor_score_prefix <- factor_score_prefix_mapping[x$fm]
   names(factor_score_prefix) <- NULL
 
-  factor_importance_order <- as.integer(stringr::str_replace(colnames(x$Vaccounted),paste0("^", factor_score_prefix), ""))
-  n_factor <- length(factor_importance_order)
-  factor_mapping <- integer(0)
-  factor_mapping[factor_importance_order] <- 1:n_factor
+  n_factor <- x$factors # Number of factors.
 
   if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
@@ -159,11 +156,12 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   }
   else if (type == "loadings") {
     res <- broom:::tidy.factanal(x) # TODO: This just happens to work. Revisit.
-    # Column order of tidy.factanal() can be not ordered well like this.
+    # Column order of tidy.factanal() is in the order of importance, and not necessarily same as the order of the IDs, like this.
     # variable    uniqueness     MR1     MR2     MR5      MR3      MR4
-    # Here we are ordering the columns so that the levels of factor we set at the end, as well as row order of the end result are sorted well.
+    # Here we are renaming the IDs of the factors so that IDs correspond with the order of importance.
     colnames(res) <-c("variable","uniqueness",stringr::str_c(factor_loading_prefix,1:n_factor))
-    res <- res %>% dplyr::select(colnames(res)[order(as.numeric(stringr::str_extract(colnames(res),"\\d+")))])
+    # Reorder columns so that the result of pivot_longer is in the order we want.
+    res <- res %>% dplyr::relocate(variable, uniqueness, .after = everything())
     # With the way psych::fa code is, x$communalities can have different value, but x$communality should always have this relationship with x$uniqueness,
     # which is the source of uniqueness in the output from tidy.factanal.
     res <- res %>% dplyr::mutate(communality=1-uniqueness)
@@ -178,8 +176,10 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     factor_2_score_col <- paste0(factor_score_prefix, "2")
     scores_df <- broom:::augment.factanal(x)
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
-    colnames(scores_df) <-stringr::str_c(factor_loading_prefix, 1:n_factor)
+    # Rename the IDs of the factors so that IDs correspond with the order of importance, which is the order in the augment.factanal output.
+    colnames(scores_df) <- stringr::str_c(factor_loading_prefix, 1:n_factor)
     loadings_df <- broom:::tidy.factanal(x)
+    # Rename the IDs of the factors so that IDs correspond with the order of importance, which is the order in the tidy.factanal output.
     colnames(loadings_df) <-c("variable", "uniqueness", stringr::str_c(factor_loading_prefix, 1:n_factor))
 
     if (is.null(n_sample)) { # set default of 5000 for biplot case.
@@ -236,6 +236,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   else { # should be data
     scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
+    # Rename the IDs of the factors so that IDs correspond with the order of importance, which is the order in the augment.factanal output.
     colnames(scores_df) <-stringr::str_c(factor_loading_prefix, 1:n_factor)
     scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,paste0("^", factor_score_prefix), "Factor ")}, starts_with(factor_score_prefix)) #TODO: Make string match condition stricter.
 
