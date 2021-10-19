@@ -172,13 +172,16 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
   }
   else if (type == "biplot") {
+    browser()
     factor_1_loading_col <- paste0(factor_loading_prefix, "1")
     factor_2_loading_col <- paste0(factor_loading_prefix, "2")
     factor_1_score_col <- paste0(factor_score_prefix, "1")
     factor_2_score_col <- paste0(factor_score_prefix, "2")
     scores_df <- broom:::augment.factanal(x)
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
+    colnames(scores_df) <-stringr::str_c(factor_loading_prefix, 1:n_factor)
     loadings_df <- broom:::tidy.factanal(x)
+    colnames(loadings_df) <-c("variable", "uniqueness", stringr::str_c(factor_loading_prefix, 1:n_factor))
 
     if (is.null(n_sample)) { # set default of 5000 for biplot case.
       n_sample = 5000
@@ -229,6 +232,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- res %>% dplyr::bind_rows(loadings_df)
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
     res <- res %>% tidyr::fill(x$grouped_cols)
+    browser()
     res
   }
   else { # should be data
