@@ -93,7 +93,6 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
         return(NULL)
       }
     }
-    # "scale." is an argument name. There is no such operator like ".=". 
     fit <- psych::fa(cleaned_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
     fit$correlation <- cor(cleaned_df) # For creating scree plot later.
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
