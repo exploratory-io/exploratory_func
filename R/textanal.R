@@ -339,7 +339,8 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 
 # vertex_size_method - "equal_length" or "equal_freq"
 get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_vertex_size = 20, vertex_size_method = "equal_length",
-                                        min_edge_width=1, max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.6, cluster_method="louvain") {
+                                        min_edge_width=1, max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.6, cluster_method="louvain",
+                                        edge_color="#4A90E2") {
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% dplyr::rename(from=token.x,to=token.y) %>% filter(from!=to)
   edges <- edges %>% dplyr::mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
@@ -348,7 +349,7 @@ get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_verte
   edges <- edges %>% dplyr::mutate(width=(max_edge_width - min_edge_width)*(width - min(width))/(max(width) - min(width)) + min_edge_width)
 
   # Set edge colors based on number of co-occurrence.
-  c_scale <- grDevices::colorRamp(c("white","#4A90E2"))
+  c_scale <- grDevices::colorRamp(c("white", edge_color))
   edges <- edges %>% dplyr::mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
   weights=log(1+edges$value)
   weights <- 5*weights/max(weights)
