@@ -276,6 +276,9 @@ dfm_to_df <- function(dfm) {
 # Extracts data as a long-format data.frame from quanteda::fcm.
 fcm_to_df <- function(fcm) {
   row_idx <- fcm@i
+  if (length(row_idx) == 0) { # No co-occurrence is in the fcm. Return empty data frame.
+    return(tibble::tibble(token.x=character(0), token.y=character(0), value=integer(0)))
+  }
   col_idx_compressed <- fcm@p
   # fcm is in CSR (Compressed Sparse Row) format.
   # Uncompress column index.

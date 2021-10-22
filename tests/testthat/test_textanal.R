@@ -25,6 +25,14 @@ test_that("exp_textanal with Japanese twitter data", {
   expect_true(is.null(graph_data_res$model[[1]]$vertices$cluster))
 })
 
+test_that("exp_textanal with no-co-occurrence", {
+  df <- tibble::tibble(text=c("Hello", "Hi", "world"))
+  model_df <- df %>% exp_textanal(`text`, stopwords_lang = "auto", remove_punct = TRUE, remove_numbers = TRUE, remove_alphabets = FALSE, tokenize_tweets = FALSE, remove_url = TRUE, hiragana_word_length_to_remove = 2, cooccurrence_context = "window")
+  res <- model_df %>% tidy_rowwise(model, type="word_pairs", max_word_pairs=30)
+  expect_equal(colnames(res), c("word.1", "word.2", "count"))
+  expect_equal(nrow(res), 0)
+})
+
 
 test_that("exp_textanal", {
   df <- tibble::tibble(text=c(
