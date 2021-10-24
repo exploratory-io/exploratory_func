@@ -483,7 +483,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", count_col = NULL){
 
 do_tfidf2 <- function(df, document, term,
                       tf_scheme = "logcount",
-                      idf_scheme = "unary",
+                      idf_scheme = "inverse",
                       tfidf_base = 10,
                       idf_smoothing = 0,
                       idf_k = 0,
