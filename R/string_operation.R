@@ -481,6 +481,21 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", count_col = NULL){
 
 }
 
+do_tfidf2 <- function(df, document, term) {
+  document_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(document))
+  term_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(term))
+  df <- df %>% rename(document_id=!!rlang::sym(document_col), term=!!rlang::sym(term_col))
+  nested <- df %>% nest_by(document_id)
+  tokens_list <- purrr::map(nested$data, function(x){x$term})
+  names(tokens_list) <- paste0("text", 1:length(tokens_list)) # Add unique names to the list so that it can be passed to quanteda::tokens().
+  tokens <- quanteda::tokens(tokens_list)
+  dfm_res <- tokens %>% quanteda::dfm()
+  dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
+  res <- dfm_to_df(dfm_tfidf_res)
+  res <- res %>% dplyr::arrange(document)
+  res %>% dplyr::select(!!rlang::sym(document_col):=document, !!rlang::sym(term_col):=token, tfidf=value)
+}
+
 #' Calculate tfidf, which shows how much particular the token is in a group.
 #' @param df Data frame which has columns of groups and their terms
 #' @param group Column of group names
