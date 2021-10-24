@@ -490,10 +490,15 @@ do_tfidf2 <- function(df, document, term) {
   names(tokens_list) <- paste0("text", 1:length(tokens_list)) # Add unique names to the list so that it can be passed to quanteda::tokens().
   tokens <- quanteda::tokens(tokens_list)
   dfm_res <- tokens %>% quanteda::dfm()
+  dfm_df <- dfm_to_df(dfm_res)
+  doc_freq_df <- dfm_df %>% group_by(token_id) %>% summarize(count_of_docs=n())
   dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
-  res <- dfm_to_df(dfm_tfidf_res)
-  res <- res %>% dplyr::arrange(document)
-  res %>% dplyr::select(!!rlang::sym(document_col):=document, !!rlang::sym(term_col):=token, tfidf=value)
+  tfidf_df <- dfm_to_df(dfm_tfidf_res)
+  res <- dfm_df %>% rename(count_per_doc=value) %>% left_join(doc_freq_df,by=c(token_id="token_id"))
+  res <- res %>% left_join(tfidf_df %>% select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
+  res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document)
+  res <- res %>% dplyr::rename(!!rlang::sym(document_col):=document, !!rlang::sym(term_col):=token)
+  res
 }
 
 #' Calculate tfidf, which shows how much particular the token is in a group.
