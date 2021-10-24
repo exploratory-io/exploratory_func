@@ -481,7 +481,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", count_col = NULL){
 
 }
 
-do_tfidf2 <- function(df, document, term
+do_tfidf2 <- function(df, document, term,
                       tf_scheme = "logcount",
                       idf_scheme = "unary",
                       tfidf_base = 10,
@@ -491,25 +491,29 @@ do_tfidf2 <- function(df, document, term
   document_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(document))
   term_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(term))
   df <- df %>% rename(document_id=!!rlang::sym(document_col), term=!!rlang::sym(term_col))
-  nested <- df %>% nest_by(document_id)
-  tokens_list <- purrr::map(nested$data, function(x){x$term})
-  names(tokens_list) <- paste0("text", 1:length(tokens_list)) # Add unique names to the list so that it can be passed to quanteda::tokens().
-  tokens <- quanteda::tokens(tokens_list)
-  dfm_res <- tokens %>% quanteda::dfm()
-  dfm_df <- dfm_to_df(dfm_res)
-  doc_freq_df <- dfm_df %>% group_by(token_id) %>% summarize(count_of_docs=n())
-  dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res,
-                                       scheme_tf = tf_scheme,
-                                       scheme_df = idf_scheme,
-                                       base = tfidf_base,
-                                       smoothing = idf_smoothing,
-                                       k = idf_k,
-                                       threshold = idf_threshold)
-  tfidf_df <- dfm_to_df(dfm_tfidf_res)
-  res <- dfm_df %>% rename(count_per_doc=value) %>% left_join(doc_freq_df,by=c(token_id="token_id"))
-  res <- res %>% left_join(tfidf_df %>% select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
-  res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document)
-  res <- res %>% dplyr::rename(!!rlang::sym(document_col):=document, !!rlang::sym(term_col):=token)
+  each_func <- function(df) {
+    nested <- df %>% nest_by(document_id)
+    tokens_list <- purrr::map(nested$data, function(x){x$term})
+    names(tokens_list) <- paste0("text", 1:length(tokens_list)) # Add unique names to the list so that it can be passed to quanteda::tokens().
+    tokens <- quanteda::tokens(tokens_list)
+    dfm_res <- tokens %>% quanteda::dfm()
+    dfm_df <- dfm_to_df(dfm_res)
+    doc_freq_df <- dfm_df %>% group_by(token_id) %>% summarize(count_of_docs=n())
+    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res,
+                                         scheme_tf = tf_scheme,
+                                         scheme_df = idf_scheme,
+                                         base = tfidf_base,
+                                         smoothing = idf_smoothing,
+                                         k = idf_k,
+                                         threshold = idf_threshold)
+    tfidf_df <- dfm_to_df(dfm_tfidf_res)
+    res <- dfm_df %>% rename(count_per_doc=value) %>% left_join(doc_freq_df,by=c(token_id="token_id"))
+    res <- res %>% left_join(tfidf_df %>% select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
+    res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document)
+    res <- res %>% dplyr::rename(!!rlang::sym(document_col):=document, !!rlang::sym(term_col):=token)
+    res
+  }
+  res <- do_on_each_group(df, each_func, with_unnest = TRUE)
   res
 }
 
