@@ -346,6 +346,7 @@ get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_verte
   edges <- edges %>% dplyr::mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
 
   edges <- edges %>% dplyr::mutate(width=log(value+1)) # +1 to avoid 0 width.
+  # Re-scale the range from min(width) to max(width) into the range between min_edge_width and max_edge_width.
   edges <- edges %>% dplyr::mutate(width=(max_edge_width - min_edge_width)*(width - min(width))/(max(width) - min(width)) + min_edge_width)
 
   # Set edge colors based on number of co-occurrence.
