@@ -2262,6 +2262,68 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
   ret %>% dplyr::mutate_if(is.integer, as.numeric)
 }
 
+bind_expr <- function(expr1, expr2) {
+  rlang::expr(!!expr1 & !!expr2)
+}
+
+aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
+  conditions <- dplyr:::dplyr_quosures(...)
+  # iterate the if conditions and creates consolidated conditions connected with &
+  flatten_conditions_exprs <- conditions %>% purrr::reduce(bind_expr)
+  # create a dummy data frame that has 2 columns (one with original x and the other with TRUE/FALSE results for specified conditions)
+  # then extract the only x column as a vector (same as doing df$x) with dplyr::pull()
+  condition <- tibble::tibble(x = x) %>% dplyr::mutate(exp_internal_condition_col = !!flatten_conditions_exprs) %>% dplyr::pull(exp_internal_condition_col)
+
+  if (aggregateFunc == "sum") {
+    sum(x[condition], na.rm = na.rm)
+  } else if (aggregateFunc == "mean" || aggregateFunc == "average") {
+    mean(x[condition], na.rm = na.rm)
+  } else if (aggregateFunc == "count") {
+    nrow(data.frame(x[condition]))
+  } else if (aggregateFunc == "median") {
+    median(x[condition], na.rm = na.rm)
+  } else if (aggregateFunc == "min") {
+    min(x[condition], na.rm = na.rm)
+  } else if (aggregateFunc == "max") {
+    max(x[condition], na.rm = na.rm)
+  }
+}
+
+#' export
+sum_if <- function(x, ...) {
+  aggregate_if(x, "sum", ...)
+}
+
+#' export
+count_if <- function(x, ...) {
+  aggregate_if(x, "count", ...)
+}
+
+#' export
+average_if <- function(x, ...) {
+  aggregate_if(x, "average", ...)
+}
+
+#' export
+means_if <- function(x, ...) {
+  aggregate_if(x, "mean", ...)
+}
+
+#' export
+median_if <- function(x, ...) {
+  aggregate_if(x, "median", ...)
+}
+
+#' export
+min_if <- function(x, ...) {
+  aggregate_if(x, "min", ...)
+}
+
+#' export
+max_if <- function(x, ...) {
+  aggregate_if(x, "max", ...)
+}
+
 # Wrapper function around apply to apply aggregation function across columns for each row.
 # Example Usage:
 # airquality %>% mutate(total = summarize_row(across(where(is.numeric)), median, na.rm=TRUE))
