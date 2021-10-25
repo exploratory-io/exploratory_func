@@ -191,8 +191,9 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support", m
   edges <- lhs_rule_edges %>%
     dplyr::bind_rows(rule_rhs_edges)
 
-  # Set edge width.
+  # Set edge width based on support. Re-scale the range from min(support) to max(support) into the range from min_edge_width to max_edge_width.
   edges <- edges %>% dplyr::mutate(width=(max_edge_width - min_edge_width)*(support - min(support))/(max(support) - min(support)) + min_edge_width)
+  # Arrow head size around 0.15 times the width visually looks about right. Note that igraph currently does not allow setting different arrow size for each edge.
   edges <- edges %>% dplyr::mutate(arrow.size=max_edge_width*0.15)
   
   product_names <- unique(c(lhs_rule_edges$from, rule_rhs_edges$to))
