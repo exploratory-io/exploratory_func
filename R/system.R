@@ -2093,15 +2093,15 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
 #' function to convert labelled class to factor
 #' @export
 #' @param df -  data frame
-#' @param convertLabelledToFactor - if this is TRUE, it converts the labelled numeric columns as Factor.
+#' @param convertLabelledNumericToFactor - if this is TRUE, it converts the labelled numeric columns as Factor.
 #' if this is FALSE, it converts labelled numeric columns as numeric.
-handleLabelledColumns = function(df, convertLabelledToFactor = FALSE){
+handleLabelledColumns = function(df, convertLabelledNumericToFactor = FALSE){
   # check if column class is labelled or haven_labelled, and convert them to factor.
   # If labelled or haven_labelled are not converted to factor, applying jsonlite::toJSON to the data frame fails.
   is_labelled <- lapply(df, function(x){ any(class(x) %in% c("labelled", "haven_labelled"))})
   is_labelled <- unlist(is_labelled)
   df[is_labelled] <- lapply(df[is_labelled], function(x){
-    if (convertLabelledToFactor == FALSE & is.numeric(x)) {
+    if (convertLabelledNumericToFactor == FALSE & is.numeric(x)) {
       as.numeric(x)
     } else {
       haven::as_factor(x)
