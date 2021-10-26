@@ -2104,7 +2104,7 @@ handleLabelledColumns = function(df){
 #' export
 #' Type Convert for haven related data sources (i.e. SPSS/SAS/STATA)
 type_convert_for_haven <- function(df, col_types = NULL, na = c("", "NA"), trim_ws = TRUE, locale = default_locale()){
-  df <- readr::type_convert(df, col_type = col_types, na = na, trim_ws = trim_ws, locale = locale)
+  df <- readr::type_convert(df, col_types = col_types, na = na, trim_ws = trim_ws, locale = locale)
   # check which column is haven_labelled and is numeric.
   is_labelled_numeric <- lapply(df, function(x){
     any(stringr::str_detect(class(x),"haven_labelled")) & is.numeric(x)
