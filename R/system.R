@@ -2092,32 +2092,23 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
 
 #' function to convert labelled class to factor
 #' @export
-handleLabelledColumns = function(df){
+#' @param df -  data frame
+#' @param shouldConvertNumericToFactor - if this is TRUE, it converts the labelled numeric columns as Factor.
+#' if this is FALSE, it converts labelled numeric columns as numeric.
+handleLabelledColumns = function(df, shouldConvertNumericToFactor = FALSE){
   # check if column class is labelled or haven_labelled, and convert them to factor.
   # If labelled or haven_labelled are not converted to factor, applying jsonlite::toJSON to the data frame fails.
-  is_labelled <- lapply(df, function(x){ any(str_detect(class(x), "labelled|haven_labelled"))})
+  is_labelled <- lapply(df, function(x){ any(class(x) %in% c("labelled", "haven_labelled"))})
   is_labelled <- unlist(is_labelled)
-  df[is_labelled] <- lapply(df[is_labelled], haven::as_factor)
-  df
-}
-
-#' export
-#' Type Convert for haven related data sources (i.e. SPSS/SAS/STATA)
-type_convert_for_haven <- function(df, col_types = NULL, na = c("", "NA"), trim_ws = TRUE, locale = default_locale()){
-  df <- readr::type_convert(df, col_types = col_types, na = na, trim_ws = trim_ws, locale = locale)
-  # check which column is haven_labelled and is numeric.
-  is_labelled_numeric <- lapply(df, function(x){
-    any(stringr::str_detect(class(x),"haven_labelled")) & is.numeric(x)
-  })
-  is_labelled_numeric <- unlist(is_labelled_numeric)
-  # For haven_labelled columns whose data type is numeric, apply remove haven labels then apply as.numeric so that Exploratory Desktop can treat these columns
-  # as normal numeric columns.
-  df[is_labelled_numeric] <- lapply(df[is_labelled_numeric], function(x){
-    as.numeric(haven::zap_labels(x))
+  df[is_labelled] <- lapply(df[is_labelled], function(x){
+    if (shouldConvertNumericToFactor == FALSE & is.numeric(x)) {
+      as.numeric(x)
+    } else {
+      haven::as_factor(x)
+    }
   })
   df
 }
-
 
 #' Checks and tells the given data is whether in ndjson format
 #' by looking at that the first line is a valid json or not.
