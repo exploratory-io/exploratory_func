@@ -2279,7 +2279,7 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
   } else if (aggregateFunc == "mean" || aggregateFunc == "average") {
     mean(x[condition], na.rm = na.rm)
   } else if (aggregateFunc == "count") {
-    sum(condition)
+    sum(condition, na.rm = na.rm)
   } else if (aggregateFunc == "median") {
     median(x[condition], na.rm = na.rm)
   } else if (aggregateFunc == "min") {
