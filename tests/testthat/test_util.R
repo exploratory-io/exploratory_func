@@ -968,8 +968,8 @@ test_that("average_if", {
 })
 
 test_that("median_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if(hp, mpg > 10, gear > 2))
-  expect_equal(df %>% dplyr::pull(custom), c(91, 110, 192))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if(hp, mpg > 10, gear > 3))
+  expect_equal(df %>% dplyr::pull(custom), c(78.5, 123.0, 299.5))
 })
 
 
