@@ -111,7 +111,7 @@ exp_kmeans <- function(df, ...,
                           trace = trace,
                           normalize_data = normalize_data,
                           seed=NULL) # Seed is already done in do_prcomp. Skip it.
-    ret <- data.frame(model = I(list(ret))) # Follow current output format for now. I() is to avoid unwanted expansion of list at creation of data frame. TODO: Revisit and support group_by.
+    ret <- tibble::tibble(model = list(ret)) # Follow current output format for now. TODO: Revisit and support group_by.
   }
   # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
   if (length(grouped_cols) > 0) {

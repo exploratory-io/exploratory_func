@@ -393,7 +393,7 @@ get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_verte
   attr(ret, "font_size_factor") <- font_size_ratio
   attr(ret, "area_factor") <- area_factor
   attr(ret, "vertex_opacity") <- vertex_opacity
-  ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
+  ret <- tibble::tibble(model=list(ret)) # return as data.frame. TODO: handle group_by
   class(ret$model) <- c("list", "exp_coocurrence_graph")
   ret
 }
