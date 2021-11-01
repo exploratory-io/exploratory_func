@@ -206,7 +206,7 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support", m
     dplyr::bind_rows(products_vertices)
   
   ret <- list(edges=edges, vertices=vertices_data)
-  ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
+  ret <- tibble::tibble(model=list(ret)) # return as data.frame. TODO: handle group_by
   class(ret$model) <- c("list", ".model", ".model.arules_graph")
   ret
 }
