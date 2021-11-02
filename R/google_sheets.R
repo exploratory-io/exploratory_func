@@ -116,6 +116,7 @@ getGoogleSheetList <- function(tokenFileId="", teamDriveId=""){
   googledrive::drive_set_token(token)
   if(teamDriveId != "" && !is.null(teamDriveId)) {
     # To improve performance, only get id, name and canEdit for each spreadsheet.
+    # NOTE: googledrive changed team_drive argument to shared_drive
     googledrive::drive_find(type = "spreadsheet", shared_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
   } else { #if team id is provided search documents within the team.
     # To improve performance, only get id, name and canEdit for each spreadsheet.
@@ -162,5 +163,6 @@ getTeamDrives <- function(tokenFileId = "", useGoogleSheetsToken = TRUE){
     token <- getGoogleTokenForDrive(tokenFileId)
   }
   googledrive::drive_set_token(token)
+  # NOTE: googledrive changed API name to shared_drive_find
   googledrive::shared_drive_find()
 }
