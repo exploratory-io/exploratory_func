@@ -2305,7 +2305,7 @@ average_if <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
-means_if <- function(x, ..., na.rm = TRUE) {
+mean_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "mean", ..., na.rm = na.rm)
 }
 
