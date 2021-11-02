@@ -2290,38 +2290,38 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
 }
 
 #' export
-sum_if <- function(x, ...) {
-  aggregate_if(x, "sum", ...)
+sum_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "sum", ..., na.rm = na.rm)
 }
 
 #' export
-count_if <- function(x, ...) {
-  aggregate_if(x, "count", ...)
+count_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "count", ..., na.rm = na.rm)
 }
 
 #' export
-average_if <- function(x, ...) {
-  aggregate_if(x, "average", ...)
+average_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "average", ..., na.rm = na.rm)
 }
 
 #' export
-means_if <- function(x, ...) {
-  aggregate_if(x, "mean", ...)
+means_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "mean", ..., na.rm = na.rm)
 }
 
 #' export
-median_if <- function(x, ...) {
-  aggregate_if(x, "median", ...)
+median_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "median", ..., na.rm = na.rm)
 }
 
 #' export
-min_if <- function(x, ...) {
-  aggregate_if(x, "min", ...)
+min_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "min", ..., na.rm = na.rm)
 }
 
 #' export
-max_if <- function(x, ...) {
-  aggregate_if(x, "max", ...)
+max_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "max", ..., na.rm = na.rm)
 }
 
 # Wrapper function around apply to apply aggregation function across columns for each row.
