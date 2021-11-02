@@ -2937,10 +2937,10 @@ read_log_file <- function(file, col_names = FALSE, col_types = NULL,
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
     tmp <- download_data_file(file, "log")
-    readr::read_log(tmp, col_names, col_types, skip, n_max, progress)
+    readr::read_log(tmp, col_names = col_names, col_types = col_types, skip = skip, n_max = n_max, progress = progress)
   } else {
     # if it's local file simply call readr::read_log
-    readr::read_log(file, col_names, col_types, skip, n_max, progress)
+    readr::read_log(file, col_names = col_names, col_types = col_types, skip = skip, n_max = n_max, progress = progress)
   }
 }
 
