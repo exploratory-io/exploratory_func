@@ -24,7 +24,7 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
       teamDriveId = googledrive::as_id(teamDriveId)
     }
     # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
-    googledrive::drive_ls(path = path, type = type, team_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
+    googledrive::drive_ls(path = path, type = type, shared_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
   }, error = function(e) {
     stop(e)
   }, finally = {
@@ -60,7 +60,7 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
     if (teamDriveId != "" && !is.null(teamDriveId)) {
       teamDriveId = googledrive::as_id(teamDriveId)
     }
-    df <- googledrive::drive_get(team_drive = teamDriveId, id = path)
+    df <- googledrive::drive_get(shared_drive = teamDriveId, id = path)
     dfdetails <- NULL
     if (nrow(df) == 1) {
       dfdetails <- df %>% googledrive::drive_reveal("path")
