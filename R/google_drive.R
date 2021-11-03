@@ -206,7 +206,7 @@ getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, isForPreview = FALS
 
 #'API that imports multiple Excel files from Google Drive
 #'@export
-searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", isForPrview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
+searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", isForPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   tryCatch({
     items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"))
