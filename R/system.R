@@ -2601,7 +2601,7 @@ download_data_file <- function(url, type){
 
 #'API that search and imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+searchAndReadExcelFiles <- function(folder, isForPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
@@ -2618,7 +2618,11 @@ searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names =
 
 #'API that imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+read_excel_files <- function(files, isForPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+    # for preview mode, just use the first file.
+    if (isForPreview & length(files) > 0) {
+      files <- files[1]
+    }
     # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
     files <- setNames(as.list(files), files)
     df <- purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
@@ -2763,7 +2767,7 @@ get_excel_sheets <- function(path){
 
 #'API that search and imports multiple same structure CSV files and merge it to a single data frame
 #'@export
-searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
+searchAndReadDelimFiles <- function(folder, pattern = "", isForPreview = FALSE, delim, quote = '"',
                                         escape_backslash = FALSE, escape_double = TRUE,
                                         col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                                         locale = readr::default_locale(),
@@ -2779,7 +2783,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  exploratory::read_delim_files(files = files, delim = delim, quote = quote,
+  exploratory::read_delim_files(files = files, isForPreview = isForPreview, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
                                 col_names = col_names, col_types = col_types,
                                 locale = locale,
@@ -2795,7 +2799,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-read_delim_files <- function(files, delim, quote = '"',
+read_delim_files <- function(files, isForPreview = FALSE, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
                               col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
@@ -2803,6 +2807,12 @@ read_delim_files <- function(files, delim, quote = '"',
                               comment = "", trim_ws = FALSE,
                               skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                               progress = interactive(), with_api_key = FALSE) {
+
+    # for preview mode, just use the first file.
+    if (isForPreview & length(files) > 0) {
+      files <- files[1]
+    }
+
     # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
     files <- setNames(as.list(files), files)
     df <- purrr::map_dfr(files, exploratory::read_delim_file, delim = delim, quote = quote,
@@ -2961,7 +2971,7 @@ read_rds_file <- function(file, refhook = NULL){
 
 #'API that search and imports multiple same structure parquet files and merge it to a single data frame
 #'@export
-searchAndReadParquetFiles <- function(folder, pattern, files, col_select = NULL){
+searchAndReadParquetFiles <- function(folder, isForPreview = FALSE, pattern, files, col_select = NULL){
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
@@ -2970,12 +2980,16 @@ searchAndReadParquetFiles <- function(folder, pattern, files, col_select = NULL)
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  read_parquet_files(files, col_select = col_select)
+  read_parquet_files(files, isForPreview = isForPreview, col_select = col_select)
 }
 
 #'API that imports multiple same structure parquet files and merge it to a single data frame
 #'@export
-read_parquet_files <- function(files, col_select = NULL) {
+read_parquet_files <- function(files, isForPreview = FALSE, col_select = NULL) {
+  # for preview mode, just use the first file.
+  if (isForPreview & length(files) > 0) {
+    files <- files[1]
+  }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::read_parquet_file, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
