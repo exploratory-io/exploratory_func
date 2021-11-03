@@ -165,7 +165,7 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
   if (nrow(items) == 0) {
     stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
   }
-  exploratory::getCSVFilesFromGoogleDrive(items$id, items$name, isForPreview = FALSE, delim = delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names,
+  exploratory::getCSVFilesFromGoogleDrive(items$id, items$name, isForPreview = isForPreview, delim = delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names,
                                           col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max,
                                           guess_max = guess_max, progress = progress)
 
