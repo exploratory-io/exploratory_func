@@ -2867,7 +2867,8 @@ read_delim_file <- function(file, delim, quote = '"',
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
       if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
         if(locale$encoding == "Shift_JIS") {
-          stop("The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
+          msg <- "The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.";
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         } else if (locale$encoding == "CP932") {
           stop("The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.");
         } else {
@@ -2876,7 +2877,7 @@ read_delim_file <- function(file, delim, quote = '"',
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
         stop(stringr::str_c("Could not read data from ", file)); # Show the original URL name in the error message.
       } else {
-        stop(e);
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
     })
   } else {
@@ -2896,16 +2897,19 @@ read_delim_file <- function(file, delim, quote = '"',
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
       if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
         if(locale$encoding == "Shift_JIS") {
-          stop("The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
+          msg <- "The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.";
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         } else if (locale$encoding == "CP932") {
-          stop("The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.");
+          msg <- "The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.";
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         } else {
-          stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
+          msg <- stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again.");
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         }
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open the connection")) {
         stop(paste0("EXP-DATASRC-1 :: ", jsonlite::toJSON(file), " ::  Failed to read file."))
       } else {
-        stop(e);
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
     })
 
