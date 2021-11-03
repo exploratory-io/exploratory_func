@@ -145,7 +145,7 @@ getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileName, delim, quote = '"',
+getCSVFilesFromS3 <- function(files, region, username, password, bucket, isForPreview = FALSE, delim, quote = '"',
                              escape_backslash = FALSE, escape_double = TRUE,
                              col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                              locale = readr::default_locale(),
@@ -153,6 +153,10 @@ getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileNam
                              comment = "", trim_ws = FALSE,
                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                              progress = interactive()) {
+  # for preview mode, just use the first file.
+  if (isForPreview & length(files) > 0) {
+    files <- files[1]
+  }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getCSVFileFromS3, region = region, username = username, password = password, bucket = bucket, delim = delim, quote = quote,
@@ -176,7 +180,7 @@ getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileNam
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password, bucket, fileName, delim, quote = '"',
+searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password, bucket, isForPreview = FALSE, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
                               col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
@@ -203,7 +207,7 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getCSVFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, fileName = fileName, delim = delim, quote = quote,
+  getCSVFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, isForPreview = isForPreview, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
                     skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
 
@@ -231,7 +235,11 @@ getParquetFileFromS3 <- function(fileName, region, username, password, bucket, c
 #'API that imports multiple same structure Parquet files and merge it to a single data frame
 #'
 #'@export
-getParquetFilesFromS3 <- function(files, region, username, password, bucket, col_select = NULL) {
+getParquetFilesFromS3 <- function(files, region, username, password, bucket, isForPreview = FALSE, col_select = NULL) {
+  # for preview mode, just use the first file.
+  if (isForPreview & length(files) > 0) {
+    files <- files[1]
+  }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getParquetFileFromS3, region = region, username = username, password = password, bucket = bucket, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
@@ -245,7 +253,7 @@ getParquetFilesFromS3 <- function(files, region, username, password, bucket, col
 #'API that search files by search keyword then imports multiple same structure Parquet files and merge it to a single data frame
 #'
 #'@export
-searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, password, bucket, col_select = NULL) {
+searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, password, bucket, isForPreview = FALSE, col_select = NULL) {
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -265,7 +273,7 @@ searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, pass
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getParquetFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, col_select = col_select)
+  getParquetFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, isForPreview = isForPreview, col_select = col_select)
 
 }
 
@@ -295,7 +303,7 @@ getExcelFileFromS3 <- function(fileName, region, username, password, bucket, she
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
+searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, password, bucket, isForPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -315,7 +323,7 @@ searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, passwo
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  exploratory::getExcelFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, sheet = sheet,
+  exploratory::getExcelFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, isForPreview = isForPreview, sheet = sheet,
                                    col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                    use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols,
                                    check.names = check.names, tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, ...)
@@ -323,7 +331,11 @@ searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, passwo
 
 #'API that imports multiple Excel files from AWS S3.
 #'@export
-getExcelFilesFromS3 <- function(files, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+getExcelFilesFromS3 <- function(files, region, username, password, bucket, isForPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+  # for preview mode, just use the first file.
+  if (isForPreview & length(files) > 0) {
+    files <- files[1]
+  }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getExcelFileFromS3, region = region, username = username, password = password, bucket = bucket, sheet = sheet,
