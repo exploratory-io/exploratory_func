@@ -2610,7 +2610,7 @@ searchAndReadExcelFiles <- function(folder, isForPreview = FALSE, pattern = "", 
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  exploratory::read_excel_files(files = files, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
+  exploratory::read_excel_files(files = files, isForPreview = isForPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
@@ -2895,7 +2895,7 @@ read_delim_file <- function(file, delim, quote = '"',
       # For the case it's running on Linux (Collaboration Server), show more user friendly message.
       # For Exploraotry Desktkop, it's already taken care of by Desktop so just show the error message as is.
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
-      if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
+      if(stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
         if(locale$encoding == "Shift_JIS") {
           msg <- "The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.";
           stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
