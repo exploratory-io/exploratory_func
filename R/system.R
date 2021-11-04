@@ -2662,81 +2662,85 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       use_readxl = TRUE
     }
   }
-  df <- NULL
-  # for .xlsx file extension
-  if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
-    # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
-    if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
-      new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
-      file.copy(path, new_path)
-      if (n_max != Inf) {
-        df <- openxlsx::read.xlsx(xlsxFile = new_path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
-      } else {
-        df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
-      }
-      # Preserve original column name for backward compatibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
-      colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
-      file.remove(new_path)
-    }
-    else {
-      if (n_max != Inf) {
-        df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
-      } else {
-        df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
-      }
-      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
-      colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
-    }
-    # trim white space needs to be done first since it cleans column names
-    if(trim_ws == TRUE) {
-      # use trimws from base to remove ending and trailing white space for character columns
-      df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
-    }
-    if(col_names == FALSE) {
-      # For backward compatibility, use X__1, X__2, .. for default column names
-      columnNames <- paste("X", 1:ncol(df), sep = "__")
-      colnames(df) <- columnNames
-    }
-  } else { # for old .xls file extension
-    if (stringr::str_detect(path, "^https://") ||
-        stringr::str_detect(path, "^http://") ||
-        stringr::str_detect(path, "^ftp://")) {
-      # need to download first since readxl::read_excel cannot work with URL.
-      tmp <- download_data_file(path, "excel")
-      df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
-    } else {
+  tryCatch({
+    df <- NULL
+    # for .xlsx file extension
+    if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
       # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
       if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
         new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
         file.copy(path, new_path)
-        df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        if (n_max != Inf) {
+          df <- openxlsx::read.xlsx(xlsxFile = new_path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+        } else {
+          df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+        }
+        # Preserve original column name for backward compatibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+        # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
+        colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
         file.remove(new_path)
       }
       else {
-        # If it's local file without multibyte path, simply call readxl::read_excel
-        df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        if (n_max != Inf) {
+          df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+        } else {
+          df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+        }
+        # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+        # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
+        colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
+      }
+      # trim white space needs to be done first since it cleans column names
+      if(trim_ws == TRUE) {
+        # use trimws from base to remove ending and trailing white space for character columns
+        df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
+      }
+      if(col_names == FALSE) {
+        # For backward compatibility, use X__1, X__2, .. for default column names
+        columnNames <- paste("X", 1:ncol(df), sep = "__")
+        colnames(df) <- columnNames
+      }
+    } else { # for old .xls file extension
+      if (stringr::str_detect(path, "^https://") ||
+          stringr::str_detect(path, "^http://") ||
+          stringr::str_detect(path, "^ftp://")) {
+        # need to download first since readxl::read_excel cannot work with URL.
+        tmp <- download_data_file(path, "excel")
+        df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+      } else {
+        # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
+        if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+          new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
+          file.copy(path, new_path)
+          df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+          file.remove(new_path)
+        }
+        else {
+          # If it's local file without multibyte path, simply call readxl::read_excel
+          df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        }
+      }
+      if(col_names == FALSE) {
+        # For backward compatibility, use X__1, X__2, .. for default column names
+        columnNames <- paste("X", 1:ncol(df), sep = "__")
+        colnames(df) <- columnNames
       }
     }
-    if(col_names == FALSE) {
-      # For backward compatibility, use X__1, X__2, .. for default column names
-      columnNames <- paste("X", 1:ncol(df), sep = "__")
-      colnames(df) <- columnNames
+    if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+      df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
     }
-  }
-  if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
-    df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
-  }
-  # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
-  # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
-  # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
-  # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
-  # We don't want to rely on readxl::read_excel's col_types argument "text" since this option converts Date or POSIXct column data as number instead of "2021-01-01" style text.
-  if (convertDataTypeToChar) {
-    df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
-  }
-  df
+    # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
+    # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
+    # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
+    # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+    # We don't want to rely on readxl::read_excel's col_types argument "text" since this option converts Date or POSIXct column data as number instead of "2021-01-01" style text.
+    if (convertDataTypeToChar) {
+      df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
+    }
+    df
+  }, error = function(e) {
+    stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
+  })
 }
 
 #'Wrapper for readxl::excel_sheets to support remote file
