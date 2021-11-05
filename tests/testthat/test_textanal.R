@@ -18,11 +18,20 @@ test_that("exp_textanal with Japanese twitter data", {
   graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="louvain")
   graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="leading_eigen")
   graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="fast_greedy")
-  # Commented out due to this error with this toy data - Error: At clustertool.cpp:286 : Cannot work with unconnected graph, Invalid value
-  # graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="spinglass")
-  # expect_equal(length(graph_data_res$model[[1]]$vertices$cluster), 14)
+  graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="spinglass")
   graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="none")
   expect_true(is.null(graph_data_res$model[[1]]$vertices$cluster))
+
+  # Test with full parameters specified.
+  graph_data_res <- model_df %>% get_cooccurrence_graph_data(max_vertex_size=20, vertex_size_method='equal_length', vertex_opacity=0.6, max_edge_width=8, min_edge_width=1, edge_color='#EC5D57', font_size_ratio=1.2, area_factor=50, cluster_method='louvain')
+})
+
+test_that("exp_textanal with no-co-occurrence", {
+  df <- tibble::tibble(text=c("Hello", "Hi", "world"))
+  model_df <- df %>% exp_textanal(`text`, stopwords_lang = "auto", remove_punct = TRUE, remove_numbers = TRUE, remove_alphabets = FALSE, tokenize_tweets = FALSE, remove_url = TRUE, hiragana_word_length_to_remove = 2, cooccurrence_context = "window")
+  res <- model_df %>% tidy_rowwise(model, type="word_pairs", max_word_pairs=30)
+  expect_equal(colnames(res), c("word.1", "word.2", "count"))
+  expect_equal(nrow(res), 0)
 })
 
 

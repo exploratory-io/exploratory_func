@@ -952,6 +952,42 @@ test_that("summarize_group", {
  expect_equal(nrow(df2),1)
 })
 
+test_that("sum_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if(hp, mpg > 10, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(909, 856, 2929))
+})
+
+test_that("count_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if(hp, mpg > 10, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(11, 7, 14))
+})
+
+test_that("average_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::average_if(hp, mpg > 10, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 209))
+})
+
+test_that("mean_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if(hp, mpg > 10, na.rm = F))
+  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 209))
+})
+
+test_that("median_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if(hp, mpg > 10, gear > 3))
+  expect_equal(df %>% dplyr::pull(custom), c(78.5, 123.0, 299.5))
+})
+
+
+test_that("min_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::min_if(hp, mpg > 10, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(52, 105, 150))
+})
+
+test_that("max_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if(hp, mpg > 4, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(113, 175, 335))
+})
+
 test_that("summarize_row", {
  df <- airquality %>% mutate(total = summarize_row(across(where(is.numeric)), mean, na.rm=TRUE))
  expect_equal(colnames(df), c("Ozone", "Solar.R", "Wind", "Temp", "Month", "Day", "total"))

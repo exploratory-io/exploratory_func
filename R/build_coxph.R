@@ -96,9 +96,9 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     # estimate.4 0.9953371 0.9813465 0.9766677 0.9672892 0.9625909 0.9578874 0.9531767 0.9484592
     # estimate.5 0.9950931 0.9803774 0.9754587 0.9656028 0.9606673 0.9557276 0.9507815 0.9458296
     high <- as.data.frame(t(res %>% select(starts_with('conf.high.'))))
-    high <- high %>% dplyr::rename_at(vars(starts_with('V')), funs(stringr::str_replace(., 'V', 'H')))
+    high <- high %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'H'), starts_with('V'))
     low <- as.data.frame(t(res %>% select(starts_with('conf.low.'))))
-    low <- low %>% dplyr::rename_at(vars(starts_with('V')), funs(stringr::str_replace(., 'V', 'L')))
+    low <- low %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'L'), starts_with('V'))
     res <- dplyr::bind_cols(est, high, low)
     res
   }

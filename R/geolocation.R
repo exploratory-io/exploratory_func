@@ -28,7 +28,7 @@ ip_to_country <- maxmind_closure("country_name")
 #'  
 #' @export
 countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = NA, 
-  custom_dict = NULL, custom_match = NULL, origin_regex = FALSE) {
+  custom_dict = NULL, custom_match = NULL, origin_regex = NULL) {
   loadNamespace("countrycode")
       
   if (origin=="flex") {

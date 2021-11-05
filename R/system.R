@@ -2092,11 +2092,21 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
 
 #' function to convert labelled class to factor
 #' @export
-handleLabelledColumns = function(df){
-  # check if column class is labelled or haven_labelled, and conver them to factor.
-  # If labelled or haven_labelled are not converted to factor, appling jsonlite::toJSON to the data frame fails.
-  is_labelled <- which(lapply(df, class) %in% c("labelled", "haven_labelled"))
-  df[is_labelled] <- lapply(df[is_labelled], haven::as_factor)
+#' @param df -  data frame
+#' @param convertLabelledNumericToFactor - if this is TRUE, it converts the labelled numeric columns as Factor.
+#' if this is FALSE, it converts labelled numeric columns as numeric.
+handleLabelledColumns = function(df, convertLabelledNumericToFactor = FALSE){
+  # check if column class is labelled or haven_labelled, and convert them to factor.
+  # If labelled or haven_labelled are not converted to factor, applying jsonlite::toJSON to the data frame fails.
+  is_labelled <- lapply(df, function(x){ any(class(x) %in% c("labelled", "haven_labelled"))})
+  is_labelled <- unlist(is_labelled)
+  df[is_labelled] <- lapply(df[is_labelled], function(x){
+    if (convertLabelledNumericToFactor == FALSE & is.numeric(x)) {
+      as.numeric(x)
+    } else {
+      haven::as_factor(x)
+    }
+  })
   df
 }
 
@@ -2927,10 +2937,10 @@ read_log_file <- function(file, col_names = FALSE, col_types = NULL,
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
     tmp <- download_data_file(file, "log")
-    readr::read_log(tmp, col_names, col_types, skip, n_max, progress)
+    readr::read_log(tmp, col_names = col_names, col_types = col_types, skip = skip, n_max = n_max, progress = progress)
   } else {
     # if it's local file simply call readr::read_log
-    readr::read_log(file, col_names, col_types, skip, n_max, progress)
+    readr::read_log(file, col_names = col_names, col_types = col_types, skip = skip, n_max = n_max, progress = progress)
   }
 }
 

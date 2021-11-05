@@ -276,6 +276,9 @@ dfm_to_df <- function(dfm) {
 # Extracts data as a long-format data.frame from quanteda::fcm.
 fcm_to_df <- function(fcm) {
   row_idx <- fcm@i
+  if (length(row_idx) == 0) { # No co-occurrence is in the fcm. Return empty data frame.
+    return(tibble::tibble(token.x=character(0), token.y=character(0), value=integer(0)))
+  }
   col_idx_compressed <- fcm@p
   # fcm is in CSR (Compressed Sparse Row) format.
   # Uncompress column index.
@@ -338,16 +341,19 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 }
 
 # vertex_size_method - "equal_length" or "equal_freq"
-get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.6, cluster_method="louvain") {
+get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_vertex_size = 20, vertex_size_method = "equal_length",
+                                        min_edge_width=1, max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.6, cluster_method="louvain",
+                                        edge_color="#4A90E2") {
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% dplyr::rename(from=token.x,to=token.y) %>% filter(from!=to)
   edges <- edges %>% dplyr::mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
 
   edges <- edges %>% dplyr::mutate(width=log(value+1)) # +1 to avoid 0 width.
-  edges <- edges %>% dplyr::mutate(width=max_edge_width*width/max(width))
+  # Re-scale the range from min(width) to max(width) into the range between min_edge_width and max_edge_width.
+  edges <- edges %>% dplyr::mutate(width=(max_edge_width - min_edge_width)*(width - min(width))/(max(width) - min(width)) + min_edge_width)
 
   # Set edge colors based on number of co-occurrence.
-  c_scale <- grDevices::colorRamp(c("white","#4A90E2"))
+  c_scale <- grDevices::colorRamp(c("white", edge_color))
   edges <- edges %>% dplyr::mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
   weights=log(1+edges$value)
   weights <- 5*weights/max(weights)
@@ -364,7 +370,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
   else { # "equal_freq"
     vertex_sizes <- floor((dplyr::min_rank(feat_counts)-1)/(length(feat_counts)/5)) + 1
   }
-  vertex_sizes <- vertex_sizes/max(vertex_sizes) * max_vertex_size
+  vertex_sizes <- (vertex_sizes - min(vertex_sizes))/(max(vertex_sizes) - min(vertex_sizes)) * (max_vertex_size - min_vertex_size) + min_vertex_size
   vertices <- tibble::tibble(name=feat_names, size=vertex_sizes)
 
   if (cluster_method != "none") {
@@ -387,7 +393,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
   attr(ret, "font_size_factor") <- font_size_ratio
   attr(ret, "area_factor") <- area_factor
   attr(ret, "vertex_opacity") <- vertex_opacity
-  ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
+  ret <- tibble::tibble(model=list(ret)) # return as data.frame. TODO: handle group_by
   class(ret$model) <- c("list", "exp_coocurrence_graph")
   ret
 }
