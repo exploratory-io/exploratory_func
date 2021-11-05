@@ -220,7 +220,7 @@ tidy.survdiff_exploratory <- function(x, ...) {
 glance.survdiff_exploratory <- function(x, ...) {
   if (is.null(x$error)) {
     ret <- broom:::glance.survdiff(x, ...)
-    ret <- ret %>% dplyr::mutate(n = !!sum(x$n, rm.na=TRUE), nevent = !!sum(x$obs, rm.na=TRUE))
+    ret <- ret %>% dplyr::mutate(n = !!sum(x$n, na.rm = TRUE), nevent = !!sum(x$obs, na.rm = TRUE))
     if ("df" %in% colnames(ret) && "p.value" %in% colnames(ret)) {
       ret <- ret %>% dplyr::relocate(df, .after=p.value) # Adjust order just to be consistent with other Analytics Views.
     }
