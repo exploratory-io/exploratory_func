@@ -2601,7 +2601,7 @@ download_data_file <- function(url, type){
 
 #'API that search and imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+searchAndReadExcelFiles <- function(folder, isForPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
@@ -2610,7 +2610,7 @@ searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names =
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  exploratory::read_excel_files(files = files, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
+  exploratory::read_excel_files(files = files, isForPreview = isForPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
@@ -2618,7 +2618,11 @@ searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names =
 
 #'API that imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+read_excel_files <- function(files, isForPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+    # for preview mode, just use the first file.
+    if (isForPreview & length(files) > 0) {
+      files <- files[1]
+    }
     # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
     files <- setNames(as.list(files), files)
     df <- purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
@@ -2658,81 +2662,85 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       use_readxl = TRUE
     }
   }
-  df <- NULL
-  # for .xlsx file extension
-  if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
-    # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
-    if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
-      new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
-      file.copy(path, new_path)
-      if (n_max != Inf) {
-        df <- openxlsx::read.xlsx(xlsxFile = new_path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
-      } else {
-        df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
-      }
-      # Preserve original column name for backward compatibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
-      colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
-      file.remove(new_path)
-    }
-    else {
-      if (n_max != Inf) {
-        df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
-      } else {
-        df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
-      }
-      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
-      colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
-    }
-    # trim white space needs to be done first since it cleans column names
-    if(trim_ws == TRUE) {
-      # use trimws from base to remove ending and trailing white space for character columns
-      df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
-    }
-    if(col_names == FALSE) {
-      # For backward compatibility, use X__1, X__2, .. for default column names
-      columnNames <- paste("X", 1:ncol(df), sep = "__")
-      colnames(df) <- columnNames
-    }
-  } else { # for old .xls file extension
-    if (stringr::str_detect(path, "^https://") ||
-        stringr::str_detect(path, "^http://") ||
-        stringr::str_detect(path, "^ftp://")) {
-      # need to download first since readxl::read_excel cannot work with URL.
-      tmp <- download_data_file(path, "excel")
-      df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
-    } else {
+  tryCatch({
+    df <- NULL
+    # for .xlsx file extension
+    if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
       # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
       if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
         new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
         file.copy(path, new_path)
-        df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        if (n_max != Inf) {
+          df <- openxlsx::read.xlsx(xlsxFile = new_path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+        } else {
+          df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+        }
+        # Preserve original column name for backward compatibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+        # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
+        colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
         file.remove(new_path)
       }
       else {
-        # If it's local file without multibyte path, simply call readxl::read_excel
-        df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        if (n_max != Inf) {
+          df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+        } else {
+          df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+        }
+        # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+        # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
+        colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
+      }
+      # trim white space needs to be done first since it cleans column names
+      if(trim_ws == TRUE) {
+        # use trimws from base to remove ending and trailing white space for character columns
+        df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
+      }
+      if(col_names == FALSE) {
+        # For backward compatibility, use X__1, X__2, .. for default column names
+        columnNames <- paste("X", 1:ncol(df), sep = "__")
+        colnames(df) <- columnNames
+      }
+    } else { # for old .xls file extension
+      if (stringr::str_detect(path, "^https://") ||
+          stringr::str_detect(path, "^http://") ||
+          stringr::str_detect(path, "^ftp://")) {
+        # need to download first since readxl::read_excel cannot work with URL.
+        tmp <- download_data_file(path, "excel")
+        df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+      } else {
+        # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
+        if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+          new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
+          file.copy(path, new_path)
+          df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+          file.remove(new_path)
+        }
+        else {
+          # If it's local file without multibyte path, simply call readxl::read_excel
+          df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        }
+      }
+      if(col_names == FALSE) {
+        # For backward compatibility, use X__1, X__2, .. for default column names
+        columnNames <- paste("X", 1:ncol(df), sep = "__")
+        colnames(df) <- columnNames
       }
     }
-    if(col_names == FALSE) {
-      # For backward compatibility, use X__1, X__2, .. for default column names
-      columnNames <- paste("X", 1:ncol(df), sep = "__")
-      colnames(df) <- columnNames
+    if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+      df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
     }
-  }
-  if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
-    df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
-  }
-  # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
-  # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
-  # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
-  # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
-  # We don't want to rely on readxl::read_excel's col_types argument "text" since this option converts Date or POSIXct column data as number instead of "2021-01-01" style text.
-  if (convertDataTypeToChar) {
-    df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
-  }
-  df
+    # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
+    # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
+    # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
+    # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+    # We don't want to rely on readxl::read_excel's col_types argument "text" since this option converts Date or POSIXct column data as number instead of "2021-01-01" style text.
+    if (convertDataTypeToChar) {
+      df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
+    }
+    df
+  }, error = function(e) {
+    stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
+  })
 }
 
 #'Wrapper for readxl::excel_sheets to support remote file
@@ -2763,7 +2771,7 @@ get_excel_sheets <- function(path){
 
 #'API that search and imports multiple same structure CSV files and merge it to a single data frame
 #'@export
-searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
+searchAndReadDelimFiles <- function(folder, pattern = "", isForPreview = FALSE, delim, quote = '"',
                                         escape_backslash = FALSE, escape_double = TRUE,
                                         col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                                         locale = readr::default_locale(),
@@ -2779,7 +2787,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  exploratory::read_delim_files(files = files, delim = delim, quote = quote,
+  exploratory::read_delim_files(files = files, isForPreview = isForPreview, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
                                 col_names = col_names, col_types = col_types,
                                 locale = locale,
@@ -2795,7 +2803,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-read_delim_files <- function(files, delim, quote = '"',
+read_delim_files <- function(files, isForPreview = FALSE, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
                               col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
@@ -2803,6 +2811,12 @@ read_delim_files <- function(files, delim, quote = '"',
                               comment = "", trim_ws = FALSE,
                               skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                               progress = interactive(), with_api_key = FALSE) {
+
+    # for preview mode, just use the first file.
+    if (isForPreview & length(files) > 0) {
+      files <- files[1]
+    }
+
     # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
     files <- setNames(as.list(files), files)
     df <- purrr::map_dfr(files, exploratory::read_delim_file, delim = delim, quote = quote,
@@ -2857,7 +2871,8 @@ read_delim_file <- function(file, delim, quote = '"',
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
       if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
         if(locale$encoding == "Shift_JIS") {
-          stop("The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
+          msg <- "The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.";
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         } else if (locale$encoding == "CP932") {
           stop("The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.");
         } else {
@@ -2866,7 +2881,7 @@ read_delim_file <- function(file, delim, quote = '"',
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
         stop(stringr::str_c("Could not read data from ", file)); # Show the original URL name in the error message.
       } else {
-        stop(e);
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
     })
   } else {
@@ -2884,18 +2899,21 @@ read_delim_file <- function(file, delim, quote = '"',
       # For the case it's running on Linux (Collaboration Server), show more user friendly message.
       # For Exploraotry Desktkop, it's already taken care of by Desktop so just show the error message as is.
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
-      if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
+      if(stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
         if(locale$encoding == "Shift_JIS") {
-          stop("The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
+          msg <- "The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.";
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         } else if (locale$encoding == "CP932") {
-          stop("The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.");
+          msg <- "The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.";
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         } else {
-          stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
+          msg <- stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again.");
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         }
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open the connection")) {
         stop(paste0("EXP-DATASRC-1 :: ", jsonlite::toJSON(file), " ::  Failed to read file."))
       } else {
-        stop(e);
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
     })
 
@@ -2961,7 +2979,7 @@ read_rds_file <- function(file, refhook = NULL){
 
 #'API that search and imports multiple same structure parquet files and merge it to a single data frame
 #'@export
-searchAndReadParquetFiles <- function(folder, pattern, files, col_select = NULL){
+searchAndReadParquetFiles <- function(folder, isForPreview = FALSE, pattern, files, col_select = NULL){
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
@@ -2970,12 +2988,16 @@ searchAndReadParquetFiles <- function(folder, pattern, files, col_select = NULL)
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  read_parquet_files(files, col_select = col_select)
+  read_parquet_files(files, isForPreview = isForPreview, col_select = col_select)
 }
 
 #'API that imports multiple same structure parquet files and merge it to a single data frame
 #'@export
-read_parquet_files <- function(files, col_select = NULL) {
+read_parquet_files <- function(files, isForPreview = FALSE, col_select = NULL) {
+  # for preview mode, just use the first file.
+  if (isForPreview & length(files) > 0) {
+    files <- files[1]
+  }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::read_parquet_file, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.

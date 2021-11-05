@@ -22,7 +22,7 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
     endDate <- lubridate::ymd_hms(stringr::str_c(date_end, " 23:59:59"), tz = "UTC")
   }
 
-  df <- riem_measures(station = station, date_start = date_start, date_end = date_end)
+  df <- riem::riem_measures(station = station, date_start = date_start, date_end = date_end)
   if (tzone != "") {# if timezone for display is specified, convert the timezone with with_tz
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::with_tz(., tzone=tzone)))
   }
