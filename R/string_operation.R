@@ -394,94 +394,12 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   res
 }
 
-#' Input:
-#' group - vector of documents
-#' term - vector terms with the same length as group.
-#' tf - vector of tf with the same length as group. It can be after weight function is applied,
-#'      in which case, we assume that group-term combination in the input is unique, and summing up at the sparseMatrix would not happen.
-#' count_per_doc - vector of word count per doc. It is tf before weight function is applied.
-#' Output: data.frame of document frequency and tf-idf. The number of rows are the same as the input vectors.
-calc_tfidf <- function(group, term, tf, count_per_doc, smooth_idf = FALSE){
-  loadNamespace("Matrix")
-  loadNamespace("text2vec")
-  if(length(group)!=length(term)){
-    stop("length of document and terms have to be the same")
-  }
-  doc_fact <- as.factor(group)
-  term_fact <- as.factor(term)
-  sparse_mat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = tf) # With weight function applied. To calculate tfidf.
-  sparse_mat_for_count <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = count_per_doc) # Without weight function applied. To calculate df.
-
-  m_tfidf <- text2vec::TfIdf$new(smooth_idf = smooth_idf, norm = "none")
-  result_tfidf <- m_tfidf$fit_transform(sparse_mat)
-
-  tfidf <- purrr::flatten_dbl(purrr::map2(as.integer(doc_fact), as.integer(term_fact), function(x,y){result_tfidf[x,y]}))
-  df <- Matrix::colSums(sparse_mat_for_count)[term_fact]
-
-  data.frame(.df=df, .tfidf=tfidf)
-}
-
-#' Calculate term frequency
-#' @param df Data frame
-#' @param group Column to be considered as a group id
-#' @param term Column to be considered as term
-#' @param weight Type of weight calculation.
-#' "ratio" is default and it's count/(total number of terms in the group).
-#' This can be "raw", "binary" and "log_scale"
-#' "raw" is the count of the term in the group.
-#' "binary" is logic if the term is in the group or not.
-#' "log_scale" is logic if the term is in the group or not.
-#' @param term Column to be considered as term
-#' @return Data frame with group, term and .tf column
-calc_tf <- function(df, group, term, ...){
-  group_col <- col_name(substitute(group))
-  term_col <- col_name(substitute(term))
-  calc_tf_(df, group_col, term_col, ...)
-}
-
-#' @param group_col - Document ID column
-#' @param term_col - Term column
-#' Output: data.frame with the following column.
-#' - document_id
-#' - token - Term
-#' - count_per_doc - Count of term occurrence per document
-#' - tf - count_per_doc with weight function applied.
-#' @rdname calc_tf
-calc_tf_ <- function(df, group_col, term_col, weight="ratio", count_col = NULL){
-  loadNamespace("dplyr")
-  loadNamespace("tidyr")
-
-  cnames <- avoid_conflict(c(group_col, term_col), c("count_per_doc", "tf"))
-
-  calc_weight <- function(raw){
-    if(weight=="raw"){
-      val <- raw
-    } else if (weight=="binary"){
-      val <- as.logical(raw)
-    } else if (weight=="log_scale"){
-      val <- 1+log(raw)
-    }
-    else{
-      stop(paste0(weight, " is not recognized as weight argument"))
-    }
-    val
-  }
-
-  if (!is.null(count_col)) {
-    ret <- df[,colnames(df) == group_col | colnames(df)==term_col | colnames(df)==count_col] %>%
-      dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for column names with backticks
-      dplyr::summarise(!!rlang::sym(cnames[[1]]) := sum(!!rlang::sym(count_col), na.rm = TRUE))
-  } else {
-    ret <- df[,colnames(df) == group_col | colnames(df)==term_col] %>%
-      dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for column names with backticks
-      dplyr::summarise(!!rlang::sym(cnames[[1]]) := n())
-  }
-  ret %>% dplyr::mutate(!!rlang::sym(cnames[[2]]) := calc_weight(!!rlang::sym(cnames[[1]]))) %>%
-  dplyr::ungroup()
-
-}
-
-do_tfidf2 <- function(df, document, term,
+#' Calculate tfidf, which shows how much particular the token is in a group.
+#' @param df - Data frame which has columns of groups and their terms
+#' @param document - Column of documet ID
+#' @param term - Column of terms
+#' @export
+do_tfidf <- function(df, document, term,
                       tf_scheme = "logcount",
                       idf_scheme = "inverse",
                       tfidf_base = 10,
@@ -515,63 +433,6 @@ do_tfidf2 <- function(df, document, term,
   }
   res <- do_on_each_group(df, each_func, with_unnest = TRUE)
   res
-}
-
-#' Calculate tfidf, which shows how much particular the token is in a group.
-#' @param df Data frame which has columns of groups and their terms
-#' @param group Column of group names
-#' @param term Column of terms
-#' @param [DEPRECATED] idf_log_scale
-#' Function to scale IDF. 'log' function is always applied to IDF. Setting other functions is ignored
-#' @export
-do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2", count = NULL){
-  validate_empty_data(df)
-
-  loadNamespace("tidytext")
-  loadNamespace("dplyr")
-
-  if(!(norm %in% c("l1", "l2") | norm == FALSE)){
-    stop("norm argument must be l1, l2 or FALSE")
-  }
-
-  if(!missing(idf_log_scale)){
-    warnings("Argument idf_log_scale is deprecated. Log is always applied to IDF.")
-  }
-
-  group_col <- col_name(substitute(group))
-  term_col <- col_name(substitute(term))
-  count_col <- NULL
-  if (!is.null(count)) {
-    count_col <- col_name(substitute(count))
-  }
-
-  # remove NA from group and term column to avoid error
-  df <- tidyr::drop_na(df, !!rlang::sym(group_col), !!rlang::sym(term_col))
-
-  cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf", "count_per_doc"))
-
-  count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight, count_col = count_col)
-  tfidf <- calc_tfidf(count_tbl[[group_col]], count_tbl[[term_col]], count_tbl[[cnames[[3]]]], count_tbl[[cnames[[4]]]], smooth_idf = FALSE)
-  count_tbl[[cnames[[1]]]] <- tfidf$.df
-  count_tbl[[cnames[[2]]]] <- tfidf$.tfidf
-  count_tbl[[cnames[[3]]]] <- NULL
-
-  if(norm == "l2"){
-    val <- lazyeval::interp(~x/sqrt(sum(x^2)), x=as.symbol(cnames[[2]]))
-    count_tbl <- (count_tbl %>%
-      dplyr::group_by(!!!rlang::syms(group_col)) %>% # convert the column name to symbol for colum names with backticks
-      dplyr::mutate_(.dots=setNames(list(val), cnames[[2]])) %>%
-      dplyr::ungroup())
-  } else if(norm == "l1"){
-    val <- lazyeval::interp(~x/sum(x), x=as.symbol(cnames[[2]]))
-    count_tbl <- (count_tbl %>%
-      dplyr::group_by(!!!rlang::syms(group_col)) %>% # convert the column name to symbol for colum names with backticks
-      dplyr::mutate_(.dots=setNames(list(val), cnames[[2]])) %>%
-      dplyr::ungroup())
-  }
-  # if NULL, no normalization
-
-  count_tbl
 }
 
 #' Stem word so that words which are the same kind of word become the same charactor
