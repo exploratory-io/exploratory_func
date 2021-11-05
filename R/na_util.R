@@ -47,6 +47,11 @@ impute_na <- function(target, type = mean, val = 0, ...) {
       target[is.na(target)] <- val
       target
     },
+    mode = {
+      val <- get_mode(target, na.rm = TRUE)
+      target[is.na(target)] <- val
+      target
+    },
     value = {
       if (length(val) == 1){
         # if val is length 1, na is filled with the value

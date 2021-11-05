@@ -95,6 +95,21 @@ test_that("test impute_na with median", {
   expect_equal(ret[["filled_na"]], rep(c(val, val, seq(7), val), 10))
 })
 
+test_that("test impute_na with mode", {
+  test_data <- data.frame(
+    rep(c(NA, NA, seq(7), NA), 10),
+    rep(c(10, seq(8), NA), 10),
+    rep(c(NA, seq(8), NA), 10),
+    letters[rep(c(NA, seq(3), NA), 20)]
+  )
+  colnames(test_data) <- c("col 1", "col-2", "col_3", "chars")
+  ret <- test_data %>%
+    dplyr::mutate(filled_na = impute_na(`col 1`, type = "mode"))
+
+  val <- get_mode(test_data[["col 1"]], na.rm = TRUE)
+  expect_equal(ret[["filled_na"]], rep(c(val, val, seq(7), val), 10))
+})
+
 test_that("test impute_na with sd", {
   test_data <- data.frame(
     rep(c(NA, NA, seq(7), NA), 10),
