@@ -301,32 +301,6 @@ test_that("do_tokenize should work with output (with content check)", {
   expect_equal(result$sentence[[2]], "This is a data frame for test.")
 })
 
-test_that("calc_tfidf", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- exploratory:::calc_tfidf(test_df$id, test_df$word)
-  expect_equal(head(result$.df,2), c(2, 2))
-  expect_equal(head(result$.tfidf,2), c(0, 0))
-})
-
-test_that("calc_tf weight binary", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- exploratory:::calc_tf(test_df, id,word, weight="binary")
-  expect_true(is.logical(result$tf))
-  expect_equal(colnames(result)[[1]], "id")
-  expect_equal(colnames(result)[[2]], "word")
-  expect_equal(colnames(result)[[3]], "count_per_doc")
-  expect_equal(colnames(result)[[4]], "tf")
-})
-
-test_that("calc_tfidf smooth_idf FALSE", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- exploratory:::calc_tfidf(test_df$id, test_df$word)
-  expect_equal(head(result$.tfidf,2), c(0, 0))
-})
-
 test_that("do_tfidf", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5))
@@ -336,90 +310,7 @@ test_that("do_tfidf", {
     test_df %>%
       do_tfidf(`doc id`, `colname with space`)
   )
-  expect_equal(result$tfidf[c(1,5)], c(2/(sqrt(2^2*3)), 2/(sqrt(2^2*4))))
-})
-
-test_that("do_tfidf with bach tick arg", {
-  test_df <- setNames(data.frame(rep(c(1,2), 5), c("this", "this", "this", letters[1:7])), c("id", "cname with space"))
-  result <- (
-    test_df %>%
-      do_tfidf(id, `cname with space`, norm = FALSE, tf_weight="raw")
-  )
-  expect_equal(head(result$tfidf,2), c(log(2/1), log(2/1)))
-})
-
-test_that("do_tfidf no norm", {
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
-  result <- (
-    test_df %>%
-      do_tfidf(id, word, norm = FALSE, tf_weight="raw")
-  )
-  expect_equal(head(result$tfidf,2), c(log(2/1), log(2/1)))
-})
-
-test_that("do_tfidf l2", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
-  result <- (
-    test_df %>%
-      do_tfidf(id, word, norm="l2")
-  )
-  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
-  expect_true(all(ret$l==1))
-})
-
-test_that("do_tfidf l1", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
-  result <- (
-    test_df %>%
-      do_tfidf(id, word, norm="l1")
-  )
-  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sum(tfidf)))
-  expect_true(all(ret$l==1))
-})
-
-test_that("do_tfidf tf_weight=raw", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
-  result <- (
-    test_df %>%
-      do_tfidf(id, word, tf_weight="raw")
-  )
-  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
-  expect_true(all(ret$l==1))
-})
-
-test_that("do_tfidf tf_weight=log_scale", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
-  result <- (
-    test_df %>%
-      do_tfidf(id, word, tf_weight="log_scale")
-  )
-  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
-  expect_true(all(ret$l==1))
-})
-
-test_that("do_tfidf tf_weight=binary", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
-  result <- (
-    test_df %>%
-      do_tfidf(id, word, tf_weight="binary")
-  )
-  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
-  expect_true(all(ret$l==1))
-})
-
-test_that("do_tfidf count column", {
-  loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2, 3, 4, 5), 2), word=c("this", "this", "this", "this", "this", letters[1:5]), count = c(1,2,3,4,5,6,7,8,9,10))
-  result <- (
-    test_df %>%
-      do_tfidf(id, word, tf_weight="binary", count = count)
-  )
-  expect_true(max(result$count_per_doc)==10)
+  expect_equal(colnames(result), c("doc id","colname with space","count_per_doc","count_of_docs","tfidf"))
 })
 
 test_that("do_ngram", {
