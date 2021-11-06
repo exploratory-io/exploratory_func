@@ -107,7 +107,7 @@ getCSVFileFromGoogleDrive <- function(fileId, delim, quote = '"',
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, isForPreview = FALSE, delim, quote = '"',
+getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
                               col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
@@ -116,7 +116,7 @@ getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, isForPreview = FALSE,
                               skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                               progress = interactive()) {
   # for preview mode, just use the first file.
-  if (isForPreview & length(fileNames) > 0 & length(fileIds) > 0) {
+  if (forPreview & length(fileNames) > 0 & length(fileIds) > 0) {
     fileNames <- fileNames[1]
     fileIds <- fileIds[1]
   }
@@ -138,7 +138,7 @@ getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, isForPreview = FALSE,
 }
 
 #'@export
-searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", isForPreview = FALSE, delim, quote = '"',
+searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", forPreview = FALSE, delim, quote = '"',
                                        escape_backslash = FALSE, escape_double = TRUE,
                                        col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                                        locale = readr::default_locale(),
@@ -165,7 +165,7 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
   if (nrow(items) == 0) {
     stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
   }
-  exploratory::getCSVFilesFromGoogleDrive(items$id, items$name, isForPreview = isForPreview, delim = delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names,
+  exploratory::getCSVFilesFromGoogleDrive(items$id, items$name, forPreview = forPreview, delim = delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names,
                                           col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max,
                                           guess_max = guess_max, progress = progress)
 
@@ -185,9 +185,9 @@ getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col
 
 #'API that imports multiple Excel files from Google Drive
 #'@export
-getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, isForPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
+getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
   # for preview mode, just use the first file.
-  if (isForPreview & length(fileNames) > 0 & length(fileIds) > 0) {
+  if (forPreview & length(fileNames) > 0 & length(fileIds) > 0) {
     fileNames <- fileNames[1]
     fileIds <- fileIds[1]
   }
@@ -206,7 +206,7 @@ getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, isForPreview = FALS
 
 #'API that imports multiple Excel files from Google Drive
 #'@export
-searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", isForPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
+searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   tryCatch({
     items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"))
@@ -227,7 +227,7 @@ searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword
   if (nrow(items) == 0) {
     stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
   }
-  exploratory::getExcelFilesFromGoogleDrive(items$id, items$name, isForPreview = isForPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip,
+  exploratory::getExcelFilesFromGoogleDrive(items$id, items$name, forPreview = forPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip,
                                             trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows,
                                             skipEmptyCols = skipEmptyCols, check.names = check.names, convertDataTypeToChar = convertDataTypeToChar, tzone = tzone, ...)
 }

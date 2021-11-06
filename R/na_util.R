@@ -36,15 +36,23 @@ impute_na <- function(target, type = mean, val = 0, ...) {
         })
       })
       ret
-    }, mean = {
+    },
+    mean = {
       val <- mean(target, na.rm = TRUE)
       target[is.na(target)] <- val
       target
-    }, median = {
+    },
+    median = {
       val <- median(target, na.rm = TRUE)
       target[is.na(target)] <- val
       target
-    }, value = {
+    },
+    mode = {
+      val <- get_mode(target, na.rm = TRUE)
+      target[is.na(target)] <- val
+      target
+    },
+    value = {
       if (length(val) == 1){
         # if val is length 1, na is filled with the value
         if (is.factor(target)) {
@@ -74,7 +82,8 @@ impute_na <- function(target, type = mean, val = 0, ...) {
         target <- dplyr::coalesce(target, val)
       }
       target
-    }, previous = {
+    },
+    previous = {
       z <- zoo::zoo(target) # create zoo object
       z <- zoo::na.locf(z) # fill NA with previous non-NA value
       z <- as.data.frame(z)
