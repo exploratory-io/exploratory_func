@@ -118,7 +118,7 @@ getCSVFileFromAzure <- function(fileName, host, securityToken, container, delim,
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-getCSVFilesFromAzure <- function(files, host, securityToken, container, folder = folder, delim, quote = '"',
+getCSVFilesFromAzure <- function(files, host, securityToken, container, folder = folder, forPreview = FALSE, delim, quote = '"',
                                  escape_backslash = FALSE, escape_double = TRUE,
                                  col_names = TRUE, col_types = NULL,
                                  locale = readr::default_locale(),
@@ -126,6 +126,10 @@ getCSVFilesFromAzure <- function(files, host, securityToken, container, folder =
                                  comment = "", trim_ws = FALSE,
                                  skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                                  progress = interactive()) {
+  # for preview mode, just use the first file.
+  if (forPreview & length(files) > 0) {
+    files <- files[1]
+  }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getCSVFileFromAzure, host = host, securityToken = securityToken, container = container, delim = delim, quote = quote,
@@ -145,7 +149,7 @@ getCSVFilesFromAzure <- function(files, host, securityToken, container, folder =
 
 #'API that search then imports CSV Files from Azure.
 #'@export
-searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, container, folder, delim, quote = '"',
+searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, container, folder, forPreview = FALSE, delim, quote = '"',
                                           escape_backslash = FALSE, escape_double = TRUE,
                                           col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                                           locale = readr::default_locale(),
@@ -172,7 +176,7 @@ searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, co
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-10 :: ', jsonlite::toJSON(container), ' :: There is no file in the Azure container that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getCSVFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, delim = delim, quote = quote,
+  getCSVFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, forPreview = forPreview, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
                     skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
 
@@ -199,7 +203,11 @@ getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = ""
 
 #'API that imports Parquet Files from Azure.
 #'@export
-getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", container = "",  col_select = NULL) {
+getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", container = "", forPreview = FALSE, col_select = NULL) {
+  # for preview mode, just use the first file.
+  if (forPreview & length(files) > 0) {
+    files <- files[1]
+  }
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getParquetFileFromAzure, host = host, securityToken = securityToken, container = container, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
@@ -210,7 +218,7 @@ getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", 
 }
 
 #'@export
-searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", securityToken = "", container = "", folder = "", col_select = NULL) {
+searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", securityToken = "", container = "", folder = "", forPreview = FALSE, col_select = NULL) {
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -231,7 +239,7 @@ searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", sec
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-10 :: ', jsonlite::toJSON(container), ' :: There is no file in the Azure container that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getParquetFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, col_select = col_select)
+  getParquetFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, forPreview = forPreview, col_select = col_select)
 
 }
 
@@ -259,7 +267,7 @@ getExcelFileFromAzure <- function(fileName, host, securityToken, container, shee
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, container, folder, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
+searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, container, folder, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -280,7 +288,7 @@ searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, 
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-10 :: ', jsonlite::toJSON(container), ' :: There is no file in the Azure container that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  exploratory::getExcelFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, sheet = sheet,
+  exploratory::getExcelFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, forPreview = forPreview, sheet = sheet,
                                    col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                    use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols,
                                    check.names = check.names, tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, ...)
@@ -288,7 +296,11 @@ searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, 
 
 #'API that imports multiple Excel files from Azure
 #'@export
-getExcelFilesFromAzure <- function(files, host, securityToken, container, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+getExcelFilesFromAzure <- function(files, host, securityToken, container, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+  # for preview mode, just use the first file.
+  if (forPreview & length(files) > 0) {
+    files <- files[1]
+  }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getExcelFileFromAzure, host = host, securityToken = securityToken, container = container, sheet = sheet,
