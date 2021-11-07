@@ -425,7 +425,7 @@ do_tfidf <- function(df, document, term,
                                          k = idf_k,
                                          threshold = idf_threshold)
     tfidf_df <- dfm_to_df(dfm_tfidf_res)
-    res <- dfm_df %>% dplyr::rename(count_per_doc=value) %>% left_join(doc_freq_df, by=c(token_id="token_id"))
+    res <- dfm_df %>% dplyr::rename(count_per_doc=value) %>% dplyr::left_join(doc_freq_df, by=c(token_id="token_id"))
     res <- res %>% dplyr::left_join(tfidf_df %>% dplyr::select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
     # Drop token_id we used as the join key, since it is an internal info that is not so useful for the users.
     res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document)
