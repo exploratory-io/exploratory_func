@@ -313,6 +313,18 @@ test_that("do_tfidf", {
   expect_equal(colnames(result), c("doc id","colname with space","count_per_doc","count_of_docs","tfidf"))
 })
 
+test_that("do_tfidf with group_by", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(group=c(rep(1,10), rep(2,10)), id=rep(c(1,2), 10))
+  test_df["doc id"] <- rep(c(1,2), 10)
+  test_df["colname with space"] <- rep(c("this", "this", "this", letters[1:7]), 2)
+  result <- (
+    test_df %>% dplyr::group_by(group) %>%
+      do_tfidf(`doc id`, `colname with space`)
+  )
+  expect_equal(colnames(result), c("group", "doc id","colname with space","count_per_doc","count_of_docs","tfidf"))
+})
+
 test_that("do_ngram", {
   loadNamespace("dplyr")
   df <- data.frame(
