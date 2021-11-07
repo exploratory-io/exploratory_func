@@ -68,8 +68,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
     }
   }
 
-  model_df <- df %>% nest_by() %>% ungroup() %>%
-    mutate(model = purrr::map(data, function(df) {
+  model_df <- df %>% dplyr::nest_by() %>% dplyr::ungroup() %>%
+    dplyr::mutate(model = purrr::map(data, function(df) {
       # Floor date. The code is copied form do_prophet.
       df[[time_col]] <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
         # Take care of issue that happened in anomaly detection here for prophet too.
