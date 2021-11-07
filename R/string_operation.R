@@ -408,15 +408,15 @@ do_tfidf <- function(df, document, term,
                       idf_threshold = 0) {
   document_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(document))
   term_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(term))
-  df <- df %>% rename(document_id=!!rlang::sym(document_col), term=!!rlang::sym(term_col))
+  df <- df %>% dplyr::rename(document_id=!!rlang::sym(document_col), term=!!rlang::sym(term_col))
   each_func <- function(df) {
-    nested <- df %>% nest_by(document_id)
+    nested <- df %>% dplyr::nest_by(document_id)
     tokens_list <- purrr::map(nested$data, function(x){x$term})
     names(tokens_list) <- paste0("text", 1:length(tokens_list)) # Add unique names to the list so that it can be passed to quanteda::tokens().
     tokens <- quanteda::tokens(tokens_list)
     dfm_res <- tokens %>% quanteda::dfm()
     dfm_df <- dfm_to_df(dfm_res)
-    doc_freq_df <- dfm_df %>% group_by(token_id) %>% summarize(count_of_docs=n())
+    doc_freq_df <- dfm_df %>% dplyr::group_by(token_id) %>% dplyr::summarize(count_of_docs=n()) # We will join this to the main results to show count of documents.
     dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res,
                                          scheme_tf = tf_scheme,
                                          scheme_df = idf_scheme,
@@ -425,8 +425,9 @@ do_tfidf <- function(df, document, term,
                                          k = idf_k,
                                          threshold = idf_threshold)
     tfidf_df <- dfm_to_df(dfm_tfidf_res)
-    res <- dfm_df %>% rename(count_per_doc=value) %>% left_join(doc_freq_df,by=c(token_id="token_id"))
-    res <- res %>% left_join(tfidf_df %>% select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
+    res <- dfm_df %>% dplyr::rename(count_per_doc=value) %>% left_join(doc_freq_df, by=c(token_id="token_id"))
+    res <- res %>% dplyr::left_join(tfidf_df %>% dplyr::select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
+    # Drop token_id we used as the join key, since it is an internal info that is not so useful for the users.
     res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document)
     res <- res %>% dplyr::rename(!!rlang::sym(document_col):=document, !!rlang::sym(term_col):=token)
     res
