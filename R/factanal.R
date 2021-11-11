@@ -33,6 +33,9 @@ preprocess_factanal_data_before_sample <- function(df, predictor_cols) {
 exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1) {
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  if (length(selected_cols) < nfactors) {
+    stop("The number of factors needs to be less than or equal to the number of selected columns.")
+  }
 
   grouped_cols <- grouped_by(df)
 
