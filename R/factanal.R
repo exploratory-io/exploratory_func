@@ -34,7 +34,7 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   if (length(selected_cols) < nfactors) {
-    stop("The number of factors needs to be less than or equal to the number of selected columns.")
+    stop("EXP-ANA-5 :: [] :: You need to set the number of factors to be less than or equal to the number of variables.")
   }
 
   grouped_cols <- grouped_by(df)
