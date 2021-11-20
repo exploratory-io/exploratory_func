@@ -24,7 +24,6 @@ Imports:
     qlcMatrix,
     purrr,
     httr,
-    text2vec,
     quanteda,
     Matrix,
     rvest,
