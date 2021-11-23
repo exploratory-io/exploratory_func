@@ -665,7 +665,7 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
   return(result)
 }
 
-createAmazonAthenaConnectionString <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
+createAmazonAthenaConnectionString <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "", ...) {
   loadNamespace("stringr")
   # if platform is Linux use predefined one
   if(Sys.info()["sysname"]=="Linux"){
@@ -687,6 +687,10 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
     connectionString <- stringr::str_c(connectionString, ";EndpointOverride=", endpointOverride)
   }
 
+  if (workgroup != "") {
+    connectionString <- stringr::str_c(connectionString, ";workgroup=", workgroup)
+  }
+
   # For Windows, set encoding to make sure non-ascii data is handled properly.
   # ref: https://github.com/r-dbi/odbc/issues/153
   if (is.win <- Sys.info()['sysname'] == 'Windows') {
@@ -702,7 +706,7 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
 
 #' Returns a Amazon Athena connection.
 #' @export
-getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "", ...) {
   loadNamespace("odbc")
   loadNamespace("stringr")
   if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
@@ -716,7 +720,8 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
                                                          password = password,
                                                          additionalParams = additionalParams,
                                                          timezone = timezone,
-                                                         endpointOverride = endpointOverride)
+                                                         endpointOverride = endpointOverride,
+                                                         workgroup = workgroup)
 
   conn <- NULL
   if (user_env$pool_connection) {
@@ -756,7 +761,7 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
 #' Clears AWS Athena Connection.
 #' @export
-clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...){
+clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",  ...){
 
   key <- createAmazonAthenaConnectionString(driver = driver,
                                             region = region,
@@ -766,7 +771,8 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
                                             password = password,
                                             additionalParams = additionalParams,
                                             timezone = timezone,
-                                            endpointOverride = endpointOverride)
+                                            endpointOverride = endpointOverride,
+                                            workgroup = workgroup)
 
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
@@ -1564,9 +1570,9 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, timezone = "", endpointOverride = "", ...){
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, timezone = "", endpointOverride = "", workgroup = "", ...){
   if(!requireNamespace("odbc")){stop("package RODBC must be installed.")}
-  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams, timezone = timezone, endpointOverride = endpointOverride)
+  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams, timezone = timezone, endpointOverride = endpointOverride, workgroup = workgroup)
   tryCatch({
     # For backward compatibility, if 0 is passed as numOfRows, change it to -1.
     # Previously with RODBC package, passing 0 means getting all rows. With odbc package, it needs to be -1 to get all rows.
@@ -1582,7 +1588,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
       clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                        user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride)
+                        user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride, workgroup = workgroup)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
