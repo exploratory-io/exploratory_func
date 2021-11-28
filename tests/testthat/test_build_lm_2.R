@@ -3,7 +3,7 @@
 
 context("test lm/glm prediction with training/test data")
 
-testdata_dir <- "~/.exploratory/"
+testdata_dir <- tempdir()
 testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
 testdata_file_path <- paste0(testdata_dir, testdata_filename)
 

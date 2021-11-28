@@ -4,7 +4,7 @@
 
 context("test tidiers for randomForest 4 (training and test data with group_by)")
 
-testdata_dir <- "~/.exploratory/"
+testdata_dir <- tempdir()
 testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
 testdata_file_path <- paste0(testdata_dir, testdata_filename)
 
