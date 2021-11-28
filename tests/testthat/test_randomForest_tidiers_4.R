@@ -6,7 +6,7 @@ context("test tidiers for randomForest 4 (training and test data with group_by)"
 
 testdata_dir <- tempdir()
 testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
-testdata_file_path <- paste0(testdata_dir, testdata_filename)
+testdata_file_path <- paste0(testdata_dir, '/', testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
   "https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1"
