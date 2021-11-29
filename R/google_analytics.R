@@ -229,16 +229,6 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
                                                    segment = segments,
                                                    max_results = 99999999,
                                                    samplingLevel=samplingLevel)
-    #query.list <- RGoogleAnalytics::Init(start.date = startDate,
-    #                                     end.date = endDate,
-    #                                     dimensions = dimensions,
-    #                                     metrics = metrics,
-    #                                     segments = segments,
-    #                                     max.results = 10000,
-    #                                     table.id = tableId)
-
-    #ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
-    #ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
   }
 
   if("date" %in% colnames(ga.data)){
