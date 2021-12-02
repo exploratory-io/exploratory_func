@@ -91,9 +91,10 @@ getGoogleAnayticsSegmentList <- function(){
 #' @param endDate - When dateRangeType is "since", you can provide end date. "today" will be used if it's not provided.
 #' @param tzone - timezone applied to POSIXct column (force_tz)
 #' @param tzonForDisplay - timezone for displaying POSIXct column (with_tz)
+#' @param samplingLevel - Sampling Level (for V3)
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
-                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, tzoneForDisplay = NULL, isV4 = FALSE, ...){
+                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, tzoneForDisplay = NULL, isV4 = FALSE, samplingLevel = "DEFAULT", ...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -206,12 +207,11 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   if(is.null(endDate)) {
     endDate <- as.character(lubridate::today())
   }
-
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  # dimension/metrics are passed as ga:country, ga:dateHour so we want to convert it as c("country", "dateHour")
+  metrics <- unlist(strsplit(stringr::str_replace_all(metrics, "ga:", ""), split = ","))
+  dimensions = unlist(strsplit(stringr::str_replace_all(dimensions, "ga:", ""), split = ","))
   if (isV4) {
-    googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
-    # dimension/metrics are passed as ga:country, ga:dateHour so we want to convert it as c("country", "dateHour")
-    metrics <- unlist(strsplit(stringr::str_replace_all(metrics, "ga:", ""), split = ","))
-    dimensions = unlist(strsplit(stringr::str_replace_all(dimensions, "ga:", ""), split = ","))
     # ref: https://code.markedmondson.me/googleAnalyticsR/articles/reporting-ga4.html
     ga.data <- googleAnalyticsR::ga_data(
       tableId,
@@ -221,16 +221,14 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
       limit = -1
     )
   } else {
-    query.list <- RGoogleAnalytics::Init(start.date = startDate,
-                                         end.date = endDate,
-                                         dimensions = dimensions,
-                                         metrics = metrics,
-                                         segments = segments,
-                                         max.results = 10000,
-                                         table.id = tableId)
-
-    ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
-    ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
+    ga.data <- googleAnalyticsR::google_analytics_3(id = tableId,
+                                                   start = startDate,
+                                                   end = endDate,
+                                                   metrics = metrics,
+                                                   dimensions = dimensions,
+                                                   segment = segments,
+                                                   max_results = 99999999,
+                                                   samplingLevel=samplingLevel)
   }
 
   if("date" %in% colnames(ga.data)){
