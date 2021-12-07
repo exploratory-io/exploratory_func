@@ -120,7 +120,7 @@ getGoogleSheetList <- function(tokenFileId="", teamDriveId="", n_max=5000){
     googledrive::drive_find(type = "spreadsheet", shared_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max)
   } else { #if team id is provided search documents within the team.
     # To improve performance, only get id, name and canEdit for each spreadsheet.
-    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max)
+    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max )
   }
 }
 
