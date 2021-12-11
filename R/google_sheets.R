@@ -107,7 +107,7 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetList <- function(tokenFileId="", teamDriveId="", n_max=5000){
+getGoogleSheetList <- function(tokenFileId="", teamDriveId="", n_max=5000, pattern = ""){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
@@ -117,10 +117,10 @@ getGoogleSheetList <- function(tokenFileId="", teamDriveId="", n_max=5000){
   if(teamDriveId != "" && !is.null(teamDriveId)) {
     # To improve performance, only get id, name and canEdit for each spreadsheet.
     # NOTE: googledrive changed team_drive argument to shared_drive
-    googledrive::drive_find(type = "spreadsheet", shared_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max)
+    googledrive::drive_find(type = "spreadsheet", shared_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max, q = pattern)
   } else { #if team id is provided search documents within the team.
     # To improve performance, only get id, name and canEdit for each spreadsheet.
-    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max )
+    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max, q = pattern )
   }
 }
 
