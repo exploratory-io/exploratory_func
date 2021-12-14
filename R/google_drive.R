@@ -3,7 +3,10 @@
 #' @param teamDriveId - in case you want to search for team drive
 #' @param path - This should be ID of the folder since searching with folder name doesn't always work as expected.
 #' @param type - object type that you want to include in your query result.
-listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx")){
+#' @param n_max - number of max items to return
+#' @param pattern - query string - if pattern is specified this is search mode so search recursively. If the pattern is not set, it's file listing mode so just get items under the path.
+
+listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx"), n_max = 5000, pattern = ""){
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
@@ -23,9 +26,14 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
     if (teamDriveId != "" && !is.null(teamDriveId)) {
       teamDriveId = googledrive::as_id(teamDriveId)
     }
+    recursive <- FALSE
+    #if pattern is specified this is search mode so search recursively. If the pattern is not set, it's file listing mode so just get items under the path.
+    if (pattern != "") {
+      recursive <- TRUE
+    }
     # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
     # NOTE: googledrive changed team_drive argument to shared_drive
-    googledrive::drive_ls(path = path, type = type, shared_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
+    googledrive::drive_ls(path = path, type = type, shared_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken", n_max = n_max, q = pattern, recursive = recursive)
   }, error = function(e) {
     stop(e)
   }, finally = {
