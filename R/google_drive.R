@@ -4,7 +4,7 @@
 #' @param path - This should be ID of the folder since searching with folder name doesn't always work as expected.
 #' @param type - object type that you want to include in your query result.
 #' @param n_max - number of max items to return
-#' @param search - query string
+#' @param pattern - query string
 listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx"), n_max = 5000, pattern = ""){
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
