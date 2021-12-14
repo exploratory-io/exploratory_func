@@ -26,6 +26,7 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
       teamDriveId = googledrive::as_id(teamDriveId)
     }
     recursive <- FALSE
+    #if pattern is specified this is search mode so search recursively. If the pattern is not set, it's file listing mode so just get items under the path.
     if (pattern != "") {
       recursive <- TRUE
     }
