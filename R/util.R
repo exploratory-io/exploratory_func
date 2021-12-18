@@ -1739,7 +1739,8 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Column reorder function we use from Reorder steps of Exploratory.
 #' @export
 reorder_cols <- function(df, ...) {
-  dplyr::select(df, !!!rlang::quos(...), dplyr::everything())
+  # use any_of to make it work even if the columns in the arguments do not exist.
+  dplyr::select(df, dplyr::any_of(!!purrr::flatten_chr(purrr::map(rlang::quos(...),rlang::as_name))), dplyr::everything())
 }
 
 #' @export
