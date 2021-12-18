@@ -1739,11 +1739,11 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Column reorder function we use from Reorder steps of Exploratory.
 #' @export
 reorder_cols <- function(df, ...) {
-  args_as_expression = substitute(list(...))
-  # Deparse each item in the expression, turning it into a char vector
-  # The [-1] is required because the first element in the list expression is "list".
-  args_as_char_vector = sapply(args_as_expression,deparse)[-1]
-  dplyr::select(df, dplyr::any_of(args_as_char_vector), dplyr::everything())
+  columns = substitute(list(...))
+  # Deparse each column in the argument and turning it into a character vector.
+  # Then remove the first element in the list because the expression is "list".
+  column_names <- sapply(columns,deparse)[-1]
+  dplyr::select(df, dplyr::any_of(column_names), dplyr::everything())
 }
 
 #' @export
