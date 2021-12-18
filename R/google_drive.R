@@ -53,7 +53,7 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
 
 #' API to get a folder details in Google Drive
 #' @export
-getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
+getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL, useGoogleSheetsToken = FALSE) {
   if(!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
