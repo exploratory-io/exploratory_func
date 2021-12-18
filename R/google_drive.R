@@ -63,7 +63,7 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL, useGoo
   # set below config (see https://github.com/jeroen/curl/issues/156)
   httr::set_config(httr::config(http_version = 0))
   result <- tryCatch({
-    token <- ""
+    token <- NULL
     if (useGoogleSheetsToken) {
       token <- getGoogleTokenForSheet()
     } else {
