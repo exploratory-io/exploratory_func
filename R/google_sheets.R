@@ -151,8 +151,9 @@ getGoogleSheetWorkSheetList <- function(tokenFileId = "", title, id = NULL){
 #' API to get Team Drives from Google Drive.
 #' @export
 #' @param tokenFileId - No longer used. It was kept for backward compatibility for the old Desktop Versions that don't handle OAuth token in server side.
-#' @param useGoogleSheetsToken - TRUE if you want to use Google Sheets OAuth token.
-#' To use this API for Exploratory Desktop Google Sheets Data Source, set this as TRUE.
+#' @param useGoogleSheetsToken - Since this API is used for both Google Sheets Data Source and Google Drive Data Source from Exploratory Desktop,
+#' set this parameter as TRUE to make it work with Google Sheets Data Source case.
+#' If this parameter is set as TRUE, it uses OAuth token set for Google Sheets Data Source.
 #' @export
 getTeamDrives <- function(tokenFileId = "", useGoogleSheetsToken = TRUE){
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}

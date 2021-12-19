@@ -5,8 +5,11 @@
 #' @param type - object type that you want to include in your query result.
 #' @param n_max - number of max items to return
 #' @param pattern - query string - if pattern is specified this is search mode so search recursively. If the pattern is not set, it's file listing mode so just get items under the path.
+#' @param useGoogleSheetsToken - Since this API is used for both Google Sheets Data Source and Google Drive Data Source from Exploratory Desktop,
+#' set this parameter as TRUE to make it work with Google Sheets Data Source case.
+#' If this parameter is set as TRUE, it uses OAuth token set for Google Sheets Data Source.
 
-listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx"), n_max = 5000, pattern = ""){
+listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx"), n_max = 5000, pattern = "", useGoogleSheetsToken = FALSE){
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
@@ -16,7 +19,12 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
   # set below config (see https://github.com/jeroen/curl/issues/156)
   httr::set_config(httr::config(http_version = 0))
   result <- tryCatch({
-    token = getGoogleTokenForDrive()
+    token <- NULL
+    if (useGoogleSheetsToken) {
+      token = getGoogleTokenForSheet()
+    } else {
+      token = getGoogleTokenForDrive()
+    }
     googledrive::drive_set_token(token)
     # "~/" is special case for listing under My Drive so do not call googledriev::as_id for "~/".
     if (!is.null(path) && path != "~/") {
@@ -48,7 +56,13 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
 
 #' API to get a folder details in Google Drive
 #' @export
-getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
+#' @param teamDriveid - (Optional) For Team Drive ID
+#' @param path - (Optional) Folder that you want to get files.
+#' @param useGoogleSheetsToken - Since this API is used for both Google Sheets Data Source and Google Drive Data Source from Exploratory Desktop,
+#' set this parameter as TRUE to make it work with Google Sheets Data Source case.
+#' If this parameter is set as TRUE, it uses OAuth token set for Google Sheets Data Source.
+#'
+getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL, useGoogleSheetsToken = FALSE) {
   if(!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
@@ -58,7 +72,12 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
   # set below config (see https://github.com/jeroen/curl/issues/156)
   httr::set_config(httr::config(http_version = 0))
   result <- tryCatch({
-    token = getGoogleTokenForDrive()
+    token <- NULL
+    if (useGoogleSheetsToken) {
+      token <- getGoogleTokenForSheet()
+    } else {
+      token <- getGoogleTokenForDrive()
+    }
     googledrive::drive_set_token(token)
     if (!is.null(path)) {
       path = googledrive::as_id(path)
