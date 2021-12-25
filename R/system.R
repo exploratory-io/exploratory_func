@@ -850,7 +850,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
-    key <- paste("mysql", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("mysql", host, port, databaseName, username, timezone, sslClientCertKey, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -880,10 +880,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
       if (timezone != "") {# if Timezone is set use it for timezone and timezone_out
         conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
-                                   password = password, host = host, port = port, bigint = "numeric")
+                                   password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslClientCertKey)
       } else {
         conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                                   password = password, host = host, port = port, bigint = "numeric")
+                                   password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslClientCertKey)
       }
       connection_pool[[key]] <- conn
     }
@@ -1526,11 +1526,11 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ..
 
 
 #' @export
-queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", ...){
+queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslClientCertKey = "", ...){
   if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  conn <- getDBConnection(type = "mysql", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone)
+  conn <- getDBConnection(type = "mysql", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslClientCertKey = sslClientCertKey, ...)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
