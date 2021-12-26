@@ -1409,9 +1409,9 @@ getListOfTablesWithODBC <- function(conn){
 }
 
 #' @export
-getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = ""){
+getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = "", sslClientCertKey = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema, sslClientCertKey)
 
   tryCatch({
     tables <- DBI::dbListTables(conn)
@@ -1484,7 +1484,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, timezone = timezone)
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, timezone = timezone, sslClientCertKey = sslClientCertKey)
     if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
