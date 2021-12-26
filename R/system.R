@@ -1467,9 +1467,9 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 
 #' API to execute a query that can be handled with DBI
 #' @export
-executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = ""){
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = "", sslClientCertKey = ""){
   if (type %in% c("mysql", "aurora")) { # In case of MySQL, just use queryMySQL, since it has workaround to read multibyte column names without getting garbled.
-    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query, timezone = timezone)
+    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query, timezone = timezone, sslClientCertKey = sslClientCertKey)
     df <- readr::type_convert(df)
     # It is hackish, but to read multibyte character data correctly, type_convert helps for some reason.
     # There is small chance of column getting converted to unwanted type, but for our usage, that is unlikely, and being able to read multibyte outweighs the potential drawback.
