@@ -7,10 +7,10 @@
 #' @param pattern - query string - if pattern is specified this is search mode so search recursively. If the pattern is not set, it's file listing mode so just get items under the path.
 #' @param useGoogleSheetsToken - Since this API is used for both Google Sheets Data Source and Google Drive Data Source from Exploratory Desktop,
 #' set this parameter as TRUE to make it work with Google Sheets Data Source case.
-#' @param isForSharedWithMe - If this is set as TRUE, it only returns the items that are shared with the user. If this is set as FALSE, it only returns items whose the owner is your user.
+#' @param sharedWithMe - If this is set as TRUE, it only returns the items that are shared with the user. If this is set as FALSE, it only returns items whose the owner is your user.
 #' If this parameter is set as TRUE, it uses OAuth token set for Google Sheets Data Source.
 
-listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx"), n_max = 5000, pattern = "", useGoogleSheetsToken = FALSE, isForSharedWithMe = FALSE){
+listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx"), n_max = 5000, pattern = "", useGoogleSheetsToken = FALSE, sharedWithMe = FALSE){
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
@@ -40,13 +40,13 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
     if (pattern != "") {
       recursive <- TRUE
     }
-    if (isForSharedWithMe) {
+    if (sharedWithMe) { # if the items are shared with me, owners attribute does not include 'me' so use "not 'me' in owners" condition.
       if (pattern != "") {
         pattern <- stringr::str_c("not 'me' in owners and ", pattern)
       } else {
         pattern <- "not 'me' in owners"
       }
-    } else {
+    } else {# if the items are NOT shared with me, owners attribute includes 'me' so use "'me' in owners" condition`.
       if (pattern != "") {
         pattern <- stringr::str_c("'me' in owners and ", pattern)
       } else {
@@ -55,6 +55,7 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
     }
     # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
     # NOTE: googledrive changed team_drive argument to shared_drive
+    # Include files/ownedByMe in the result so that we can use it for verifying sharedWithMe parameter works as expected.
     googledrive::drive_ls(path = path, type = type, shared_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, files/ownedByMe, files/owners/displayName, nextPageToken", n_max = n_max, q = pattern, recursive = recursive)
   }, error = function(e) {
     stop(e)
