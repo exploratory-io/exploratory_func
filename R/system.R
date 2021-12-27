@@ -1530,7 +1530,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  conn <- getDBConnection(type = "mysql", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslCA = sslCA, ...)
+  conn <- getDBConnection(type = "mysql", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslCA = sslCA)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
