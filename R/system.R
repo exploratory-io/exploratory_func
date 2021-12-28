@@ -850,6 +850,11 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
+
+    # When the Amazon Aurora data source is executed on Linux and sslCA parameter is defined, switch it to use seeded pem file for now.
+    if(type == "aurora" && Sys.info()["sysname"] == "Linux" && sslCA != ""){
+      sslCA <- "/etc/ssl/certs/rds-combined-ca-bundle.pem";
+    }
     key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
