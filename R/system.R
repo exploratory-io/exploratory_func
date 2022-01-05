@@ -884,18 +884,18 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
       if (timezone != "") {# if Timezone is set use it for timezone and timezone_out
-        if (sslCA != "") {
+        if (sslCA != "") { # if sslCA is set, pass it as ssl.ca
           conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
                                      password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
-        } else {
+        } else { # if sslCA is not set, do not set it since passing empty string causes Error : Failed to connect: SSL connection error: No such file or directory
           conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
                                      password = password, host = host, port = port, bigint = "numeric")
         }
-      } else {
+      } else {# if sslCA is set, pass it as ssl.ca
         if (sslCA != "") {
           conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
                                      password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
-        } else {
+        } else {# if sslCA is not set, do not set it since passing empty string causes Error : Failed to connect: SSL connection error: No such file or directory
           conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
                                      password = password, host = host, port = port, bigint = "numeric")
         }
