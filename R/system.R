@@ -884,11 +884,21 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
       if (timezone != "") {# if Timezone is set use it for timezone and timezone_out
-        conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
-                                   password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
+        if (sslCA != "") {
+          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
+                                     password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
+        } else {
+          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
+                                     password = password, host = host, port = port, bigint = "numeric")
+        }
       } else {
-        conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                                   password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
+        if (sslCA != "") {
+          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
+                                     password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
+        } else {
+          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
+                                     password = password, host = host, port = port, bigint = "numeric")
+        }
       }
       connection_pool[[key]] <- conn
     }
@@ -1416,7 +1426,7 @@ getListOfTablesWithODBC <- function(conn){
 #' @export
 getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = "", sslCA = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema, sslCA)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema, sslCA = sslCA)
 
   tryCatch({
     tables <- DBI::dbListTables(conn)
