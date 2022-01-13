@@ -31,26 +31,28 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
     if (!is.null(path) && path != "~/") {
       path = googledrive::as_id(path)
     }
-    # If team id is provided search documents within the team.
-    if (teamDriveId != "" && !is.null(teamDriveId)) {
-      teamDriveId = googledrive::as_id(teamDriveId)
-    }
     recursive <- FALSE
     #if pattern is specified this is search mode so search recursively. If the pattern is not set, it's file listing mode so just get items under the path.
     if (pattern != "") {
       recursive <- TRUE
     }
-    if (sharedWithMe) { # if the items are shared with me, owners attribute does not include 'me' so use "not 'me' in owners" condition.
-      if (pattern != "") {
-        pattern <- stringr::str_c("not 'me' in owners and ", pattern)
-      } else {
-        pattern <- "not 'me' in owners"
-      }
-    } else {# if the items are NOT shared with me, owners attribute includes 'me' so use "'me' in owners" condition`.
-      if (pattern != "") {
-        pattern <- stringr::str_c("'me' in owners and ", pattern)
-      } else {
-        pattern <- "'me' in owners"
+
+    # If team id is provided search documents within the team.
+    if (teamDriveId != "" && !is.null(teamDriveId)) {
+      teamDriveId = googledrive::as_id(teamDriveId)
+    } else { # if team drive id is NOT provided, handle sharedWithMe case. NOTE: sharedWithMe query condition does not work for team drive (aka shared drive)
+      if (sharedWithMe) { # if the items are shared with me, owners attribute does not include 'me' so use "not 'me' in owners" condition.
+        if (pattern != "") {
+          pattern <- stringr::str_c("not 'me' in owners and ", pattern)
+        } else {
+          pattern <- "not 'me' in owners"
+        }
+      } else {# if the items are NOT shared with me, owners attribute includes 'me' so use "'me' in owners" condition`.
+        if (pattern != "") {
+          pattern <- stringr::str_c("'me' in owners and ", pattern)
+        } else {
+          pattern <- "'me' in owners"
+        }
       }
     }
     # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
