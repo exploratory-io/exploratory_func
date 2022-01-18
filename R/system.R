@@ -852,6 +852,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # queryMySQL() too, which uses the key "mysql"
 
     # When the Amazon Aurora data source is executed on Linux, it's possible that sslCA parameter is defined, for this case switch it to use seeded pem file for now.
+    # Also, when getDBConnection is called from queryMySQL, the type argument is set as "mysql" for both MariaDB and Aurora, so stop checking type
+    # and simply check if sslCA is empty string or not.
     if(Sys.info()["sysname"] == "Linux" && sslCA != ""){
       sslCA <- "/etc/ssl/certs/rds-combined-ca-bundle.pem";
     }
