@@ -851,8 +851,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
 
-    # When the Amazon Aurora data source is executed on Linux and sslCA parameter is defined, switch it to use seeded pem file for now.
-    if(type == "aurora" && Sys.info()["sysname"] == "Linux" && sslCA != ""){
+    # When the Amazon Aurora data source is executed on Linux, it's possible that sslCA parameter is defined, for this case switch it to use seeded pem file for now.
+    if(Sys.info()["sysname"] == "Linux" && sslCA != ""){
       sslCA <- "/etc/ssl/certs/rds-combined-ca-bundle.pem";
     }
     key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sep = ":")
