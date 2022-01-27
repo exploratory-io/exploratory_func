@@ -1375,7 +1375,7 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
   args <- append(list(quote(.)), rlang::call_args(params))
-  call <- rlang::new_call(func, rlang::as_pairlist(args))
+  call <- rlang::new_call(func, as.pairlist(args))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
@@ -1404,8 +1404,8 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   # This is a list of arguments in do clause
   args1 <- append(list(quote(.)), rlang::call_args(params1))
   args2 <- append(list(quote(.)), rlang::call_args(params2))
-  call1 <- rlang::new_call(func1, rlang::as_pairlist(args1))
-  call2 <- rlang::new_call(func2, rlang::as_pairlist(args2))
+  call1 <- rlang::new_call(func1, as.pairlist(args1))
+  call2 <- rlang::new_call(func2, as.pairlist(args2))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
