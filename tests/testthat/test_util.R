@@ -1122,6 +1122,12 @@ test_that("seconds_between", {
   expect_equal(age, 600)
 })
 
+test_that("prefecturecode", {
+  df <- data.frame(a=c("北海道", "東京都", NA))
+  result <- exploratory::prefecturecode(df$a)
+  expect_equal(result,c("01", "13", NA))
+})
+
 
 
 

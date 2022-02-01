@@ -2628,3 +2628,12 @@ merge_sds <- function(sds, means, sizes) {
   res <- sqrt(var_merged)
   res
 }
+
+# Get Prefecture Code from Prefecture Kanji Column
+#' @param prefecture kanji column
+#' @export
+prefecturecode <- function(prefectures) {
+  targetDF <- data.frame(prefecture_kanji = prefectures)
+  result <- targetDF %>% dplyr::left_join(zipangu::jpnprefs, by = "prefecture_kanji")
+  result$jis_code
+}
