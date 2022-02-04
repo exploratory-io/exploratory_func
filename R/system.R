@@ -330,6 +330,11 @@ js_glue_transformer <- function(expr, envir) {
   # Trim white spaces.
   name <- trimws(name)
 
+  # Extract the vector index from name[index] expression if it exists.
+  name_index <- stringr::str_split(name,'[\\[\\]]')[[1]]
+  name <- name_index[1]
+  index <- name_index[2]
+
   # Strip quote by ``.
   should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
@@ -337,6 +342,9 @@ js_glue_transformer <- function(expr, envir) {
     name <- sub("`$", "", name)
   }
   code <- paste0("exploratory_env$`", name, "`")
+  if (!is.na(index)) { # Apply the vector index if it is specified.
+    code <- paste0(code, '[', index, ']')
+  }
 
   val <- eval(parse(text = code), envir)
 
@@ -464,6 +472,11 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE, salesforc
   # Trim white spaces.
   name <- trimws(name)
 
+  # Extract the vector index from name[index] expression if it exists.
+  name_index <- stringr::str_split(name,'[\\[\\]]')[[1]]
+  name <- name_index[1]
+  index <- name_index[2]
+
   # Strip quote by ``.
   should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
@@ -472,6 +485,9 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE, salesforc
   }
 
   code <- paste0("exploratory_env$`", name, "`")
+  if (!is.na(index)) { # Apply the vector index if it is specified.
+    code <- paste0(code, '[', index, ']')
+  }
 
   val <- eval(parse(text = code), envir)
 
