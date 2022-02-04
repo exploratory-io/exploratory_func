@@ -125,9 +125,7 @@ do_cor.kv_ <- function(df,
         stop("More than 1 aggregated measures per category are required to calculate correlations.")
       }
     }
-    sorted_colnames <- colnames(mat)
-
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
+    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -197,13 +195,8 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
       # Convert logical to numeric explicitly, since implicit conversion by as.matrix does not happen if all the columns are logical.
       dplyr::mutate(across(where(is.logical), as.numeric)) %>%
       as.matrix()
-    # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
-    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE.
-    # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
-    sorted_colnames <- stringr::str_sort(colnames(mat))
-    mat <- mat[,sorted_colnames]
 
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=TRUE)
+    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, na.rm=TRUE)
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -229,7 +222,13 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 }
 
 
-do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm) {
+do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, na.rm) {
+  # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
+  # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE.
+  # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
+  sorted_colnames <- stringr::str_sort(colnames(mat))
+  mat <- mat[,sorted_colnames]
+
   cor_mat <- cor(mat, use = use, method = method)
   if(distinct){
     ret <- upper_gather(
