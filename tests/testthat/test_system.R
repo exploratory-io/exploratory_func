@@ -183,6 +183,10 @@ test_that("js_glue_transformer", {
   exploratory_env$stock_symbols <- c()
   res <- exploratory:::glue_exploratory("{stock:{$in:[@{stock_symbols}]}}", .transformer=exploratory:::js_glue_transformer)
   expect_equal(as.character(res), "{stock:{$in:[]}}", "message")
+
+  exploratory_env$number_range <- c(-10, 20)
+  res <- exploratory:::glue_exploratory("{salary:{$gte:@{number_range[1]}, $lt:@{number_range[2]}}}", .transformer=exploratory:::js_glue_transformer)
+  expect_equal(as.character(res), "{salary:{$gte:-10, $lt:20}}")
 })
 
 test_that("sql_glue_transformer", {
