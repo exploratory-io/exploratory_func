@@ -217,6 +217,10 @@ test_that("sql_glue_transformer", {
   exploratory_env$number_limit <- 1000000
   res <- exploratory:::glue_exploratory("select top @{number_limit} * from emp", .transformer=exploratory:::sql_glue_transformer)
   expect_equal(as.character(res), "select top 1000000 * from emp")
+
+  exploratory_env$number_range <- c(-10, 20)
+  res <- exploratory:::glue_exploratory("select * from emp where salary between @{number_range[1]} and @{number_range[2]}", .transformer=exploratory:::sql_glue_transformer)
+  expect_equal(as.character(res), "select * from emp where salary between -10 and 20")
 })
 
 test_that("bigquery_glue_transformer", {
