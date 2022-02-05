@@ -197,10 +197,15 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
       as.matrix()
 
     ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=TRUE)
-    browser()
+
+    # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
     cor0 <- ret %>% filter(pair.name.x != pair.name.y)
     cor0 <- cor0 %>% group_by(pair.name.x) %>% summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% arrange(desc(mean_cor))
     ret <- ret %>% mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
+
+    if (diag) {
+      ret <- ret %>% filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
+    }
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
