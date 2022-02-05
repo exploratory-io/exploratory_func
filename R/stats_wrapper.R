@@ -203,7 +203,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     cor0 <- cor0 %>% group_by(pair.name.x) %>% summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% arrange(desc(mean_cor))
     ret <- ret %>% mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
 
-    if (diag) {
+    if (distinct) {
       ret <- ret %>% filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
     }
 
