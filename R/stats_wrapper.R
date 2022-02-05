@@ -125,7 +125,7 @@ do_cor.kv_ <- function(df,
         stop("More than 1 aggregated measures per category are required to calculate correlations.")
       }
     }
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
+    ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -196,7 +196,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
       dplyr::mutate(across(where(is.logical), as.numeric)) %>%
       as.matrix()
 
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, na.rm=TRUE)
+    ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=TRUE)
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -222,7 +222,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 }
 
 
-do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, na.rm) {
+do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
   # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
   # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE.
   # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
@@ -230,21 +230,11 @@ do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, na.rm
   mat <- mat[,sorted_colnames]
 
   cor_mat <- cor(mat, use = use, method = method)
-  if(distinct){
-    ret <- upper_gather(
-      cor_mat,
-      diag=diag,
-      cnames=output_cols[1:3],
-      na.rm=na.rm,
-      zero.rm=FALSE
-    )
-  } else {
-    ret <- mat_to_df(cor_mat,
-                     cnames=output_cols[1:3],
-                     diag=diag,
-                     na.rm=na.rm,
-                     zero.rm=FALSE)
-  }
+  ret <- mat_to_df(cor_mat,
+                   cnames=output_cols[1:3],
+                   diag=diag,
+                   na.rm=na.rm,
+                   zero.rm=FALSE)
 
   # Create a matrix of P-values for Analytics View case.
   dim <- length(sorted_colnames)
@@ -279,13 +269,8 @@ do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, na.rm
   rownames(pvalue_mat) <- sorted_colnames
   colnames(tvalue_mat) <- sorted_colnames
   rownames(tvalue_mat) <- sorted_colnames
-  if (distinct) {
-    p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols[c(1,2,4)], zero.rm=FALSE)
-    t_value_ret <- upper_gather(tvalue_mat, diag=diag, cnames=output_cols[c(1,2,5)], zero.rm=FALSE)
-  } else {
-    p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols[c(1,2,4)], diag=diag, zero.rm=FALSE)
-    t_value_ret <- mat_to_df(tvalue_mat, cnames=output_cols[c(1,2,5)], diag=diag, zero.rm=FALSE)
-  }
+  p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols[c(1,2,4)], diag=diag, zero.rm=FALSE)
+  t_value_ret <- mat_to_df(tvalue_mat, cnames=output_cols[c(1,2,5)], diag=diag, zero.rm=FALSE)
   ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret <- ret %>% dplyr::left_join(t_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret
