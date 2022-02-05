@@ -2460,11 +2460,14 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 #' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"    "群馬"
 
 prefecturecode <- function(prefecture, output_type="name") {
-  if (output_type == "code") {
+  if (output_type == "code") { # covert preferctur name to prefecture code
+    loadNamespace("zipangu")
     prefecture = exploratory::prefecturecode(prefecture, output_type = "name")
     targetDF <- data.frame(prefecture_normalized = prefecture)
     answerDF <- zipangu::jpnprefs
+    # create prefecture_normalized column from a prefecture_kanji column and removes "都", "府", "県" from it.
     answerDF <- answerDF %>% dplyr::mutate(prefecture_normalized = stringr::str_remove(prefecture_kanji, "[\u90FD\u5E9C\u770C]$"))
+    # Join data frames by prefecture_normalized so that it can get a corresponding prefecture code.
     result <- targetDF %>% dplyr::left_join(answerDF, by = "prefecture_normalized")
     result$jis_code
   } else if (output_type == "name") {
