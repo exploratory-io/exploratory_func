@@ -85,6 +85,17 @@ test_that("do_cor with Spearman method", {
   expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
 })
 
+test_that("do_cor with variable order based on the input order", {
+  # Steps to produce the output
+  df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
+  model_df <- df %>% do_cor(`x`, `y`, `z`, method = "pearson", distinct = FALSE, diag = TRUE, variable_order = "input", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type='cor')
+  # The output variable name order should be same as the input.
+  expect_equal(as.character(res$pair.name.x), c(rep("x", 3), rep("y", 3), rep("z", 3)))
+  expect_equal(as.character(res$pair.name.y), rep(c("x", "y", "z"), 3))
+  expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
+})
+
 test_that("do_cor with only lower triangle", {
   # Steps to produce the output
   df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
