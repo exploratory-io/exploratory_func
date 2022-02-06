@@ -2481,11 +2481,11 @@ prefecturecode <- function(prefecture, output_type="name") {
     pref_normalized <- gsub("[_ \\.\\-](to|fu|hu|ken)$", "", pref_normalized)
     # Convert "o" with macron to simple "o".
     pref_normalized <- gsub("\u014D", "o", pref_normalized)
-    # Convert "gunma" to "gumma".
+    # jp_prefecture_name_id_map uses gumma as a mapping key, so to take care of "gunma" properly, convert "gunma" to "gumma.
     pref_normalized <- dplyr::if_else(pref_normalized=="gunma", "gumma" ,pref_normalized)
     # Return the matching IDs.
     return (as.character(jp_prefecture_name_id_map$id[match(pref_normalized, jp_prefecture_name_id_map$name)]))
-  } else { #for other case, just return the prefecure
+  } else { #for other case, just return the prefecture.
     prefecture
   }
 
