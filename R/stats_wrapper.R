@@ -257,8 +257,9 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 
 
 do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
-  # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
-  # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE.
+  # Sort the column name.
+  # Now that we sort the variables based on correlation result or input order, this might not be as meaningful,
+  # but I'm hoping this might still help align the result between Mac and Windows if there are ties in the mean correlations.
   # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
   sorted_colnames <- stringr::str_sort(colnames(mat))
   mat <- mat[,sorted_colnames]
