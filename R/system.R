@@ -2460,7 +2460,7 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 #' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"    "群馬"
 
 prefecturecode <- function(prefecture, output_type="name") {
-  if (output_type == "code") { # covert preferctur name to prefecture code
+  if (output_type == "code") { # covert prefecture name to prefecture code
     loadNamespace("zipangu")
     prefecture = exploratory::prefecturecode(prefecture, output_type = "name")
     targetDF <- data.frame(prefecture_normalized = prefecture)
