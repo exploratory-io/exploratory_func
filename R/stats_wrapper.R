@@ -100,7 +100,7 @@ do_cor.kv_ <- function(df,
   }
   # column names are "{subject}.x", "{subject}.y", "value"
   output_cols <- avoid_conflict(grouped_col,
-                                c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                                c("pair.name.x", "pair.name.y",
                                   "correlation", "p_value", "statistic"))
 
   do_cor_each <- function(df){
@@ -127,8 +127,6 @@ do_cor.kv_ <- function(df,
     }
     ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
 
-    # Rename the column names once so that the following processing is easier. Will rename them back before the output.
-    ret <- ret %>% rename(pair.name.x=paste0(col, ".x"), pair.name.y=paste0(col, ".y"))
     # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
     cor0 <- ret %>% filter(pair.name.x != pair.name.y)
     cor0 <- cor0 %>% group_by(pair.name.x) %>% summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% arrange(desc(mean_cor))
@@ -142,12 +140,14 @@ do_cor.kv_ <- function(df,
       ret <- ret %>% arrange(pair.name.x, pair.name.y)
       # Revert the variable names to character for step output.
       ret <- ret %>% mutate(pair.name.x = as.character(pair.name.x), pair.name.y = as.character(pair.name.y))
+      # We use paste0 since str_c garbles multibyte column names here for some reason.
       ret <- ret %>% rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
       ret # Return correlation data frame as is.
     }
     else {
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
+      # We use paste0 since str_c garbles multibyte column names here for some reason.
       ret <- ret %>% rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
       ret <- list(cor = ret, data = df)
       class(ret) <- c("cor_exploratory", class(ret))
