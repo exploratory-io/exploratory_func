@@ -272,7 +272,7 @@ test_that("prefecturecode", {
   res <- exploratory::prefecturecode(df$kanji.with.todofuken, output_type="name")
   expect_equal(FALSE, any(is.na(res)))
 
-  df <- data.frame(a=c("北海道", "東京", "", NA, "おおさか"))
+  df <- data.frame(a=c("\u5317\u6D77\u9053", "\u6771\u4eac", "", NA, "\u304a\u304a\u3055\u304b"))
   result <- exploratory::prefecturecode(df$a, output_type = "code")
   expect_equal(result,c("01", "13", NA, NA, "27"))
 
