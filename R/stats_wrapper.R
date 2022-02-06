@@ -213,6 +213,8 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     }
 
     if (return_type == "data.frame") {
+      # Revert the variable names to character for step output.
+      ret <- ret %>% mutate(pair.name.x = as.character(pair.name.x, !!select_dots), pair.name.y = as.character(pair.name.y, !!select_dots))
       ret # Return correlation data frame as is.
     }
     else {
