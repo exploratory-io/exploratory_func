@@ -2453,7 +2453,7 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 #' Converts Japan prefecture names into various formats.
 #' Currently, with output_type ="name", it converts names into the short name format,
 #' which has a name without the suffix such as "-to", "-ken".
-#' And with output_type = "code", it can converts names into the prefecture code.
+#' And with output_type = "code", it converts names into the prefecture code.
 #'
 #' Example:
 #' > prefecturecode(c("東京都", "京都", "Kanagawa-ken", "Iwate", "あいち", "Kōchi", "gunma"), output_type="name")
