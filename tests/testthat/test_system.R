@@ -21,7 +21,7 @@ test_that("test clean_data_frame",{
   df3a <- clean_data_frame(df3a)
   df3b <- mtcars
   row.names(df3b) <- NULL
-  # Compare the row names between data frames. 
+  # Compare the row names between data frames.
   # One data frame is processed by clean_data_frame.
   # The other one is processed manually.
   expect_equal(row.names(df3a), row.names(df3b))
@@ -279,6 +279,11 @@ test_that("prefecturecode", {
 
   res <- exploratory::prefecturecode(df$kanji.with.todofuken, output_type="name")
   expect_equal(FALSE, any(is.na(res)))
+  # Test case for Hokkaido (Kanji), Tokyo (Kanji), and Osaka (Hiragana)
+  df <- data.frame(a=c("\u5317\u6D77\u9053", "\u6771\u4eac", "", NA, "\u304a\u304a\u3055\u304b"))
+  result <- exploratory::prefecturecode(df$a, output_type = "code")
+  expect_equal(result,c("01", "13", NA, NA, "27"))
+
 
   res <- exploratory::prefecturecode(df$kanji, output_type="name")
   expect_equal(FALSE, any(is.na(res)))
@@ -308,9 +313,9 @@ test_that("read_parquet_file", {
 })
 
 test_that("read_parquet_file should be to read the parquet file with an invalid UTF-8 encoding.", {
-  # Make sure that the current arrow version (5.0) can read this parquet file. 
-  # arrow 3.0/4.0, cannot read this parquet file and throw an error 
-  # "Invalid UTF-8 payload" but it is fixed in 5.0. 
+  # Make sure that the current arrow version (5.0) can read this parquet file.
+  # arrow 3.0/4.0, cannot read this parquet file and throw an error
+  # "Invalid UTF-8 payload" but it is fixed in 5.0.
   df <- read_parquet_file("https://dl.dropbox.com/s/9yp6yk1jjnd8dz0/invalid_utf8_payload_test.parquet")
   expect_equal(TRUE, is.data.frame(df))
 })
