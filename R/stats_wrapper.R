@@ -128,27 +128,27 @@ do_cor.kv_ <- function(df,
     ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
 
     # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
-    cor0 <- ret %>% filter(pair.name.x != pair.name.y)
-    cor0 <- cor0 %>% group_by(pair.name.x) %>% summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% arrange(desc(mean_cor))
-    ret <- ret %>% mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
+    cor0 <- ret %>% dplyr::filter(pair.name.x != pair.name.y)
+    cor0 <- cor0 %>% dplyr::group_by(pair.name.x) %>% dplyr::summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% dplyr::arrange(desc(mean_cor))
+    ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
     if (distinct) {
-      ret <- ret %>% filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
+      ret <- ret %>% dplyr::filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
     }
 
     if (return_type == "data.frame") {
       # Sort the data for step output to look better organized on the table view.
-      ret <- ret %>% arrange(pair.name.x, pair.name.y)
+      ret <- ret %>% dplyr::arrange(pair.name.x, pair.name.y)
       # Revert the variable names to character for step output.
-      ret <- ret %>% mutate(pair.name.x = as.character(pair.name.x), pair.name.y = as.character(pair.name.y))
+      ret <- ret %>% dplyr::mutate(pair.name.x = as.character(pair.name.x), pair.name.y = as.character(pair.name.y))
       # We use paste0 since str_c garbles multibyte column names here for some reason.
-      ret <- ret %>% rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
+      ret <- ret %>% dplyr::rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
       ret # Return correlation data frame as is.
     }
     else {
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
       # We use paste0 since str_c garbles multibyte column names here for some reason.
-      ret <- ret %>% rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
+      ret <- ret %>% dplyr::rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
       ret <- list(cor = ret, data = df)
       class(ret) <- c("cor_exploratory", class(ret))
       ret
@@ -216,23 +216,23 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 
     if (variable_order == "correlation") {
       # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
-      cor0 <- ret %>% filter(pair.name.x != pair.name.y)
-      cor0 <- cor0 %>% group_by(pair.name.x) %>% summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% arrange(desc(mean_cor))
-      ret <- ret %>% mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
+      cor0 <- ret %>% dplyr::filter(pair.name.x != pair.name.y)
+      cor0 <- cor0 %>% dplyr::group_by(pair.name.x) %>% dplyr::summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% dplyr::arrange(desc(mean_cor))
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
     }
     else { # "input" case. Honor the specified variable order.
-      ret <- ret %>% mutate(pair.name.x = forcats::fct_relevel(pair.name.x, !!select_dots), pair.name.y = forcats::fct_relevel(pair.name.y, !!select_dots))
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, !!select_dots), pair.name.y = forcats::fct_relevel(pair.name.y, !!select_dots))
     }
 
     if (distinct) {
-      ret <- ret %>% filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
+      ret <- ret %>% dplyr::filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
     }
 
     if (return_type == "data.frame") {
       # Sort the data for step output to look better organized on the table view.
-      ret <- ret %>% arrange(pair.name.x, pair.name.y)
+      ret <- ret %>% dplyr::arrange(pair.name.x, pair.name.y)
       # Revert the variable names to character for step output.
-      ret <- ret %>% mutate(pair.name.x = as.character(pair.name.x), pair.name.y = as.character(pair.name.y))
+      ret <- ret %>% dplyr::mutate(pair.name.x = as.character(pair.name.x), pair.name.y = as.character(pair.name.y))
       ret # Return correlation data frame as is.
     }
     else {
