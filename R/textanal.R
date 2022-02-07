@@ -669,7 +669,9 @@ exp_topic_model <- function(df, text, category = NULL,
 #' extracts results from textmodel_lda_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
+#' @param num_top_words - Number of top words for each topic in the output of topic_words type.
+#' @param word_topic_probability_threshold - The probability of the topic of the word required to be highlighted in the output of doc_topics_tagged type.
+tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, word_topic_probability_threshold = 0, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
     docs_topics_df <- as.data.frame(x$model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max.safe))
@@ -694,10 +696,11 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- x$doc_df
   }
   else if (type == "doc_topics_tagged") {
-    words_to_tag_df <- x$doc_word_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
-    # Filter per document at 70 percentile. Use filter rather than slice_max to preserve the row order.
-    # na.rm seems to be necessary to avoid error. Not very sure of the condition for it to become NA at this point though.
-    words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::filter(topic_max >= quantile(topic_max, probs=0.7, na.rm=TRUE)) %>% dplyr::ungroup()
+    words_to_tag_df <- x$doc_word_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe),
+                                                       .topic_max = summarize_row(across(starts_with("topic")), max),
+                                                       .topic_sum = summarize_row(across(starts_with("topic")), sum),
+                                                       max_topic_prob = .topic_max/.topic_sum)
+    words_to_tag_df <- words_to_tag_df %>% dplyr::filter(max_topic_prob > word_topic_probability_threshold) # TODO: expose the threshold.
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% dplyr::ungroup()
     res <- x$doc_df %>% dplyr::rename(text=!!x$text_col) %>% dplyr::mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% dplyr::mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
