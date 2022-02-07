@@ -669,6 +669,8 @@ exp_topic_model <- function(df, text, category = NULL,
 #' extracts results from textmodel_lda_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
+#' @param num_top_words - Number of top words for each topic in the output of topic_words type.
+#' @param word_topic_probability_threshold - The probability of the topic of the word required to be highlighted in the output of doc_topics_tagged type.
 tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, word_topic_probability_threshold = 0, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
     docs_topics_df <- as.data.frame(x$model$theta)
