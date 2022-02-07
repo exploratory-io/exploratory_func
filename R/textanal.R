@@ -669,7 +669,7 @@ exp_topic_model <- function(df, text, category = NULL,
 #' extracts results from textmodel_lda_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
+tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, word_topic_probability_threshold = 0, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
     docs_topics_df <- as.data.frame(x$model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max.safe))
@@ -698,7 +698,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
                                                        .topic_max = summarize_row(across(starts_with("topic")), max),
                                                        .topic_sum = summarize_row(across(starts_with("topic")), sum),
                                                        max_topic_prob = .topic_max/.topic_sum)
-    words_to_tag_df <- words_to_tag_df %>% dplyr::filter(max_topic_prob > 0.4) # TODO: expose the threshold.
+    words_to_tag_df <- words_to_tag_df %>% dplyr::filter(max_topic_prob > word_topic_probability_threshold) # TODO: expose the threshold.
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% dplyr::ungroup()
     res <- x$doc_df %>% dplyr::rename(text=!!x$text_col) %>% dplyr::mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% dplyr::mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
