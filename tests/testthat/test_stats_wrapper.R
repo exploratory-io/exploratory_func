@@ -85,6 +85,17 @@ test_that("do_cor with Spearman method", {
   expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
 })
 
+test_that("do_cor with variable order based on the input order", {
+  # Steps to produce the output
+  df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
+  model_df <- df %>% do_cor(`x`, `y`, `z`, method = "pearson", distinct = FALSE, diag = TRUE, variable_order = "input", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type='cor')
+  # The output variable name order should be same as the input.
+  expect_equal(as.character(res$pair.name.x), c(rep("x", 3), rep("y", 3), rep("z", 3)))
+  expect_equal(as.character(res$pair.name.y), rep(c("x", "y", "z"), 3))
+  expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
+})
+
 test_that("do_cor with only lower triangle", {
   # Steps to produce the output
   df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
@@ -272,8 +283,8 @@ test_that("test do_cor.kv with model output", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val, return_type = "model")
   result_cor <- result %>% tidy_rowwise(model, type = "cor")
   expect_equal(ncol(result_cor), 5)
-  expect_equal(result_cor[["cat.x"]], c("cat1", "cat2"))
-  expect_equal(result_cor[["cat.y"]], c("cat2", "cat1"))
+  expect_equal(as.character(result_cor[["cat.x"]]), c("cat1", "cat2"))
+  expect_equal(as.character(result_cor[["cat.y"]]), c("cat2", "cat1"))
   expect_equal(result_cor[["correlation"]], replicate(2, 1))
   expect_equal(result_cor[["p_value"]], c(0, 0))
   result_data <- result %>% tidy_rowwise(model, type = "data")
@@ -285,8 +296,8 @@ test_that("test do_cor.kv with group_by with model output", {
   result_cor <- result %>% tidy_rowwise(model, type = "cor")
   expect_equal(ncol(result_cor), 6)
   expect_equal(result_cor[["grp"]], c("A", "A", "B", "B"))
-  expect_equal(result_cor[["cat.x"]], c("cat1", "cat2", "cat1", "cat2"))
-  expect_equal(result_cor[["cat.y"]], c("cat2", "cat1", "cat2", "cat1"))
+  expect_equal(as.character(result_cor[["cat.x"]]), c("cat1", "cat2", "cat1", "cat2"))
+  expect_equal(as.character(result_cor[["cat.y"]]), c("cat2", "cat1", "cat2", "cat1"))
   expect_equal(result_cor[["correlation"]], replicate(4, 1))
   expect_equal(result_cor[["p_value"]], c(0, 0, 0, 0))
   result_data <- result %>% tidy_rowwise(model, type = "data")

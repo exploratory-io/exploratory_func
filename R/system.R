@@ -330,6 +330,11 @@ js_glue_transformer <- function(expr, envir) {
   # Trim white spaces.
   name <- trimws(name)
 
+  # Extract the vector index from name[index] expression if it exists.
+  name_index <- stringr::str_split(name,'[\\[\\]]')[[1]]
+  name <- name_index[1]
+  index <- name_index[2]
+
   # Strip quote by ``.
   should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
@@ -337,6 +342,9 @@ js_glue_transformer <- function(expr, envir) {
     name <- sub("`$", "", name)
   }
   code <- paste0("exploratory_env$`", name, "`")
+  if (!is.na(index)) { # Apply the vector index if it is specified.
+    code <- paste0(code, '[', index, ']')
+  }
 
   val <- eval(parse(text = code), envir)
 
@@ -464,6 +472,11 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE, salesforc
   # Trim white spaces.
   name <- trimws(name)
 
+  # Extract the vector index from name[index] expression if it exists.
+  name_index <- stringr::str_split(name,'[\\[\\]]')[[1]]
+  name <- name_index[1]
+  index <- name_index[2]
+
   # Strip quote by ``.
   should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
@@ -472,6 +485,9 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE, salesforc
   }
 
   code <- paste0("exploratory_env$`", name, "`")
+  if (!is.na(index)) { # Apply the vector index if it is specified.
+    code <- paste0(code, '[', index, ']')
+  }
 
   val <- eval(parse(text = code), envir)
 
@@ -2451,28 +2467,44 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 }
 
 #' Converts Japan prefecture names into various formats.
-#' Currently, it can converts names into the short name format,
+#' Currently, with output_type ="name", it converts names into the short name format,
 #' which has a name without the suffix such as "-to", "-ken".
+#' And with output_type = "code", it converts names into the prefecture code.
 #'
 #' Example:
 #' > prefecturecode(c("東京都", "京都", "Kanagawa-ken", "Iwate", "あいち", "Kōchi", "gunma"), output_type="name")
 #' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"    "群馬"
 
 prefecturecode <- function(prefecture, output_type="name") {
-  loadNamespace("stringr")
-  # TODO: support other output types.
-  # Clean up the input.
-  pref_normalized <- stringr::str_trim(tolower(prefecture))
-  # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" and "to" from "Kyoto" (in Japanese).
-  pref_normalized <- dplyr::if_else(pref_normalized=="\u4EAC\u90FD", pref_normalized, gsub("[\u90FD\u5E9C\u770C]$", "", pref_normalized))
-  # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" (in Roma-ji).
-  pref_normalized <- gsub("[_ \\.\\-](to|fu|hu|ken)$", "", pref_normalized)
-  # Convert "o" with macron to simple "o".
-  pref_normalized <- gsub("\u014D", "o", pref_normalized)
-  # Convert "gunma" to "gumma".
-  pref_normalized <- dplyr::if_else(pref_normalized=="gunma", "gumma" ,pref_normalized)
-  # Return the matching IDs.
-  return (as.character(jp_prefecture_name_id_map$id[match(pref_normalized, jp_prefecture_name_id_map$name)]))
+  if (output_type == "code") { # covert prefecture name to prefecture code
+    loadNamespace("zipangu")
+    prefecture = exploratory::prefecturecode(prefecture, output_type = "name")
+    targetDF <- data.frame(prefecture_normalized = prefecture)
+    answerDF <- zipangu::jpnprefs
+    # create prefecture_normalized column from a prefecture_kanji column and removes "都", "府", "県" from it.
+    answerDF <- answerDF %>% dplyr::mutate(prefecture_normalized = stringr::str_remove(prefecture_kanji, "[\u90FD\u5E9C\u770C]$"))
+    # Join data frames by prefecture_normalized so that it can get a corresponding prefecture code.
+    result <- targetDF %>% dplyr::left_join(answerDF, by = "prefecture_normalized")
+    result$jis_code
+  } else if (output_type == "name") {
+    loadNamespace("stringr")
+    # TODO: support other output types.
+    # Clean up the input.
+    pref_normalized <- stringr::str_trim(tolower(prefecture))
+    # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" and "to" from "Kyoto" (in Japanese).
+    pref_normalized <- dplyr::if_else(pref_normalized=="\u4EAC\u90FD", pref_normalized, gsub("[\u90FD\u5E9C\u770C]$", "", pref_normalized))
+    # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" (in Roma-ji).
+    pref_normalized <- gsub("[_ \\.\\-](to|fu|hu|ken)$", "", pref_normalized)
+    # Convert "o" with macron to simple "o".
+    pref_normalized <- gsub("\u014D", "o", pref_normalized)
+    # jp_prefecture_name_id_map uses gumma as a mapping key, so to take care of "gunma" properly, convert "gunma" to "gumma.
+    pref_normalized <- dplyr::if_else(pref_normalized=="gunma", "gumma" ,pref_normalized)
+    # Return the matching IDs.
+    return (as.character(jp_prefecture_name_id_map$id[match(pref_normalized, jp_prefecture_name_id_map$name)]))
+  } else { #for other case, just return the prefecture.
+    prefecture
+  }
+
 }
 
 #' Converts pair of state name and county name into county ID,

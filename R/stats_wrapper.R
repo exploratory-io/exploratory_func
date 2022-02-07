@@ -100,7 +100,7 @@ do_cor.kv_ <- function(df,
   }
   # column names are "{subject}.x", "{subject}.y", "value"
   output_cols <- avoid_conflict(grouped_col,
-                                c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                                c("pair.name.x", "pair.name.y",
                                   "correlation", "p_value", "statistic"))
 
   do_cor_each <- function(df){
@@ -125,16 +125,30 @@ do_cor.kv_ <- function(df,
         stop("More than 1 aggregated measures per category are required to calculate correlations.")
       }
     }
-    sorted_colnames <- colnames(mat)
+    ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
 
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
+    # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
+    cor0 <- ret %>% dplyr::filter(pair.name.x != pair.name.y)
+    cor0 <- cor0 %>% dplyr::group_by(pair.name.x) %>% dplyr::summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% dplyr::arrange(desc(mean_cor))
+    ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
+    if (distinct) {
+      ret <- ret %>% dplyr::filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
+    }
 
     if (return_type == "data.frame") {
+      # Sort the data for step output to look better organized on the table view.
+      ret <- ret %>% dplyr::arrange(pair.name.x, pair.name.y)
+      # Revert the variable names to character for step output.
+      ret <- ret %>% dplyr::mutate(pair.name.x = as.character(pair.name.x), pair.name.y = as.character(pair.name.y))
+      # We use paste0 since str_c garbles multibyte column names here for some reason.
+      ret <- ret %>% dplyr::rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
       ret # Return correlation data frame as is.
     }
     else {
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
+      # We use paste0 since str_c garbles multibyte column names here for some reason.
+      ret <- ret %>% dplyr::rename(!!rlang::sym(paste0(col, ".x")):=pair.name.x, !!rlang::sym(paste0(col, ".y")):=pair.name.y)
       ret <- list(cor = ret, data = df)
       class(ret) <- c("cor_exploratory", class(ret))
       ret
@@ -167,7 +181,7 @@ do_cor.kv_ <- function(df,
 #' @return correlations between pairs of columns
 #' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
-                        distinct = FALSE, diag = FALSE,
+                        distinct = FALSE, diag = FALSE, variable_order = "correlation",
                         return_type = "data.frame") {
   validate_empty_data(df)
 
@@ -197,15 +211,28 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
       # Convert logical to numeric explicitly, since implicit conversion by as.matrix does not happen if all the columns are logical.
       dplyr::mutate(across(where(is.logical), as.numeric)) %>%
       as.matrix()
-    # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
-    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE.
-    # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
-    sorted_colnames <- stringr::str_sort(colnames(mat))
-    mat <- mat[,sorted_colnames]
 
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=TRUE)
+    ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=TRUE)
+
+    if (variable_order == "correlation") {
+      # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
+      cor0 <- ret %>% dplyr::filter(pair.name.x != pair.name.y)
+      cor0 <- cor0 %>% dplyr::group_by(pair.name.x) %>% dplyr::summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% dplyr::arrange(desc(mean_cor))
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
+    }
+    else { # "input" case. Honor the specified variable order.
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, !!select_dots), pair.name.y = forcats::fct_relevel(pair.name.y, !!select_dots))
+    }
+
+    if (distinct) {
+      ret <- ret %>% dplyr::filter(as.integer(pair.name.x) <= as.integer(pair.name.y))
+    }
 
     if (return_type == "data.frame") {
+      # Sort the data for step output to look better organized on the table view.
+      ret <- ret %>% dplyr::arrange(pair.name.x, pair.name.y)
+      # Revert the variable names to character for step output.
+      ret <- ret %>% dplyr::mutate(pair.name.x = as.character(pair.name.x), pair.name.y = as.character(pair.name.y))
       ret # Return correlation data frame as is.
     }
     else {
@@ -229,23 +256,20 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 }
 
 
-do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm) {
+do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
+  # Sort the column name.
+  # Now that we sort the variables based on correlation result or input order, this might not be as meaningful,
+  # but I'm hoping this might still help align the result between Mac and Windows if there are ties in the mean correlations.
+  # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
+  sorted_colnames <- stringr::str_sort(colnames(mat))
+  mat <- mat[,sorted_colnames]
+
   cor_mat <- cor(mat, use = use, method = method)
-  if(distinct){
-    ret <- upper_gather(
-      cor_mat,
-      diag=diag,
-      cnames=output_cols[1:3],
-      na.rm=na.rm,
-      zero.rm=FALSE
-    )
-  } else {
-    ret <- mat_to_df(cor_mat,
-                     cnames=output_cols[1:3],
-                     diag=diag,
-                     na.rm=na.rm,
-                     zero.rm=FALSE)
-  }
+  ret <- mat_to_df(cor_mat,
+                   cnames=output_cols[1:3],
+                   diag=diag,
+                   na.rm=na.rm,
+                   zero.rm=FALSE)
 
   # Create a matrix of P-values for Analytics View case.
   dim <- length(sorted_colnames)
@@ -280,13 +304,8 @@ do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorte
   rownames(pvalue_mat) <- sorted_colnames
   colnames(tvalue_mat) <- sorted_colnames
   rownames(tvalue_mat) <- sorted_colnames
-  if (distinct) {
-    p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols[c(1,2,4)], zero.rm=FALSE)
-    t_value_ret <- upper_gather(tvalue_mat, diag=diag, cnames=output_cols[c(1,2,5)], zero.rm=FALSE)
-  } else {
-    p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols[c(1,2,4)], diag=diag, zero.rm=FALSE)
-    t_value_ret <- mat_to_df(tvalue_mat, cnames=output_cols[c(1,2,5)], diag=diag, zero.rm=FALSE)
-  }
+  p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols[c(1,2,4)], diag=diag, zero.rm=FALSE)
+  t_value_ret <- mat_to_df(tvalue_mat, cnames=output_cols[c(1,2,5)], diag=diag, zero.rm=FALSE)
   ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret <- ret %>% dplyr::left_join(t_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret
