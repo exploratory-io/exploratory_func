@@ -194,10 +194,11 @@ fill_ts_na <- function(target, time, type = c("value", "previous", "extend"), va
 
     # Then, fill intermediate values.
     if (type[2] == "spline") {
-      df_zoo <- zoo::na.spline(df_zoo)
+      # na.rm = FALSE to handle the case where we don't fill leading or trailing NAs.
+      df_zoo <- zoo::na.spline(df_zoo, na.rm = FALSE)
     }
     else if (type[2] == "interpolate") {
-      df_zoo <- zoo::na.approx(df_zoo)
+      df_zoo <- zoo::na.approx(df_zoo, na.rm = FALSE)
     }
     else if (type[2] == "previous") {
       df_zoo <- zoo::na.locf(df_zoo, na.rm = FALSE)
@@ -209,6 +210,7 @@ fill_ts_na <- function(target, time, type = c("value", "previous", "extend"), va
     #   df_zoo <- zoo::na.StructTS(df_zoo)
     # }
     else if (type[2] == "value") {
+      # TODO: This would fill the leading or trailing NAs even if we specify NA as the value. Fix it.
       df_zoo <- zoo::na.fill(df_zoo, val[2])
     }
     else {
