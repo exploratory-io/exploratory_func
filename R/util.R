@@ -2611,6 +2611,19 @@ ts_lag <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
   tmp_df$y
 }
 
+#' @param type - "difference", or "ratio".
+#' @param na_fill_type - "previous", "next", or "none".
+ts_diff <- function(x, time, unit = "year", n = 1, type = "difference", na_fill_type = "previous") {
+  x_lag <- ts_lag(x, time, unit = unit, n = n, na_fill_type = na_fill_type)
+  if (type == "ratio") {
+    res <- x/x_lag
+  }
+  else {
+    res <- x - x_lag
+  }
+  res
+}
+
 # Caluculates cumulative sum of decaying effects.
 # It is same as cumsum when r is 1.
 #' @param r - After n periods, original effect a decays down to a*r^n.
