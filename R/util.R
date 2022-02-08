@@ -2577,7 +2577,8 @@ complete_date <- function(df, date_col, time_unit = "day") {
   ret
 }
 
-ts_lag <- function(x, time, unit="year", n=1) {
+#' @param na_fill_type - "previous", "next", or "none".
+ts_lag <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
   if (unit == "day") {
     time_unit_func <- lubridate::days
   }
@@ -2598,7 +2599,12 @@ ts_lag <- function(x, time, unit="year", n=1) {
   base_time <- time - time_unit_func(n)
   tmp_df <- tibble::tibble(t=time, x=x)
   join_df <- tmp_df %>% tidyr::complete(t=base_time) %>% dplyr::arrange(t)
-  join_df <- join_df %>% dplyr::mutate(y = fill_ts_na(x, t, type = c("value", "previous", "extend"), val = c(NA, 0, 0)))
+  if (na_fill_type == "none") {
+    join_df <- join_df %>% dplyr::mutate(y = x)
+  }
+  else {
+    join_df <- join_df %>% dplyr::mutate(y = fill_ts_na(x, t, type = c("value", na_fill_type, "value"), val = c(NA, 0, NA)))
+  }
   join_df <- join_df %>% dplyr::select(-x)
   tmp_df <- tmp_df %>% dplyr::mutate(bt = !!base_time)
   tmp_df <- tmp_df %>% dplyr::left_join(join_df, by=c("bt"="t"))
