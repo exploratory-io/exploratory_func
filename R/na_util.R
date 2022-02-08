@@ -203,6 +203,9 @@ fill_ts_na <- function(target, time, type = c("value", "previous", "extend"), va
     else if (type[2] == "previous") {
       df_zoo <- zoo::na.locf(df_zoo, na.rm = FALSE)
     }
+    else if (type[2] == "next") {
+      df_zoo <- zoo::na.locf(df_zoo, na.rm = FALSE, fromLast = TRUE)
+    }
     # TODO: Getting this error with some input with na.StructTS().
     #       Error in rowSums(tsSmooth(StructTS(y))[, -2]) : 'x' must be an array of at least two dimensions
     #
