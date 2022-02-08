@@ -2577,6 +2577,34 @@ complete_date <- function(df, date_col, time_unit = "day") {
   ret
 }
 
+ts_lag <- function(x, time, unit="year", n=1) {
+  if (unit == "day") {
+    time_unit_func <- lubridate::days
+  }
+  else if (unit == "week") {
+    time_unit_func <- lubridate::weeks
+  }
+  else if (unit == "month") {
+    time_unit_func <- base::months
+  }
+  else if (unit == "quarter") {
+    time_unit_func <- function(x) {
+      base::months(3 * x)
+    }
+  }
+  else { # assuming it is year.
+    time_unit_func <- lubridate::years
+  }
+  base_time <- time - time_unit_func(n)
+  tmp_df <- tibble::tibble(t=time, x=x)
+  join_df <- tmp_df %>% tidyr::complete(t=base_time) %>% dplyr::arrange(t)
+  join_df <- join_df %>% dplyr::mutate(y = fill_ts_na(x, t, type = c("value", "previous", "extend"), val = c(NA, 0, 0)))
+  join_df <- join_df %>% dplyr::select(-x)
+  tmp_df <- tmp_df %>% dplyr::mutate(bt = !!base_time)
+  tmp_df <- tmp_df %>% dplyr::left_join(join_df, by=c("bt"="t"))
+  tmp_df$y
+}
+
 # Caluculates cumulative sum of decaying effects.
 # It is same as cumsum when r is 1.
 #' @param r - After n periods, original effect a decays down to a*r^n.
