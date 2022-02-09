@@ -1160,3 +1160,22 @@ test_that("ts_diff", {
   expect_equal(res, c(NA, 1, 2, 1))
 })
 
+test_that("ts_diff_ratio", {
+  t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
+  y <- c(1, 2, 3, 4)
+  res <- ts_diff_ratio(y, t)
+  expect_equal(res, c(NA, 2, 3, 4))
+  res <- ts_diff_ratio(y, t, unit="quarter")
+  expect_equal(res, c(NA, 2, 3, 4))
+  res <- ts_diff_ratio(y, t, unit="month")
+  expect_equal(res, c(NA, 2, 3, 2))
+  res <- ts_diff_ratio(y, t, unit="week")
+  expect_equal(res, c(NA, 2, 1.5, 4/3))
+  res <- ts_diff_ratio(y, t, unit="week", na_fill_type="none")
+  expect_equal(res, c(NA, NA, 1.5, NA))
+  res <- ts_diff_ratio(y, t, unit="week", na_fill_type="next")
+  expect_equal(res, c(1, 1, 1.5, 1))
+  res <- ts_diff_ratio(y, t, unit="week", n=2)
+  expect_equal(res, c(NA, 2, 3, 4/3))
+})
+
