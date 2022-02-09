@@ -1122,7 +1122,33 @@ test_that("seconds_between", {
   expect_equal(age, 600)
 })
 
+test_that("ts_lag", {
+  t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
+  y <- c(1, 2, 3, 4)
+  res <- ts_lag(y, t)
+  expect_equal(res, c(NA, 1, 1, 1))
+  res <- ts_lag(y, t, unit="month")
+  expect_equal(res, c(NA, 1, 1, 2))
+  res <- ts_lag(y, t, unit="week")
+  expect_equal(res, c(NA, 1, 2, 3))
+  res <- ts_lag(y, t, unit="week", na_fill_type="none")
+  expect_equal(res, c(NA, NA, 2, NA))
+  res <- ts_lag(y, t, unit="week", n=2)
+  expect_equal(res, c(NA, 1, 1, 3))
+})
 
-
-
+test_that("ts_diff", {
+  t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
+  y <- c(1, 2, 3, 4)
+  res <- ts_diff(y, t)
+  expect_equal(res, c(NA, 1, 2, 3))
+  res <- ts_diff(y, t, unit="month")
+  expect_equal(res, c(NA, 1, 2, 2))
+  res <- ts_diff(y, t, unit="week")
+  expect_equal(res, c(NA, 1, 1, 1))
+  res <- ts_diff(y, t, unit="week", na_fill_type="none")
+  expect_equal(res, c(NA, NA, 1, NA))
+  res <- ts_diff(y, t, unit="week", n=2)
+  expect_equal(res, c(NA, 1, 2, 1))
+})
 
