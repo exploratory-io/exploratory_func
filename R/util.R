@@ -2578,7 +2578,7 @@ complete_date <- function(df, date_col, time_unit = "day") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
-ts_lag <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
+ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   if (unit == "day") {
     time_unit_func <- lubridate::days
   }
@@ -2612,15 +2612,15 @@ ts_lag <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
-ts_diff <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
-  x_lag <- ts_lag(x, time, unit = unit, n = n, na_fill_type = na_fill_type)
+ts_diff <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
+  x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
   res <- x - x_lag
   res
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
-ts_diff_ratio <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
-  x_lag <- ts_lag(x, time, unit = unit, n = n, na_fill_type = na_fill_type)
+ts_diff_ratio <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
+  x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
   res <- x/x_lag
   res
 }
