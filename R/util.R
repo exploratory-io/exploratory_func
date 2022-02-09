@@ -2611,16 +2611,17 @@ ts_lag <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
   tmp_df$y
 }
 
-#' @param type - "difference", or "ratio".
 #' @param na_fill_type - "previous", "next", or "none".
-ts_diff <- function(x, time, unit = "year", n = 1, type = "difference", na_fill_type = "previous") {
+ts_diff <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
   x_lag <- ts_lag(x, time, unit = unit, n = n, na_fill_type = na_fill_type)
-  if (type == "ratio") {
-    res <- x/x_lag
-  }
-  else {
-    res <- x - x_lag
-  }
+  res <- x - x_lag
+  res
+}
+
+#' @param na_fill_type - "previous", "next", or "none".
+ts_diff_ratio <- function(x, time, unit = "year", n = 1, na_fill_type = "previous") {
+  x_lag <- ts_lag(x, time, unit = unit, n = n, na_fill_type = na_fill_type)
+  res <- x/x_lag
   res
 }
 
