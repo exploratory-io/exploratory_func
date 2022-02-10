@@ -2376,7 +2376,9 @@ max_if <- function(x, ..., na.rm = TRUE) {
 
 #' Alias for n()
 #' export
-count_rows <- dplyr::n
+count_rows <- function(...) { # Discard arguments and keep going rather than throwing an error.
+  dplyr::n()
+}
 
 #' Alias for n_distinct()
 #' export
