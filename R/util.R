@@ -2374,6 +2374,15 @@ max_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "max", ..., na.rm = na.rm)
 }
 
+#' Alias for n()
+#' export
+count_rows <- dplyr::n
+
+#' Alias for n_distinct()
+#' export
+count_unique <- dplyr::n_distinct
+
+
 # Wrapper function around apply to apply aggregation function across columns for each row.
 # Example Usage:
 # airquality %>% mutate(total = summarize_row(across(where(is.numeric)), median, na.rm=TRUE))
