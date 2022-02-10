@@ -2582,10 +2582,16 @@ seconds_between <- function(start_date, end_date=lubridate::now()) {
 }
 
 #' Returns the last day of the specified time period (e.g. month) that the original date belongs to.
-last_date <- function(x, unit = "month",
+last_date <- function(x, unit = "month", previous = FALSE,
                       week_start = getOption("lubridate.week.start", 7)) {
-  lubridate::ceiling_date(x, unit = unit,
+  if (previous) { # The last date of the previous period.
+    lubridate::floor_date(x, unit = unit,
                           week_start = week_start) - 1;
+  }
+  else { # The last date of the current period.
+    lubridate::ceiling_date(x, unit = unit,
+                            week_start = week_start) - 1;
+  }
 }
 
 #' Calculates area under ROC. (AUC)
