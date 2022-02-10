@@ -2621,7 +2621,7 @@ ts_diff <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
 #' @param na_fill_type - "previous", "next", or "none".
 ts_diff_ratio <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
-  res <- x/x_lag
+  res <- (x - x_lag)/x_lag
   res
 }
 
