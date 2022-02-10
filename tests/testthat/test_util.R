@@ -1124,6 +1124,11 @@ test_that("seconds_between", {
   expect_equal(age, 600)
 })
 
+test_that("last_date", {
+  res <- last_date(lubridate::ymd("2000-01-01"))
+  expect_equal(res, lubridate::ymd("2000-01-31"))
+})
+
 test_that("ts_lag", {
   t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
   y <- c(1, 2, 3, 4)
