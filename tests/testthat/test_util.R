@@ -1124,10 +1124,10 @@ test_that("seconds_between", {
   expect_equal(age, 600)
 })
 
-test_that("window_calculation", {
-  df <- mtcars %>% exploratory::window_calculation(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
+test_that("mutate_group", {
+  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
   expect_equal(head(df)$mpg_cummean[[1]],21)
-  df2 <- mtcars %>% exploratory::window_calculation(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt))
+  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt))
   expect_equal(head(df2)$wt_cummean[[1]],2.62)
 
 })

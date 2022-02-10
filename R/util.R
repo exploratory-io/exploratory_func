@@ -2269,7 +2269,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
 #' @param group_funs - Functions to apply to group_by columns
 #' @param ... - Name-value pairs of mutate functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
 #' @export
-window_calculation <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, ...) {
+mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, ...) {
   ret <- if(length(group_cols) == 0) {
     .data %>% dplyr::mutate(.data = .data, ...)
   } else {
