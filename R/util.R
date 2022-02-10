@@ -2263,6 +2263,55 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
   ret %>% dplyr::mutate_if(is.integer, as.numeric)
 }
 
+# Wrapper function that takes care of dplyr::group_by and dplyr::mutate as a single step.
+#' @param .data - data frame
+#' @param group_cols - Columns to group_by
+#' @param group_funs - Functions to apply to group_by columns
+#' @param ... - Name-value pairs of mutate functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
+#' @export
+mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, ...) {
+  ret <- if(length(group_cols) == 0) {
+    .data %>% dplyr::mutate(.data = .data, ...)
+  } else {
+    # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
+    # when group_cols conflict with group columns in previous steps.
+    .data <- .data %>% dplyr::ungroup()
+    groupby_args <- list() # default empty list
+    name_list <- list()
+    name_index = 1
+    # If group_by columns and associated categorizing functionts are provided,
+    # quote the columns/functions with rlang::quo so that dplyr can understand them.
+    if (!is.null(group_cols) && !is.null(group_funs)) {
+      groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
+      # Set names of group_by columns in the output.
+      name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
+      if (is.null(name_list)) { # If name is not specified, use original column names.
+        name_list <- group_cols
+      }
+      names(groupby_args) <- name_list
+      # make sure to ungroup result
+      .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...)
+    } else {
+      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+        # make sure to ungroup result
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...)
+      } else { # In case no group_by columns are provided,skip group_by
+        .data %>% dplyr::mutate(...)
+      }
+    }
+  }
+  # For integer columns (like # of rows, unique), change them to numeric columns for better usability.
+  # Without this, when the next transform step is a mutate using case_when that contains the # of rows as a condition,
+  # case_when command fails due to data type mismatch (integer vs numeric).
+  #
+  ret <- ret %>% dplyr::mutate_if(is.integer, as.numeric)
+  if (keep_group) {
+    ret
+  } else {
+    ret %>% dplyr::ungroup()
+  }
+}
+
 bind_expr <- function(expr1, expr2) {
   rlang::expr(!!expr1 & !!expr2)
 }
