@@ -2626,6 +2626,54 @@ complete_date <- function(df, date_col, time_unit = "day") {
   ret
 }
 
+#' @param na_fill_type - "previous", "next", or "none".
+ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
+  if (unit == "day") {
+    time_unit_func <- lubridate::days
+  }
+  else if (unit == "week") {
+    time_unit_func <- lubridate::weeks
+  }
+  else if (unit == "month") {
+    time_unit_func <- base::months
+  }
+  else if (unit == "quarter") {
+    time_unit_func <- function(x) {
+      base::months(3 * x)
+    }
+  }
+  else { # assuming it is year.
+    time_unit_func <- lubridate::years
+  }
+  base_time <- time - time_unit_func(n)
+  tmp_df <- tibble::tibble(t=time, x=x)
+  join_df <- tmp_df %>% tidyr::complete(t=base_time) %>% dplyr::arrange(t)
+  if (na_fill_type == "none") {
+    join_df <- join_df %>% dplyr::mutate(y = x)
+  }
+  else {
+    join_df <- join_df %>% dplyr::mutate(y = fill_ts_na(x, t, type = c("value", na_fill_type, "value"), val = c(NA, 0, NA)))
+  }
+  join_df <- join_df %>% dplyr::select(-x)
+  tmp_df <- tmp_df %>% dplyr::mutate(bt = !!base_time)
+  tmp_df <- tmp_df %>% dplyr::left_join(join_df, by=c("bt"="t"))
+  tmp_df$y
+}
+
+#' @param na_fill_type - "previous", "next", or "none".
+ts_diff <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
+  x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
+  res <- x - x_lag
+  res
+}
+
+#' @param na_fill_type - "previous", "next", or "none".
+ts_diff_ratio <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
+  x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
+  res <- (x - x_lag)/x_lag
+  res
+}
+
 # Caluculates cumulative sum of decaying effects.
 # It is same as cumsum when r is 1.
 #' @param r - After n periods, original effect a decays down to a*r^n.
