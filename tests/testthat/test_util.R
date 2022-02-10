@@ -952,6 +952,8 @@ test_that("summarize_group", {
  expect_equal(nrow(df2),1)
 })
 
+
+
 test_that("sum_if", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if(hp, mpg > 10, na.rm = T))
   expect_equal(df %>% dplyr::pull(custom), c(909, 856, 2929))
@@ -1179,3 +1181,10 @@ test_that("ts_diff_ratio", {
   expect_equal(res, c(NA, 1, 2, 1/3))
 })
 
+test_that("mutate_group", {
+  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
+  expect_equal(head(df)$mpg_cummean[[1]],21)
+  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt))
+  expect_equal(head(df2)$wt_cummean[[1]],2.62)
+
+})
