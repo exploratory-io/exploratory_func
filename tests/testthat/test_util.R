@@ -952,6 +952,8 @@ test_that("summarize_group", {
  expect_equal(nrow(df2),1)
 })
 
+
+
 test_that("sum_if", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if(hp, mpg > 10, na.rm = T))
   expect_equal(df %>% dplyr::pull(custom), c(909, 856, 2929))
@@ -1122,7 +1124,67 @@ test_that("seconds_between", {
   expect_equal(age, 600)
 })
 
+test_that("ts_lag", {
+  t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
+  y <- c(1, 2, 3, 4)
+  res <- ts_lag(t, y)
+  expect_equal(res, c(NA, 1, 1, 1))
+  res <- ts_lag(t, y, unit="quarter")
+  expect_equal(res, c(NA, 1, 1, 1))
+  res <- ts_lag(t, y, unit="month")
+  expect_equal(res, c(NA, 1, 1, 2))
+  res <- ts_lag(t, y, unit="week")
+  expect_equal(res, c(NA, 1, 2, 3))
+  res <- ts_lag(t, y, unit="week", na_fill_type="none")
+  expect_equal(res, c(NA, NA, 2, NA))
+  res <- ts_lag(t, y, unit="week", na_fill_type="next")
+  expect_equal(res, c(1, 2, 2, 4))
+  res <- ts_lag(t, y, unit="week", n=2)
+  expect_equal(res, c(NA, 1, 1, 3))
+})
 
+test_that("ts_diff", {
+  t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
+  y <- c(1, 2, 3, 4)
+  res <- ts_diff(t, y)
+  expect_equal(res, c(NA, 1, 2, 3))
+  res <- ts_diff(t, y, unit="quarter")
+  expect_equal(res, c(NA, 1, 2, 3))
+  res <- ts_diff(t, y, unit="month")
+  expect_equal(res, c(NA, 1, 2, 2))
+  res <- ts_diff(t, y, unit="week")
+  expect_equal(res, c(NA, 1, 1, 1))
+  res <- ts_diff(t, y, unit="week", na_fill_type="none")
+  expect_equal(res, c(NA, NA, 1, NA))
+  res <- ts_diff(t, y, unit="week", na_fill_type="next")
+  expect_equal(res, c(0, 0, 1, 0))
+  res <- ts_diff(t, y, unit="week", n=2)
+  expect_equal(res, c(NA, 1, 2, 1))
+})
 
+test_that("ts_diff_ratio", {
+  t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
+  y <- c(1, 2, 3, 4)
+  res <- ts_diff_ratio(t, y)
+  expect_equal(res, c(NA, 1, 2, 3))
+  res <- ts_diff_ratio(t, y, unit="quarter")
+  expect_equal(res, c(NA, 1, 2, 3))
+  res <- ts_diff_ratio(t, y, unit="month")
+  expect_equal(res, c(NA, 1, 2, 1))
+  res <- ts_diff_ratio(t, y, unit="week")
+  expect_equal(res, c(NA, 1, 0.5, 1/3))
+  res <- ts_diff_ratio(t, y, unit="week", na_fill_type="none")
+  expect_equal(res, c(NA, NA, 0.5, NA))
+  res <- ts_diff_ratio(t, y, unit="week", na_fill_type="next")
+  expect_equal(res, c(0, 0, 0.5, 0))
+  res <- ts_diff_ratio(t, y, unit="week", n=2)
+  expect_equal(res, c(NA, 1, 2, 1/3))
+})
 
+test_that("mutate_group", {
+  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
+  expect_equal(head(df)$mpg_cummean[[1]],21)
+  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt))
+  expect_equal(head(df2)$wt_cummean[[1]],2.62)
 
+})
