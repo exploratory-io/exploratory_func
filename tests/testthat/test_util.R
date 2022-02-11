@@ -1137,8 +1137,12 @@ test_that("seconds_between", {
 test_that("last_date", {
   res <- last_date(lubridate::ymd("2000-01-01"))
   expect_equal(res, lubridate::ymd("2000-01-31"))
+  res <- last_date(lubridate::ymd_hms("2000-01-01 1:00:00"))
+  expect_equal(res, lubridate::ymd_hms("2000-01-31 00:00:00"))
   res <- last_date(lubridate::ymd("2000-01-01"), previous = TRUE)
   expect_equal(res, lubridate::ymd("1999-12-31"))
+  res <- last_date(lubridate::ymd_hms("2000-01-01 1:00:00"), previous = TRUE)
+  expect_equal(res, lubridate::ymd_hms("1999-12-31 00:00:00"))
 })
 
 test_that("ts_lag", {

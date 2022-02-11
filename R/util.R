@@ -2586,11 +2586,11 @@ last_date <- function(x, unit = "month", previous = FALSE,
                       week_start = getOption("lubridate.week.start", 7)) {
   if (previous) { # The last date of the previous period.
     lubridate::floor_date(x, unit = unit,
-                          week_start = week_start) - 1;
+                          week_start = week_start) - lubridate::days(1);
   }
   else { # The last date of the current period.
     lubridate::ceiling_date(x, unit = unit,
-                            week_start = week_start) - 1;
+                            week_start = week_start) - lubridate::days(1);
   }
 }
 
