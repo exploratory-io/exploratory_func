@@ -336,7 +336,7 @@ test_that("test exp_ttest with power", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret),
                c("t Value","P Value","Degree of Freedom","Difference",
-                 "Conf High","Conf Low","Effect Size (Cohen's d)","Target Power",
+                 "Conf High","Conf Low","Base Level","Effect Size (Cohen's d)","Target Power",
                  "Target Probability of Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Number of Rows",
                  "Number of Rows for 0","Number of Rows for 1"))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
