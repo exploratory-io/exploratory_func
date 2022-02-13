@@ -2336,6 +2336,8 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
     min(x[condition], na.rm = na.rm)
   } else if (aggregateFunc == "max") {
     max(x[condition], na.rm = na.rm)
+  } else if (aggregateFunc == "n_distinct" || aggregateFunc == "count_unique") { # count_unique is our alias for n_distinct.
+    n_distinct(x[condition], na.rm = na.rm)
   }
 }
 
@@ -2373,6 +2375,22 @@ min_if <- function(x, ..., na.rm = TRUE) {
 max_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "max", ..., na.rm = na.rm)
 }
+
+#' export
+count_unique_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "n_distinct", ..., na.rm = na.rm)
+}
+
+#' Alias for n()
+#' export
+count_rows <- function(...) { # Discard arguments and keep going rather than throwing an error.
+  dplyr::n()
+}
+
+#' Alias for n_distinct()
+#' export
+count_unique <- dplyr::n_distinct
+
 
 # Wrapper function around apply to apply aggregation function across columns for each row.
 # Example Usage:
@@ -2568,6 +2586,19 @@ minutes_between <- function(start_date, end_date=lubridate::now()) {
 #' API to calculate duration between the start_date and the end_date in seconds
 seconds_between <- function(start_date, end_date=lubridate::now()) {
   time_between(start_date, end_date, unit = "seconds")
+}
+
+#' Returns the last day of the specified time period (e.g. month) that the original date belongs to.
+last_date <- function(x, unit = "month", previous = FALSE,
+                      week_start = getOption("lubridate.week.start", 7)) {
+  if (previous) { # The last date of the previous period.
+    lubridate::floor_date(x, unit = unit,
+                          week_start = week_start) - lubridate::days(1);
+  }
+  else { # The last date of the current period.
+    lubridate::ceiling_date(x, unit = unit,
+                            week_start = week_start) - lubridate::days(1);
+  }
 }
 
 #' Calculates area under ROC. (AUC)

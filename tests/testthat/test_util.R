@@ -955,39 +955,54 @@ test_that("summarize_group", {
 
 
 test_that("sum_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if(hp, mpg > 10, na.rm = T))
-  expect_equal(df %>% dplyr::pull(custom), c(909, 856, 2929))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(909, 856, 1454))
 })
 
 test_that("count_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if(hp, mpg > 10, na.rm = F))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
+})
+
+test_that("count_unique_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique_if(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(10, 4, 4))
+})
+
+test_that("count_rows", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_rows())
   expect_equal(df %>% dplyr::pull(custom), c(11, 7, 14))
 })
 
+test_that("count_unique", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique(hp))
+  expect_equal(df %>% dplyr::pull(custom), c(10, 4, 9))
+})
+
 test_that("average_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::average_if(hp, mpg > 10, na.rm = T))
-  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 209))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::average_if(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 182))
 })
 
 test_that("mean_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if(hp, mpg > 10, na.rm = F))
-  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 209))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 182))
 })
 
 test_that("median_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if(hp, mpg > 10, gear > 3))
-  expect_equal(df %>% dplyr::pull(custom), c(78.5, 123.0, 299.5))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if(hp, mpg > 15, gear > 3))
+  expect_equal(df %>% dplyr::pull(custom), c(78.5, 123.0, 264))
 })
 
 
 test_that("min_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::min_if(hp, mpg > 10, gear > 2, na.rm = T))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::min_if(hp, mpg > 15, gear > 2, na.rm = T))
   expect_equal(df %>% dplyr::pull(custom), c(52, 105, 150))
 })
 
 test_that("max_if", {
-  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if(hp, mpg > 4, gear > 2, na.rm = T))
-  expect_equal(df %>% dplyr::pull(custom), c(113, 175, 335))
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(113, 175, 264))
 })
 
 test_that("summarize_row", {
@@ -1122,6 +1137,17 @@ test_that("minutes_between", {
 test_that("seconds_between", {
   age <- seconds_between(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd_hms("2000-01-01 13:10:00"))
   expect_equal(age, 600)
+})
+
+test_that("last_date", {
+  res <- last_date(lubridate::ymd("2000-01-01"))
+  expect_equal(res, lubridate::ymd("2000-01-31"))
+  res <- last_date(lubridate::ymd_hms("2000-01-01 1:00:00"))
+  expect_equal(res, lubridate::ymd_hms("2000-01-31 00:00:00"))
+  res <- last_date(lubridate::ymd("2000-01-01"), previous = TRUE)
+  expect_equal(res, lubridate::ymd("1999-12-31"))
+  res <- last_date(lubridate::ymd_hms("2000-01-01 1:00:00"), previous = TRUE)
+  expect_equal(res, lubridate::ymd_hms("1999-12-31 00:00:00"))
 })
 
 test_that("ts_lag", {
