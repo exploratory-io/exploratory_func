@@ -964,6 +964,11 @@ test_that("count_if", {
   expect_equal(df %>% dplyr::pull(custom), c(11, 7, 14))
 })
 
+test_that("count_unique_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique_if(hp, mpg > 10, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(10, 4, 9))
+})
+
 test_that("count_rows", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_rows())
   expect_equal(df %>% dplyr::pull(custom), c(11, 7, 14))

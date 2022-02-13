@@ -2336,6 +2336,8 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
     min(x[condition], na.rm = na.rm)
   } else if (aggregateFunc == "max") {
     max(x[condition], na.rm = na.rm)
+  } else if (aggregateFunc == "n_distinct" || aggregateFunc == "count_unique") { # count_unique is our alias for n_distinct.
+    n_distinct(x[condition], na.rm = na.rm)
   }
 }
 
@@ -2372,6 +2374,11 @@ min_if <- function(x, ..., na.rm = TRUE) {
 #' export
 max_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "max", ..., na.rm = na.rm)
+}
+
+#' export
+count_unique_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "n_distinct", ..., na.rm = na.rm)
 }
 
 #' Alias for n()
