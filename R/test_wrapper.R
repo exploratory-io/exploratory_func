@@ -915,10 +915,13 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     }
 
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
+      ret <- ret %>% dplyr::mutate(base.level = !!v2)
+      ret <- ret %>% dplyr::relocate(base.level, .after = conf.low)
       ret <- ret %>% dplyr::rename(`P Value`=p.value,
                      Difference=estimate,
                      `Conf High`=conf.high,
                      `Conf Low`=conf.low,
+                     `Base Level`=base.level,
                      `Method`=method)
     }
     else {
