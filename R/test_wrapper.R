@@ -563,7 +563,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   }
 
   # For logical explanatory variable, make it a factor and adjust label order so that
-  # the calculated difference it TRUE case - FALSE case, which intuitively makes better sense.
+  # the calculated difference is TRUE case - FALSE case, which intuitively makes better sense.
   if (is.logical(df[[var2_col]])) {
     df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
   }
@@ -703,6 +703,9 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     n2 <- data_summary$n_rows[[2]] # number of 2nd class
     v1 <- data_summary[[x$var2]][[1]] # value for 1st class
     v2 <- data_summary[[x$var2]][[2]] # value for 2nd class
+    # t.test seems to consider the 2nd category based on alphabetical/numerical/factor sort as the base category.
+    # Since group_by/summarize also sorts the group based on alphabetical/numerical/factor order, we can assume that the v2 is the base category.
+    ret <- ret %>% dplyr::mutate(base.level = !!v2)
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
@@ -720,7 +723,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
 
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low, base.level) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
         dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
@@ -728,6 +731,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       Difference=estimate,
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
+                      `Base Level`=base.level,
                       `Effect Size (Cohen's d)`=d,
                       `Power`=power,
                       `Probability of Type 2 Error`=beta)
@@ -742,7 +746,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         required_sample_size <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low, base.level) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
         dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
         dplyr::rename(`t Value`=statistic,
@@ -751,6 +755,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       Difference=estimate,
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
+                      `Base Level`=base.level,
                       `Effect Size (Cohen's d)`=d,
                       `Target Power`=power,
                       `Target Probability of Type 2 Error`=beta,
@@ -912,10 +917,15 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     }
 
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
+      # wilcox.test, just like t.test, seems to consider the 2nd category based on alphabetical/numerical/factor sort as the base category.
+      # Since group_by/summarize also sorts the group based on alphabetical/numerical/factor order, we can assume that the v2 is the base category.
+      ret <- ret %>% dplyr::mutate(base.level = !!v2)
+      ret <- ret %>% dplyr::relocate(base.level, .after = conf.low)
       ret <- ret %>% dplyr::rename(`P Value`=p.value,
                      Difference=estimate,
                      `Conf High`=conf.high,
                      `Conf Low`=conf.low,
+                     `Base Level`=base.level,
                      `Method`=method)
     }
     else {
