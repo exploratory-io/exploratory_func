@@ -660,7 +660,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
           df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
           df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
-          dplyr::bind_rows(df1, df2)
+          bind_rows_safe(df1, df2)
         })) %>%
         dplyr::select(-source.data.training, -source.data.test) %>%
         dplyr::ungroup()
@@ -777,7 +777,7 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, pretty.name=FALS
     dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
       df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
       df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
-      res <- dplyr::bind_rows(df1, df2)
+      res <- bind_rows_safe(df1, df2)
       res[grouping_cols]<-NULL # A dirty hack to avoid column name conflict at unnest. TODO: Maybe group column should not be there inside do_on_each_group in the first place.
       res
     })) %>%
@@ -882,7 +882,7 @@ evaluation <- function(df, ...){
       if (nrow(df2) > 0) {
         df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
         df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
-        dplyr::bind_rows(df1, df2)
+        bind_rows_safe(df1, df2)
       }
       else {
         df1
