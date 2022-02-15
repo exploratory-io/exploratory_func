@@ -3,8 +3,8 @@ test_that("bind_rows_safe", {
   df1 <- tibble::tibble(a...1=1, b=1)
   df2 <- tibble::tibble(a...1=2, c=2)
   res <- dplyr::bind_rows(df1, df2)
-  expect_equal(colnames(res), c("a", "b", "c"))
-  res <- bind_rows_safe(df1, df2)
+  expect_equal(colnames(res), c("a", "b", "c")) # To check if this fix is still necessary when dplyr is upgraded in future.
+  res <- exploratory:::bind_rows_safe(df1, df2) # This is an internal function.
   expect_equal(colnames(res), c("a...1", "b", "c"))
 })
 

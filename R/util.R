@@ -1908,6 +1908,8 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   }
 }
 
+# bind_rows wrapper to avoid the issue that column names like "a...1" is reduced to "a".
+# We use this internally in functions like prediction() to avoid such an issue.
 bind_rows_safe <- function(df1, df2) {
   colnames1 <- colnames(df1)
   colnames2 <- colnames(df2)
