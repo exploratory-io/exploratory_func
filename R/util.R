@@ -1908,6 +1908,20 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   }
 }
 
+bind_rows_safe <- function(df1, df2) {
+  colnames1 <- colnames(df1)
+  colnames2 <- colnames(df2)
+  colnames_unique <- unique(c(colnames1, colnames2))
+  safe_names <- paste('c', 1:length(colnames_unique), sep = '')
+  names(colnames_unique) <- safe_names
+  names(safe_names) <- colnames_unique
+  names(df1) <- safe_names[colnames1]
+  names(df2) <- safe_names[colnames2]
+  ret <- dplyr::bind_rows(df1, df2)
+  names(ret) <- colnames_unique[names(ret)]
+  ret
+}
+
 #'Wrapper function for dplyr's set operations to support ignoring data type difference.
 set_operation_with_force_character <- function(func, x, y, ...) {
   x <- dplyr::mutate_all(x, funs(as.character))
