@@ -415,7 +415,9 @@ kmeans_info <- function(df){
   ret
 }
 
-#' augment using source data and test index
+#' augment using source data (source.data column) and test index (.test_index column).
+#' The data frames in source.data are in the safe column names (e.g. c1, c2, ...).
+#' The augmenter for each type of models is expected to map the column names back to the original.
 #' @param df Data frame that has model and .test_index.
 #' @param data "training" or "test" or "newdata". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
