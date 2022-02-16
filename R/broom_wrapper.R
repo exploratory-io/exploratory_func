@@ -415,7 +415,9 @@ kmeans_info <- function(df){
   ret
 }
 
-#' augment using source data and test index
+#' augment using source data (source.data column) and test index (.test_index column).
+#' The data frames in source.data are in the safe column names (e.g. c1, c2, ...).
+#' The augmenter for each type of models is expected to map the column names back to the original.
 #' @param df Data frame that has model and .test_index.
 #' @param data "training" or "test" or "newdata". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
@@ -660,7 +662,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
           df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
           df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
-          dplyr::bind_rows(df1, df2)
+          bind_rows_safe(df1, df2)
         })) %>%
         dplyr::select(-source.data.training, -source.data.test) %>%
         dplyr::ungroup()
@@ -777,7 +779,7 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, pretty.name=FALS
     dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
       df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
       df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
-      res <- dplyr::bind_rows(df1, df2)
+      res <- bind_rows_safe(df1, df2)
       res[grouping_cols]<-NULL # A dirty hack to avoid column name conflict at unnest. TODO: Maybe group column should not be there inside do_on_each_group in the first place.
       res
     })) %>%
@@ -882,7 +884,7 @@ evaluation <- function(df, ...){
       if (nrow(df2) > 0) {
         df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
         df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
-        dplyr::bind_rows(df1, df2)
+        bind_rows_safe(df1, df2)
       }
       else {
         df1
