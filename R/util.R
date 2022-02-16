@@ -304,7 +304,10 @@ grouped_by <- function(df){
 #' @param diag If diagonal values should be returned
 #' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
-  df <- as.data.frame(mat) %>% tibble::rownames_to_column("Var2") %>% tidyr::pivot_longer(-Var2, "Var1","value", values_drop_na = na.rm)
+  df <- as.data.frame(mat) %>%
+    tibble::rownames_to_column(".Var2.temp") %>% # The column name .Var2.temp is to avoid name conflict as much as possible.
+    tidyr::pivot_longer(-.Var2.temp, "Var1","value", values_drop_na = na.rm) %>%
+    dplyr::rename(Var2 = .Var2.temp)
 
   if(zero.rm){
     df <- df[is.na(df[[3]]) | df[[3]] != 0, ]
