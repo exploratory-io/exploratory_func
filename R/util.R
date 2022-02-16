@@ -2762,7 +2762,7 @@ merge_sds <- function(sds, means, sizes) {
 #' @param address - column that contains address text data
 #' @export
 separate_japanese_address <- function(df, address){
-  # create a new column with above dummy column name.
+  # create a new column with a dummy column name.
   df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = zipangu::separate_address(address))
   # since the .exploratory_dummy_column_for_japanese_address column is a list that contains address elements,
   # call tidyr::unnest_wider so that each element becomes dedicated column like prefecture, city, and street.
