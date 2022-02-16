@@ -304,8 +304,9 @@ grouped_by <- function(df){
 #' @param diag If diagonal values should be returned
 #' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
-  loadNamespace("reshape2")
-  df <- reshape2::melt(t(mat), na.rm=na.rm)
+  # loadNamespace("reshape2")
+  # df <- reshape2::melt(t(mat), na.rm=na.rm)
+  df <- as.data.frame(mat) %>% tibble::rownames_to_column("Var2") %>% tidyr::pivot_longer(-Var2, "Var1","value", values_drop_na = na.rm)
 
   if(zero.rm){
     df <- df[is.na(df[[3]]) | df[[3]] != 0, ]
@@ -316,17 +317,17 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
   }
 
   # make the first column to be sorted
-  df <- df[,c(2,1,3)]
-  if(!is.null(colnames)){
+  #df <- df[,c(2,1,3)]
+  if(!is.null(cnames)){
     colnames(df) <- cnames
   }
 
-  if (!is.character(df[,1])) { # Can be a factor. Also can be integer if the origin column name was number.
-    df[,1] <- as.character(df[,1])
+  if (!is.character(df[[1]])) { # Can be a factor. Also can be integer if the origin column name was number.
+    df[[1]] <- as.character(df[[1]])
   }
 
   if (!is.character(df[,2])) { # Can be a factor. Also can be integer if the origin column name was number.
-    df[,2] <- as.character(df[,2])
+    df[[2]] <- as.character(df[[2]])
   }
 
   df
