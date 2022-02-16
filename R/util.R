@@ -304,8 +304,6 @@ grouped_by <- function(df){
 #' @param diag If diagonal values should be returned
 #' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
-  # loadNamespace("reshape2")
-  # df <- reshape2::melt(t(mat), na.rm=na.rm)
   df <- as.data.frame(mat) %>% tibble::rownames_to_column("Var2") %>% tidyr::pivot_longer(-Var2, "Var1","value", values_drop_na = na.rm)
 
   if(zero.rm){
@@ -316,8 +314,6 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
     df <- df[df[[1]]!=df[[2]],]
   }
 
-  # make the first column to be sorted
-  #df <- df[,c(2,1,3)]
   if(!is.null(cnames)){
     colnames(df) <- cnames
   }
