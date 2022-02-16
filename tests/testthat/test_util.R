@@ -1214,3 +1214,12 @@ test_that("mutate_group", {
   expect_equal(head(df2)$wt_cummean[[1]],2.62)
 
 })
+
+test_that("separate_japanese_address", {
+  #  Address 1. Tokyo-To Shinjuku-ku Hyakunin-cho 1-2
+  #  Address 2. Tokyo-To Shibuya-ku Shoto 2-3
+  df <- data.frame(address = c("\u6771\u4EAC\u90FD\u65B0\u5BBF\u533A\u767E\u4EBA\u0031\u002D\u0032", "\u6771\u4EAC\u90FD\u6E0B\u8C37\u533A\u677E\u6FE4\u0032\u002D\u0033"))
+  df2 <- exploratory::separate_japanese_address(df, address)
+  # The city for the first line should be Shinjuku-ku
+  expect_equal(nrow(df2 %>% filter(city=="\u65B0\u5BBF\u533A")), 1)
+})
