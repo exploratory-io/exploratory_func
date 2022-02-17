@@ -2776,20 +2776,20 @@ merge_sds <- function(sds, means, sizes) {
 # Wrapper function for zipangu's separate_address
 #' @param df - data frame
 #' @param address - column that contains address text data
-#' @param prefectre_newcolname - new column name for prefecture
-#' @param city_newcolname - new column name for city
-#' @param street_newcolname - new column name for street
+#' @param prefecture_col - new column name for prefecture
+#' @param city_col - new column name for city
+#' @param street_col - new column name for street
 #' @export
-separate_japanese_address <- function(df, address, prefecture_newcolname = "prefecture", city_newcolname = "city", street_newcolname = "street"){
+separate_japanese_address <- function(df, address, prefecture_col = "prefecture", city_col = "city", street_col = "street"){
   # get column name from address.
   address_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(address))
   # create a new column with a dummy column name and store the separated address elements.
   df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = zipangu::separate_address(!!rlang::sym(address_col)))
   # since the .exploratory_dummy_column_for_japanese_address column is a list that contains address elements,
   # call tidyr::unnest_wider so that each element becomes dedicated column like prefecture, city, and street.
-  prefecture_newcolname <- avoid_conflict(colnames(df), prefecture_newcolname)
-  city_newcolname <- avoid_conflict(colnames(df), city_newcolname)
-  street_newcolname <- avoid_conflict(colnames(df), street_newcolname)
-  new_names <- c(setdiff(names(df), '.exploratory_dummy_column_for_japanese_address'),c(prefecture_newcolname, city_newcolname, street_newcolname))
+  prefecture_col <- avoid_conflict(colnames(df), prefecture_col)
+  city_col <- avoid_conflict(colnames(df), city_col)
+  street_col <- avoid_conflict(colnames(df), street_col)
+  new_names <- c(setdiff(names(df), '.exploratory_dummy_column_for_japanese_address'),c(prefecture_col, city_col, street_col))
   df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = ~new_names)
 }
