@@ -1216,6 +1216,18 @@ test_that("ts_diff_ratio", {
   expect_equal(res, c(NA, 1, 2, 1/3))
 })
 
+test_that("is_japanese_holiday", {
+  current_option <- getOption("lubridate.week.start")
+  # reset the week stat day to Monday (1) to test the fix
+  options(lubridate.week.start = 1)
+  expect_equal(exploratory::is_japanese_holiday("2019-10-14"), TRUE)
+  expect_equal(exploratory::is_japanese_holiday("2019-10-08"), FALSE)
+  # Make sure the option is not reset by exploratory::is_japanese_holiday
+  expect_equal(getOption("lubridate.week.start"),1)
+  # reset
+  options(lubridate.week.start = current_option)
+})
+
 test_that("mutate_group", {
   df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
   expect_equal(head(df)$mpg_cummean[[1]],21)

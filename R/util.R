@@ -1613,6 +1613,28 @@ weekend <- function(x){
 }
 
 #' @export
+#' Wrapper function for zipangu::is_jholiday
+#' To get correct Japanese Holiday information with zipangu's is_jholiday API,
+#' week start day (i.e. lubridate.week.start) should be 7 (Sunday).
+#' But there are cases that users want to use a different week start day
+#' and still want to detect the correct Japanese holidays.
+#' To workaround it, this wrapper function first sets the week start day to 7 (Sunday)
+#' and switches it back to the original value once the process is done.
+#'
+is_japanese_holiday <- function(date) {
+  current_option <- getOption("lubridate.week.start")
+  result <- tryCatch({
+    options(lubridate.week.start = 7)
+    zipangu::is_jholiday(date)
+  }, error=function(cond) {
+    stop(cond)
+  }, finally = {
+    options(lubridate.week.start = current_option)
+  })
+  result
+}
+
+#' @export
 extract_from_numeric <- function(x, type = "asdisc") {
   switch(type,
     asnum = {
