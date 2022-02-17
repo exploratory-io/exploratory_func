@@ -1625,7 +1625,16 @@ is_japanese_holiday <- function(date) {
   current_option <- getOption("lubridate.week.start")
   result <- tryCatch({
     options(lubridate.week.start = 7)
-    zipangu::is_jholiday(date)
+    # When NA is pass to zipangu::is_joholiday, it throws an error.
+    # As an workaround, use a date which is not Japanese Holiday (e.g. 2020-02-01)
+    # so that it returns FALSE for NA.
+    if (is.character(date)) {
+      zipangu::is_jholiday(tidyr::replace_na(date, "2020-02-01"))
+    } else if (lubridate::is.Date(date)) {
+      zipangu::is_jholiday(tidyr::replace_na(date, as.Date("2020-02-01")))
+    } else if (lubridate::is.POSIXct(date)) {
+      zipangu::is_jholiday(tidyr::replace_na(date, as.POSIXCt("2020-02-01")))
+    }
   }, error=function(cond) {
     stop(cond)
   }, finally = {

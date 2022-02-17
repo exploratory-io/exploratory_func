@@ -1222,6 +1222,8 @@ test_that("is_japanese_holiday", {
   options(lubridate.week.start = 1)
   expect_equal(exploratory::is_japanese_holiday("2019-10-14"), TRUE)
   expect_equal(exploratory::is_japanese_holiday("2019-10-08"), FALSE)
+  expect_equal(exploratory::is_japanese_holiday(c("2019-10-14", "2019-10-08", NA)), c(TRUE, FALSE, FALSE))
+
   # Make sure the option is not reset by exploratory::is_japanese_holiday
   expect_equal(getOption("lubridate.week.start"),1)
   # reset
