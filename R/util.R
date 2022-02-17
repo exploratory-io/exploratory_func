@@ -2776,13 +2776,20 @@ merge_sds <- function(sds, means, sizes) {
 # Wrapper function for zipangu's separate_address
 #' @param df - data frame
 #' @param address - column that contains address text data
+#' @param prefectre_newcolname - new column name for prefecture
+#' @param city_newcolname - new column name for city
+#' @param street_newcolname - new column name for street
 #' @export
-separate_japanese_address <- function(df, address){
+separate_japanese_address <- function(df, address, prefecture_newcolname = "prefecture", city_newcolname = "city", street_newcolname = "street"){
   # get column name from address.
   address_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(address))
   # create a new column with a dummy column name and store the separated address elements.
   df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = zipangu::separate_address(!!rlang::sym(address_col)))
   # since the .exploratory_dummy_column_for_japanese_address column is a list that contains address elements,
   # call tidyr::unnest_wider so that each element becomes dedicated column like prefecture, city, and street.
-  df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = "unique")
+  prefecture_newcolname <- avoid_conflict(colnames(df), prefecture_newcolname)
+  city_newcolname <- avoid_conflict(colnames(df), city_newcolname)
+  street_newcolname <- avoid_conflict(colnames(df), street_newcolname)
+  new_names <- c(setdiff(names(df), '.exploratory_dummy_column_for_japanese_address'),c(prefecture_newcolname, city_newcolname, street_newcolname))
+  df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = ~new_names)
 }
