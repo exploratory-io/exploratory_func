@@ -2784,13 +2784,13 @@ separate_japanese_address <- function(df, address, prefecture_col = "prefecture"
   # get column name from address.
   address_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(address))
   # prepare new column names for the result data frame.
+  prefecture_col <- avoid_conflict(colnames(df), prefecture_col)
+  city_col <- avoid_conflict(colnames(df), city_col)
+  street_col <- avoid_conflict(colnames(df), street_col)
   new_names <- c(names(df), prefecture_col, city_col, street_col)
   # create a new column with a dummy column name and store the separated address elements.
   df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = zipangu::separate_address(!!rlang::sym(address_col)))
   # since the .exploratory_dummy_column_for_japanese_address column is a list that contains address elements,
   # call tidyr::unnest_wider so that each element becomes dedicated column like prefecture, city, and street.
-  prefecture_col <- avoid_conflict(colnames(df), prefecture_col)
-  city_col <- avoid_conflict(colnames(df), city_col)
-  street_col <- avoid_conflict(colnames(df), street_col)
   df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = ~new_names)
 }
