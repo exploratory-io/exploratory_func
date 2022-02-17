@@ -166,11 +166,11 @@ test_that("test upper_gather with vector", {
   names <- paste("entity", seq(4))
   result <- upper_gather(mat,names)
   expect_equal(result$Var1, sort(result$Var1))
-  expect_equal(result[result[,1]=="entity 1" & result[,2]=="entity 3",3], 2)
-  expect_equal(result[result[,1]=="entity 1" & result[,2]=="entity 4",3], 3)
-  expect_equal(result[result[,1]=="entity 2" & result[,2]=="entity 3",3], 4)
-  expect_equal(result[result[,1]=="entity 2" & result[,2]=="entity 4",3], 5)
-  expect_equal(result[result[,1]=="entity 3" & result[,2]=="entity 4",3], 6)
+  expect_equal(as.numeric(result[result[[1]]=="entity 1" & result[[2]]=="entity 3",3]), 2)
+  expect_equal(as.numeric(result[result[[1]]=="entity 1" & result[[2]]=="entity 4",3]), 3)
+  expect_equal(as.numeric(result[result[[1]]=="entity 2" & result[[2]]=="entity 3",3]), 4)
+  expect_equal(as.numeric(result[result[[1]]=="entity 2" & result[[2]]=="entity 4",3]), 5)
+  expect_equal(as.numeric(result[result[[1]]=="entity 3" & result[[2]]=="entity 4",3]), 6)
   expect_equal(nrow(result), 6)
 })
 
@@ -349,9 +349,9 @@ test_that("test mat_to_df", {
   colnames(mat) <- paste("cname", seq(nc))
   rownames(mat) <- paste("rname", seq(nr))
   ret <- mat_to_df(mat, c("aa", "bb", "value"))
-  expect_true(is.character(ret[,1]))
-  expect_true(is.character(ret[,2]))
-  expect_true(!is.unsorted(ret[,1]))
+  expect_true(is.character(ret$aa))
+  expect_true(is.character(ret$bb))
+  expect_true(!is.unsorted(ret$aa))
 })
 
 test_that("test mat_to_df with column names with numeric characters only", {
@@ -364,9 +364,9 @@ test_that("test mat_to_df with column names with numeric characters only", {
   rownames(mat) <- as.character(seq(nr))
 
   ret <- mat_to_df(mat, c("aa", "bb", "value"))
-  expect_true(is.character(ret[,1]))
-  expect_true(is.character(ret[,2]))
-  expect_true(!is.unsorted(ret[,1]))
+  expect_true(is.character(ret$aa))
+  expect_true(is.character(ret$bb))
+  expect_true(!is.unsorted(ret$aa))
 })
 
 test_that("test %nin%", {

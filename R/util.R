@@ -304,8 +304,12 @@ grouped_by <- function(df){
 #' @param diag If diagonal values should be returned
 #' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
-  loadNamespace("reshape2")
-  df <- reshape2::melt(t(mat), na.rm=na.rm)
+  df <- as.data.frame(mat) %>%
+    tibble::rownames_to_column(".Var2.temp") %>% # The column name .Var2.temp is to avoid name conflict as much as possible.
+    tidyr::pivot_longer(-.Var2.temp, "Var1","value", values_drop_na = na.rm) %>%
+    dplyr::rename(Var2 = .Var2.temp)
+  # Remove V from names like V1, V2 to align the output to the previous implementation that used reshape2::melt.
+  df <- df %>% dplyr::mutate(Var1 = stringr::str_replace(Var1, "^V", ""))
 
   if(zero.rm){
     df <- df[is.na(df[[3]]) | df[[3]] != 0, ]
@@ -315,18 +319,16 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
     df <- df[df[[1]]!=df[[2]],]
   }
 
-  # make the first column to be sorted
-  df <- df[,c(2,1,3)]
-  if(!is.null(colnames)){
+  if(!is.null(cnames)){
     colnames(df) <- cnames
   }
 
-  if (!is.character(df[,1])) { # Can be a factor. Also can be integer if the origin column name was number.
-    df[,1] <- as.character(df[,1])
+  if (!is.character(df[[1]])) { # Can be a factor. Also can be integer if the origin column name was number.
+    df[[1]] <- as.character(df[[1]])
   }
 
   if (!is.character(df[,2])) { # Can be a factor. Also can be integer if the origin column name was number.
-    df[,2] <- as.character(df[,2])
+    df[[2]] <- as.character(df[[2]])
   }
 
   df
