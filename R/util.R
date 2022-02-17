@@ -1633,7 +1633,7 @@ is_japanese_holiday <- function(date) {
     } else if (lubridate::is.Date(date)) {
       zipangu::is_jholiday(tidyr::replace_na(date, as.Date("2020-02-01")))
     } else if (lubridate::is.POSIXct(date)) {
-      zipangu::is_jholiday(tidyr::replace_na(date, as.POSIXCt("2020-02-01")))
+      zipangu::is_jholiday(tidyr::replace_na(date, as.POSIXCt("2020-02-01 00:00:00")))
     }
   }, error=function(cond) {
     stop(cond)
