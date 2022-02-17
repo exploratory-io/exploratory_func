@@ -1228,11 +1228,11 @@ test_that("separate_japanese_address", {
   #  Address 1. Tokyo-To Shinjuku-ku Hyakunin-cho 1-2
   #  Address 2. Tokyo-To Shibuya-ku Shoto 2-3
   df <- data.frame(address2 = c("\u6771\u4EAC\u90FD\u65B0\u5BBF\u533A\u767E\u4EBA\u753A\u0031\u002D\u0032", "\u6771\u4EAC\u90FD\u6E0B\u8C37\u533A\u677E\u6FE4\u0032\u002D\u0033"))
-  df2 <- exploratory::separate_japanese_address(df, address2)
+  df2 <- exploratory::separate_japanese_address(df, address2, prefecture_col = "TODOFUKEN", city_col = "SHIKUCHOSON", street_col = "BANCHI")
   # The prefecure is Tokyo for both first line and second line.
   # The city for the first line is Shinjuku-ku and the city for the second line is Shibuya-ku
   # The street for the fist line is Hyakunin-cho 1-2 and the street for the second line is Shoto 2-3.
   check <- df2 %>% dplyr::select(-address2)
-  answer <- tibble::tibble(prefecture = c("\u6771\u4EAC\u90FD", "\u6771\u4EAC\u90FD"),  city = c("\u65B0\u5BBF\u533A", "\u6E0B\u8C37\u533A"), street = c("\u767E\u4EBA\u753A\u0031\u002D\u0032", "\u677E\u6FE4\u0032\u002D\u0033"))
+  answer <- tibble::tibble(TODOFUKEN = c("\u6771\u4EAC\u90FD", "\u6771\u4EAC\u90FD"),  SHIKUCHOSON = c("\u65B0\u5BBF\u533A", "\u6E0B\u8C37\u533A"), BANCHI = c("\u767E\u4EBA\u753A\u0031\u002D\u0032", "\u677E\u6FE4\u0032\u002D\u0033"))
   expect_true(isTRUE(all.equal(check, answer)), TRUE)
 })
