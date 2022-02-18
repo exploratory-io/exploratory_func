@@ -2983,9 +2983,12 @@ calc_permutation_importance_rpart_binary <- function(fit, target, vars, data) {
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict(object, newdata)},
-                                loss.fun = function(x,y){
-                                  -sum(log(1- abs(x[,2]-as.numeric(as.logical(y[[1]])))),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
-                                # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                loss.fun = function(x,y) {
+                                  # Probability-error-based loss function. Removed log from the negative-log-likelihood-based, since giving 0 probability for the ground truth would give infinite penalty,
+                                  # which can regularly happen with a single decision tree.
+                                  -sum(1- abs(x[,2]-as.numeric(as.logical(y[[1]]))),na.rm = TRUE)}
+                                  # -sum(log(1- abs(x[,2]-as.numeric(as.logical(y[[1]])))),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                  # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
                                 )
   })
   importances <- purrr::flatten_dbl(importances)
@@ -3000,8 +3003,10 @@ calc_permutation_importance_rpart_multiclass <- function(fit, target, vars, data
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict(object, newdata)},
                                 # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                # Probability-error-based loss function. Removed log from the negative-log-likelihood-based, since giving 0 probability for the ground truth would give infinite penalty,
+                                # which can regularly happen with a single decision tree.
                                 loss.fun = function(x,y) {
-                                  sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]))
+                                  sum(-(x[match(y[[1]][row(x)], colnames(x))==col(x)]))
                                 }) # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
   })
   importances <- purrr::flatten_dbl(importances)
