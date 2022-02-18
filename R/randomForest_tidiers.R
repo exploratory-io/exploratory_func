@@ -2986,7 +2986,7 @@ calc_permutation_importance_rpart_binary <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y) {
                                   # Probability-error-based loss function. Removed log from the negative-log-likelihood-based, since giving 0 probability for the ground truth would give infinite penalty,
                                   # which can regularly happen with a single decision tree.
-                                  -sum(1- abs(x[,2]-as.numeric(as.logical(y[[1]]))),na.rm = TRUE)}
+                                  -sum(1- abs(x[,2]-as.numeric(as.logical(y[[1]]))), na.rm = TRUE)}
                                   # -sum(log(1- abs(x[,2]-as.numeric(as.logical(y[[1]])))),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
                                   # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
                                 )
@@ -3006,7 +3006,7 @@ calc_permutation_importance_rpart_multiclass <- function(fit, target, vars, data
                                 # Probability-error-based loss function. Removed log from the negative-log-likelihood-based, since giving 0 probability for the ground truth would give infinite penalty,
                                 # which can regularly happen with a single decision tree.
                                 loss.fun = function(x,y) {
-                                  sum(-(x[match(y[[1]][row(x)], colnames(x))==col(x)]))
+                                  sum(-(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)
                                 }) # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
   })
   importances <- purrr::flatten_dbl(importances)
