@@ -1230,9 +1230,9 @@ test_that("is_japanese_holiday", {
 
 test_that("mutate_group", {
   df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
-  expect_equal(head(df)$mpg_cummean[[1]],21)
+  expect_equal(head(df)$mpg_cummean[[1]],22.8)
   df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt))
-  expect_equal(head(df2)$wt_cummean[[1]],2.62)
+  expect_equal(head(df2)$wt_cummean[[1]],2.32)
 
 })
 
