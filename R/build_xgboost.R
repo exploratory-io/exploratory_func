@@ -802,7 +802,7 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])), na.rm = TRUE)} # Negative-log-likelihood-based loss function.
                                 # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
                                 )
   })
@@ -818,7 +818,7 @@ calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, da
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
                                 # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
-                                loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]))} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
+                                loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
                                 )
   })
   importances <- purrr::flatten_dbl(importances)
