@@ -2329,12 +2329,12 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
         name_list <- group_cols
       }
       names(groupby_args) <- name_list
-      # make sure to ungroup result
-      .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...)
+      # make sure to sorr result by group by columns
+      .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
-        # make sure to ungroup result
-        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...)
+        # make sure to sorr result by group by columns
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% dplyr::mutate(...)
       }
@@ -2347,7 +2347,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
   ret <- ret %>% dplyr::mutate_if(is.integer, as.numeric)
   if (keep_group) {
     ret
-  } else {
+  } else { # if keep_group is FALSE, make sure to ungroup result
     ret %>% dplyr::ungroup()
   }
 }
