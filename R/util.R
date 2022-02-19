@@ -2347,8 +2347,8 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
   ret <- ret %>% dplyr::mutate_if(is.integer, as.numeric)
   if (keep_group) {
     ret
-  } else { # if keep_group is FALSE, make sure to ungroup result
-    ret %>% dplyr::ungroup()
+  } else { # if keep_group is FALSE, make sure to ungroup result but move the columns used for grouping at the beginning.
+    ret %>% dplyr::ungroup() %>% dplyr::select(group_cols, dplyr::everything())
   }
 }
 
