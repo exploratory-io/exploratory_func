@@ -2963,6 +2963,59 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
   pd
 }
 
+# Calculates permutation importance for regression by rpart. 
+calc_permutation_importance_rpart_regression <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict(object, newdata)},
+                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
+calc_permutation_importance_rpart_binary <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict(object, newdata)},
+                                loss.fun = function(x,y) {
+                                  # Probability-error-based loss function. Removed log from the negative-log-likelihood-based, since giving 0 probability for the ground truth would give infinite penalty,
+                                  # which can regularly happen with a single decision tree.
+                                  -sum(1- abs(x[,2]-as.numeric(as.logical(y[[1]]))), na.rm = TRUE)}
+                                  # -sum(log(1- abs(x[,2]-as.numeric(as.logical(y[[1]])))),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                  # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                )
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
+calc_permutation_importance_rpart_multiclass <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict(object, newdata)},
+                                # loss.fun = function(x,y) {1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                # loss.fun = function(x,y) {sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
+                                # Probability-error-based loss function. Removed log from the negative-log-likelihood-based, since giving 0 probability for the ground truth would give infinite penalty,
+                                # which can regularly happen with a single decision tree.
+                                loss.fun = function(x,y) {
+                                  sum(-(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)
+                                })
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
 #' @export
 exp_rpart <- function(df,
                       target,
@@ -3022,6 +3075,9 @@ exp_rpart <- function(df,
   # Sort predictors so that the result of permutation importance is stable against change of column order.
   selected_cols <- stringr::str_sort(selected_cols)
 
+  # Remember if the target column was originally numeric or logical before converting type.
+  is_target_numeric <- is.numeric(df[[target_col]])
+  is_target_logical <- is.logical(df[[target_col]])
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
 
@@ -3157,6 +3213,18 @@ exp_rpart <- function(df,
         model$imp_vars <- imp_vars
         # Shrink the partial dependence data keeping only the important variables.
         model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+      }
+      else if (importance_measure == "permutation") {
+        if (is_target_logical) {
+          imp_df <- calc_permutation_importance_rpart_binary(model, clean_target_col, c_cols, df)
+        }
+        else if (is_target_numeric) {
+          imp_df <- calc_permutation_importance_rpart_regression(model, clean_target_col, c_cols, df)
+        }
+        else {
+          imp_df <- calc_permutation_importance_rpart_multiclass(model, clean_target_col, c_cols, df)
+        }
+        model$imp_df <- imp_df
       }
 
       if (pd_with_bin_means && is_target_logical_or_numeric) {
