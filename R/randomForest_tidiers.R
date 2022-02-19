@@ -3002,12 +3002,13 @@ calc_permutation_importance_rpart_multiclass <- function(fit, target, vars, data
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict(object, newdata)},
-                                # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                # loss.fun = function(x,y) {1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                # loss.fun = function(x,y) {sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
                                 # Probability-error-based loss function. Removed log from the negative-log-likelihood-based, since giving 0 probability for the ground truth would give infinite penalty,
                                 # which can regularly happen with a single decision tree.
                                 loss.fun = function(x,y) {
                                   sum(-(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)
-                                }) # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
+                                })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
