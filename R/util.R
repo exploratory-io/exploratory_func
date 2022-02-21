@@ -2329,7 +2329,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
         name_list <- group_cols
       }
       names(groupby_args) <- name_list
-      # make sure to sorr result by group by columns
+      # make sure to sort result by group by columns
       .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns

@@ -1229,11 +1229,17 @@ test_that("is_japanese_holiday", {
 })
 
 test_that("mutate_group", {
-  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
+  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg), mpg_cumsum = cumsum(mpg))
   expect_equal(head(df)$mpg_cummean[[1]],22.8)
-  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt))
+  expect_equal(head(df)$mpg_cummean[[2]],23.6)
+  expect_equal(head(df)$mpg_cumsum[[1]],22.8)
+  expect_equal(head(df)$mpg_cumsum[[2]],47.2)
+  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt), wt_cumsum = cumsum(wt))
   expect_equal(head(df2)$wt_cummean[[1]],2.32)
-
+  print(head(df2)$wt_cummean[[2]])
+  expect_equal(round(head(df2)$wt_cummean[[2]], digits = 2) ,2.76)
+  expect_equal(head(df2)$wt_cumsum[[1]],2.32)
+  expect_equal(head(df2)$wt_cumsum[[2]],5.51)
 })
 
 test_that("separate_japanese_address", {
