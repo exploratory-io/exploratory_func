@@ -1631,7 +1631,7 @@ is_japanese_holiday <- function(date) {
     date <-
       lubridate::as_date(date)
     na_index <- which(sapply(date, is.na))
-    # make sure to exclude NA otherwise, lubridate::year fails.
+    # make sure to exclude NA otherwise, lubridate::as_date(unlist(zipangu::jholiday(yr, "en")))
     if (length(na_index) == 0) {
       yr <- unique(lubridate::year(date))
     } else {
