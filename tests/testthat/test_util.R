@@ -1229,11 +1229,21 @@ test_that("is_japanese_holiday", {
 })
 
 test_that("mutate_group", {
-  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg))
-  expect_equal(head(df)$mpg_cummean[[1]],21)
-  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt))
-  expect_equal(head(df2)$wt_cummean[[1]],2.62)
-
+  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg), mpg_cumsum = cumsum(mpg))
+  expect_equal(head(df)$mpg_cummean[[1]],22.8)
+  expect_equal(head(df)$mpg_cummean[[2]],23.6)
+  expect_equal(head(df)$cyl[[1]], 4) # cyl is sorted so first line should be 4
+  expect_equal(head(df)$mpg_int10[[1]], 20) # mpg_int10 is sorted so first line should be 20
+  expect_equal(head(df, 12)$cyl[[12]], 6) # cyl is sorted and next group (6) starts from line 12
+  expect_equal(head(df, 12)$mpg_int10[[12]], 10) # mpg_int10 is sorted and the value for the line 12 is 10
+  expect_equal(head(df)$mpg_cumsum[[1]],22.8)
+  expect_equal(head(df)$mpg_cumsum[[2]],47.2)
+  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt), wt_cumsum = cumsum(wt))
+  expect_equal(head(df2)$wt_cummean[[1]],2.32)
+  print(head(df2)$wt_cummean[[2]])
+  expect_equal(round(head(df2)$wt_cummean[[2]], digits = 2) ,2.76)
+  expect_equal(head(df2)$wt_cumsum[[1]],2.32)
+  expect_equal(head(df2)$wt_cumsum[[2]],5.51)
 })
 
 test_that("separate_japanese_address", {
