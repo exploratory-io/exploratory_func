@@ -1628,12 +1628,28 @@ is_japanese_holiday <- function(date) {
     # When NA is pass to zipangu::is_joholiday, it throws an error.
     # As an workaround, use a date which is not Japanese Holiday (e.g. 2020-02-01)
     # so that it returns FALSE for NA.
-    if (is.character(date)) {
-      zipangu::is_jholiday(tidyr::replace_na(date, "2020-02-01"))
-    } else if (lubridate::is.Date(date)) {
-      zipangu::is_jholiday(tidyr::replace_na(date, lubridate::as_date("2020-02-01")))
-    } else if (lubridate::is.POSIXct(date)) {
-      zipangu::is_jholiday(tidyr::replace_na(date, lubridate::as_datetime("2020-02-01 00:00:00")))
+    date <-
+      lubridate::as_date(date)
+    na_index <- which(sapply(date, is.na))
+    # make sure to exclude NA otherwise, lubridate::year fails.
+    if (length(na_index) == 0) {
+      yr <- unique(lubridate::year(date))
+    } else {
+      yr <-
+        unique(lubridate::year(date[-na_index]))
+    }
+    jholidays <-
+      unique(c(
+        zipangu:::jholiday_df$date,            # Holidays from https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv
+        lubridate::as_date(unlist(zipangu::jholiday(yr, "en")))   # Calculated holidays
+      ))
+
+    # exclude NA from jholidays then check if the date is Japanese Holiday or not.
+    jholidays_na_index <- which(sapply(jholidays, is.na))
+    if (length(jholidays_na_index) == 0) {
+      date %in% jholidays
+    } else {
+      date %in% jholidays[-jholidays_na_index]
     }
   }, error=function(cond) {
     stop(cond)
