@@ -1624,10 +1624,8 @@ weekend <- function(x){
 is_japanese_holiday <- function(date) {
   current_option <- getOption("lubridate.week.start")
   result <- tryCatch({
+    # Make sure to set 7 as the week start date to make the result stable.
     options(lubridate.week.start = 7)
-    # When NA is pass to zipangu::is_joholiday, it throws an error.
-    # As an workaround, use a date which is not Japanese Holiday (e.g. 2020-02-01)
-    # so that it returns FALSE for NA.
     date <-
       lubridate::as_date(date)
     na_index <- which(sapply(date, is.na))
