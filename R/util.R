@@ -1624,10 +1624,28 @@ weekend <- function(x){
 #' and switches it back to the original value once the process is done.
 #'
 is_japanese_holiday <- function(date) {
+  # This API is originally from https://github.com/uribo/zipangu/blob/main/R/jholiday.R
+  # With this wrapper function, we added NA handling fix as well lubridate.week.start handling fix on top of it.
+
+  # Remember the current option so that we can restore to it once the process is done.
   current_option <- getOption("lubridate.week.start")
   result <- tryCatch({
+    # Make sure to set 7 as the week start date to make the result stable.
+    # This is required since zipangu calls lubridate::wday without passing wee_start argument. (see https://github.com/uribo/zipangu/issues/40 for details)
     options(lubridate.week.start = 7)
-    zipangu::is_jholiday(date)
+    date <-
+      lubridate::as_date(date)
+      # make sure to exclude NA otherwise, lubridate::as_date(unlist(zipangu::jholiday(yr, "en")))
+    yr <-
+      unique(lubridate::year(date[!is.na(date)]))
+    jholidays <-
+      unique(c(
+        zipangu:::jholiday_df$date,            # Holidays from https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv
+        lubridate::as_date(unlist(zipangu::jholiday(yr, "en")))   # Calculated holidays
+      ))
+
+    # exclude NA from jholidays then check if the date is Japanese Holiday or not.
+    date %in% jholidays[!is.na(jholidays)]
   }, error=function(cond) {
     stop(cond)
   }, finally = {
