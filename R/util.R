@@ -1634,8 +1634,8 @@ is_japanese_holiday <- function(date) {
     date <-
       lubridate::as_date(date)
       # make sure to exclude NA otherwise, lubridate::as_date(unlist(zipangu::jholiday(yr, "en")))
-      yr <-
-        unique(lubridate::year(date[!is.na(date)]))
+    yr <-
+      unique(lubridate::year(date[!is.na(date)]))
     jholidays <-
       unique(c(
         zipangu:::jholiday_df$date,            # Holidays from https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv
