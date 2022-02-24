@@ -369,6 +369,24 @@ test_that("test mat_to_df with column names with numeric characters only", {
   expect_true(!is.unsorted(ret$aa))
 })
 
+test_that("test floor", {
+  ret <- exploratory::floor(c(3, 3.0001, 2.9999, NA))
+  expect_equal(ret, c(3, 3, 2, NA))
+  ret <- exploratory::floor(c(3.1, 3.10001, 3.09999, NA), digits=1)
+  expect_equal(ret, c(3.1, 3.1, 3, NA))
+  ret <- exploratory::floor(c(30, 31, 29.9999, NA), digits=-1)
+  expect_equal(ret, c(30, 30, 20, NA))
+})
+
+test_that("test ceiling", {
+  ret <- exploratory::ceiling(c(3, 3.0001, 2.9999, NA))
+  expect_equal(ret, c(3, 4, 3, NA))
+  ret <- exploratory::ceiling(c(3.1, 3.10001, 3.09999, NA), digits=1)
+  expect_equal(ret, c(3.1, 3.2, 3.1, NA))
+  ret <- exploratory::ceiling(c(30, 31, 29.9999, NA), digits=-1)
+  expect_equal(ret, c(30, 40, 30, NA))
+})
+
 test_that("test %nin%", {
   ret <- c(1,3,NA,2) %nin% c(3, NA)
   expect_equal(ret, c(T,F,F,T))
