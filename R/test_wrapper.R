@@ -477,6 +477,9 @@ glance.chisq_exploratory <- function(x) {
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
   N <- sum(x$observed) # Total number of observations (rows).
+  k <- ncol(x$observed)
+  r <- nrow(x$observed)
+  V <- sqrt(x$statistic/N/min(k-1, r-1)) # Cramer's V - https://en.wikipedia.org/wiki/Cram%C3%A9r%27s_V
   note <- NULL
   if (is.null(x$power)) {
     # If power is not specified in the arguments, estimate current power.
@@ -495,11 +498,12 @@ glance.chisq_exploratory <- function(x) {
       note <- "Could not calculate Cohhen's w." 
       power_val <- NA_real_
     }
-    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val, n=!!N)
+    ret <- ret %>% dplyr::mutate(v=!!V, w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val, n=!!N)
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, everything()) # Reorder to unify order with t-test.
     ret <- ret %>% dplyr::rename(`Chi-Square`=statistic,
                                  `P Value`=p.value,
                                  `Degree of Freedom`=parameter,
+                                 `Association Coef. (Cramer's V)`=v,
                                  `Effect Size (Cohen's w)`=w,
                                  `Power`=power,
                                  `Probability of Type 2 Error`=beta,
@@ -515,11 +519,12 @@ glance.chisq_exploratory <- function(x) {
       note <<- e$message
       required_sample_size <<- NA_real_
     })
-    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), n=!!N, required_n=!!required_sample_size)
+    ret <- ret %>% dplyr::mutate(v=!!V, w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), n=!!N, required_n=!!required_sample_size)
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, everything()) # Reorder to unify order with t-test.
     ret <- ret %>% dplyr::rename(`Chi-Square`=statistic,
                                  `P Value`=p.value,
                                  `Degree of Freedom`=parameter,
+                                 `Association Coef. (Cramer's V)`=v,
                                  `Effect Size (Cohen's w)`=w,
                                  `Target Power`=power,
                                  `Target Probability of Type 2 Error`=beta,
