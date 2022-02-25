@@ -378,6 +378,27 @@ to_same_type <- function(vector, original) {
   }
 }
 
+#' floor with digits argument.
+#' @export
+floor <- function(x, digits = 0) {
+  if (digits == 0) {
+    base::floor(x)
+  }
+  else {
+    base::floor(x * 10^digits) / 10^digits
+  }
+}
+
+#' ceiling with digits argument.
+#' @export
+ceiling <- function(x, digits = 0) {
+  if (digits == 0) {
+    base::ceiling(x)
+  }
+  else {
+    base::ceiling(x * 10^digits) / 10^digits
+  }
+}
 
 #' Not %in% function
 #' @export
