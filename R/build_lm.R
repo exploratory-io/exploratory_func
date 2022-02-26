@@ -361,8 +361,9 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
     ret <- dplyr::rowwise(ret)
     ret
   }, error = function(e){
-    # error message was changed when upgrading dplyr to 0.7.1
-    # so use stringr::str_detect to make these robust
+    # Error message was changed when upgrading dplyr to 0.7.1
+    # so use stringr::str_detect to make these robust.
+    # With dplyr 1.0.8, now it seems that the message is separated into e$message and e$parant$message.
     if (stringr::str_detect(e$parent$message, "contrasts can be applied only to factors with 2 or more levels")) {
       stop("more than 1 unique values are expected for categorical columns assigned as predictors")
     }
