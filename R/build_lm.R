@@ -363,14 +363,13 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   }, error = function(e){
     # error message was changed when upgrading dplyr to 0.7.1
     # so use stringr::str_detect to make these robust
-    if(stringr::str_detect(e$message, "contrasts can be applied only to factors with 2 or more levels")){
+    if (stringr::str_detect(e$parent$message, "contrasts can be applied only to factors with 2 or more levels")) {
       stop("more than 1 unique values are expected for categorical columns assigned as predictors")
     }
-    if(stringr::str_detect(e$message, "0 \\(non\\-NA\\) cases")){
+    if(stringr::str_detect(e$parent$message, "0 \\(non\\-NA\\) cases")){
       stop("no data after removing NA")
     }
-
-    stop(e$message)
+    stop(stringr::str_c(e$message, " ", e$parent$message))
   })
   if(augment){
     if(test_rate == 0){
