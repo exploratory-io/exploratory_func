@@ -245,10 +245,19 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     } else {
       paste0("broom::augment(m, newdata = df, ", aug_args, ")")
     }
-    ret <- model_df %>%
-      # result of aug_fml will be stored in .text_index column
-      # .test_index is used because model_df has it and won't be used here
-      dplyr::mutate(.test_index=purrr::map(model, function(m){eval(parse(text=aug_fml))})) 
+    ret <- tryCatch({
+      model_df %>%
+        # result of aug_fml will be stored in .text_index column
+        # .test_index is used because model_df has it and won't be used here
+        dplyr::mutate(.test_index=purrr::map(model, function(m){eval(parse(text=aug_fml))})) 
+    }, error = function(e) {
+      if (!is.null(e$parent)) { # With dplyr 1.0.8, the original error inside mutate is in e$parent. Re-throw that error.
+        stop(e$parent)
+      }
+      else {
+        stop(e)
+      }
+    })
 
     ret <- if(with_response) {
       ret %>%
