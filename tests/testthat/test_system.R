@@ -307,19 +307,19 @@ test_that("geocode_japan_prefecture", {
   expect_equal(FALSE, any(is.na(res$latitude)))
 })
 
-test_that("japan_city_code", {
-  # original: tibble(x=c("北海道", "東京都"), y=c("札幌市白石区", "稲城市"))  
+test_that("city_code_japan", {
+  # Data: tibble(x=c("Hokkaido", "Tokyo-to"), y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi"))  (In all Japanese Kanji chars).
   df <- tibble(x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd"), y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02"))  
-  res <- exploratory::japan_city_code(df$x, df$y)
+  res <- exploratory::city_code_japan(df$x, df$y)
   expect_equal(FALSE, any(is.na(res)))
   expect_equal("01104", res[1])
   expect_equal("13225", res[2])
 })
 
 test_that("geocode_japan_city", {
-  # original: tibble(x=c("北海道", "東京都"), y=c("札幌市白石区", "稲城市"))  
+  # Data: tibble(x=c("Hokkaido", "Tokyo-to"), y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi"))  (In all Japanese Kanji chars).
   df <- tibble(x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd"), y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02"))  
-  df$code <- exploratory::japan_city_code(df$x, df$y)
+  df$code <- exploratory::city_code_japan(df$x, df$y)
   res <- exploratory::geocode_japan_city(df, "code")
   expect_equal(FALSE, any(is.na(res$longitude)))
   expect_equal(FALSE, any(is.na(res$latitude)))

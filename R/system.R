@@ -2512,7 +2512,7 @@ prefecturecode <- function(prefecture, output_type="name") {
 #' @param city City name. 
 #' @return 5-digit city code in a character vector
 #' @export
-japan_city_code <- function(prefecture, city) {
+city_code_japan <- function(prefecture, city) {
   name <- stringr::str_c(prefecture, city)
   # return matching city code.
   jp_city_name_code_map$code[match(name, jp_city_name_code_map$name)]
