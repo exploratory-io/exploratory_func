@@ -453,10 +453,16 @@ jp_prefecture_name_id_map <- data.frame(
   id = jp_prefecture_name_id_map.id
 )
 
+# RDS data is originally coming from https://geolonia.github.io/japanese-addresses/
+jp_city_name_code_map <- readRDS("jp_city_name_code_map.rds") 
+jp_city_coordinates <- readRDS("jp_city_coordinates.rds") 
+
 usethis::use_data(
   us_state_coordinates,
   us_county_coordinates,
   world_country_coordinates,
   jp_prefecture_coordinates,
   jp_prefecture_name_id_map,
+  jp_city_coordinates,
+  jp_city_name_code_map,
   overwrite = TRUE)
