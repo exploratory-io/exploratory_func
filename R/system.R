@@ -2504,7 +2504,31 @@ prefecturecode <- function(prefecture, output_type="name") {
   } else { #for other case, just return the prefecture.
     prefecture
   }
+}
 
+#' Returns city codes from the prefecture and city names.
+#' Original geocode data is from https://geolonia.github.io/japanese-addresses/
+#' @param prefecture Prefecture name 
+#' @param city City name. 
+#' @return 5-digit city code in a character vector
+#' @export
+city_code_japan <- function(prefecture, city) {
+  name <- stringr::str_c(prefecture, city)
+  # return matching city code.
+  jp_city_name_code_map$code[match(name, jp_city_name_code_map$name)]
+}
+
+#' It adds the 'longitude' and 'latitude' columns to the given data frame 
+#' that contains the 5-digit Japan city code column. 
+#'
+#' Original geocode data is from https://geolonia.github.io/japanese-addresses/
+#' @param city_code_colname City code column name in the data frame. 
+#' @return data frame.
+#' @export
+geocode_japan_city <- function(df, city_code_colname) {
+  mapping <- "code"
+  names(mapping) <- c(city_code_colname)
+  df %>% left_join(jp_city_coordinates, by=mapping)
 }
 
 #' Converts pair of state name and county name into county ID,
