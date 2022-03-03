@@ -3166,6 +3166,20 @@ exp_rpart <- function(df,
         model$imp_df <- error
         imp_vars <- c_cols
       }
+      else if (importance_measure == "permutation") {
+        if (is_target_logical) {
+          imp_df <- calc_permutation_importance_rpart_binary(model, clean_target_col, c_cols, df)
+        }
+        else if (is_target_numeric) {
+          imp_df <- calc_permutation_importance_rpart_regression(model, clean_target_col, c_cols, df)
+        }
+        else {
+          imp_df <- calc_permutation_importance_rpart_multiclass(model, clean_target_col, c_cols, df)
+        }
+        model$imp_df <- imp_df
+        imp_vars <- imp_df$variable
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+      }
       else if (importance_measure == "impurity" && !is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
         imp <- model$variable.importance
         imp_vars <- names(imp) # model$variable.importance is already sorted by importance.
@@ -3213,18 +3227,6 @@ exp_rpart <- function(df,
         model$imp_vars <- imp_vars
         # Shrink the partial dependence data keeping only the important variables.
         model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
-      }
-      else if (importance_measure == "permutation") {
-        if (is_target_logical) {
-          imp_df <- calc_permutation_importance_rpart_binary(model, clean_target_col, c_cols, df)
-        }
-        else if (is_target_numeric) {
-          imp_df <- calc_permutation_importance_rpart_regression(model, clean_target_col, c_cols, df)
-        }
-        else {
-          imp_df <- calc_permutation_importance_rpart_multiclass(model, clean_target_col, c_cols, df)
-        }
-        model$imp_df <- imp_df
       }
 
       if (pd_with_bin_means && is_target_logical_or_numeric) {
