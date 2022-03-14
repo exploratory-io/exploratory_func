@@ -213,6 +213,7 @@ test_that("test exp_chisq", {
   expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
                     "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
   ))
+  expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
 })
 
@@ -224,6 +225,7 @@ test_that("test exp_chisq with power", {
   expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
                      "Target Power","Target Probability of Type 2 Error","Current Sample Size","Required Sample Size") %in% colnames(ret)
   ))
+  expect_true(ret$`Association Coef. (Cramer's V)` >= 0 && ret$`Association Coef. (Cramer's V)` <= 1)
 })
 
 test_that("test exp_chisq with grouping functions", {
@@ -232,6 +234,7 @@ test_that("test exp_chisq with grouping functions", {
   expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
                  "Probability of Type 2 Error","Number of Rows") %in% colnames(ret)
   ))
+  expect_true(ret$`Association Coef. (Cramer's V)` >= 0 && ret$`Association Coef. (Cramer's V)` <= 1)
 })
 
 test_that("test exp_chisq with logical", {
