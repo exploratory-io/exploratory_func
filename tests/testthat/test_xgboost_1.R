@@ -95,6 +95,10 @@ test_that("exp_xgboost(regression) evaluate training and test with permutation i
   # Check result of variable importance 
   ret <- model_df %>% tidy_rowwise(model, type="importance")
   expect_equal(as.character(ret$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
+  ret2 <- model_df %>% rf_partial_dependence()
+  variables <- ret$variable
+  names(variables) <- NULL
+  expect_equal(levels(ret2$x_name), variables) # Factor order of the PDP should be the same as the importance.
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test

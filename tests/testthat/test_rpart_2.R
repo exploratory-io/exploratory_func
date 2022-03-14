@@ -29,7 +29,6 @@ test_that("exp_rpart(regression) evaluate training and test with permutation imp
   ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
   ret <- flight %>% select(-`FL NUM`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
-  ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -47,6 +46,8 @@ test_that("exp_rpart(regression) evaluate training and test with permutation imp
   # Check order of result of variable importance.
   ret <- model_df %>% tidy_rowwise(model, type="importance") %>% arrange(-importance)
   expect_equal(as.character(ret$variable), c("DIS TANCE", "DEP TIME"))
+  ret <- model_df %>% rf_partial_dependence()
+  expect_equal(levels(ret$x_name), c("DIS TANCE", "DEP TIME")) # Factor order should be the same as the importance.
 
   # Training only case
   model_df <- flight %>%

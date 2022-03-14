@@ -164,7 +164,10 @@ test_that("Linear Regression with test rate", {
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     expect_equal(res$`Number of Rows`, 17)
+    variables <- (ret %>% tidy_rowwise(model, type="importance") %>% arrange(desc(importance)))$variable
+    names(variables) <- NULL
     res <- ret %>% lm_partial_dependence()
+    expect_equal(levels(res$x_name), variables) # Factor order of the PDP should be the same as the importance.
     expect_true(all(c("conf_high", "conf_low", "bin_sample_size") %in% colnames(res)))
    })
 })
@@ -670,6 +673,11 @@ test_that("Logistic Regression with test_rate", {
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
+
+  variables <- (ret %>% tidy_rowwise(model, type="importance") %>% arrange(desc(importance)))$variable
+  names(variables) <- NULL
+  res <- ret %>% lm_partial_dependence()
+  expect_equal(levels(res$x_name), variables) # Factor order of the PDP should be the same as the importance.
 
   suppressWarnings({
     pred_new <- prediction(ret, data = "newdata", data_frame=test_data)

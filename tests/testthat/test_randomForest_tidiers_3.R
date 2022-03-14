@@ -32,6 +32,10 @@ test_that("calc_feature_imp(regression) evaluate training and test with FIRM imp
   # Check variable importance output.
   ret <- model_df %>% tidy_rowwise(model, type="importance")
   expect_equal(colnames(ret), c("variable", "importance"))
+  ret2 <- model_df %>% rf_partial_dependence()
+  variables <- ret$variable
+  names(variables) <- NULL
+  expect_equal(levels(ret2$x_name), variables) # Factor order of the PDP should be the same as the importance.
 
   ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
