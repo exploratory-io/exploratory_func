@@ -68,8 +68,11 @@ test_that("build_coxph.fast with start_time and end_time", {
   ret <- model_df %>% evaluation(pretty.name=TRUE)
   expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
-  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
-  expect_true(all(c("estimate", "p.value") %in% colnames(ret))) # Make sure that estimate and p.value are joined to the result for hover on Prediction tab.
+  ret2 <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+  variables <- (ret %>% arrange(desc(importance)))$term
+  names(variables) <- NULL
+  expect_equal(unique(ret2$variable), variables) # Factor order of the PDP should be the same as the importance.
+  expect_true(all(c("estimate", "p.value") %in% colnames(ret2))) # Make sure that estimate and p.value are joined to the result for hover on Prediction tab.
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   ret <- model_df %>% tidy_rowwise(model, type='vif')
   ret <- model_df %>% tidy_rowwise(model)
