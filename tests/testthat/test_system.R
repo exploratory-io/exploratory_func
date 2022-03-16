@@ -308,12 +308,22 @@ test_that("geocode_japan_prefecture", {
 })
 
 test_that("city_code_japan", {
-  # Data: tibble(x=c("Hokkaido", "Tokyo-to"), y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi"))  (In all Japanese Kanji chars).
-  df <- tibble(x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd"), y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02"))  
+  # Data: tibble(
+  #  x=c("Hokkaido", "Tokyo-to", "Kanagawa-ken", "Kanagawa-ken"), 
+  #  y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi", "Ashigarashimo-gun Hakone-machi", "Hakone-machi"))  
+  # (In all Japanese Kanji chars).
+  df <- tibble(
+    x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd", "\u795e\u5948\u5ddd\u770c", "\u795e\u5948\u5ddd\u770c"), 
+    y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02", "\u8db3\u67c4\u4e0b\u90e1\u7bb1\u6839\u753a", "\u7bb1\u6839\u753a"))  
   res <- exploratory::city_code_japan(df$x, df$y)
   expect_equal(FALSE, any(is.na(res)))
   expect_equal("01104", res[1])
   expect_equal("13225", res[2])
+  # It should resolve the city code from the city name with "gun".
+  expect_equal("14382", res[3])
+  # It should resolve the city code from the city name without "gun".
+  expect_equal("14382", res[4])
+
 })
 
 test_that("geocode_japan_city", {
