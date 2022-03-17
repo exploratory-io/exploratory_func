@@ -308,7 +308,7 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
     tidyr::pivot_longer(-.Var2.temp, "Var1","value", values_drop_na = na.rm) %>%
     dplyr::rename(Var2 = .Var2.temp)
   # Remove V from names like V1, V2 to align the output to the previous implementation that used reshape2::melt.
-  df <- df %>% dplyr::mutate(Var1 = stringr::str_replace(Var1, "^V(?=[0-9]+$)", ""))
+  # df <- df %>% dplyr::mutate(Var1 = stringr::str_replace(Var1, "^V(?=[0-9]+$)", ""))
 
   if(zero.rm){
     df <- df[is.na(df[[3]]) | df[[3]] != 0, ]
