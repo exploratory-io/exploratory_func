@@ -147,9 +147,6 @@ do_svd.kv_ <- function(df,
         # with subjects, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c(subject_col, "new.dimension", value_cname))
         rownames(mat) <- rownames(matrix)
-        # Set column names. Without it, new.demension column value
-        # would be "V1", "V2", ... instead of "1", "2".
-        colnames(mat) <- 1:dim(mat)[2]
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
@@ -179,9 +176,6 @@ do_svd.kv_ <- function(df,
         # this returns molten format data frame of matrix
         # with key, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c(dimension_col, "new.dimension", value_cname))
-        # Set column names. Without it, new.demension column value
-        # would be "V1", "V2", ... instead of "1", "2".
-        colnames(mat) <- 1:dim(mat)[2]
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
@@ -333,9 +327,6 @@ do_svd.cols <- function(df,
         # this returns molten format data frame of matrix
         # with subjects, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c("row", "new.dimension", value_colname))
-        # Set column names. Without it, new.demension column value
-        # would be "V1", "V2", ... instead of "1", "2".
-        colnames(mat) <- 1:dim(mat)[2]
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
@@ -366,9 +357,6 @@ do_svd.cols <- function(df,
         # of v matrix
         # with key, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c("colname", "new.dimension", value_colname))
-        # Set column names. Without it, new.demension column value
-        # would be "V1", "V2", ... instead of "1", "2".
-        colnames(mat) <- 1:dim(mat)[2]
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
