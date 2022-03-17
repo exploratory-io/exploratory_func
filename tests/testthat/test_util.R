@@ -354,15 +354,15 @@ test_that("test mat_to_df", {
   expect_true(!is.unsorted(ret$aa))
 })
 
-test_that("test mat_to_df handling V at the beginning of the name", { #TODO: revisit this behavior.
+test_that("test mat_to_df output when no colnames are set.", {
   nc <- 4
   nr <- 5
   mat <- matrix(seq(nc*nr), ncol=nc, nrow=nr)
-  colnames(mat) <- paste0("V", seq(nc))
-  rownames(mat) <- paste0("V", seq(nr))
   ret <- mat_to_df(mat, c("aa", "bb", "value"))
-  expect_true(all(stringr::str_detect(ret$aa,"^V"))) # V from row names are kept.
-  expect_true(all(!stringr::str_detect(ret$bb,"^V"))) # V from col names are dropped.
+  # Values should be pure numeric string, as opposed to "V1", "V2", which as.data.frame() adds by default.
+  expect_true(all(stringr::str_detect(ret$bb,"^[0-9]+$")))
+  # The same check for the first column of the output just in case.
+  expect_true(all(stringr::str_detect(ret$aa,"^[0-9]+$")))
   expect_true(is.character(ret$bb))
   expect_true(!is.unsorted(ret$aa))
 })

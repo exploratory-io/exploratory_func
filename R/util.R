@@ -303,12 +303,15 @@ grouped_by <- function(df){
 #' @param diag If diagonal values should be returned
 #' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
+  # Set column names. Without it, values of the second column of the output df
+  # would be "V1", "V2", ... instead of "1", "2".
+  if (is.null(colnames(mat))) {
+    colnames(mat) <- 1:dim(mat)[2]
+  }
   df <- as.data.frame(mat) %>%
     tibble::rownames_to_column(".Var2.temp") %>% # The column name .Var2.temp is to avoid name conflict as much as possible.
     tidyr::pivot_longer(-.Var2.temp, "Var1","value", values_drop_na = na.rm) %>%
     dplyr::rename(Var2 = .Var2.temp)
-  # Remove V from names like V1, V2 to align the output to the previous implementation that used reshape2::melt.
-  df <- df %>% dplyr::mutate(Var1 = stringr::str_replace(Var1, "^V(?=[0-9]+$)", ""))
 
   if(zero.rm){
     df <- df[is.na(df[[3]]) | df[[3]] != 0, ]
