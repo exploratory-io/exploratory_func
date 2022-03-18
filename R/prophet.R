@@ -185,6 +185,21 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     holiday_country_names <- dplyr::recode(holiday_country_names, GB="UnitedKingdom", TR="Turkey", FR="France")
   }
 
+  if (!is.null(holidays)) {
+    if (!("ds" %in% colnames(holidays))) {
+      stop("The holiday data frame needs to have the ds column.")
+    }
+    if (!("holiday" %in% colnames(holidays))) {
+      stop("The holiday data frame needs to have the holiday column.")
+    }
+    if (!lubridate::is.Date(holidays$ds) && !lubridate::is.POSIXct(holidays$ds)) {
+      stop("The type of the ds column of the holiday data frame needs to be Date or POSIXct.")
+    }
+    if (!lubridate::is.character(holidays$holiday)) {
+      holidays$holiday <- as.character(holidays$holiday)
+    }
+  }
+
   # To filter NAs on regressor columns
   filter_args <- list() # default empty list
   if (!is.null(regressors)) {
