@@ -195,7 +195,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     if (!lubridate::is.Date(holidays$ds) && !lubridate::is.POSIXct(holidays$ds)) {
       stop("The type of the ds column of the holiday data frame needs to be Date or POSIXct.")
     }
-    if (!lubridate::is.character(holidays$holiday)) {
+    if (!is.character(holidays$holiday)) {
       holidays$holiday <- as.character(holidays$holiday)
     }
   }
