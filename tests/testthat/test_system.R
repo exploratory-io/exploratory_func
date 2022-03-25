@@ -28,7 +28,8 @@ test_that("test clean_data_frame",{
 })
 
 test_that("test clean_names", {
-  df1 <- data.frame("a space name" = c(1,2,3), "b space name" = c(4,5,6)) %>% dplyr::rename(`a space name` = "a.space.name", `b space name` = "b.space.name")
+  df0 <- data.frame("a space name" = c(1,2,3), "b space name" = c(4,5,6))
+  df1 <- df0 %>% dplyr::rename(`a space name` = "a.space.name", `b space name` = "b.space.name")
   df2 <- exploratory::clean_names(df1, case = "remove_space")
   expect_equal(colnames(df2), c("aspacename", "bspacename"))
   df3 <- exploratory::clean_names(df1)
@@ -49,6 +50,11 @@ test_that("test clean_names", {
   expect_equal(colnames(df10), c("AspaceNAME", "BspaceNAME"))
   df11 <- exploratory::clean_names(df1, case ="old_janitor")
   expect_equal(colnames(df11), c("a_space_name", "b_space_name"))
+  df12 <- df0 %>% dplyr::rename(` a space name ` = "a.space.name ", ` b space name ` = "b.space.name")
+  df13 <- exploratory::clean_names(df12, case ="trim_space")
+  expect_equal(colnames(df13), c("a space name", "b space name"))
+
+
 })
 
 test_that("test parse_html_tables",{
