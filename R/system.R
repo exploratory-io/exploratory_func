@@ -2367,6 +2367,7 @@ clean_data_frame <- function(x) {
 #'
 clean_names <- function(dat, ...){
   dots <- list(...)
+  # if remove_space option is passed, remove all spaces from the column names.
   if(length(dots) > 0 && dots$case == "remove_space") {
     dat %>% dplyr::rename_all(function(.) str_remove_all(., "[[:blank:]]"))
   } else {
