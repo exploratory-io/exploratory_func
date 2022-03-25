@@ -27,6 +27,30 @@ test_that("test clean_data_frame",{
   expect_equal(row.names(df3a), row.names(df3b))
 })
 
+test_that("test clean_names", {
+  df1 <- data.frame("a space name" = c(1,2,3), "b space name" = c(4,5,6)) %>% dplyr::rename(`a space name` = "a.space.name", `b space name` = "b.space.name")
+  df2 <- exploratory::clean_names(df1, case = "remove_space")
+  expect_equal(colnames(df2), c("aspacename", "bspacename"))
+  df3 <- exploratory::clean_names(df1)
+  expect_equal(colnames(df3), c("a_space_name", "b_space_name"))
+  df4 <- exploratory::clean_names(df1, case ="parsed")
+  expect_equal(colnames(df4), c("a_space_name", "b_space_name"))
+  df5 <- exploratory::clean_names(df1, case ="snake")
+  expect_equal(colnames(df5), c("a_space_name", "b_space_name"))
+  df6 <- exploratory::clean_names(df1, case ="lower_camel")
+  expect_equal(colnames(df6), c("aSpaceName", "bSpaceName"))
+  df7 <- exploratory::clean_names(df1, case ="upper_camel")
+  expect_equal(colnames(df7), c("ASpaceName", "BSpaceName"))
+  df8 <- exploratory::clean_names(df1, case ="all_caps")
+  expect_equal(colnames(df8), c("A_SPACE_NAME", "B_SPACE_NAME"))
+  df9 <- exploratory::clean_names(df1, case ="lower_upper")
+  expect_equal(colnames(df9), c("aSPACEname", "bSPACEname"))
+  df10 <- exploratory::clean_names(df1, case ="upper_lower")
+  expect_equal(colnames(df10), c("AspaceNAME", "BspaceNAME"))
+  df11 <- exploratory::clean_names(df1, case ="old_janitor")
+  expect_equal(colnames(df11), c("a_space_name", "b_space_name"))
+})
+
 test_that("test parse_html_tables",{
   result <- parse_html_tables('https://www.cbinsights.com/research-unicorn-companies')
   expect_equal(length(result), 1)
@@ -309,12 +333,12 @@ test_that("geocode_japan_prefecture", {
 
 test_that("city_code_japan", {
   # Data: tibble(
-  #  x=c("Hokkaido", "Tokyo-to", "Kanagawa-ken", "Kanagawa-ken"), 
-  #  y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi", "Ashigarashimo-gun Hakone-machi", "Hakone-machi"))  
+  #  x=c("Hokkaido", "Tokyo-to", "Kanagawa-ken", "Kanagawa-ken"),
+  #  y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi", "Ashigarashimo-gun Hakone-machi", "Hakone-machi"))
   # (In all Japanese Kanji chars).
   df <- tibble(
-    x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd", "\u795e\u5948\u5ddd\u770c", "\u795e\u5948\u5ddd\u770c"), 
-    y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02", "\u8db3\u67c4\u4e0b\u90e1\u7bb1\u6839\u753a", "\u7bb1\u6839\u753a"))  
+    x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd", "\u795e\u5948\u5ddd\u770c", "\u795e\u5948\u5ddd\u770c"),
+    y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02", "\u8db3\u67c4\u4e0b\u90e1\u7bb1\u6839\u753a", "\u7bb1\u6839\u753a"))
   res <- exploratory::city_code_japan(df$x, df$y)
   expect_equal(FALSE, any(is.na(res)))
   expect_equal("01104", res[1])
@@ -328,7 +352,7 @@ test_that("city_code_japan", {
 
 test_that("geocode_japan_city", {
   # Data: tibble(x=c("Hokkaido", "Tokyo-to"), y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi"))  (In all Japanese Kanji chars).
-  df <- tibble(x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd"), y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02"))  
+  df <- tibble(x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd"), y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02"))
   df$code <- exploratory::city_code_japan(df$x, df$y)
   res <- exploratory::geocode_japan_city(df, "code")
   expect_equal(FALSE, any(is.na(res$longitude)))
