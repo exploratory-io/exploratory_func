@@ -50,7 +50,7 @@ test_that("test clean_names", {
   expect_equal(colnames(df10), c("AspaceNAME", "BspaceNAME"))
   df11 <- exploratory::clean_names(df1, case ="old_janitor")
   expect_equal(colnames(df11), c("a_space_name", "b_space_name"))
-  df12 <- df0 %>% dplyr::rename(` a space name ` = "a.space.name ", ` b space name ` = "b.space.name")
+  df12 <- df0 %>% dplyr::rename(` a space name ` = "a.space.name", ` b space name ` = "b.space.name")
   df13 <- exploratory::clean_names(df12, case ="trim_space")
   expect_equal(colnames(df13), c("a space name", "b space name"))
 
