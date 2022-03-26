@@ -2363,6 +2363,23 @@ clean_data_frame <- function(x) {
   df
 }
 
+#' Wrapper function for Janitor's clean_names
+#' On top of janitor::clean_names "case" options, this wrapper API supports the below two cases too.
+#' - remove_space which removes all the white spaces in column names
+#' - trim_space which trims the trailing and leading white spaces in column names.
+#'
+clean_names <- function(dat, ...){
+  dots <- list(...)
+  # if remove_space option is passed, remove all spaces from the column names.
+  if(length(dots) > 0 && dots$case == "remove_space") {
+    dat %>% dplyr::rename_all(function(.) stringr::str_remove_all(., "[[:blank:]]"))
+  } else if (length(dots) > 0 && dots$case == "trim_space") {
+    dat %>% dplyr::rename_all(function(.) stringr::str_trim(., side = "both"))
+  } else {
+    janitor::clean_names(dat, ...)
+  }
+}
+
 #' This checks name conflict and attach the file if there isn't any conflict
 #' @export
 checkSourceConflict <- function(files, encoding="UTF-8"){
@@ -2508,8 +2525,8 @@ prefecturecode <- function(prefecture, output_type="name") {
 
 #' Returns city codes from the prefecture and city names.
 #' Original geocode data is from https://geolonia.github.io/japanese-addresses/
-#' @param prefecture Prefecture name 
-#' @param city City name. 
+#' @param prefecture Prefecture name
+#' @param city City name.
 #' @return 5-digit city code in a character vector
 #' @export
 city_code_japan <- function(prefecture, city) {
@@ -2518,11 +2535,11 @@ city_code_japan <- function(prefecture, city) {
   jp_city_name_code_map$code[match(name, jp_city_name_code_map$name)]
 }
 
-#' It adds the 'longitude' and 'latitude' columns to the given data frame 
-#' that contains the 5-digit Japan city code column. 
+#' It adds the 'longitude' and 'latitude' columns to the given data frame
+#' that contains the 5-digit Japan city code column.
 #'
 #' Original geocode data is from https://geolonia.github.io/japanese-addresses/
-#' @param city_code_colname City code column name in the data frame. 
+#' @param city_code_colname City code column name in the data frame.
 #' @return data frame.
 #' @export
 geocode_japan_city <- function(df, city_code_colname) {
