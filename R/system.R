@@ -2364,6 +2364,9 @@ clean_data_frame <- function(x) {
 }
 
 #' Wrapper function for Janitor's clean_names
+#' On top of janitor::lean_names "case" options, this wrapper API supports the below two cases too.
+#' - remove_space which removes all the white spaces in column names
+#' - trim_space which trims the trailing and leading white spaces in column names.
 #'
 clean_names <- function(dat, ...){
   dots <- list(...)
