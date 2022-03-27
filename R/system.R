@@ -2824,7 +2824,13 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     }
     if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
       df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
+      # make sure to convert POSIXct to Date if the col_types are set as Date specifically
+      df <- df %>% dplyr::mutate_at(vars(colnames(df)[col_types == "date"]), funs(as.Date(.,tz=tzone)))
+    } else {
+      # make sure to convert POSIXct to Date if the col_types are set as Date specifically
+      df <- df %>% dplyr::mutate_at(vars(colnames(df)[col_types == "date"]), funs(as.Date))
     }
+
     # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
     # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
     # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
