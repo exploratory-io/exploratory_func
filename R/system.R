@@ -2835,7 +2835,13 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     }
     df
   }, error = function(e) {
-    stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
+    # The error message for non-existent file looks like this - "`path` does not exist: '<full-path>'"
+    # (The single quotes in the above actually are curly quotes. I'm avoiding typing them here not to break the format of this code.)
+    if (stringr::str_detect(stringr::str_to_lower(e$message), "`path` does not exist")) {
+      stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(path), ' :: The file does not exist.'))
+    } else {
+      stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
+    }
   })
 }
 
