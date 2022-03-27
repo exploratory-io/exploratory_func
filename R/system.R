@@ -3066,10 +3066,25 @@ read_rds_file <- function(file, refhook = NULL){
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
     # for remote RDS, need to call url and gzcon before pass it to readRDS
-    readRDS(gzcon(url(file)), refhook)
+    tryCatch({
+      readRDS(gzcon(url(file)), refhook)
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+    })
   } else {
     # if it's local file simply call read_rds
-    readRDS(file, refhook)
+    tryCatch({
+      readRDS(file, refhook)
+    }, error = function(e) {
+      if (stringr::str_detect(e$message, "cannot open the connection")) {
+        # Assuming that this means the mile is missing.
+        # Strictly speaking, it might happen when the file is broken as a gzip file, but we can't distinguish between them from the error.
+        stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
+      }
+      else {
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+      }
+    })
   }
 }
 
