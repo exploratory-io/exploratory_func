@@ -3145,16 +3145,31 @@ read_parquet_file <- function(file, col_select = NULL) {
     # mode="wb" for binary download
     utils::download.file(file, tf, mode = "wb")
     # Read the local parquet file.
-    if (is.null(col_select)) {
-      res <- read_parquet_file_internal(tf)
-    } else {
-      res <- read_parquet_file_internal(tf, col_select = col_select)
-    }
-
-  } else if (is.null(col_select)) {
-    res <- read_parquet_file_internal(file)
+    tryCatch({
+      if (is.null(col_select)) {
+        res <- read_parquet_file_internal(tf)
+      } else {
+        res <- read_parquet_file_internal(tf, col_select = col_select)
+      }
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+    })
   } else {
-    res <- read_parquet_file_internal(file, col_select = col_select)
+    tryCatch({
+      if (is.null(col_select)) {
+        res <- read_parquet_file_internal(file)
+      } else {
+        res <- read_parquet_file_internal(file, col_select = col_select)
+      }
+    }, error = function(e) {
+      # Error message for non-existent file case looks like this - "Error : IOError: Failed to open local file '<full filepath>'. Detail: [errno 2] No such file or directory"
+      if (stringr::str_detect(e$message, "No such file or directory")) {
+        stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
+      }
+      else {
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+      }
+    })
   }
   res
 }
