@@ -2835,7 +2835,15 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     }
     df
   }, error = function(e) {
-    stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
+    # The error message for non-existent file looks like this - "`path` does not exist: '<full-path>'"
+    # (The single quotes in the above actually are curly quotes. I'm avoiding typing them here not to break the format of this code.)
+    if (stringr::str_detect(stringr::str_to_lower(e$message), "`path` does not exist")) {
+      stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(path), ' :: The file does not exist.'))
+    } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open url")) { # The actual error looks like this - "cannot open URL '<url>'"
+      stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to download from the URL.'))
+    } else {
+      stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
+    }
   })
 }
 
@@ -2957,7 +2965,11 @@ read_delim_file <- function(file, delim, quote = '"',
         }
       }
     }
-    tmp <- download_data_file(file, "csv")
+    tryCatch({
+      tmp <- download_data_file(file, "csv")
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to download from the URL.'))
+    })
     tryCatch({ # try to close connection and ignore error
       readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
                         locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
@@ -3008,6 +3020,8 @@ read_delim_file <- function(file, delim, quote = '"',
         }
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open the connection")) {
         stop(paste0("EXP-DATASRC-1 :: ", jsonlite::toJSON(file), " ::  Failed to read file."))
+      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) {
+        stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
       } else {
         stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
@@ -3066,10 +3080,25 @@ read_rds_file <- function(file, refhook = NULL){
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
     # for remote RDS, need to call url and gzcon before pass it to readRDS
-    readRDS(gzcon(url(file)), refhook)
+    tryCatch({
+      readRDS(gzcon(url(file)), refhook)
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+    })
   } else {
     # if it's local file simply call read_rds
-    readRDS(file, refhook)
+    tryCatch({
+      readRDS(file, refhook)
+    }, error = function(e) {
+      if (stringr::str_detect(e$message, "cannot open the connection")) {
+        # Assuming that this means the file is missing.
+        # Strictly speaking, it might happen when the file is broken as a gzip file, but we can't distinguish between them from the error.
+        stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
+      }
+      else {
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+      }
+    })
   }
 }
 
@@ -3119,19 +3148,38 @@ read_parquet_file <- function(file, col_select = NULL) {
     tf <- tempfile()
     # Remove on exit.
     on.exit(unlink(tf))
-    # mode="wb" for binary download
-    utils::download.file(file, tf, mode = "wb")
+    tryCatch({
+      # mode="wb" for binary download
+      utils::download.file(file, tf, mode = "wb")
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to download from the URL.'))
+    })
     # Read the local parquet file.
-    if (is.null(col_select)) {
-      res <- read_parquet_file_internal(tf)
-    } else {
-      res <- read_parquet_file_internal(tf, col_select = col_select)
-    }
-
-  } else if (is.null(col_select)) {
-    res <- read_parquet_file_internal(file)
+    tryCatch({
+      if (is.null(col_select)) {
+        res <- read_parquet_file_internal(tf)
+      } else {
+        res <- read_parquet_file_internal(tf, col_select = col_select)
+      }
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+    })
   } else {
-    res <- read_parquet_file_internal(file, col_select = col_select)
+    tryCatch({
+      if (is.null(col_select)) {
+        res <- read_parquet_file_internal(file)
+      } else {
+        res <- read_parquet_file_internal(file, col_select = col_select)
+      }
+    }, error = function(e) {
+      # Error message for non-existent file case looks like this - "Error : IOError: Failed to open local file '<full filepath>'. Detail: [errno 2] No such file or directory"
+      if (stringr::str_detect(e$message, "No such file or directory")) {
+        stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
+      }
+      else {
+        stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
+      }
+    })
   }
   res
 }
