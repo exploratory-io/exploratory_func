@@ -2963,7 +2963,11 @@ read_delim_file <- function(file, delim, quote = '"',
         }
       }
     }
-    tmp <- download_data_file(file, "csv")
+    tryCatch({
+      tmp <- download_data_file(file, "csv")
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to download from the URL.'))
+    })
     tryCatch({ # try to close connection and ignore error
       readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
                         locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
