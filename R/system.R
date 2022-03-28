@@ -2839,6 +2839,8 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     # (The single quotes in the above actually are curly quotes. I'm avoiding typing them here not to break the format of this code.)
     if (stringr::str_detect(stringr::str_to_lower(e$message), "`path` does not exist")) {
       stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(path), ' :: The file does not exist.'))
+    } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open url")) { # The actual error looks like this - "cannot open URL '<url>'"
+      stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to download from the URL.'))
     } else {
       stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
     }
