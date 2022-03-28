@@ -2,6 +2,7 @@
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
 #' @export
 do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE) {
+  all_cols <- colnames(df)
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -9,6 +10,10 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
 
   # remove grouped col or target col
   selected_cols <- setdiff(selected_cols, grouped_cols)
+
+  if (any(stringr::str_detect(all_cols, "^PC[0-9]+$"))) {
+    stop("EXP-ANA-6 :: [] :: Columns with names such as PC1, PC2, ... cannot be in the input data frame. Please rename them.")
+  }
 
   if (any(selected_cols %in% grouped_cols)) {
     stop("Repeat-By column cannot be used as a variable column.")
