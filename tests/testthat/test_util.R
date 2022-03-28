@@ -1277,6 +1277,86 @@ test_that("mutate_group", {
   expect_equal(round(head(df2)$wt_cummean[[2]], digits = 2) ,2.76)
   expect_equal(head(df2)$wt_cumsum[[1]],2.32)
   expect_equal(head(df2)$wt_cumsum[[2]],5.51)
+  tmp <- tempfile(fileext = ".parquet")
+  download.file("https://www.dropbox.com/s/n0jkv4wu9dpb4se/Employee_Data_win_calc.parquet?dl=1",destfile = tmp)
+  empDF <- arrow::read_parquet(tmp)
+
+    # group by Date - floor to year
+  df3 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_year` = "hired_date"),group_funs = c("rtoyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df3)$hired_date_year[[1]], as.Date("1976-01-01"))
+  expect_equal(head(df3)$salary_cumsum[[3]], 13872)
+
+    # group by Date - floor to half year
+  df4 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_halfyear` = "hired_date"),group_funs = c("rtohalfyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df4)$hired_date_halfyear[[1]], as.Date("1976-07-01"))
+  expect_equal(head(df4)$salary_cumsum[[3]], 10169)
+
+  # group by Date - floor to quarter
+  df5 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_q` = "hired_date"),group_funs = c("rtoq"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df5)$hired_date_q[[2]], as.Date("1977-04-01"))
+  expect_equal(head(df5)$salary_cumsum[[4]], 13872)
+
+    # group by Date - floor to bi-month
+  df6 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_bimon` = "hired_date"),group_funs = c("rtobimon"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df6)$hired_date_bimon[[2]], as.Date("1977-05-01"))
+  expect_equal(head(df6)$salary_cumsum[[5]], 19586)
+
+  # group by Date - floor to month
+  df7 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_mon` = "hired_date"),group_funs = c("rtomon"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df7)$hired_date_mon[[2]], as.Date("1977-06-01"))
+  expect_equal(head(df7)$salary_cumsum[[6]], 19045)
+
+  # group by Date - floor to week
+  df8 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("rtoweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df8)$hired_date_week[[2]], as.Date("1977-06-12"))
+  expect_equal(head(df8,7)$salary_cumsum[[7]], 16856)
+
+  # group by Date - floor to day
+  df9 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_day` = "hired_date"),group_funs = c("rtoday"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df9)$hired_date_day[[2]], as.Date("1977-06-13"))
+  expect_equal(head(df9)$salary_cumsum[[3]], 10169)
+
+  # group by Date - extract year
+  df10 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_year` = "hired_date"),group_funs = c("year"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df10)$hired_date_year[[1]], 1976)
+  expect_equal(head(df10)$salary_cumsum[[1]], 19246)
+
+  # group by Date - extract half year
+  df11 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_halfyear` = "hired_date"),group_funs = c("halfyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df11)$hired_date_halfyear[[1]], 1)
+  expect_equal(head(df11)$salary_cumsum[[1]], 2090)
+
+  # group by Date - extract quarter
+  df12 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_quarter` = "hired_date"),group_funs = c("quarter"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df12)$hired_date_quarter[[1]], 1)
+  expect_equal(head(df12)$salary_cumsum[[1]], 2909)
+
+  # group by Date - extract bi-month
+  df13 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_bimon` = "hired_date"),group_funs = c("bimon"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df13)$hired_date_bimon[[2]], 1)
+  expect_equal(head(df13)$salary_cumsum[[1]], 2909)
+
+  # group by Date - extract month (number)
+  df14 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_mon` = "hired_date"),group_funs = c("monn"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df14)$hired_date_mon[[2]], 1)
+  expect_equal(head(df14)$salary_cumsum[[1]], 2426)
+
+  # group by Date - extract month (number)
+  df15 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monname` = "hired_date"),group_funs = c("monname"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df15)$hired_date_monname[[2]], 1)
+  expect_equal(head(df15)$salary_cumsum[[1]], 2426)
+
+  # group by Date - extract
+  df16 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("rtoweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df8)$hired_date_week[[2]], as.Date("1977-06-12"))
+  expect_equal(head(df8,7)$salary_cumsum[[7]], 16856)
+
+  # group by Date - floor to day
+  df9 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_day` = "hired_date"),group_funs = c("rtoday"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df9)$hired_date_day[[2]], as.Date("1977-06-13"))
+  expect_equal(head(df9)$salary_cumsum[[3]], 10169)
+
+
 })
 
 test_that("separate_japanese_address", {
