@@ -1344,7 +1344,7 @@ test_that("mutate_group", {
 
   # group by Date - extract month name (short)
   df15 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monname` = "hired_date"),group_funs = c("monname"),salary_cumsum = cumsum(salary))
-  if (Sys.info()["sysname"] == "Windows") { # for Windows test, since we run the test on Japanese locale,
+  if (Sys.info()["sysname"] == "Windows") { # for Windows test, since we run the test on Japanese locale, it becomes 1.
     expect_equal(as.character(head(df15)$hired_date_monname[[2]]), "1")
   } else {
     expect_equal(as.character(head(df15)$hired_date_monname[[2]]), "Jan")
@@ -1407,7 +1407,7 @@ test_that("mutate_group", {
 
   # group by Date - extract week day
   df25 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wday` = "hired_date"),group_funs = c("wday"),salary_cumsum = cumsum(salary))
-  if (Sys.info()["sysname"] == "Windows") { # for Windows test, since we run the test on Japanese locale check the result in Japanese,
+  if (Sys.info()["sysname"] == "Windows") { # for Windows test, since we run the test on Japanese locale check the result in Japanese (Nichi),
     expect_equal(as.character(head(df25)$hired_date_wday[[2]]), "\u65e5")
   } else {
     expect_equal(as.character(head(df25)$hired_date_wday[[2]]), "Sun")
@@ -1416,7 +1416,7 @@ test_that("mutate_group", {
 
   # group by Date - extract week day
   df26 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wdaylong` = "hired_date"),group_funs = c("wdaylong"),salary_cumsum = cumsum(salary))
-  if (Sys.info()["sysname"] == "Windows") { # for Windows test, since we run the test on Japanese locale check the result in Japanese,
+  if (Sys.info()["sysname"] == "Windows") { # for Windows test, since we run the test on Japanese locale check the result in Japanese (Nichi Yo)
     expect_equal(as.character(head(df26)$hired_date_wdaylong[[2]]), "\u65e5\u66dc")
   } else {
     expect_equal(as.character(head(df26)$hired_date_wdaylong[[2]]), "Sunday")
