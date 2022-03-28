@@ -1262,6 +1262,7 @@ test_that("is_japanese_holiday", {
 })
 
 test_that("mutate_group", {
+  library(lubridate)
   df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg), mpg_cumsum = cumsum(mpg))
   expect_equal(head(df)$mpg_cummean[[1]],22.8)
   expect_equal(head(df)$mpg_cummean[[2]],23.6)
@@ -1341,20 +1342,75 @@ test_that("mutate_group", {
   expect_equal(head(df14)$hired_date_mon[[2]], 1)
   expect_equal(head(df14)$salary_cumsum[[1]], 2426)
 
-  # group by Date - extract month (number)
+  # group by Date - extract month name (short)
   df15 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monname` = "hired_date"),group_funs = c("monname"),salary_cumsum = cumsum(salary))
   expect_equal(as.character(head(df15)$hired_date_monname[[2]]), "Jan")
   expect_equal(head(df15)$salary_cumsum[[1]], 2426)
 
-  # group by Date - extract
-  df16 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("rtoweek"),salary_cumsum = cumsum(salary))
-  expect_equal(head(df8)$hired_date_week[[2]], as.Date("1977-06-12"))
-  expect_equal(head(df8,7)$salary_cumsum[[7]], 16856)
+  # group by Date - extract month name (long)
+  df16 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monnamelong` = "hired_date"),group_funs = c("monnamelong"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df16)$hired_date_monnamelong[[2]]), "January")
+  expect_equal(head(df16)$salary_cumsum[[1]], 2426)
 
-  # group by Date - floor to day
-  df9 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_day` = "hired_date"),group_funs = c("rtoday"),salary_cumsum = cumsum(salary))
-  expect_equal(head(df9)$hired_date_day[[2]], as.Date("1977-06-13"))
-  expect_equal(head(df9)$salary_cumsum[[3]], 10169)
+  # group by Date - extract week
+  df17 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("week"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df17)$hired_date_week[[2]], 1)
+  expect_equal(head(df17)$salary_cumsum[[3]], 31304)
+
+  # group by Date - extract week (Starts from Sun)
+  df18 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_epiweek` = "hired_date"),group_funs = c("epiweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df18)$hired_date_epiweek[[2]], 1)
+  expect_equal(head(df18)$salary_cumsum[[3]], 21246)
+
+  # group by Date - extract week (Starts from Mon)
+  df19 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_isoweek` = "hired_date"),group_funs = c("isoweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df19)$hired_date_isoweek[[2]], 1)
+  expect_equal(head(df19)$salary_cumsum[[3]], 31304)
+
+  # group by Date - extract week of quarter
+  df19 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week_of_quarter` = "hired_date"),group_funs = c("week_of_quarter"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df19)$hired_date_week_of_quarter[[2]], 1)
+  expect_equal(head(df19)$salary_cumsum[[3]], 15048)
+
+  # group by Date - extract week of Month
+  df20 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week_of_month` = "hired_date"),group_funs = c("week_of_month"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df20)$hired_date_week_of_month[[2]], 1)
+  expect_equal(head(df20)$salary_cumsum[[3]], 15505)
+
+  # group by Date - extract day of year
+  df21 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofyera` = "hired_date"),group_funs = c("dayofyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df21)$hired_date_dayofyera[[2]], 1)
+  expect_equal(head(df21)$salary_cumsum[[3]], 5484)
+
+  # group by Date - extract day of quarter
+  df22 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofquarter` = "hired_date"),group_funs = c("dayofquarter"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df22)$hired_date_dayofquarter[[2]], 1)
+  expect_equal(head(df22)$salary_cumsum[[3]], 14385)
+
+  # group by Date - extract day of month
+  df23 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_day` = "hired_date"),group_funs = c("day"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df23)$hired_date_day[[2]], 1)
+  expect_equal(head(df23)$salary_cumsum[[3]], 22548)
+
+  # group by Date - extract day of week
+  df24 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofweek` = "hired_date"),group_funs = c("dayofweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df24)$hired_date_dayofweek[[2]], 1)
+  expect_equal(head(df24)$salary_cumsum[[3]], 8399)
+
+  # group by Date - extract week day
+  df25 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wday` = "hired_date"),group_funs = c("wday"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df25)$hired_date_wday[[2]]), "Sun")
+  expect_equal(head(df25)$salary_cumsum[[3]], 8399)
+
+  # group by Date - extract week day
+  df26 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wdaylong` = "hired_date"),group_funs = c("wdaylong"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df26)$hired_date_wdaylong[[2]]), "Sunday")
+  expect_equal(head(df26)$salary_cumsum[[3]], 8399)
+
+  # group by Date - extract weekend
+  df27 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_weekend` = "hired_date"),group_funs = c("weekend"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df27)$hired_date_weekend[[2]]), "Weekday")
+  expect_equal(head(df27)$salary_cumsum[[3]], 13213)
 
 
 })
