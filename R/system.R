@@ -2822,13 +2822,19 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
         colnames(df) <- columnNames
       }
     }
-    if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+    # readxl always uses UTC for POSIXct timezone so when converting POSIXct to Date, make sure to set tz as UTC
+    # e.g.
+    # > psx <- as.POSIXct("2020-01-01 00:00:00", tz = "UTC")
+    # > psx
+    # [1] "2020-01-01 UTC"
+    # > as.Date(psx, tz = "America/Los_Angeles")
+    # [1] "2019-12-31"  # this is not what we want when converting the POSIXct to Date.
+    # > as.Date(psx, tz = "UTC")
+    # [1] "2020-01-01"  # this is the date we want when converting the POXIct to Date.
+    #
+    df <- df %>% dplyr::mutate_at(vars(colnames(df)[col_types == "date"]), funs(as.Date(., tz="UTC")))
+    if(!is.null(tzone)) { # if timezone is specified, force the timezeon to POSIXct columns
       df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
-      # make sure to convert POSIXct to Date if the col_types are set as Date specifically
-      df <- df %>% dplyr::mutate_at(vars(colnames(df)[col_types == "date"]), funs(as.Date(.,tz=tzone)))
-    } else {
-      # make sure to convert POSIXct to Date if the col_types are set as Date specifically
-      df <- df %>% dplyr::mutate_at(vars(colnames(df)[col_types == "date"]), funs(as.Date))
     }
 
     # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
