@@ -3148,8 +3148,12 @@ read_parquet_file <- function(file, col_select = NULL) {
     tf <- tempfile()
     # Remove on exit.
     on.exit(unlink(tf))
-    # mode="wb" for binary download
-    utils::download.file(file, tf, mode = "wb")
+    tryCatch({
+      # mode="wb" for binary download
+      utils::download.file(file, tf, mode = "wb")
+    }, error = function(e) {
+      stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to download from the URL.'))
+    })
     # Read the local parquet file.
     tryCatch({
       if (is.null(col_select)) {
