@@ -427,6 +427,19 @@ test_that("read_delim_file with too long column name error message", {
   })
 })
 
+
+test_that("read_delim_file with incorrect encoding error message (invalid multibyte string)", {
+  tryCatch({
+    df <- exploratory::read_delim_file("https://www.dropbox.com/s/zqr228arxwnxsvp/b2010_ksmj.csv?dl=1", delim = ",",
+                                       quote = "\"" , col_names = TRUE , na = c(''),n_max=50 ,
+                                       locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "Asia/Tokyo", grouping_mark = "," ),
+                                       trim_ws = TRUE , progress = FALSE)
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://www.dropbox.com/s/zqr228arxwnxsvp/b2010_ksmj.csv?dl=1\",\"invalid multibyte string, element 1\"] :: Failed to import file."))
+  })
+})
+
+
 test_that("read_delim_file open local file failed error message", {
   tryCatch({
     df <- exploratory::read_delim_file("test_dummy.csv", delim=",")
