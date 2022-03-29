@@ -410,6 +410,23 @@ test_that("read_delim_file downlod failed error message", {
   })
 })
 
+test_that("read_delim_file witout requirement delim argument error message", {
+  tryCatch({
+    df <- exploratory::read_delim_file("https://www.dropbox.com/s/tb6ppzockjao7vg/too_longer_header.csv?dl=1")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://www.dropbox.com/s/tb6ppzockjao7vg/too_longer_header.csv?dl=1\",\"argument \\\"delim\\\" is missing, with no default\"] :: Failed to import file."))
+  })
+})
+
+test_that("read_delim_file with too long column name error message", {
+  tryCatch({
+    df <- exploratory::read_delim_file("https://www.dropbox.com/s/tb6ppzockjao7vg/too_longer_header.csv?dl=1", delim=",")
+    as.name(colnames(df))
+  }, error = function(cond) {
+    expect_equal(cond$message, c("variable names are limited to 10000 bytes"))
+  })
+})
+
 test_that("read_delim_file open local file failed error message", {
   tryCatch({
     df <- exploratory::read_delim_file("test_dummy.csv", delim=",")
