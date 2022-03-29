@@ -370,6 +370,70 @@ test_that("read_parquet_file", {
   expect_equal(TRUE, is.data.frame(df))
 })
 
+test_that("read_parquet_file downlod failed error message", {
+  tryCatch({
+    df <- read_parquet_file("https://download2.exploratory.io/data/sample.parquet")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://download2.exploratory.io/data/sample.parquet\",\"cannot open URL 'https://download2.exploratory.io/data/sample.parquet'\"] :: Failed to download from the URL."))
+  })
+})
+
+test_that("read_parquet_file open local file failed error message", {
+  tryCatch({
+    df <- read_parquet_file("test_dummy.parquet")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.parquet\"] :: The file does not exist."))
+  })
+})
+
+test_that("read_rds_file downlod failed error message", {
+  tryCatch({
+    df <- read_parquet_file("https://download2.exploratory.io/data/sample.rds")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://download2.exploratory.io/data/sample.rds\",\"cannot open URL 'https://download2.exploratory.io/data/sample.rds'\"] :: Failed to download from the URL."))
+  })
+})
+
+test_that("read_rds_file open local file failed error message", {
+  tryCatch({
+    df <- exploratory::read_parquet_file("test_dummy.rds")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.rds\"] :: The file does not exist."))
+  })
+})
+
+test_that("read_delim_file downlod failed error message", {
+  tryCatch({
+    df <- exploratory::read_parquet_file("https://download2.exploratory.io/data/sample.csv")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://download2.exploratory.io/data/sample.csv\",\"cannot open URL 'https://download2.exploratory.io/data/sample.csv'\"] :: Failed to download from the URL."))
+  })
+})
+
+test_that("read_delim_file open local file failed error message", {
+  tryCatch({
+    df <- exploratory::read_delim_file("test_dummy.csv", delim=",")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.csv\"] :: The file does not exist."))
+  })
+})
+
+test_that("read_excel_file downlod failed error message", {
+  tryCatch({
+    df <- exploratory::read_excel_file("https://download2.exploratory.io/data/sample.xlsx")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://download2.exploratory.io/data/sample.xlsx\",\"cannot open URL 'https://download2.exploratory.io/data/sample.xlsx'\"] :: Failed to download from the URL."))
+  })
+})
+
+test_that("read_excel_file open local file failed error message", {
+  tryCatch({
+    df <- exploratory::read_excel_file("test_dummy.xlsx")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.xlsx\"] :: The file does not exist."))
+  })
+})
+
 test_that("read_parquet_file should be to read the parquet file with an invalid UTF-8 encoding.", {
   # Make sure that the current arrow version (5.0) can read this parquet file.
   # arrow 3.0/4.0, cannot read this parquet file and throw an error
