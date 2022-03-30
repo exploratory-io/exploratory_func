@@ -73,13 +73,13 @@ test_that("test parse_html_tables with japanese shift_jis table",{
 })
 
 if (FALSE) { # Disabled for now since this test is susceptible to webpage change and unstable.
-test_that("test scrape_html_table",{
-  result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)
-  expect_equal(ncol(result), 6)
-  # may change if the web page is updated
-  # seems it changes quite often, excluding this check.
-  #expect_equal(nrow(result), 166)
-})
+  test_that("test scrape_html_table",{
+    result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)
+    expect_equal(ncol(result), 6)
+    # may change if the web page is updated
+    # seems it changes quite often, excluding this check.
+    #expect_equal(nrow(result), 166)
+  })
 }
 
 
@@ -368,6 +368,120 @@ test_that("geocode_japan_city", {
 test_that("read_parquet_file", {
   df <- read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.parquet")
   expect_equal(TRUE, is.data.frame(df))
+})
+
+test_that("read_parquet_file downlod failed error message", {
+  tryCatch({
+    df <- exploratory::read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet\",\"cannot open URL 'https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet'\"] :: Failed to download from the URL."))
+  })
+})
+
+test_that("read_parquet_file open local file failed error message", {
+  tryCatch({
+    df <- exploratory::read_parquet_file("test_dummy.parquet")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.parquet\"] :: The file does not exist."))
+  })
+})
+
+test_that("read_rds_file failed to import remove file error message", {
+  tryCatch({
+    df <- exploratory::read_rds_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds\",\"cannot open the connection to 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds'\"] :: Failed to import file."))
+  })
+})
+
+test_that("read_rds_file open local file failed error message", {
+  tryCatch({
+    df <- exploratory::read_rds_file("test_dummy.rds")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.rds\"] :: The file does not exist."))
+  })
+})
+
+test_that("read_delim_file downlod failed error message", {
+  tryCatch({
+    df <- exploratory::read_delim_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv", delim = ",")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv\",\"cannot open URL 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv'\"] :: Failed to download from the URL."))
+  })
+})
+
+test_that("read_delim_file witout requirement delim argument error message", {
+  tryCatch({
+    df <- exploratory::read_delim_file("https://www.dropbox.com/s/tb6ppzockjao7vg/too_longer_header.csv?dl=1")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://www.dropbox.com/s/tb6ppzockjao7vg/too_longer_header.csv?dl=1\",\"argument \\\"delim\\\" is missing, with no default\"] :: Failed to import file."))
+  })
+})
+
+test_that("read_delim_file with too long column name error message", {
+  tryCatch({
+    df <- exploratory::read_delim_file("https://www.dropbox.com/s/tb6ppzockjao7vg/too_longer_header.csv?dl=1", delim=",")
+    as.name(colnames(df))
+  }, error = function(cond) {
+    expect_equal(cond$message, c("variable names are limited to 10000 bytes"))
+  })
+})
+
+
+test_that("read_delim_file with incorrect encoding error message (invalid multibyte string)", {
+  tryCatch({
+    df <- exploratory::read_delim_file("https://www.dropbox.com/s/zqr228arxwnxsvp/b2010_ksmj.csv?dl=1", delim = ",",
+                                       quote = "\"" , col_names = TRUE , na = c(''),n_max=50 ,
+                                       locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "Asia/Tokyo", grouping_mark = "," ),
+                                       trim_ws = TRUE , progress = FALSE)
+  }, error = function(cond) {
+    if (Sys.info()["sysname"]=="Linux") { # for Linux case, exploratory::read_delim_file returns error message without ID to make it more readable.
+      expect_equal(cond$message, c("The encoding of the file may not be UTF-8. Select other encoding and try again."))
+    } else {
+      expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://www.dropbox.com/s/zqr228arxwnxsvp/b2010_ksmj.csv?dl=1\",\"invalid multibyte string, element 1\"] :: Failed to import file."))
+    }
+  })
+})
+
+
+test_that("read_delim_file open local file failed error message", {
+  tryCatch({
+    df <- exploratory::read_delim_file("test_dummy.csv", delim=",")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.csv\"] :: The file does not exist."))
+  })
+})
+
+# TODO: For now the below test fails on Linux so skip it for Linux.
+if (Sys.info()["sysname"] !="Linux") {
+  test_that("case_when mixed data types error message", {
+    tryCatch({
+      Global_Sales_1_source1 <- exploratory::read_excel_file("https://www.dropbox.com/s/t9ou9hmbqdxj75f/Global_Sales.xlsx?dl=1")
+      Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
+    }, error = function(e) {
+      if (!is.null(e$parent)) {
+        expect_equal(stringr::str_detect(e$parent$message, "must be a double vector, not a character vector."),TRUE)
+      } else {
+        expect_equal(stringr::str_detect(e$message, "must be a double vector, not a character vector."),TRUE)
+      }
+    })
+  })
+}
+
+test_that("read_excel_file downlod failed error message", {
+  tryCatch({
+    df <- exploratory::read_excel_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.xlsx")
+  }, error = function(cond) {
+    expect_equal(stringr::str_detect(cond$message, "EXP-DATASRC-13 :: \\[\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.xlsx\",\"Evaluation error: zip file"), TRUE)
+  })
+})
+
+test_that("read_excel_file open local file failed error message", {
+  tryCatch({
+    df <- exploratory::read_excel_file("test_dummy.xlsx")
+  }, error = function(cond) {
+    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.xlsx\"] :: The file does not exist."))
+  })
 })
 
 test_that("read_parquet_file should be to read the parquet file with an invalid UTF-8 encoding.", {
