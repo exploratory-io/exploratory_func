@@ -435,7 +435,11 @@ test_that("read_delim_file with incorrect encoding error message (invalid multib
                                        locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "Asia/Tokyo", grouping_mark = "," ),
                                        trim_ws = TRUE , progress = FALSE)
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://www.dropbox.com/s/zqr228arxwnxsvp/b2010_ksmj.csv?dl=1\",\"invalid multibyte string, element 1\"] :: Failed to import file."))
+    if (Sys.info()["sysname"]=="Linux") { # for Linux case, it shows error message without ID.
+      expect_equal(cond$message, c("The encoding of the file may not be UTF-8. Select other encoding and try again."))
+    } else {
+      expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://www.dropbox.com/s/zqr228arxwnxsvp/b2010_ksmj.csv?dl=1\",\"invalid multibyte string, element 1\"] :: Failed to import file."))
+    }
   })
 })
 
