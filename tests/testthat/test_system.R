@@ -372,7 +372,7 @@ test_that("read_parquet_file", {
 
 test_that("read_parquet_file downlod failed error message", {
   tryCatch({
-    df <- read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet")
+    df <- exploratory::read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet")
   }, error = function(cond) {
     expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet\",\"cannot open URL 'https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet'\"] :: Failed to download from the URL."))
   })
@@ -380,7 +380,7 @@ test_that("read_parquet_file downlod failed error message", {
 
 test_that("read_parquet_file open local file failed error message", {
   tryCatch({
-    df <- read_parquet_file("test_dummy.parquet")
+    df <- exploratory::read_parquet_file("test_dummy.parquet")
   }, error = function(cond) {
     expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.parquet\"] :: The file does not exist."))
   })
