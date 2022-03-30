@@ -456,8 +456,12 @@ test_that("case_when mixed data types error message", {
   tryCatch({
     Global_Sales_1_source1 <- exploratory::read_excel_file("https://www.dropbox.com/s/t9ou9hmbqdxj75f/Global_Sales.xlsx?dl=1")
     Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
-  }, error = function(cond) {
-    expect_equal(stringr::str_detect(cond$message, "must be a double vector, not a character vector."),TRUE)
+  }, error = function(e) {
+    if (!is.null(e$parent)) {
+      expect_equal(stringr::str_detect(e$parent$message, "must be a double vector, not a character vector."),TRUE)
+    } else {
+      expect_equal(stringr::str_detect(e$message, "must be a double vector, not a character vector."),TRUE)
+    }
   })
 })
 
