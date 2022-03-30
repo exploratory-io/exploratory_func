@@ -386,17 +386,17 @@ test_that("read_parquet_file open local file failed error message", {
   })
 })
 
-test_that("read_rds_file downlod failed error message", {
+test_that("read_rds_file failed to import remove file error message", {
   tryCatch({
-    df <- read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.rds")
+    df <- exploratory::read_rds_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.rds\",\"cannot open URL 'https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.rds'\"] :: Failed to download from the URL."))
+    expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds\",\"cannot open the connection to 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds'\"] :: Failed to import file."))
   })
 })
 
 test_that("read_rds_file open local file failed error message", {
   tryCatch({
-    df <- exploratory::read_parquet_file("test_dummy.rds")
+    df <- exploratory::read_rds_file("test_dummy.rds")
   }, error = function(cond) {
     expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.rds\"] :: The file does not exist."))
   })
@@ -404,9 +404,9 @@ test_that("read_rds_file open local file failed error message", {
 
 test_that("read_delim_file downlod failed error message", {
   tryCatch({
-    df <- exploratory::read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.csv")
+    df <- exploratory::read_delim_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv", delim = ",")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.csv\",\"cannot open URL 'https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.csv'\"] :: Failed to download from the URL."))
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv\",\"cannot open URL 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv'\"] :: Failed to download from the URL."))
   })
 })
 
