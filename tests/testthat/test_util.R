@@ -1279,8 +1279,7 @@ test_that("mutate_group", {
   expect_equal(head(df2)$wt_cumsum[[1]],2.32)
   expect_equal(head(df2)$wt_cumsum[[2]],5.51)
   tmp <- tempfile(fileext = ".parquet")
-  download.file("https://www.dropbox.com/s/n0jkv4wu9dpb4se/Employee_Data_win_calc.parquet?dl=1",destfile = tmp)
-  empDF <- arrow::read_parquet(tmp)
+  empDF <- exploratory::read_parquet_file("https://www.dropbox.com/s/n0jkv4wu9dpb4se/Employee_Data_win_calc.parquet?dl=1")
 
     # group by Date - floor to year
   df3 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_year` = "hired_date"),group_funs = c("rtoyear"),salary_cumsum = cumsum(salary))
