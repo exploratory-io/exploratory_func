@@ -383,7 +383,7 @@ test_that("read_parquet_file open local file failed error message", {
     df <- exploratory::read_parquet_file("test_dummy.parquet")
   }, error = function(cond) {
     if (Sys.info()["sysname"]=="Windows") { # Windows show different message than Linux and Mac.
-      expect_equal(stringr::str_c(cond$message, "EXP-DATASRC-13 :: [\"test_dummy.parquet\",\"IOError: Failed to open local file 'C:/Users/exploratory/exploratory_func/test_dummy.parquet'"))
+      expect_equal(stringr::str_c(cond$message, "EXP-DATASRC-13 :: \\[\"test_dummy.parquet\",\"IOError: Failed to open local file"))
     } else {
       expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.parquet\"] :: The file does not exist."))
     }
