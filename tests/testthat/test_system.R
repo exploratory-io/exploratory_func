@@ -372,9 +372,9 @@ test_that("read_parquet_file", {
 
 test_that("read_parquet_file downlod failed error message", {
   tryCatch({
-    df <- exploratory::read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet")
+    df <- exploratory::read_parquet_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet\",\"cannot open URL 'https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet'\"] :: Failed to download from the URL."))
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet\",\"cannot open URL 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet'\"] :: Failed to download from the URL."))
   })
 })
 
@@ -382,7 +382,11 @@ test_that("read_parquet_file open local file failed error message", {
   tryCatch({
     df <- exploratory::read_parquet_file("test_dummy.parquet")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.parquet\"] :: The file does not exist."))
+    if (Sys.info()["sysname"]=="Windows") { # Windows show different message than Linux and Mac.
+      expect_equal(stringr::str_c(cond$message, "EXP-DATASRC-13 :: [\"test_dummy.parquet\",\"IOError: Failed to open local file 'C:/Users/exploratory/exploratory_func/test_dummy.parquet'"))
+    } else {
+      expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.parquet\"] :: The file does not exist."))
+    }
   })
 })
 
