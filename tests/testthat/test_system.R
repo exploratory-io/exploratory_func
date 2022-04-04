@@ -383,7 +383,7 @@ test_that("read_parquet_file open local file failed error message", {
     df <- exploratory::read_parquet_file("test_dummy.parquet")
   }, error = function(cond) {
     if (Sys.info()["sysname"]=="Windows") { # Windows show different message than Linux and Mac.
-      expect_equal(stringr::str_detect(cond$message, "EXP-DATASRC-13 :: \\[\"test_dummy.parquet\",\"IOError: Failed to open local file"))
+      expect_equal(stringr::str_detect(cond$message, "EXP-DATASRC-13 :: \\[\"test_dummy.parquet\",\"IOError: Failed to open local file"), TRUE)
     } else {
       expect_equal(cond$message, c("EXP-DATASRC-14 :: [\"test_dummy.parquet\"] :: The file does not exist."))
     }
@@ -394,7 +394,7 @@ test_that("read_rds_file failed to import remove file error message", {
   tryCatch({
     df <- exploratory::read_rds_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-13 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds\",\"cannot open the connection to 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds'\"] :: Failed to import file."))
+    expect_equal(stringr::str_detect(cond$message, "EXP-DATASRC-13 :: \\[\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.rds\""),TRUE)
   })
 })
 
