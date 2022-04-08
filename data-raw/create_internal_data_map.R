@@ -3,7 +3,12 @@
 us_state_coordinates <- read.csv("us-states.csv") 
 us_county_coordinates <- readRDS("us-counties.rds") 
 world_country_coordinates <- read.csv("world-countries.csv") 
-world_country_coordinates_po_centered <- read.csv("world-countries-po-centered.csv") 
+
+# Move the countries in North/South America to the right.
+world_country_coordinates_po_centered <- world_country_coordinates 
+lng <- world_country_coordinates_po_centered$longitude 
+lng <- ifelse(lng < -28, lng+360, lng)
+world_country_coordinates_po_centered$longitude <- lng
 
 # Based on jp-prefectures.csv
 jp_prefecture_coordinates.name <- c(

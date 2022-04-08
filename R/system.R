@@ -2461,10 +2461,10 @@ geocode_us_county <- function(df, fipscode_colname) {
 #' 1   JP 138.252924 36.20482
 #' 2   GB  -3.435973 55.37805
 #'
-geocode_world_country <- function(df, countrycode_colname, is.pacific.ocean.centered=FALSE) {
+geocode_world_country <- function(df, countrycode_colname, center.pacific.ocean=FALSE) {
   mapping <- "iso2c"
   names(mapping) <- countrycode_colname
-  if (is.pacific.ocean.centered) {
+  if (center.pacific.ocean) {
     df %>% left_join(world_country_coordinates_po_centered, by=mapping)
   } else {
     df %>% left_join(world_country_coordinates, by=mapping)
