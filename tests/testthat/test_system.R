@@ -367,9 +367,9 @@ test_that("geocode_japan_city", {
 
 test_that("is.pacific.ocean.centered argument in geocode_world_country.", {
   df <- tibble(country.code=c("US"))
-  res <- exploratory::geocode_world_country(df "country.code", is.pacific.ocean.centered=TRUE)
+  res <- exploratory::geocode_world_country(df, "country.code", is.pacific.ocean.centered=TRUE)
   expect_equal(264.287109, res$longitude[[1]])
-  res <- exploratory::geocode_world_country(df "country.code", is.pacific.ocean.centered=FALSE)
+  res <- exploratory::geocode_world_country(df, "country.code", is.pacific.ocean.centered=FALSE)
   expect_equal(-95.712891, res$longitude[[1]])
 })
 
