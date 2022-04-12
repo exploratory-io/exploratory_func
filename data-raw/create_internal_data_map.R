@@ -4,6 +4,12 @@ us_state_coordinates <- read.csv("us-states.csv")
 us_county_coordinates <- readRDS("us-counties.rds") 
 world_country_coordinates <- read.csv("world-countries.csv") 
 
+# Move the countries in North/South America to the right.
+world_country_coordinates_po_centered <- world_country_coordinates 
+lng <- world_country_coordinates_po_centered$longitude 
+lng <- ifelse(lng < -28, lng+360, lng)
+world_country_coordinates_po_centered$longitude <- lng
+
 # Based on jp-prefectures.csv
 jp_prefecture_coordinates.name <- c(
   '\u5317\u6d77\u9053',
@@ -461,6 +467,7 @@ usethis::use_data(
   us_state_coordinates,
   us_county_coordinates,
   world_country_coordinates,
+  world_country_coordinates_po_centered,
   jp_prefecture_coordinates,
   jp_prefecture_name_id_map,
   jp_city_coordinates,

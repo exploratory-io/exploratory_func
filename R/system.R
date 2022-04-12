@@ -2461,10 +2461,14 @@ geocode_us_county <- function(df, fipscode_colname) {
 #' 1   JP 138.252924 36.20482
 #' 2   GB  -3.435973 55.37805
 #'
-geocode_world_country <- function(df, countrycode_colname) {
+geocode_world_country <- function(df, countrycode_colname, center.pacific.ocean=FALSE) {
   mapping <- "iso2c"
   names(mapping) <- countrycode_colname
-  df %>% left_join(world_country_coordinates, by=mapping)
+  if (center.pacific.ocean) {
+    df %>% left_join(world_country_coordinates_po_centered, by=mapping)
+  } else {
+    df %>% left_join(world_country_coordinates, by=mapping)
+  }
 }
 
 #' It can add 'longitude' and 'latitude' columns to a data frame which has
