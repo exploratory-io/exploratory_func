@@ -2964,7 +2964,7 @@ read_delim_file <- function(file, delim, quote = '"',
                             na = c("", "NA"), quoted_na = TRUE,
                             comment = "", trim_ws = FALSE,
                             skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                            progress = interactive(), with_api_key = FALSE){
+                            progress = interactive(), with_api_key = FALSE, is_free_text = FALSE){
   loadNamespace("readr")
   loadNamespace("stringr")
   if (stringr::str_detect(file, "^https://") ||
@@ -3013,7 +3013,8 @@ read_delim_file <- function(file, delim, quote = '"',
     # reading through file() is to be able to read files with path that includes multibyte chars.
     # without it, error is thrown from inside read_delim.
     file_path <- file
-    if(stringi::stri_enc_mark(file) != "ASCII"){
+    # for Free Text case (i.e. is_free_text = TRUE), file is actually a data so do not call file()
+    if(!is_free_text && stringi::stri_enc_mark(file) != "ASCII"){
       file_path <- file(file)
     }
     tryCatch({ # try to close connection and ignore error
