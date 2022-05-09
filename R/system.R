@@ -2964,12 +2964,16 @@ read_delim_file <- function(file, delim, quote = '"',
                             na = c("", "NA"), quoted_na = TRUE,
                             comment = "", trim_ws = FALSE,
                             skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                            progress = interactive(), with_api_key = FALSE, is_free_text = FALSE){
+                            progress = interactive(), with_api_key = FALSE, data_text = NULL){
   loadNamespace("readr")
   loadNamespace("stringr")
-  if (stringr::str_detect(file, "^https://") ||
+
+  is_free_input_text = !is.null(data_text)
+  # For remote file
+  if (!is_free_input_text && (
+      stringr::str_detect(file, "^https://") ||
       stringr::str_detect(file, "^http://") ||
-      stringr::str_detect(file, "^ftp://")) {
+      stringr::str_detect(file, "^ftp://"))) {
     if(with_api_key){
       token <- exploratory::getTokenInfo("exploratory-data-catalog")
       if(!is.null(token)) {
@@ -3008,17 +3012,28 @@ read_delim_file <- function(file, delim, quote = '"',
         stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
     })
-  } else {
-    # if it's local file simply call readr::read_delim
-    # reading through file() is to be able to read files with path that includes multibyte chars.
-    # without it, error is thrown from inside read_delim.
-    file_path <- file
-    # for Free Text case (i.e. is_free_text = TRUE), file is actually a data so do not call file()
-    if(!is_free_text && stringi::stri_enc_mark(file) != "ASCII"){
-      file_path <- file(file)
+  } else { # for local file or free input text cases.
+    data <- ""
+    if (is_free_input_text) { # for free input text
+      # For Windows, make sure to convert text to UTF-8
+      if (Sys.info()["sysname"] == "Windows") {
+        data_text <- exploratory::convertUserInputToUtf8(data_text)
+        locale$encoding <- "UTF-8"
+      }
+      # call I() to data_text so that readr::read_delimit can hand the text data.
+      data <- I(data_text)
+    } else { # if it's local file simply call readr::read_delim
+      # reading through file() is to be able to read files with path that includes multibyte chars.
+      # without it, error is thrown from inside read_delim.
+      if(stringi::stri_enc_mark(file) != "ASCII"){
+        data <- file(file)
+      } else {
+        data <- file
+      }
     }
+    # for Free Text case (i.e. is_free_text = TRUE), file is actually a data so do not call file()
     tryCatch({ # try to close connection and ignore error
-      readr::read_delim(file_path, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+      readr::read_delim(data, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
                         locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
     }, error = function(e) {
       # For the case it's running on Linux (Collaboration Server), show more user friendly message.
