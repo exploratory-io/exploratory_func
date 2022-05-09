@@ -3017,10 +3017,6 @@ read_delim_file <- function(file, delim, quote = '"',
     if(!is_free_text && stringi::stri_enc_mark(file) != "ASCII"){
       file_path <- file(file)
     }
-    # For Windows and Free Text, it's most likely not Unicode so guess encoding.
-    if (is_free_text && Sys.info()["sysname"]=="Windows") {
-      locale$encoding <- utils::head((readr::guess_encoding(file, n_max = -1, threshold = 0.3))$encoding,1)
-    }
     tryCatch({ # try to close connection and ignore error
       readr::read_delim(file_path, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
                         locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
