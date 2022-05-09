@@ -3017,7 +3017,7 @@ read_delim_file <- function(file, delim, quote = '"',
     if (is_free_input_text) { # for free input text
       # For Windows, make sure to convert text to UTF-8
       if (Sys.info()["sysname"] == "Windows") {
-        data_text <- exploratory::convertUserInputToUtf8(data_text)
+        data_text <- exploratory:::convertUserInputToUtf8(data_text)
         locale$encoding <- "UTF-8"
       }
       # call I() to data_text so that readr::read_delimit can hand the text data.
