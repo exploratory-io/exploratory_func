@@ -125,7 +125,9 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
     # tidystopwords required language name with Title Case so make sure it's title case.
     stopwords <- append(stopwords, tidystopwords::generate_stoplist(stringr::str_to_title(lang)))
   }
-  ret <- c(stopwords[!stopwords %in% exclude], include)
+  # include first and then exclude, so that we can exclude words in the include, which we use for custom dictionary too.
+  stopwords <- c(stopwords, include)
+  ret <- stopwords[!stopwords %in% exclude]
   ret
 }
 

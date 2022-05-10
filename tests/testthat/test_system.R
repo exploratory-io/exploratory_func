@@ -464,6 +464,12 @@ test_that("read_delim_file open local file failed error message", {
   })
 })
 
+test_that("read_delim_file with text data", {
+  df <- exploratory::read_delim_file(data_text = "a,b\n1,2", delim=",")
+  expect_equal(nrow(df),1)
+  expect_equal(ncol(df),2)
+})
+
 # TODO: For now the below test fails on Linux so skip it for Linux.
 if (Sys.info()["sysname"] !="Linux") {
   test_that("case_when mixed data types error message", {
