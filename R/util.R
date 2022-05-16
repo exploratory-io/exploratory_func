@@ -993,8 +993,6 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   value_col_name = avoid_conflict(colnames(df), c("value"))
   pivot_each <- function(df) {
     res <- if(is.null(value_col)) {
-      # make a count matrix if value_col is NULL
-      value_col_name <- avoid_conflict(colnames(df), c("value"))
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
       df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
     } else {
