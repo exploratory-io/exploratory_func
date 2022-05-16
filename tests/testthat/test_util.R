@@ -631,6 +631,7 @@ test_that("test pivot", {
     cat1 = c(letters[round(runif(100)*5)+1], NA),
     cat2 = c(letters[round(runif(100)*3)+1], "a"),
     cat3 = c(letters[round(runif(100)*3)+1], "a"),
+    value = c(letters[round(runif(100)*3)+1], "a"),
     num3 = c(NA, seq(100))
   )
 
@@ -650,6 +651,9 @@ test_that("test pivot", {
 
   pivoted_with_na_ratio <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2") , value = num3, fun.aggregate=na_ratio, na.rm = TRUE)
   expect_true(any(pivoted_with_na_ratio %>% select(a,b,c,d) !=0)) # Verify that NA is detected.
+
+  pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("value"),fun.aggregate=mean, na.rm = FALSE) # test for the case where original df has value column
+  expect_true(ncol(pivoted_with_na)>1) # make sure resulting column is not the only one row.
 
 })
 
