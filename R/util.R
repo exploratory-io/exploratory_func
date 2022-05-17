@@ -989,11 +989,13 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
     # fill must be a numeric type of NA for data type consistency
     fill <- NA_real_
   }
-
+  # make sure the value column name is unique and does not conflict existing columns in the source data frame.
+  value_col_name = avoid_conflict(colnames(df), c("value"))
   pivot_each <- function(df) {
     res <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=dplyr::n())
+      # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
@@ -1005,10 +1007,12 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df %>% dplyr::filter(!is.na(!!rlang::sym(value_col)))
       }
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col)))
+      # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col)))
     }
     res <- res %>% dplyr::arrange(!!!rlang::syms(new_col_cols)) # arrange before pivot_wider, so that the create columns are sorted.
-    res <- res %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+    # Dynamically set value column name to list passed to value_fill argument.
+    res <- res %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=!!rlang::sym(value_col_name), values_fill=setNames(list(!!fill), value_col_name), names_sep=cols_sep)
     res <- res %>% dplyr::arrange(!!!rlang::syms(new_row_cols)) # arrange grouping rows.
     res
   }
