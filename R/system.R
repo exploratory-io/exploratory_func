@@ -3296,14 +3296,34 @@ mutate_and_friends <- c('mutate_group', 'mutate', 'summaryze_group',
   'summarize', 'filter')
 
 # Returns names that references outside objects (most likely data frames) from the call.
-get_refs_in_call <- function(call, inside_mutate_and_friends = FALSE) {
+get_refs_in_call <- function(call,
+                             inside_mutate_and_friends = FALSE,
+                             inside_bang = FALSE,
+                             inside_bang_bang = FALSE) {
   if (rlang::call_name(call) %in% select_and_friends) {
     res <- c()
   }
   else {
+    # State transitions on inside_mutate_and_friends, inside_bang, and inside_bang_bang.
+    if (inside_mutate_and_friends) {
+      if (rlang::call_name(call) == '!') {
+        if (!inside_bang) {
+          inside_bang <- TRUE
+        }
+        else { # Already inside a bang.
+          inside_bang_bang <- TRUE
+        }
+      }
+      else {
+        if (inside_bang && !inside_bang_bang) { # Got a ! but inside it was not !. Reset the state.
+          inside_bang <- FALSE
+        }
+      }
+    }
     if (rlang::call_name(call) %in% mutate_and_friends) {
       inside_mutate_and_friends <- TRUE
     }
+
     # It seems rlang::parse_expr does not recognize !! as one function.
     # Refraining from this handling for now.
     # else if (rlang::call_name(call) == '!!') {
@@ -3323,7 +3343,7 @@ get_refs_in_call <- function(call, inside_mutate_and_friends = FALSE) {
         }
       }
       else if (class(arg) == 'call') {
-        c(names, get_refs_in_call(arg, inside_mutate_and_friends))
+        c(names, get_refs_in_call(arg, inside_mutate_and_friends, inside_bang, inside_bang_bang))
       }
       else {
         names
