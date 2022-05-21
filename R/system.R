@@ -3296,18 +3296,18 @@ mutate_and_friends <- c('mutate_group', 'mutate', 'summaryze_group',
   'summarize', 'filter')
 
 # Returns names that references outside objects (most likely data frames) from the call.
-get_refs_in_call <- function(call, prev_step_colnames = c(), may_reference_prev_step_colnames = FALSE) {
+get_refs_in_call <- function(call, prev_step_colnames = c(), inside_mutate_and_friends = FALSE) {
   if (rlang::call_name(call) %in% select_and_friends) {
     res <- c()
   }
   else {
     if (rlang::call_name(call) %in% mutate_and_friends) {
-      may_reference_prev_step_colnames <- TRUE
+      inside_mutate_and_friends <- TRUE
     }
     # It seems rlang::parse_expr does not recognize !! as one function.
     # Refraining from this handling for now.
     # else if (rlang::call_name(call) == '!!') {
-    #   may_reference_prev_step_colnames <- FALSE 
+    #   inside_mutate_and_friends <- FALSE 
     # }
     args <- rlang::call_args(call)
     if (rlang::call_name(call) == '$') { # Ignore after $ since it should be a name inside the first arg.
@@ -3315,7 +3315,7 @@ get_refs_in_call <- function(call, prev_step_colnames = c(), may_reference_prev_
     }
     res <- purrr::reduce(args, function(names, arg) {
       if (class(arg) == 'name') {
-        if (may_reference_prev_step_colnames && as.character(arg) %in% prev_step_colnames) {
+        if (inside_mutate_and_friends && as.character(arg) %in% prev_step_colnames) {
           names
         }
         else {
@@ -3323,7 +3323,7 @@ get_refs_in_call <- function(call, prev_step_colnames = c(), may_reference_prev_
         }
       }
       else if (class(arg) == 'call') {
-        c(names, get_refs_in_call(arg, prev_step_colnames, may_reference_prev_step_colnames))
+        c(names, get_refs_in_call(arg, prev_step_colnames, inside_mutate_and_friends))
       }
       else {
         names
