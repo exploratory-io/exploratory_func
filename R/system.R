@@ -3290,3 +3290,56 @@ load_fred <- function(series_id, date_start = "", date_end = "", password) {
 }
 
 
+select_and_friends <- c('select', 'rename', 'reorder_cols',
+  'group_by', 'gather', 'spread', 'pivot_longer', 'pivot_wider')
+mutate_and_friends <- c('mutate_group', 'mutate', 'summaryze_group',
+  'summarize', 'filter')
+
+# Returns names that references outside objects (most likely data frames) from the call.
+get_refs_in_call <- function(call, prev_step_colnames = c(), may_reference_prev_step_colnames = FALSE) {
+  if (rlang::call_name(call) %in% select_and_friends) {
+    res <- c()
+  }
+  else {
+    if (rlang::call_name(call) %in% mutate_and_friends) {
+      may_reference_prev_step_colnames <- TRUE
+    }
+    # It seems rlang::parse_expr does not recognize !! as one function.
+    # Refraining from this handling for now.
+    # else if (rlang::call_name(call) == '!!') {
+    #   may_reference_prev_step_colnames <- FALSE 
+    # }
+    args <- rlang::call_args(call)
+    if (rlang::call_name(call) == '$') { # Ignore after $ since it should be a name inside the first arg.
+      args <- args[1]
+    }
+    res <- purrr::reduce(args, function(names, arg) {
+      if (class(arg) == 'name') {
+        if (may_reference_prev_step_colnames && as.character(arg) %in% prev_step_colnames) {
+          names
+        }
+        else {
+          c(names, as.character(arg)) 
+        }
+      }
+      else if (class(arg) == 'call') {
+        c(names, get_refs_in_call(arg, prev_step_colnames, may_reference_prev_step_colnames))
+      }
+      else {
+        names
+      }
+    }, .init = c())
+  }
+  res
+}
+
+# Returns names that references outside objects (most likely data frames) from the script.
+# priv_step_df - The data frame of the previous step. Refs to the columns of it are not considered outside refs.
+get_refs_in_script <- function(script, prev_step_df = NULL) {
+  prev_step_colnames <- c()
+  if (!is.null(prev_step_df)) {
+    prev_step_colnames <- colnames(prev_step_df)
+  }
+  call <- rlang::parse_expr(script)
+  get_refs_in_call(call, prev_step_colnames)
+}
