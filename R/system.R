@@ -3305,6 +3305,8 @@ get_refs_in_call <- function(call,
   }
   else {
     # State transitions on inside_mutate_and_friends, inside_bang, and inside_bang_bang.
+    # It seems rlang::parse_expr does not recognize !! as one function, and rather recognize it as 2 separate bangs.
+    # So we need a state machine to detect it.
     if (inside_mutate_and_friends) {
       if (rlang::call_name(call) == '!') {
         if (!inside_bang) {
@@ -3324,18 +3326,15 @@ get_refs_in_call <- function(call,
       inside_mutate_and_friends <- TRUE
     }
 
-    # It seems rlang::parse_expr does not recognize !! as one function.
-    # Refraining from this handling for now.
-    # else if (rlang::call_name(call) == '!!') {
-    #   inside_mutate_and_friends <- FALSE 
-    # }
     args <- rlang::call_args(call)
     if (rlang::call_name(call) == '$') { # Ignore after $ since it should be a name inside the first arg.
       args <- args[1]
     }
     res <- purrr::reduce(args, function(names, arg) {
       if (class(arg) == 'name') {
-        if (inside_mutate_and_friends) { # Skip the name since it would be reference to a column.
+        if (inside_mutate_and_friends && !inside_bang_bang) {
+          # If inside mutate and friends, skip the name since it would be reference to a column.
+          # Exception is when it is inside !! (bang bang), which means it is a reference to the outside environment.
           names
         }
         else {
