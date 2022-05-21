@@ -3296,7 +3296,7 @@ mutate_and_friends <- c('mutate_group', 'mutate', 'summaryze_group',
   'summarize', 'filter')
 
 # Returns names that references outside objects (most likely data frames) from the call.
-get_refs_in_call <- function(call, prev_step_colnames = c(), inside_mutate_and_friends = FALSE) {
+get_refs_in_call <- function(call, inside_mutate_and_friends = FALSE) {
   if (rlang::call_name(call) %in% select_and_friends) {
     res <- c()
   }
@@ -3315,7 +3315,7 @@ get_refs_in_call <- function(call, prev_step_colnames = c(), inside_mutate_and_f
     }
     res <- purrr::reduce(args, function(names, arg) {
       if (class(arg) == 'name') {
-        if (inside_mutate_and_friends && as.character(arg) %in% prev_step_colnames) {
+        if (inside_mutate_and_friends) { # Skip the name since it would be reference to a column.
           names
         }
         else {
@@ -3323,7 +3323,7 @@ get_refs_in_call <- function(call, prev_step_colnames = c(), inside_mutate_and_f
         }
       }
       else if (class(arg) == 'call') {
-        c(names, get_refs_in_call(arg, prev_step_colnames, inside_mutate_and_friends))
+        c(names, get_refs_in_call(arg, inside_mutate_and_friends))
       }
       else {
         names
@@ -3335,11 +3335,7 @@ get_refs_in_call <- function(call, prev_step_colnames = c(), inside_mutate_and_f
 
 # Returns names that references outside objects (most likely data frames) from the script.
 # priv_step_df - The data frame of the previous step. Refs to the columns of it are not considered outside refs.
-get_refs_in_script <- function(script, prev_step_df = NULL) {
-  prev_step_colnames <- c()
-  if (!is.null(prev_step_df)) {
-    prev_step_colnames <- colnames(prev_step_df)
-  }
+get_refs_in_script <- function(script) {
   call <- rlang::parse_expr(script)
-  get_refs_in_call(call, prev_step_colnames)
+  get_refs_in_call(call)
 }
