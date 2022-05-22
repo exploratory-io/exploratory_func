@@ -3336,6 +3336,11 @@ get_refs_in_call <- function(call,
     if (rlang::call_name(call) == '$') { # Ignore after $ since it should be a name inside the first arg.
       args <- args[1]
     }
+
+    args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
+      class(arg) == 'name' && as.character(arg) == ''
+    })
+
     res <- purrr::reduce(args, function(names, arg) {
       if (class(arg) == 'name') {
         if (inside_mutate_and_friends &&
