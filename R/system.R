@@ -3290,10 +3290,16 @@ load_fred <- function(series_id, date_start = "", date_end = "", password) {
 }
 
 
-select_and_friends <- c('select', 'rename', 'reorder_cols',
-  'group_by', 'gather', 'spread', 'pivot_longer', 'pivot_wider')
-mutate_and_friends <- c('mutate_group', 'mutate', 'summaryze_group',
-  'summarize', 'filter')
+# Names of functions that uses column specifications, but would never reference outside data frame, such as select.
+# Collected from the doc of dplyr, tidyr, and our command menu.
+select_and_friends <- c('arrange', 'select', 'rename', 'relocate', 'reorder_cols',
+  'group_by', 'gather', 'spread', 'pivot_longer', 'pivot_wider', 'complete', 'drop_na', 'expand', 'extract', 'fill',
+  'unnest', 'unnest_longer', 'unnest_wider', 'nest', 'hoist', 'nest_legacy', 'unnest_legacy', 'pack', 'unpack',
+  'separate', 'unite', 'separate_rows', 'pivot')
+# Names of functions that uses column specifications or reference with the column names, and could also reference outside data frames, such as mutate.
+# Collected from the doc of dplyr, and our command menu.
+mutate_and_friends <- c('mutate_group', 'mutate', 'mutate_at', 'mutate_all', 'mutate_if', 'transmute', 'summarize_group',
+  'summarize', 'summarize_at', 'summarize_all', 'summarize_if', 'summarise', 'summarise_at', 'summarise_all', 'summarise_if', 'filter')
 
 # Returns names that references outside objects (most likely data frames) from the call.
 get_refs_in_call <- function(call,
