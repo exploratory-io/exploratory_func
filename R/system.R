@@ -3410,6 +3410,15 @@ get_refs_in_call <- function(call,
 # Returns names that references outside objects (most likely data frames) from the script.
 # priv_step_df - The data frame of the previous step. Refs to the columns of it are not considered outside refs.
 get_refs_in_script <- function(script) {
-  call <- rlang::parse_expr(script)
-  get_refs_in_call(call)
+  call <- NULL
+  tryCatch({
+    call <- rlang::parse_expr(script)
+  }, error = function(e) { # Ignore parse error and return NULL.
+  })
+  if (is.null(call)) {
+    NULL
+  }
+  else {
+    get_refs_in_call(call)
+  }
 }

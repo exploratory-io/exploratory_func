@@ -12,6 +12,10 @@ test_that("get_refs_in_script", {
   expect_equal(refs, c('\u5916\u90e8'))
   refs <- get_refs_in_script("mutate(cyl2 = `\u5916\u90e8`$cyl)") # With backticks.
   expect_equal(refs, c('\u5916\u90e8'))
+  refs <- get_refs_in_script("mutate(") # With parse error.
+  expect_equal(refs, NULL)
+  refs <- get_refs_in_script("") # With parse error (empty input).
+  expect_equal(refs, NULL)
   refs <- get_refs_in_script('build_lm(y~x+z)')
   expect_equal(refs, NULL)
   refs <- get_refs_in_script('build_lr(y~x+z)')
