@@ -3332,9 +3332,14 @@ get_refs_in_call <- function(call,
     }
     res <- purrr::reduce(args, function(names, arg) {
       if (class(arg) == 'name') {
-        if (inside_mutate_and_friends && !inside_bang_bang) {
+        if (inside_mutate_and_friends &&
+            !inside_bang_bang &&
+            !rlang::call_name(call) == '$') {
           # If inside mutate and friends, skip the name since it would be reference to a column.
-          # Exception is when it is inside !! (bang bang), which means it is a reference to the outside environment.
+          # Exception is when it is inside !! (bang bang), which means it is a reference to the outside environment,
+          # and when this is a name before $, which makes it likely to be a data frame name.
+          # Since the exception for $ is prone to false positive, we might fade it out some time, but for now we
+          # do this to ameliorate the impact of the breaking change to strictly require !! for outside object reference.
           names
         }
         else {
