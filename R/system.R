@@ -3310,7 +3310,6 @@ select_and_friends <- c('arrange', 'select', 'rename', 'relocate', 'reorder_cols
   'do_market_impact',
   'do_cmdscale',
   'do_svd',
-  'do_prophet',
   'exp_ts_cluster',
   'do_anomaly_detection',
   'exp_bayes_ab',
@@ -3335,7 +3334,8 @@ select_and_friends <- c('arrange', 'select', 'rename', 'relocate', 'reorder_cols
 # Names of functions that uses column specifications or reference with the column names, and could also reference outside data frames, such as mutate.
 # Collected from the doc of dplyr, and our command menu.
 mutate_and_friends <- c('mutate_group', 'mutate', 'mutate_at', 'mutate_all', 'mutate_if', 'transmute', 'summarize_group',
-  'summarize', 'summarize_at', 'summarize_all', 'summarize_if', 'summarise', 'summarise_at', 'summarise_all', 'summarise_if', 'filter')
+  'summarize', 'summarize_at', 'summarize_all', 'summarize_if', 'summarise', 'summarise_at', 'summarise_all', 'summarise_if', 'filter',
+  'do_prophet') # do_prophet is here to handle reference to holiday data frame.
 
 # Returns names that references outside objects (most likely data frames) from the call.
 get_refs_in_call <- function(call,
@@ -3377,16 +3377,19 @@ get_refs_in_call <- function(call,
       class(arg) == 'name' && as.character(arg) == ''
     })
 
-    res <- purrr::reduce(args, function(names, arg) {
+    res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
       if (class(arg) == 'name') {
         if (inside_mutate_and_friends &&
             !inside_bang_bang &&
-            !rlang::call_name(call) == '$') {
+            !rlang::call_name(call) == '$' &&
+            !(rlang::call_name(call) == 'do_prophet' && arg_name == 'holidays')) {
           # If inside mutate and friends, skip the name since it would be reference to a column.
-          # Exception is when it is inside !! (bang bang), which means it is a reference to the outside environment,
-          # and when this is a name before $, which makes it likely to be a data frame name.
-          # Since the exception for $ is prone to false positive, we might fade it out some time, but for now we
-          # do this to ameliorate the impact of the breaking change to strictly require !! for outside object reference.
+          # Exceptions are...
+          # - when it is inside !! (bang bang), which means it is a reference to the outside environment.
+          # - when this is a name before $, which makes it likely to be a data frame name.
+          #   Since the exception for $ is prone to false positive, we might fade it out some time, but for now we
+          #   do this to ameliorate the impact of the breaking change to strictly require !! for outside object reference.
+          # - holidays arg of do_prophet, which is meant for holiday data frame. (While picking up the holiday table, we don't want to pick up time column, etc.)
           names
         }
         else {
