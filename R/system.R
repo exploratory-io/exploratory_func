@@ -3448,13 +3448,13 @@ get_refs_in_call <- function(call,
                                             inside_bang_bang = inside_bang_bang)
   }
   else if (call_name_str == '%>%') {
-    res1 <- get_refs_in_call_args_basic(call_name_str, args[[1]])
-    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[[-1]])
+    res1 <- get_refs_in_call_args_basic(call_name_str, args[1])
+    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[-1])
     res <- c(res1, res2)
   }
   else if (call_name_str %in% c(select_and_friends, mutate_and_friends)) {
-    res1 <- get_refs_in_call_args_basic(call_name_str, args[[1]])
-    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[[-1]])
+    res1 <- get_refs_in_call_args_basic(call_name_str, args[1])
+    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[-1])
     res <- c(res1, res2)
   }
   else {
