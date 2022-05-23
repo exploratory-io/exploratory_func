@@ -3338,6 +3338,75 @@ mutate_and_friends <- c('mutate_group', 'mutate', 'mutate_at', 'mutate_all', 'mu
   'summarize', 'summarize_at', 'summarize_all', 'summarize_if', 'summarise', 'summarise_at', 'summarise_all', 'summarise_if', 'filter',
   'do_prophet') # do_prophet is here to handle reference to holiday data frame.
 
+get_refs_in_call_args <- function(call_name_str,
+                                  args,
+                                  inside_mutate_and_friends = FALSE,
+                                  inside_bang = FALSE, # Passes down the state of inside a single bang.
+                                  inside_bang_bang = FALSE) { # Passes down the state of inside a consecutive bang bang.
+  if (call_name_str %in% select_and_friends) {
+    res <- c()
+  }
+  else {
+    # State transitions on inside_mutate_and_friends, inside_bang, and inside_bang_bang.
+    # It seems rlang::parse_expr does not recognize !! as one function, and rather recognize it as 2 separate bangs.
+    # So we need a state machine to detect it.
+    if (inside_mutate_and_friends) {
+      if (call_name_str == '!') {
+        if (!inside_bang) {
+          inside_bang <- TRUE
+        }
+        else { # Already inside a bang.
+          inside_bang_bang <- TRUE
+        }
+      }
+      else { # This call is not !.
+        if (inside_bang && !inside_bang_bang) { # Got a ! but inside it was not !. Reset the state.
+          inside_bang <- FALSE
+        }
+      }
+    }
+    if (call_name_str %in% mutate_and_friends) {
+      inside_mutate_and_friends <- TRUE
+    }
+
+    if (call_name_str == '$') { # Ignore after $ since it should be a name inside the first arg.
+      args <- args[1]
+    }
+
+    args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
+      class(arg) == 'name' && as.character(arg) == ''
+    })
+
+    res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
+      if (class(arg) == 'name') {
+        if (inside_mutate_and_friends &&
+            !inside_bang_bang &&
+            !call_name_str == '$' &&
+            !(call_name_str == 'do_prophet' && arg_name == 'holidays')) {
+          # If inside mutate and friends, skip the name since it would be reference to a column.
+          # Exceptions are...
+          # - when it is inside !! (bang bang), which means it is a reference to the outside environment.
+          # - when this is a name before $, which makes it likely to be a data frame name.
+          #   Since the exception for $ is prone to false positive, we might fade it out some time, but for now we
+          #   do this to ameliorate the impact of the breaking change to strictly require !! for outside object reference.
+          # - holidays arg of do_prophet, which is meant for holiday data frame. (While picking up the holiday table, we don't want to pick up time column, etc.)
+          names
+        }
+        else {
+          c(names, as.character(arg)) 
+        }
+      }
+      else if (class(arg) == 'call') {
+        c(names, get_refs_in_call(arg, inside_mutate_and_friends, inside_bang, inside_bang_bang))
+      }
+      else {
+        names
+      }
+    }, .init = c())
+  }
+  res
+}
+
 # Returns names that references outside objects (most likely data frames) from the call.
 get_refs_in_call <- function(call,
                              inside_mutate_and_friends = FALSE,
