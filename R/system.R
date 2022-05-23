@@ -3407,6 +3407,29 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
   res
 }
 
+get_refs_in_call_args_basic <- function(call_name_str, args) {
+  if (call_name_str == '$') { # Ignore after $ since it should be a name inside the first arg.
+    args <- args[1]
+  }
+
+  args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
+    class(arg) == 'name' && as.character(arg) == ''
+  })
+
+  res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
+    if (class(arg) == 'name') {
+      c(names, as.character(arg)) 
+    }
+    else if (class(arg) == 'call') {
+      c(names, get_refs_in_call(arg))
+    }
+    else {
+      names
+    }
+  }, .init = c())
+  res
+}
+
 # Returns names that references outside objects (most likely data frames) from the call.
 get_refs_in_call <- function(call,
                              inside_mutate_and_friends = FALSE,
