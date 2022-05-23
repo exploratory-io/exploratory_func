@@ -3448,10 +3448,14 @@ get_refs_in_call <- function(call,
                                             inside_bang_bang = inside_bang_bang)
   }
   else if (call_name_str == '%>%') {
-    # TODO
+    res1 <- get_refs_in_call_args_basic(call_name_str, args[[1]])
+    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[[-1]])
+    res <- c(res1, res2)
   }
   else if (call_name_str %in% c(select_and_friends, mutate_and_friends)) {
-    # TODO
+    res1 <- get_refs_in_call_args_basic(call_name_str, args[[1]])
+    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[[-1]])
+    res <- c(res1, res2)
   }
   else {
     res <- get_refs_in_call_args_basic(call_name_str, args)
@@ -3461,7 +3465,7 @@ get_refs_in_call <- function(call,
 
 # Returns names that references outside objects (most likely data frames) from the script.
 # priv_step_df - The data frame of the previous step. Refs to the columns of it are not considered outside refs.
-get_refs_in_script <- function(script) {
+get_refs_in_script <- function(script, after_pipe = TRUE) {
   calls <- NULL
   tryCatch({
     calls <- rlang::parse_exprs(script)
@@ -3472,7 +3476,7 @@ get_refs_in_script <- function(script) {
   }
   else {
     res <- purrr::reduce(calls, function(names, call) {
-      c(names, get_refs_in_call(call))
+      c(names, get_refs_in_call(call, after_pipe = after_pipe))
     }, .init = c())
     res
   }
