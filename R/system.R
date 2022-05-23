@@ -3340,8 +3340,8 @@ mutate_and_friends <- c('mutate_group', 'mutate', 'mutate_at', 'mutate_all', 'mu
 # Returns names that references outside objects (most likely data frames) from the call.
 get_refs_in_call <- function(call,
                              inside_mutate_and_friends = FALSE,
-                             inside_bang = FALSE,
-                             inside_bang_bang = FALSE) {
+                             inside_bang = FALSE, # Passes down the state of inside a single bang.
+                             inside_bang_bang = FALSE) { # Passes down the state of inside a consecutive bang bang.
   if (rlang::call_name(call) %in% select_and_friends) {
     res <- c()
   }
@@ -3358,7 +3358,7 @@ get_refs_in_call <- function(call,
           inside_bang_bang <- TRUE
         }
       }
-      else {
+      else { # This call is not !.
         if (inside_bang && !inside_bang_bang) { # Got a ! but inside it was not !. Reset the state.
           inside_bang <- FALSE
         }
