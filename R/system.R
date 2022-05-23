@@ -3338,7 +3338,7 @@ mutate_and_friends <- c('mutate_group', 'mutate', 'mutate_at', 'mutate_all', 'mu
   'summarize', 'summarize_at', 'summarize_all', 'summarize_if', 'summarise', 'summarise_at', 'summarise_all', 'summarise_if', 'filter',
   'do_prophet') # do_prophet is here to handle reference to holiday data frame.
 
-get_refs_in_call_args <- function(call_name_str,
+get_refs_in_call_args_after_pipe <- function(call_name_str,
                                   args,
                                   inside_mutate_and_friends = FALSE,
                                   inside_bang = FALSE, # Passes down the state of inside a single bang.
@@ -3414,7 +3414,7 @@ get_refs_in_call <- function(call,
                              inside_bang_bang = FALSE) { # Passes down the state of inside a consecutive bang bang.
   args <- rlang::call_args(call)
   call_name_str <- rlang::call_name(call)
-  res <- get_refs_in_call_args(call_name_str, args,
+  res <- get_refs_in_call_args_after_pipe(call_name_str, args,
                                inside_mutate_and_friends = inside_mutate_and_friends,
                                inside_bang = inside_bang,
                                inside_bang_bang = inside_bang_bang)
