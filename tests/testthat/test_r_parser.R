@@ -6,8 +6,10 @@ test_that("get_refs_in_script", {
   expect_equal(refs, NULL)
   refs <- get_refs_in_script('mutate(cyl2 = !!external[["cyl"]])')
   expect_equal(refs, c('external'))
-  refs <- get_refs_in_script("mutate(cyl2 = \nexternal$cyl)")
+  refs <- get_refs_in_script("mutate(cyl2 = \nexternal$cyl)") # multi-line
   expect_equal(refs, c('external'))
+  refs <- get_refs_in_script("cyl1 <- external1\ncyl2 <- external2") # multi-expressions
+  expect_equal(refs, c('cyl1', 'external1', 'cyl2', 'external2'))
   refs <- get_refs_in_script("mutate(cyl2 = \u5916\u90e8$cyl)") # "external" in Japanese.
   expect_equal(refs, c('\u5916\u90e8'))
   refs <- get_refs_in_script("mutate(cyl2 = `\u5916\u90e8`$cyl)") # With backticks.
