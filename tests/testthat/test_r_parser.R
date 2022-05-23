@@ -6,6 +6,8 @@ test_that("get_refs_in_script", {
   expect_equal(refs, NULL)
   refs <- get_refs_in_script('mutate(cyl2 = !!external[["cyl"]])')
   expect_equal(refs, c('external'))
+  refs <- get_refs_in_script("library(MASS)") # library()
+  expect_equal(refs, NULL)
   refs <- get_refs_in_script("mutate(cyl2 = \nexternal$cyl)") # multi-line
   expect_equal(refs, c('external'))
   refs <- get_refs_in_script("cyl1 <- external1\ncyl2 <- external2") # multi-expressions
