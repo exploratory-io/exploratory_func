@@ -3397,7 +3397,9 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
         }
       }
       else if (class(arg) == 'call') {
-        c(names, get_refs_in_call(arg, inside_mutate_and_friends, inside_bang, inside_bang_bang))
+        c(names, get_refs_in_call(arg, inside_mutate_and_friends, inside_bang, inside_bang_bang,
+                                  TRUE) # after_pipe
+        )
       }
       else {
         names
@@ -3434,13 +3436,26 @@ get_refs_in_call_args_basic <- function(call_name_str, args) {
 get_refs_in_call <- function(call,
                              inside_mutate_and_friends = FALSE,
                              inside_bang = FALSE, # Passes down the state of inside a single bang.
-                             inside_bang_bang = FALSE) { # Passes down the state of inside a consecutive bang bang.
+                             inside_bang_bang = FALSE, # Passes down the state of inside a consecutive bang bang.
+                             after_pipe = FALSE 
+                             ) {
   args <- rlang::call_args(call)
   call_name_str <- rlang::call_name(call)
-  res <- get_refs_in_call_args_after_pipe(call_name_str, args,
-                               inside_mutate_and_friends = inside_mutate_and_friends,
-                               inside_bang = inside_bang,
-                               inside_bang_bang = inside_bang_bang)
+  if (after_pipe) {
+    res <- get_refs_in_call_args_after_pipe(call_name_str, args,
+                                            inside_mutate_and_friends = inside_mutate_and_friends,
+                                            inside_bang = inside_bang,
+                                            inside_bang_bang = inside_bang_bang)
+  }
+  else if (call_name_str == '%>%') {
+    # TODO
+  }
+  else if (call_name_str %in% c(select_and_friends, mutate_and_friends)) {
+    # TODO
+  }
+  else {
+    res <- get_refs_in_call_args_basic(call_name_str, args)
+  }
   res
 }
 
