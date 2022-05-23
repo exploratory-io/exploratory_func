@@ -3373,6 +3373,11 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
       args <- args[1]
     }
 
+    if (call_name_str == '<-') { # Assignment should not count as a reference.
+      args <- args[-1]
+    }
+
+
     args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
       class(arg) == 'name' && as.character(arg) == ''
     })
@@ -3412,6 +3417,10 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
 get_refs_in_call_args_basic <- function(call_name_str, args) {
   if (call_name_str == '$') { # Ignore after $ since it should be a name inside the first arg.
     args <- args[1]
+  }
+
+  if (call_name_str == '<-') { # Assignment should not count as a reference.
+    args <- args[-1]
   }
 
   args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.

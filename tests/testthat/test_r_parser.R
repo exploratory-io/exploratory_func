@@ -11,7 +11,7 @@ test_that("get_refs_in_script", {
   refs <- get_refs_in_script("mutate(cyl2 = \nexternal$cyl)") # multi-line
   expect_equal(refs, c('external'))
   refs <- get_refs_in_script("cyl1 <- external1\ncyl2 <- external2", after_pipe = FALSE) # multi-expressions, non-after-pipe.
-  expect_equal(refs, c('cyl1', 'external1', 'cyl2', 'external2'))
+  expect_equal(refs, c('external1', 'external2')) # cyl1, cyl2 should not be picked up as references.
   refs <- get_refs_in_script("df1 %>% mutate(a1 = x1)\ndf2 %>% select(a2)", after_pipe = FALSE) # multi-expressions, non-after-pipe case 2.
   expect_equal(refs, c('df1', 'df2'))
   refs <- get_refs_in_script("mutate(cyl2 = \u5916\u90e8$cyl)") # "external" in Japanese.
