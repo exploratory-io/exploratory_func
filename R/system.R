@@ -3373,7 +3373,7 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
       args <- args[1]
     }
 
-    if (call_name_str == '<-') { # Assignment should not count as a reference.
+    if (call_name_str %in% c('<-', '=')) { # Assignment should not count as a reference.
       args <- args[-1]
     }
 
@@ -3419,7 +3419,7 @@ get_refs_in_call_args_basic <- function(call_name_str, args) {
     args <- args[1]
   }
 
-  if (call_name_str == '<-') { # Assignment should not count as a reference.
+  if (call_name_str %in% c('<-', '=')) { # Assignment should not count as a reference.
     args <- args[-1]
   }
 
