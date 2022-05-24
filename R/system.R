@@ -3330,8 +3330,7 @@ select_and_friends <- c('arrange', 'select', 'rename', 'relocate', 'reorder_cols
   'do_tokenize',
   'do_ngram',
   'do_tf_idf',
-  'pair_count',
-  'library') # library() is a little different, but the name inside it should be a package name and not a ref to an object.
+  'pair_count')
 # Names of functions that uses column specifications or reference with the column names, and could also reference outside data frames, such as mutate.
 # Collected from the doc of dplyr, and our command menu.
 mutate_and_friends <- c('mutate_group', 'mutate', 'mutate_at', 'mutate_all', 'mutate_if', 'transmute', 'summarize_group',
