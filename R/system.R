@@ -3337,12 +3337,12 @@ mutate_and_friends <- c('mutate_group', 'mutate', 'mutate_at', 'mutate_all', 'mu
   'summarize', 'summarize_at', 'summarize_all', 'summarize_if', 'summarise', 'summarise_at', 'summarise_all', 'summarise_if', 'filter',
   'do_prophet') # do_prophet is here to handle reference to holiday data frame.
 
-# Returns names that references outside objects (most likely data frames) from the call.
-get_refs_in_call <- function(call,
-                             inside_mutate_and_friends = FALSE,
-                             inside_bang = FALSE, # Passes down the state of inside a single bang.
-                             inside_bang_bang = FALSE) { # Passes down the state of inside a consecutive bang bang.
-  if (rlang::call_name(call) %in% select_and_friends) {
+get_refs_in_call_args_after_pipe <- function(call_name_str,
+                                  args,
+                                  inside_mutate_and_friends = FALSE,
+                                  inside_bang = FALSE, # Passes down the state of inside a single bang.
+                                  inside_bang_bang = FALSE) { # Passes down the state of inside a consecutive bang bang.
+  if (call_name_str %in% select_and_friends) {
     res <- c()
   }
   else {
@@ -3350,7 +3350,7 @@ get_refs_in_call <- function(call,
     # It seems rlang::parse_expr does not recognize !! as one function, and rather recognize it as 2 separate bangs.
     # So we need a state machine to detect it.
     if (inside_mutate_and_friends) {
-      if (rlang::call_name(call) == '!') {
+      if (call_name_str == '!') {
         if (!inside_bang) {
           inside_bang <- TRUE
         }
@@ -3364,25 +3364,33 @@ get_refs_in_call <- function(call,
         }
       }
     }
-    if (rlang::call_name(call) %in% mutate_and_friends) {
+    if (call_name_str %in% mutate_and_friends) {
       inside_mutate_and_friends <- TRUE
     }
 
-    args <- rlang::call_args(call)
-    if (rlang::call_name(call) == '$') { # Ignore after $ since it should be a name inside the first arg.
+    if (call_name_str == 'library') { # Ignore symbol inside library() since it is a library name.
+      return(c())
+    }
+
+    if (call_name_str == '$') { # Ignore after $ since it should be a name inside the first arg.
       args <- args[1]
     }
 
+    if (call_name_str %in% c('<-', '=')) { # Assignment should not count as a reference.
+      args <- args[-1]
+    }
+
+
     args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
-      class(arg) == 'name' && as.character(arg) == ''
+      rlang::is_symbol(arg) && as.character(arg) == ''
     })
 
     res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
-      if (class(arg) == 'name') {
+      if (rlang::is_symbol(arg)) {
         if (inside_mutate_and_friends &&
             !inside_bang_bang &&
-            !rlang::call_name(call) == '$' &&
-            !(rlang::call_name(call) == 'do_prophet' && arg_name == 'holidays')) {
+            !call_name_str == '$' &&
+            !(call_name_str == 'do_prophet' && arg_name == 'holidays')) {
           # If inside mutate and friends, skip the name since it would be reference to a column.
           # Exceptions are...
           # - when it is inside !! (bang bang), which means it is a reference to the outside environment.
@@ -3396,8 +3404,10 @@ get_refs_in_call <- function(call,
           c(names, as.character(arg)) 
         }
       }
-      else if (class(arg) == 'call') {
-        c(names, get_refs_in_call(arg, inside_mutate_and_friends, inside_bang, inside_bang_bang))
+      else if (rlang::is_call(arg)) {
+        c(names, get_refs_in_call(arg, inside_mutate_and_friends, inside_bang, inside_bang_bang,
+                                  TRUE) # after_pipe
+        )
       }
       else {
         names
@@ -3407,18 +3417,88 @@ get_refs_in_call <- function(call,
   res
 }
 
+get_refs_in_call_args_basic <- function(call_name_str, args) {
+  if (call_name_str == 'library') { # Ignore symbol inside library() since it is a library name.
+    return(c())
+  }
+
+  if (call_name_str == '$') { # Ignore after $ since it should be a name inside the first arg.
+    args <- args[1]
+  }
+
+  if (call_name_str %in% c('<-', '=')) { # Assignment should not count as a reference.
+    args <- args[-1]
+  }
+
+  args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
+    rlang::is_symbol(arg) && as.character(arg) == ''
+  })
+
+  res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
+    if (rlang::is_symbol(arg)) {
+      c(names, as.character(arg)) 
+    }
+    else if (rlang::is_call(arg)) {
+      c(names, get_refs_in_call(arg))
+    }
+    else {
+      names
+    }
+  }, .init = c())
+  res
+}
+
+# Returns names that references outside objects (most likely data frames) from the call.
+get_refs_in_call <- function(call,
+                             inside_mutate_and_friends = FALSE,
+                             inside_bang = FALSE, # Passes down the state of inside a single bang.
+                             inside_bang_bang = FALSE, # Passes down the state of inside a consecutive bang bang.
+                             after_pipe = FALSE 
+                             ) {
+  args <- rlang::call_args(call)
+  call_name_str <- rlang::call_name(call)
+  if (after_pipe) {
+    res <- get_refs_in_call_args_after_pipe(call_name_str, args,
+                                            inside_mutate_and_friends = inside_mutate_and_friends,
+                                            inside_bang = inside_bang,
+                                            inside_bang_bang = inside_bang_bang)
+  }
+  else if (call_name_str == '%>%') {
+    res1 <- get_refs_in_call_args_basic(call_name_str, args[1])
+    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[-1])
+    res <- c(res1, res2)
+  }
+  else if (call_name_str %in% c(select_and_friends, mutate_and_friends)) {
+    res1 <- get_refs_in_call_args_basic(call_name_str, args[1])
+    res2 <- get_refs_in_call_args_after_pipe(call_name_str, args[-1])
+    res <- c(res1, res2)
+  }
+  else {
+    res <- get_refs_in_call_args_basic(call_name_str, args)
+  }
+  res
+}
+
 # Returns names that references outside objects (most likely data frames) from the script.
 # priv_step_df - The data frame of the previous step. Refs to the columns of it are not considered outside refs.
-get_refs_in_script <- function(script) {
-  call <- NULL
+get_refs_in_script <- function(script, after_pipe = TRUE) {
+  exprs <- NULL
   tryCatch({
-    call <- rlang::parse_expr(script)
+    exprs <- rlang::parse_exprs(script)
   }, error = function(e) { # Ignore parse error and return NULL.
   })
-  if (is.null(call)) {
+  if (is.null(exprs)) {
     NULL
   }
   else {
-    get_refs_in_call(call)
+    res <- purrr::reduce(exprs, function(names, expr) {
+      if (rlang::is_call(expr)) {
+        c(names, get_refs_in_call(expr, after_pipe = after_pipe))
+      }
+      else if (rlang::is_symbol(expr)) {
+        c(names, as.character(expr)) 
+      }
+    }, .init = c())
+    res
   }
 }

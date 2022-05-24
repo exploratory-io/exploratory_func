@@ -1,13 +1,27 @@
 context("test R parser")
 test_that("get_refs_in_script", {
+  refs <- get_refs_in_script("df1") # Just a name.
+  expect_equal(refs, c('df1'))
   refs <- get_refs_in_script("select(cyl)")
   expect_equal(refs, NULL)
   refs <- get_refs_in_script("mutate(cyl2 = cyl)")
   expect_equal(refs, NULL)
   refs <- get_refs_in_script('mutate(cyl2 = !!external[["cyl"]])')
   expect_equal(refs, c('external'))
-  refs <- get_refs_in_script("mutate(cyl2 = \nexternal$cyl)")
+  refs <- get_refs_in_script("library(MASS)", after_pipe = FALSE) # library()
+  expect_equal(refs, NULL)
+  refs <- get_refs_in_script("library(MASS)", after_pipe = TRUE) # library() in after-pipe expression.
+  expect_equal(refs, NULL)
+  refs <- get_refs_in_script("cyl1 <- external1\ncyl2 <- external2", after_pipe = FALSE) # multi-expressions, non-after-pipe.
+  expect_equal(refs, c('external1', 'external2')) # cyl1, cyl2 should not be picked up as references.
+  refs <- get_refs_in_script("cyl1 = external1\ncyl2 = external2", after_pipe = FALSE) # multi-expressions, non-after-pipe.
+  expect_equal(refs, c('external1', 'external2')) # cyl1, cyl2 should not be picked up as references.
+  refs <- get_refs_in_script("mutate(cyl2 = \nexternal$cyl)") # multi-line
   expect_equal(refs, c('external'))
+  refs <- get_refs_in_script("df1 %>% mutate(a1 = x1)\ndf2 %>% select(a2)", after_pipe = FALSE) # multi-expressions, non-after-pipe case 2.
+  expect_equal(refs, c('df1', 'df2'))
+  refs <- get_refs_in_script("mutate(df1, a1 = x1)\nselect(df2, a2)", after_pipe = FALSE) # multi-expressions, non-after-pipe case 3.
+  expect_equal(refs, c('df1', 'df2'))
   refs <- get_refs_in_script("mutate(cyl2 = \u5916\u90e8$cyl)") # "external" in Japanese.
   expect_equal(refs, c('\u5916\u90e8'))
   refs <- get_refs_in_script("mutate(cyl2 = `\u5916\u90e8`$cyl)") # With backticks.
