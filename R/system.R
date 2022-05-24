@@ -3369,6 +3369,10 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
       inside_mutate_and_friends <- TRUE
     }
 
+    if (call_name_str == 'library') { # Ignore symbol inside library() since it is a library name.
+      return(c())
+    }
+
     if (call_name_str == '$') { # Ignore after $ since it should be a name inside the first arg.
       args <- args[1]
     }
@@ -3415,6 +3419,10 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
 }
 
 get_refs_in_call_args_basic <- function(call_name_str, args) {
+  if (call_name_str == 'library') { # Ignore symbol inside library() since it is a library name.
+    return(c())
+  }
+
   if (call_name_str == '$') { # Ignore after $ since it should be a name inside the first arg.
     args <- args[1]
   }
