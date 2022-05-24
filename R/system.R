@@ -3383,11 +3383,11 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
 
 
     args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
-      class(arg) == 'name' && as.character(arg) == ''
+      rlang::is_symbol(arg) && as.character(arg) == ''
     })
 
     res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
-      if (class(arg) == 'name') {
+      if (rlang::is_symbol(arg)) {
         if (inside_mutate_and_friends &&
             !inside_bang_bang &&
             !call_name_str == '$' &&
@@ -3405,7 +3405,7 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
           c(names, as.character(arg)) 
         }
       }
-      else if (class(arg) == 'call') {
+      else if (rlang::is_call(arg)) {
         c(names, get_refs_in_call(arg, inside_mutate_and_friends, inside_bang, inside_bang_bang,
                                   TRUE) # after_pipe
         )
@@ -3432,14 +3432,14 @@ get_refs_in_call_args_basic <- function(call_name_str, args) {
   }
 
   args <- purrr::discard(args, function(arg) { # Remove empty names that are formed by empty arg. e.g. func(a, ,b). It leads purr::reduce to throw error.
-    class(arg) == 'name' && as.character(arg) == ''
+    rlang::is_symbol(arg) && as.character(arg) == ''
   })
 
   res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
-    if (class(arg) == 'name') {
+    if (rlang::is_symbol(arg)) {
       c(names, as.character(arg)) 
     }
-    else if (class(arg) == 'call') {
+    else if (rlang::is_call(arg)) {
       c(names, get_refs_in_call(arg))
     }
     else {
@@ -3483,17 +3483,22 @@ get_refs_in_call <- function(call,
 # Returns names that references outside objects (most likely data frames) from the script.
 # priv_step_df - The data frame of the previous step. Refs to the columns of it are not considered outside refs.
 get_refs_in_script <- function(script, after_pipe = TRUE) {
-  calls <- NULL
+  exprs <- NULL
   tryCatch({
-    calls <- rlang::parse_exprs(script)
+    exprs <- rlang::parse_exprs(script)
   }, error = function(e) { # Ignore parse error and return NULL.
   })
-  if (is.null(calls)) {
+  if (is.null(exprs)) {
     NULL
   }
   else {
-    res <- purrr::reduce(calls, function(names, call) {
-      c(names, get_refs_in_call(call, after_pipe = after_pipe))
+    res <- purrr::reduce(exprs, function(names, expr) {
+      if (rlang::is_call(expr)) {
+        c(names, get_refs_in_call(expr, after_pipe = after_pipe))
+      }
+      else if (rlang::is_symbol(expr)) {
+        c(names, as.character(expr)) 
+      }
     }, .init = c())
     res
   }
