@@ -997,10 +997,14 @@ test_that("summarize_group", {
 })
 
 
-
 test_that("sum_if", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if(hp, mpg > 15, na.rm = T))
   expect_equal(df %>% dplyr::pull(custom), c(909, 856, 1454))
+})
+
+test_that("sum_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if_ratio(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 1454/2929)) # 909/909, 856/856, 1454/2929
 })
 
 test_that("count_if", {
@@ -1008,9 +1012,19 @@ test_that("count_if", {
   expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
 })
 
+test_that("count_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_ratio(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 8/14)) # 11/11, 7/7, 8/14
+})
+
 test_that("count_unique_if", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique_if(hp, mpg > 15, na.rm = F))
   expect_equal(df %>% dplyr::pull(custom), c(10, 4, 4))
+})
+
+test_that("count_unique_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique_if_ratio(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 4/9)) # 10/10, 4/4, 4/9
 })
 
 test_that("count_rows", {
@@ -1028,14 +1042,29 @@ test_that("average_if", {
   expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 182))
 })
 
+test_that("average_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::average_if_ratio(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(1, 1, 0.87))
+})
+
 test_that("mean_if", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if(hp, mpg > 15, na.rm = F))
   expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 182))
 })
 
+test_that("mean_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if_ratio(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(1, 1, 0.87))
+})
+
 test_that("median_if", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if(hp, mpg > 15, gear > 3))
   expect_equal(df %>% dplyr::pull(custom), c(78.5, 123.0, 264))
+})
+
+test_that("median_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if_ratio(hp, mpg > 15, gear > 3))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(0.86, 1.12, 1.37))
 })
 
 
@@ -1044,9 +1073,19 @@ test_that("min_if", {
   expect_equal(df %>% dplyr::pull(custom), c(52, 105, 150))
 })
 
+test_that("min_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::min_if_ratio(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 1))
+})
+
 test_that("max_if", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if(hp, mpg > 15, gear > 2, na.rm = T))
   expect_equal(df %>% dplyr::pull(custom), c(113, 175, 264))
+})
+
+test_that("max_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if_ratio(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(1, 1, 0.79))
 })
 
 test_that("summarize_row", {
