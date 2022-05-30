@@ -2427,6 +2427,20 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
     max(x[condition], na.rm = na.rm)
   } else if (aggregateFunc == "n_distinct" || aggregateFunc == "count_unique") { # count_unique is our alias for n_distinct.
     n_distinct(x[condition], na.rm = na.rm)
+  } else if (aggregateFunc == "sum_ratio") {
+    sum(x[condition], na.rm = na.rm) / sum(x, na.rm = na.rm)
+  } else if (aggregateFunc == "count_ratio") {
+    sum(condition, na.rm = na.rm) / length(condition)
+  } else if (aggregateFunc == "mean_ratio" || aggregateFunc == "average_ratio") {
+    mean(x[condition], na.rm = na.rm) / mean(x, na.rm = na.rm)
+  } else if (aggregateFunc == "median_ratio") {
+    median(x[condition], na.rm = na.rm) / median(x, na.rm = na.rm)
+  } else if (aggregateFunc == "min_ratio") {
+    min(x[condition], na.rm = na.rm) / min(x, na.rm = na.rm)
+  } else if (aggregateFunc == "max_ratio") {
+    max(x[condition], na.rm = na.rm) / max(x, na.rm = na.rm)
+  } else if (aggregateFunc == "n_distinct_ratio" || aggregateFunc == "count_unique_ratio") {
+    n_distinct(x[condition], na.rm = na.rm) / n_distinct(x, na.rm = na.rm)
   }
 }
 
@@ -2435,9 +2449,18 @@ sum_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "sum", ..., na.rm = na.rm)
 }
 
+sum_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "sum_ratio", ..., na.rm = na.rm)
+}
+
 #' export
 count_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "count", ..., na.rm = na.rm)
+}
+
+#' export
+count_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "count_ratio", ..., na.rm = na.rm)
 }
 
 #' export
@@ -2446,8 +2469,18 @@ average_if <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
+average_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "average_ratio", ..., na.rm = na.rm)
+}
+
+#' export
 mean_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "mean", ..., na.rm = na.rm)
+}
+
+#' export
+mean_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "mean_ratio", ..., na.rm = na.rm)
 }
 
 #' export
@@ -2456,8 +2489,18 @@ median_if <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
+median_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "median_ratio", ..., na.rm = na.rm)
+}
+
+#' export
 min_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "min", ..., na.rm = na.rm)
+}
+
+#' export
+min_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "min_ratio", ..., na.rm = na.rm)
 }
 
 #' export
@@ -2466,8 +2509,18 @@ max_if <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
+max_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "max_ratio", ..., na.rm = na.rm)
+}
+
+#' export
 count_unique_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "n_distinct", ..., na.rm = na.rm)
+}
+
+#' export
+count_unique_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "n_distinct_ratio", ..., na.rm = na.rm)
 }
 
 #' Alias for n()
