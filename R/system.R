@@ -1866,6 +1866,8 @@ listGoogleCloudStorageBuckets <- function(project, tokenFileId){
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  # make sure to pass "noAcl" as projection so that Google won't limit maxResults as 200.
+  # ref: https://cloud.google.com/storage/docs/json_api/v1/buckets/list
   googleCloudStorageR::gcs_list_buckets(projectId = project, maxResults = 1000, projection = c("noAcl"))
 }
 
