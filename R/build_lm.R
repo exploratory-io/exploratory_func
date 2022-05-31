@@ -1336,12 +1336,14 @@ vif_to_dataframe <- function(x) {
   ret <- NULL
   if (is.matrix(x$vif)) {
     # It is a matrix when there are categorical variables.
-    ret <- x$vif %>% as.data.frame() %>%  tibble::rownames_to_column(var="term") %>% rename(VIF=GVIF)
+    ret <- x$vif %>% as.data.frame() %>% tibble::rownames_to_column(var="term") %>% rename(VIF=GVIF)
   }
   else {
     # It is a vector when there is no categorical variable.
     ret <- data.frame(term=names(x$vif), VIF=x$vif)
   }
+  # Eliminate negative VIF values that sometimes happen, most likely because of numeric error.
+  ret <- ret %>% dplyr::mutate(VIF = pmax(VIF, 0))
   # Map variable names back to the original.
   # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
   ret$term <- x$terms_mapping[as.character(ret$term)]
