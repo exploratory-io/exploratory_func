@@ -1866,7 +1866,7 @@ listGoogleCloudStorageBuckets <- function(project, tokenFileId){
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
-  googleCloudStorageR::gcs_list_buckets(projectId = project, projection = c("full"))
+  googleCloudStorageR::gcs_list_buckets(projectId = project, maxResults = 1000, projection = c("noAcl"))
 }
 
 #' API to get a data from google BigQuery table
