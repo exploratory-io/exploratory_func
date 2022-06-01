@@ -61,6 +61,12 @@ test_that("exp_kmeans elbow method mode", {
   model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
   res <- model_df %>% tidyr::unnest(model)
   expect_equal(colnames(res), c("center","totss","tot.withinss","betweenss","iter"))
+  # Test the case the rows are fewer and we have to limit the search.
+  df <- df %>% head(9)
+  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
+  res <- model_df %>% tidyr::unnest(model)
+  # Search should be limited up to 8 (9 - 1).
+  expect_equal(nrow(res), 8)
 })
 
 # group_by for elbow method is not currently supported. Revive this test when it is.
