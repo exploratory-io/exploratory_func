@@ -1469,3 +1469,33 @@ test_that("separate_japanese_address", {
   answer <- tibble::tibble(TODOFUKEN = c("\u6771\u4EAC\u90FD", "\u6771\u4EAC\u90FD"),  SHIKUCHOSON = c("\u65B0\u5BBF\u533A", "\u6E0B\u8C37\u533A"), BANCHI = c("\u767E\u4EBA\u753A\u0031\u002D\u0032", "\u677E\u6FE4\u0032\u002D\u0033"))
   expect_true(isTRUE(all.equal(check, answer)), TRUE)
 })
+
+test_that("format_cut_output function", {
+  x <- cut(c(1,2,3,4,5), breaks=3, dig.lab=10)
+  formatted <- format_cut_output(x)
+  expect_equal(formatted, factor(c("1.00 - 2.33","1.00 - 2.33","2.33 - 3.67","3.67 - 5.00","3.67 - 5.00")))
+
+  # Negative test
+  expect_equal(c(NA,NA,NA), format_cut_output(c(NA,NA,NA), decimal.digits=2))
+  expect_equal(NULL, format_cut_output(c(), decimal.digits=2))
+})
+
+test_that("construct_new_labels function.", {
+  new.labels <- c("a", "b", "c")
+  base.labels <- c("1", "2", "3", "4", "5")
+  expect_equal(construct_new_labels(base.labels, new.labels), c("a", "b", "c", "4", "5"))
+
+  new.labels <- c("a", "b", "c", "d", "e", "f", "g")
+  base.labels <- c("1", "2", "3", "4", "5")
+  expect_equal(construct_new_labels(base.labels, new.labels), c("a", "b", "c", "d", "e"))
+
+  new.labels <- c("a", "b", "c", "d", "e")
+  base.labels <- c("1", "2", "3", "4", "5")
+  expect_equal(construct_new_labels(base.labels, new.labels), c("a", "b", "c", "d", "e"))
+
+  new.labels <- NA
+  base.labels <- c("1", "2", "3", "4", "5")
+  expect_equal(construct_new_labels(base.labels, new.labels), c("1", "2", "3", "4", "5"))
+
+})
+
