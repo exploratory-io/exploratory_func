@@ -1812,7 +1812,7 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
     bigrquery::set_access_cred(token)
     tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
     # Treat int64 as numeric by passing bigint = c("numeric")
-    bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, bigint = c("numeric"), quiet = TRUE, max_connections = max_connections)
+    bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, bigint = "numeric", quiet = TRUE, max_connections = max_connections)
   }, finally = {
     # Set original scipen
     options(scipen = original_scipen)
@@ -1960,7 +1960,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
       tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
       # Treat int64 as numeric by passing bigint = c("numeric")
-      df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, bigint=c("numeric"), max_connections = max_connections, quiet = TRUE)
+      df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, bigint = "numeric", max_connections = max_connections, quiet = TRUE)
     }
     df
   }, finally = {
