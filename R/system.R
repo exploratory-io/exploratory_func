@@ -2418,7 +2418,8 @@ statecode <- function(input = input, output_type = output_type) {
   if (!output_type %in% output_types) {
      stop("Output type not supported")
   }
-  # get rid of space, period, apostrophe, hiphen, etc to normalize inputs.
+  # get rid of space, period, apostrophe, hiphen, number, etc to normalize inputs.
+  # e.g. California[4] is normalized as california
   input_normalized <- stringr::str_remove_all(input, "[:punct:]|[:digit:]|[:space:]") %>%  stringr::str_to_lower()
   # in case input is US state code.
   input_normalized_number <- stringr::str_remove_all(input, "[^0-9]")
@@ -3408,7 +3409,7 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
           names
         }
         else {
-          c(names, as.character(arg)) 
+          c(names, as.character(arg))
         }
       }
       else if (rlang::is_call(arg)) {
@@ -3443,7 +3444,7 @@ get_refs_in_call_args_basic <- function(call_name_str, args) {
 
   res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
     if (rlang::is_symbol(arg)) {
-      c(names, as.character(arg)) 
+      c(names, as.character(arg))
     }
     else if (rlang::is_call(arg)) {
       c(names, get_refs_in_call(arg))
@@ -3460,7 +3461,7 @@ get_refs_in_call <- function(call,
                              inside_mutate_and_friends = FALSE,
                              inside_bang = FALSE, # Passes down the state of inside a single bang.
                              inside_bang_bang = FALSE, # Passes down the state of inside a consecutive bang bang.
-                             after_pipe = FALSE 
+                             after_pipe = FALSE
                              ) {
   args <- rlang::call_args(call)
   call_name_str <- rlang::call_name(call)
@@ -3503,7 +3504,7 @@ get_refs_in_script <- function(script, after_pipe = TRUE) {
         c(names, get_refs_in_call(expr, after_pipe = after_pipe))
       }
       else if (rlang::is_symbol(expr)) {
-        c(names, as.character(expr)) 
+        c(names, as.character(expr))
       }
     }, .init = c())
     res
