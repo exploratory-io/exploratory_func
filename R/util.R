@@ -2928,12 +2928,12 @@ separate_japanese_address <- function(df, address, prefecture_col = "prefecture"
 #
 #  new.labels <- c("a", "b", "c")
 #  base.labels <- c("1", "2", "3", "4", "5")
-#  _tam_construct_new_labels (base.labels, new.labels)
+#  construct_new_labels (base.labels, new.labels)
 #  [1] "a" "b" "c" "4" "5"
 #
 #  new.labels <- c("a", "b", "c", "d", "e", "f")
 #  base.labels <- c("1", "2", "3", "4", "5")
-#  _tam_construct_new_labels (base.labels, new.labels)
+#  construct_new_labels (base.labels, new.labels)
 #  [1] "a" "b" "c" "d" "e"
 construct_new_labels <- function(base.labels, new.labels) {
   if (is.null(new.labels)) {
@@ -2942,14 +2942,14 @@ construct_new_labels <- function(base.labels, new.labels) {
   # If the length of new.labels and base.labels are the same,
   # new.labels is ready to use. Just return it.
   else if (length(new.labels) == length(base.labels)) {
-    coalesce(new.labels, base.labels)
+    dplyr::coalesce(new.labels, base.labels)
   }
 
   # If new.labels is longer than the base.labels, chop it to make them
   # in the same length and return it.
   else if (length(new.labels) > length(base.labels)) {
     length(new.labels) <- length(base.labels)
-    coalesce(new.labels, base.labels)
+    dplyr::coalesce(new.labels, base.labels)
   }
   else {
     # If new.labels is shorter than the base.labels, pad NAs at the end
@@ -2971,7 +2971,7 @@ format_cut_output <- function(x, decimal.digits=2, big.mark=",", small.mark=".",
   # Get levels
   x.levels <- levels(x)
   # Format the text.
-  new.names <- format_cut_output_line(x.levels, decimal.digits, big.mark, small.mark, prefix, suffix, right)
+  new.names <- format_cut_output_levels(x.levels, decimal.digits, big.mark, small.mark, prefix, suffix, right)
 
   if (!is.null(new.labels)) {
     new.names <- construct_new_labels(new.names, new.labels)
@@ -2991,7 +2991,7 @@ format_cut_output <- function(x, decimal.digits=2, big.mark=",", small.mark=".",
 # Input: [1] "(0.996,2.333333333]"       "(2.333333333,3.666666667]" "(3.666666667,5.004]"
 # Output: [1] "1.00 - 2.33" "2.33 - 3.67" "3.67 - 5.00"
 #
-format_cut_output_line <- function(x, decimal.digits=2, big.mark=",", small.mark=".", prefix="", suffix="", right=TRUE) {
+format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.mark=".", prefix="", suffix="", right=TRUE) {
   # Split the text by ",". It will breaks the vector like this.
   # [[1]]
   # [1] "(0.996"       "2.333333333]"
