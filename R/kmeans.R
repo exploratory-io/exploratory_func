@@ -7,7 +7,9 @@ iterate_kmeans <- function(df, max_centers = 10,
                            normalize_data = TRUE,
                            seed = NULL
                            ) {
-  n_centers <- seq(max_centers)
+  # Limit the numbers of centers to search up to nrow(df) - 1.
+  # Otherwise we will get "Centers should be less than rows" error.
+  n_centers <- seq(min(max_centers, nrow(df) - 1))
   ret <- data.frame(center = n_centers)
   ret <- ret %>% dplyr::mutate(model = purrr::map(center, function(x) {
     model_df <- df %>% build_kmeans.cols(everything(),
