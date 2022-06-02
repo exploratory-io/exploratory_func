@@ -118,6 +118,7 @@ test_that("test statecode",{
   abbs <- c("NY", "CA", "IL", "DC", "DC")
   num_codes <- c("36", "06", "17", "11", "11")
   names <- c("New York","California","Illinois","District of Columbia","District of Columbia")
+  dirty_names <- c("* New York","California[4]"," Illinois","* District of Columbia","* District of Columbia[3]")
   namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS", "districtOf columbia","washington D.C.")
   divisions <- c("Middle Atlantic","Pacific", "East North Central", "South Atlantic", "South Atlantic")
   regions <- c("Northeast","West","North Central", "South", "South")
@@ -131,6 +132,8 @@ test_that("test statecode",{
   expect_equal(abbs, statecode(namesWithDifferentCases, "alpha_code"))
   # format test
   expect_equal(names, statecode(namesWithDifferentCases, "name"))
+  # normalize test
+  expect_equal(abbs, statecode(dirty_names, "alpha_code"))
 })
 
 test_that("test select_columns",{
