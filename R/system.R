@@ -2426,7 +2426,7 @@ statecode <- function(input = input, output_type = output_type) {
 
   # return matching state info.
   # state_name_id_map data frame has all those state info plus normalized_name as the search key.
-  # it first search by US state names or abbreviations (normalized) then try with US State code.
+  # it first searches by US state names or abbreviations (normalized) then try with US State code.
   key <- ifelse(!is.na(match(input_normalized, state_name_id_map$normalized_name)), match(input_normalized, state_name_id_map$normalized_name), match(input_normalized_number, state_name_id_map$normalized_name))
   res <- as.character(state_name_id_map[[output_type]][key])
 }
