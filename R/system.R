@@ -2418,11 +2418,16 @@ statecode <- function(input = input, output_type = output_type) {
   if (!output_type %in% output_types) {
      stop("Output type not supported")
   }
-  # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
-  input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
+  # get rid of space, period, apostrophe, hiphen, etc to normalize inputs.
+  input_normalized <- stringr::str_remove_all(input, "[:punct:]|[:digit:]|[:space:]") %>%  stringr::str_to_lower()
+  # in case input is US state code.
+  input_normalized_number <- stringr::str_remove_all(input, "[^0-9]")
+
   # return matching state info.
   # state_name_id_map data frame has all those state info plus normalized_name as the search key.
-  return (as.character(state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)]))
+  # it first search by US state names or abbreviations (normalized) then try with US State code.
+  key <- ifelse(!is.na(match(input_normalized, state_name_id_map$normalized_name)), match(input_normalized, state_name_id_map$normalized_name), match(input_normalized_number, state_name_id_map$normalized_name))
+  res <- as.character(state_name_id_map[[output_type]][key])
 }
 
 #' It can add 'longitude' and 'latitude' columns to a data frame which has
