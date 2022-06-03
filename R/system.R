@@ -1811,7 +1811,8 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
     token <- getGoogleTokenForBigQuery(tokenFileId)
     bigrquery::set_access_cred(token)
     tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
-    bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
+    # Since Exploratory Desktop does not handle int64, convert int64 to numeric by passing bigint = "numeric" ref: https://bigrquery.r-dbi.org/reference/bq_table_download.html
+    bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, bigint = "numeric", quiet = TRUE, max_connections = max_connections)
   }, finally = {
     # Set original scipen
     options(scipen = original_scipen)
@@ -1958,7 +1959,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       # set envir = parent.frame() to get variables from users environment, not papckage environment
       query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
       tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
-      df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
+      # Since Exploratory Desktop does not handle int64, convert int64 to numeric by passing bigint = "numeric" ref: https://bigrquery.r-dbi.org/reference/bq_table_download.html
+      df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, bigint = "numeric", max_connections = max_connections, quiet = TRUE)
     }
     df
   }, finally = {
