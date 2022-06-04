@@ -104,7 +104,7 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
 
     df
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "`range` doesn't appear to be a range in A1 notation, a named range, or a sheet name:")) {
+    if (stringr::str_detect(e$message, "`range` doesn't appear to be a range in A1 notation, a named range")) {
       stop(paste0('EXP-DATASRC-16 :: ', jsonlite::toJSON(c(title, sheetName)), ' :: There is no such sheet in the Google Sheets.'))
     } else {
       stop(e)
