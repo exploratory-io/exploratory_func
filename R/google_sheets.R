@@ -104,9 +104,10 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
 
     df
   }, error = function(e) {
+    # When a worksheet is missing, Google returns "`range` doesn't appear to be a range in A1 notation" error so detect it.
     if (stringr::str_detect(e$message, "`range` doesn't appear to be a range in A1 notation, a named range")) {
       stop(paste0('EXP-DATASRC-16 :: ', jsonlite::toJSON(c(title, sheetName)), ' :: There is no such work sheet in the Google Sheets.'))
-    } else if (stringr::str_detect(e$message, "Client error: \\(404\\) Not Found")) {
+    } else if (stringr::str_detect(e$message, "Client error: \\(404\\) Not Found")) { # When a sheet does not exist, Google Returns (404) Not Found so detect it.
       stop(paste0('EXP-DATASRC-17 :: ', jsonlite::toJSON(c(title, sheetName)), ' :: There is no such sheet in the Google Sheets.'))
     } else {
       stop(e)
