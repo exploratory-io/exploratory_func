@@ -72,37 +72,47 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+  tryCatch({
+    token <- getGoogleTokenForSheet(tokenFileId)
+    googlesheets4::sheets_set_token(token)
+    googledrive::drive_set_token(token)
+    # For some of the sheets, below API does not return result with title so try it with the id if id parameter is passed.
+    # If id is not provided, try it with title.
+    # Exploratory Desktop might send an empty string for id for the existing data source, so check it too.
+    if(!is.null(id) && id != "") {
+      gsheet <- googledrive::drive_get(id = id)
+    } else {
+      gsheet <- googledrive::drive_get(title)
+    }
+    col_types <- NULL
+    if(!guessDataType) {
+      # if guessDataType is FALSE, use character as the default column data type.
+      col_types <- c(.default="c")
+    }
+    # The "na" argument of googlesheets4::read_sheet does not accept null,
+    # so if the treatTheseAsNA is null, do not pass it to googlesheets4::read_sheet
+    if(!is.null(treatTheseAsNA)) {
+      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types)
+    } else {
+      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types)
+    }
+    if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+      df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
+    }
+    # For list columns, change the data type to characters
+    df <- df %>% dplyr::mutate_if(is.list, funs(as.character))
 
-  token <- getGoogleTokenForSheet(tokenFileId)
-  googlesheets4::sheets_set_token(token)
-  googledrive::drive_set_token(token)
-  # For some of the sheets, below API does not return result with title so try it with the id if id parameter is passed.
-  # If id is not provided, try it with title.
-  # Exploratory Desktop might send an empty string for id for the existing data source, so check it too.
-  if(!is.null(id) && id != "") {
-    gsheet <- googledrive::drive_get(id = id)
-  } else {
-    gsheet <- googledrive::drive_get(title)
-  }
-  col_types <- NULL
-  if(!guessDataType) {
-    # if guessDataType is FALSE, use character as the default column data type.
-    col_types <- c(.default="c")
-  }
-  # The "na" argument of googlesheets4::read_sheet does not accept null,
-  # so if the treatTheseAsNA is null, do not pass it to googlesheets4::read_sheet
-  if(!is.null(treatTheseAsNA)) {
-    df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types)
-  } else {
-    df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types)
-  }
-  if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
-    df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
-  }
-  # For list columns, change the data type to characters
-  df <- df %>% dplyr::mutate_if(is.list, funs(as.character))
-
-  df
+    df
+  }, error = function(e) {
+    # When a worksheet is missing, Google returns "`range` doesn't appear to be a range in A1 notation" error so detect it.
+    if (stringr::str_detect(e$message, "`range` doesn't appear to be a range in A1 notation, a named range")) {
+      stop(paste0('EXP-DATASRC-16 :: ', jsonlite::toJSON(c(title, sheetName)), ' :: There is no such work sheet in the Google Sheets.'))
+    } else if (stringr::str_detect(e$message, "Client error: \\(404\\) Not Found")) { # When a sheet does not exist, Google Returns (404) Not Found so detect it.
+      stop(paste0('EXP-DATASRC-17 :: ', jsonlite::toJSON(c(title, sheetName)), ' :: There is no such sheet in the Google Sheets.'))
+    } else {
+      stop(e)
+    }
+  })
 }
 
 #' API to get a list of available google sheets
