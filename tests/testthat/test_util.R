@@ -1483,19 +1483,19 @@ test_that("format_cut_output function", {
 test_that("construct_new_labels function.", {
   new.labels <- c("a", "b", "c")
   base.labels <- c("1", "2", "3", "4", "5")
-  expect_equal(construct_new_labels(base.labels, new.labels), c("a", "b", "c", "4", "5"))
+  expect_equal(exploratory:::construct_new_labels(base.labels, new.labels), c("a", "b", "c", "4", "5"))
 
   new.labels <- c("a", "b", "c", "d", "e", "f", "g")
   base.labels <- c("1", "2", "3", "4", "5")
-  expect_equal(construct_new_labels(base.labels, new.labels), c("a", "b", "c", "d", "e"))
+  expect_equal(exploratory:::construct_new_labels(base.labels, new.labels), c("a", "b", "c", "d", "e"))
 
   new.labels <- c("a", "b", "c", "d", "e")
   base.labels <- c("1", "2", "3", "4", "5")
-  expect_equal(construct_new_labels(base.labels, new.labels), c("a", "b", "c", "d", "e"))
+  expect_equal(exploratory:::construct_new_labels(base.labels, new.labels), c("a", "b", "c", "d", "e"))
 
   new.labels <- NA
   base.labels <- c("1", "2", "3", "4", "5")
-  expect_equal(construct_new_labels(base.labels, new.labels), c("1", "2", "3", "4", "5"))
+  expect_equal(exploratory:::construct_new_labels(base.labels, new.labels), c("1", "2", "3", "4", "5"))
 
 })
 
