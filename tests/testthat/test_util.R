@@ -643,6 +643,11 @@ test_that("test pivot", {
   pivoted_with_val <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2","cat3"), value = num3, fun.aggregate=mean, fill = 0)
   expect_true(all(!is.na(pivoted_with_val)))
 
+  # add test case for fill argument is not 0 or 1.
+  pivoted_with_val2 <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2","cat3"), value = num3, fun.aggregate=mean, fill = 10)
+  expect_equal(sum(pivoted_with_val2$a_a), 152)
+
+
   pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2", "cat3"), value = num3, fun.aggregate=mean, na.rm = FALSE)
   expect_true(any(is.na(pivoted_with_na)))
 

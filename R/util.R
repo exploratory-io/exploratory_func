@@ -1012,7 +1012,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
     }
     res <- res %>% dplyr::arrange(!!!rlang::syms(new_col_cols)) # arrange before pivot_wider, so that the create columns are sorted.
     # Dynamically set value column name to list passed to value_fill argument.
-    res <- res %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=!!rlang::sym(value_col_name), values_fill=setNames(list(!!fill), value_col_name), names_sep=cols_sep)
+    res <- res %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=!!rlang::sym(value_col_name), values_fill=setNames(list(fill), value_col_name), names_sep=cols_sep)
     res <- res %>% dplyr::arrange(!!!rlang::syms(new_row_cols)) # arrange grouping rows.
     res
   }
