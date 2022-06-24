@@ -38,7 +38,7 @@ loginToSalesforce <- function(server = NULL, username, password, securityToken =
 #' @param username - Salesforce login user name
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
-querySaleseforceMetadata <- function(server = NULL, username, password, securityToken = NULL){
+querySalesforceMetadata <- function(server = NULL, username, password, securityToken = NULL){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
@@ -57,7 +57,7 @@ querySaleseforceMetadata <- function(server = NULL, username, password, security
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
 #' @param table - name of the table that you want to get details.
-querySaleseforceTableDetails <- function(server = NULL, username, password, securityToken = NULL, table){
+querySalesforceTableDetails <- function(server = NULL, username, password, securityToken = NULL, table){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
