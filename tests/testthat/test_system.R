@@ -493,7 +493,7 @@ test_that("read_excel_file downlod failed error message", {
   tryCatch({
     df <- exploratory::read_excel_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.xlsx")
   }, error = function(cond) {
-    expect_equal(stringr::str_detect(cond$message, "zip file '(.*)' cannot be opened"), TRUE)
+    expect_equal(stringr::str_detect(cond$message, "EXP-DATASRC-13 :: \\[\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.xlsx\",\"zip file (.*) cannot be opened"), TRUE)
   })
 })
 
