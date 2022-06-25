@@ -1292,7 +1292,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 
   if ("glm" %in% class(df$model[[1]])) {
     if (!is.null(df$model[[1]]$family)) {
-      if (df$model[[1]]$family == "binomial"){
+      if (df$model[[1]]$family$family == "binomial"){
         ret <- ret %>% dplyr::mutate(odds_ratio = exp(estimate))
       }
     }
