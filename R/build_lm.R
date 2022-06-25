@@ -919,7 +919,7 @@ build_lm.fast <- function(df,
             family_arg <- stats::gaussian(link=link)
           }
 
-          if (family_arg == "negativebinomial"){
+          if (family == "negativebinomial"){
             # In MASS::glm.nb function, the link arg must be one of log, sqrt or identity.
             # So if the other is used, the link arg should be set to "log" which is the default value.
             if (is.null(link) || (!link %in% c("log", "sqrt", "identity"))){
