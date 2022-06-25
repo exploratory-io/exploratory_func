@@ -68,7 +68,7 @@ getGoogleAnalyticsV4Property <- function(accountId){
   web_prop()
 }
 
-getGoogleAnayticsSegmentList <- function(){
+getGoogleAnalyticsSegmentList <- function(){
   if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
 
