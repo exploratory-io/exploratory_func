@@ -481,8 +481,12 @@ if (Sys.info()["sysname"] !="Linux") {
       Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
     }, error = function(e) {
       if (!is.null(e$parent)) {
+        # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
+        # Once the issue is fixed, we will update the test with the original condition.
         expect_equal(stringr::str_detect(e$parent$message, "must be the same length as the vector"),TRUE)
       } else {
+        # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
+        # Once the issue is fixed, we will update the test with the original condition.
         expect_equal(stringr::str_detect(e$message, "must be the same length as the vector"),TRUE)
       }
     })
