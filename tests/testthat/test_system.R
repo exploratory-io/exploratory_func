@@ -481,9 +481,13 @@ if (Sys.info()["sysname"] !="Linux") {
       Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
     }, error = function(e) {
       if (!is.null(e$parent)) {
-        expect_equal(stringr::str_detect(e$parent$message, "must be a double vector, not a character vector."),TRUE)
+        # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
+        # Once the issue is fixed, we will update the test with the original condition.
+        expect_equal(stringr::str_detect(e$parent$message, "must be the same length as the vector"),TRUE)
       } else {
-        expect_equal(stringr::str_detect(e$message, "must be a double vector, not a character vector."),TRUE)
+        # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
+        # Once the issue is fixed, we will update the test with the original condition.
+        expect_equal(stringr::str_detect(e$message, "must be the same length as the vector"),TRUE)
       }
     })
   })
@@ -493,7 +497,7 @@ test_that("read_excel_file downlod failed error message", {
   tryCatch({
     df <- exploratory::read_excel_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.xlsx")
   }, error = function(cond) {
-    expect_equal(stringr::str_detect(cond$message, "EXP-DATASRC-13 :: \\[\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.xlsx\",\"Evaluation error: zip file"), TRUE)
+    expect_equal(stringr::str_detect(cond$message, "EXP-DATASRC-13 :: \\[\"https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.xlsx\",\"zip file (.*) cannot be opened"), TRUE)
   })
 })
 

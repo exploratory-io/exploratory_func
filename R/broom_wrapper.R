@@ -200,7 +200,7 @@ augment_kmeans <- function(df, model, data){
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 add_prediction <- function(df, model_df, conf_int = 0.95, ...){
-  if (class(model_df$model[[1]]) %in% c("coxph_exploratory", "ranger_survival_exploratory")) { # For now this is only for Cox regression Analytics View model.
+  if (any(class(model_df$model[[1]]) %in% c("coxph_exploratory", "ranger_survival_exploratory"))) { # For now this is only for Cox regression Analytics View model.
     return(add_prediction2(df, model_df, conf_int = conf_int, ...))
   }
 
@@ -1292,7 +1292,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 
   if ("glm" %in% class(df$model[[1]])) {
     if (!is.null(df$model[[1]]$family)) {
-      if (df$model[[1]]$family == "binomial"){
+      if (df$model[[1]]$family$family == "binomial"){
         ret <- ret %>% dplyr::mutate(odds_ratio = exp(estimate))
       }
     }
