@@ -634,10 +634,12 @@ test_that("test pivot", {
     value = c(letters[round(runif(100)*3)+1], "a"),
     dateCol = c(rep(lubridate::ymd("2022-01-01"),101)),
     posixctCol = c(rep(lubridate::ymd_hms("2022-01-01 00:00:00"),101)),
+    intCol = as.integer(1:101),
     num3 = c(NA, seq(100))
   )
   test_df <- test_df %>% dplyr::mutate(dateCol = dplyr::case_when(cat2 == "a" ~ as.Date(NA), TRUE ~ dateCol))
   test_df <- test_df %>% dplyr::mutate(posixctCol = dplyr::case_when(cat2 == "b" ~ as.POSIXct(NA), TRUE ~ posixctCol))
+  test_df <- test_df %>% dplyr::mutate(intCol = dplyr::case_when(cat2 == "b" ~ NA_integer_, TRUE ~ intCol))
 
   pivoted <- pivot(test_df, row_cols=c("cat1","cat3"), col_cols=c("cat2"))
   #pivoted <- pivot(test_df, cat1+cat3 ~ cat2)
@@ -664,17 +666,21 @@ test_that("test pivot", {
   pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("value"),fun.aggregate=mean, na.rm = FALSE) # test for the case where original df has value column
   expect_true(ncol(pivoted_with_na)>1) # make sure resulting column is not the only one row.
 
-  # test with value column with categorical column
+  # value column as categorical column
   pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = get_mode, na.rm = TRUE)
   expect_true(nrow(pivoted_with_categorical)>1)
 
-  # test with value column with Date column
+  # value column as Date column
   pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = get_mode, na.rm = TRUE)
   expect_true(nrow(pivoted_with_date)>1)
 
-  # test with value column with POSIXct column
+  # value column as POSIXct column
   pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = get_mode, na.rm = TRUE)
   expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as integer column
+  pivoted_with_int <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = intCol, fun.aggregate = sum, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_int)>1)
 
 })
 
