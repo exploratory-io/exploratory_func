@@ -980,7 +980,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
     } else if (class(df[[value_col]]) %in% c("numeric", "integer")) {
       # NA is regarded as numeric
       fill <- NA_real_
-    } else if (class(df[[value_col]]) %in% c("character", "factor"))
+    } else if (class(df[[value_col]]) %in% c("character", "factor")) {
       # NA is regarded as character
       fill <- NA_character_
     } else {
