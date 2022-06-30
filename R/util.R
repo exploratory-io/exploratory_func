@@ -977,10 +977,10 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
     if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
       # NA is regarded as logical
       fill <- NA
-    } else if (class(df[[value_col]]) %in% c("numeric", "integer")) {
+    } else if (any(class(df[[value_col]]) %in% c("numeric", "integer"))) {
       # NA_real is regarded as numeric
       fill <- NA_real_
-    } else if (class(df[[value_col]]) %in% c("character", "factor")) {
+    } else if (any(class(df[[value_col]]) %in% c("character", "factor"))) {
       # NA_character_ is regarded as character
       fill <- NA_character_
     } else {
