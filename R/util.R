@@ -978,13 +978,13 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
       # NA is regarded as logical
       fill <- NA
     } else if (class(df[[value_col]]) %in% c("numeric", "integer")) {
-      # NA is regarded as numeric
+      # NA_real is regarded as numeric
       fill <- NA_real_
     } else if (class(df[[value_col]]) %in% c("character", "factor")) {
-      # NA is regarded as character
+      # NA_character_ is regarded as character
       fill <- NA_character_
     } else {
-      # NA for all the other data types.
+      # NA is regarded as logical for all the other data types.
       fill <- NA
     }
   } else if (is.null(fill)) {
