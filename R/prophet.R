@@ -92,7 +92,7 @@ add_country_holidays <- function(m, country_names) {
       country_names
     )
   }
-  m$country_holidays = country_names
+  m$country_holidays <- country_names
   return(m)
 }
 
