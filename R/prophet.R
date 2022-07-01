@@ -69,6 +69,33 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
   do_prophet_(df, time_col, value_col, periods, holiday_col = holiday_col, ...)
 }
 
+# Modified version of prophet::add_country_holidays to allow multiple country names
+# under R4.2's stricter rule of if condition having to be length-1 vector.
+add_country_holidays <- function(m, country_names) {
+  if (!is.null(m$history)) {
+    stop("Country holidays must be added prior to model fitting.")
+  }
+  for (country_name in country_names) {
+    if (!(country_name %in% generated_holidays$country)){
+      stop("Holidays in ", country_name, " are not currently supported!")
+    }
+  }
+  # Validate names.
+  for (name in prophet:::get_holiday_names(country_names)) {
+    # Allow merging with existing holidays
+    prophet:::validate_column_name(m, name, check_holidays = FALSE)
+  }
+  # Set the holidays.
+  if (!is.null(m$country_holidays)) {
+    message(
+      'Changing country holidays from ', m$country_holidays, ' to ',
+      country_names
+    )
+  }
+  m$country_holidays <- country_names
+  return(m)
+}
+
 #' Forecast time series data
 #' @param df - Data frame
 #' @param time_col - Column that has time data
@@ -182,7 +209,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     # For ISO2C codes, make it upper case.
     holiday_country_names <- dplyr::if_else(stringr::str_length(holiday_country_names) == 2, stringr::str_to_upper(holiday_country_names), holiday_country_names)
     # Mapping to support some ISO2C codes, that are actually supported but with different names.
-    holiday_country_names <- dplyr::recode(holiday_country_names, GB="UnitedKingdom", TR="Turkey", FR="France")
+    holiday_country_names <- dplyr::recode(holiday_country_names, `UnitedKingdom`="GB", `Turkey`="TR", `France`="FR")
   }
 
   if (!is.null(holidays)) {

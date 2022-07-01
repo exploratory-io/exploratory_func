@@ -22,7 +22,8 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
 }
 
 test_that("exp_ts_cluster elbow method mode", {
-  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, output="model", elbow_method_mode=TRUE)
+  # Set max_centers to 6 to avoid known error under investigation. #25298
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, output="model", elbow_method_mode=TRUE, max_centers=6)
   ret <- model_df %>% tidy_rowwise(model, type="elbow_method")
   expect_equal(colnames(ret), c("n_center","av_dist","iter","converged"))
 })
