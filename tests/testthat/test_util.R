@@ -702,8 +702,40 @@ test_that("test pivot", {
   pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = get_mode, na.rm = TRUE)
   expect_true(nrow(pivoted_with_date)>1)
 
+  # value column as Date column: n_distinct
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: na_count
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: na_ratio
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
   # value column as POSIXct column
   pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = get_mode, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: n_distinct
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: min
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = min, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: max
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: na_count
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: na_ratio
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = na_ratio, na.rm = TRUE)
   expect_true(nrow(pivoted_with_posixct)>1)
 
   # value column as integer column
