@@ -981,10 +981,11 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
       # NA_real is regarded as numeric
       fill <- NA_real_
     } else if (any(class(df[[value_col]]) %in% c("character", "factor"))) {
+      # when aggregate function is min, max, or get_mode, resulting data is character
       if (identical(fun.aggregate, min) || identical(fun.aggregate, max) || identical(fun.aggregate, get_mode)) {
         # NA_character_ is regarded as character
         fill <- NA_character_
-      } else {
+      } else { # for other cases such as na_count, na_ratio etc, resulting data is numeric.
         fill <- NA_real_
       }
     } else {
