@@ -999,7 +999,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
       }
     } else if (any(class(df[[value_col]]) %in% c("logical"))) {
       if (identical(fun.aggregate, first) || identical(fun.aggregate, last) || identical(fun.aggregate, get_mode)) {
-        # NA is regarded as character
+        # Returned value is logical.
         fill <- NA
       } else { # for other cases such as na_count, na_ratio etc, resulting data is numeric.
         fill <- NA_real_
