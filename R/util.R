@@ -981,8 +981,29 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
       # NA_real is regarded as numeric
       fill <- NA_real_
     } else if (any(class(df[[value_col]]) %in% c("character", "factor"))) {
-      # NA_character_ is regarded as character
-      fill <- NA_character_
+      # when aggregate function is min, max, or get_mode, resulting data is character
+      if (identical(fun.aggregate, min) || identical(fun.aggregate, max) ||
+          identical(fun.aggregate, first) || identical(fun.aggregate, last) || identical(fun.aggregate, get_mode)) {
+        # NA_character_ is regarded as character
+        fill <- NA_character_
+      } else { # for other cases such as na_count, na_ratio etc, resulting data is numeric.
+        fill <- NA_real_
+      }
+    } else if (any(class(df[[value_col]]) %in% c("Date", "POSIXct"))) {
+      if (identical(fun.aggregate, min) || identical(fun.aggregate, max) || identical(fun.aggregate, median) ||
+          identical(fun.aggregate, first) || identical(fun.aggregate, last) || identical(fun.aggregate, get_mode)) {
+        # Returned value is Date/POSIXct.
+        fill <- NA
+      } else { # for other cases such as na_count, na_ratio etc, resulting data is numeric.
+        fill <- NA_real_
+      }
+    } else if (any(class(df[[value_col]]) %in% c("logical"))) {
+      if (identical(fun.aggregate, first) || identical(fun.aggregate, last) || identical(fun.aggregate, get_mode)) {
+        # Returned value is logical.
+        fill <- NA
+      } else { # for other cases such as na_count, na_ratio etc, resulting data is numeric.
+        fill <- NA_real_
+      }
     } else {
       # NA is regarded as logical for all the other data types.
       fill <- NA
