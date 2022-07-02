@@ -992,7 +992,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
     } else if (any(class(df[[value_col]]) %in% c("Date", "POSIXct"))) {
       if (identical(fun.aggregate, min) || identical(fun.aggregate, max) || identical(fun.aggregate, median) ||
           identical(fun.aggregate, first) || identical(fun.aggregate, last) || identical(fun.aggregate, get_mode)) {
-        # NA is regarded as character
+        # Returned value is Date/POSIXct.
         fill <- NA
       } else { # for other cases such as na_count, na_ratio etc, resulting data is numeric.
         fill <- NA_real_
