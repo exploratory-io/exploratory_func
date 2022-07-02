@@ -674,12 +674,28 @@ test_that("test pivot", {
   pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = n_distinct, na.rm = TRUE)
   expect_true(nrow(pivoted_with_categorical)>1)
 
-  # value column as categorical column: n_distinct
+  # value column as categorical column: min
   pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = min, na.rm = TRUE)
   expect_true(nrow(pivoted_with_categorical)>1)
 
-  # value column as categorical column: n_distinct
+  # value column as categorical column: max
   pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: na_count
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: na_ratio
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: non_na_count
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = non_na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: non_na_ratio
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = non_na_ratio, na.rm = TRUE)
   expect_true(nrow(pivoted_with_categorical)>1)
 
   # value column as Date column
