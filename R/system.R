@@ -1719,6 +1719,9 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
     DBI::dbClearResult(resultSet)
   }
+  if (type == "access") { # clear access connection so that lock file is removed.
+    DBI::dbDisconnect(conn)
+  }
   df
 }
 
