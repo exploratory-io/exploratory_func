@@ -1722,7 +1722,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   if (type == "access") { # clear access connection so that lock file is removed.
     tryCatch({
       clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
-      DBI::dbDisconnect(conn)
+      odbc::dbDisconnect(conn)
     })
   }
   df
