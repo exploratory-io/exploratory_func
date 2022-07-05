@@ -666,16 +666,116 @@ test_that("test pivot", {
   pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("value"),fun.aggregate=mean, na.rm = FALSE) # test for the case where original df has value column
   expect_true(ncol(pivoted_with_na)>1) # make sure resulting column is not the only one row.
 
-  # value column as categorical column
+  # value column as categorical column: mode
   pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = get_mode, na.rm = TRUE)
   expect_true(nrow(pivoted_with_categorical)>1)
 
-  # value column as Date column
+  # value column as categorical column: n_distinct
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: min
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = min, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: max
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: na_count
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: na_ratio
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: non_na_count
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = non_na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: non_na_ratio
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = non_na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as Date column: mode
   pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = get_mode, na.rm = TRUE)
   expect_true(nrow(pivoted_with_date)>1)
 
-  # value column as POSIXct column
+  # value column as Date column:median
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = median, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column:min
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = min, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column:max
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: n_distinct
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: na_count
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: na_ratio
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: non_na_count
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = non_na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: non_na_ratio
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = non_na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as POSIXct column: mode
   pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = get_mode, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: median
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = median, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: min
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = min, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: max
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: first
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = first, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: last
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = last, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: n_distinct
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: na_count
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: na_ratio
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: non_na_count
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = non_na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: non_na_ratio
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = non_na_ratio, na.rm = TRUE)
   expect_true(nrow(pivoted_with_posixct)>1)
 
   # value column as integer column
