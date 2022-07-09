@@ -801,7 +801,9 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
 #' Clears AWS Athena Connection.
 #' @export
-clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",  ...){
+clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "",
+                                        user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",
+                                        useProxy = 0, proxyHost = "",  proxyPort = -1, proxyUID = "", proxyPWD = "", ...){
 
   key <- createAmazonAthenaConnectionString(driver = driver,
                                             region = region,
@@ -812,7 +814,12 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
                                             additionalParams = additionalParams,
                                             timezone = timezone,
                                             endpointOverride = endpointOverride,
-                                            workgroup = workgroup)
+                                            workgroup = workgroup,
+                                            useProxy = useProxy,
+                                            proxyHost = proxyHost,
+                                            proxyPort = proxyPort,
+                                            proxyUID = proxyUID,
+                                            proxyPWD = proxyPWD)
 
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
@@ -1652,7 +1659,8 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
       clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                        user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride, workgroup = workgroup)
+                        user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride,
+                        workgroup = workgroup, useProxy = useProxy, proxyHost = proxyHost, proxyPort = proxyPort, proxyUID = proxyUID, proxyPWD = proxyPWD)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
@@ -1667,7 +1675,8 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
     clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                       user = user, password = password, additionalParams = additionalParams)
+                       user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride, workgroup = workgroup,
+                       useProxy = useProxy, proxyHost = proxyHost, proxyPort = proxyPort, proxyUID = proxyUID, proxyPWD = proxyPWD)
     stop(err)
   })
   DBI::dbClearResult(resultSet)
