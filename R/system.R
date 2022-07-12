@@ -682,7 +682,7 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
 }
 
 createAmazonAthenaConnectionString <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",
-                                               useProxy = 0, proxyHost="", proxyPort = -1, proxyUID = "", proxyPWD = "",...) {
+                                               useProxy = 0, proxyHost="", proxyPort = -1, proxyUID = "", proxyPWD = "", ...) {
   loadNamespace("stringr")
   # if platform is Linux use predefined one
   if(Sys.info()["sysname"]=="Linux"){
