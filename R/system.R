@@ -681,7 +681,8 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
   return(result)
 }
 
-createAmazonAthenaConnectionString <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "", ...) {
+createAmazonAthenaConnectionString <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",
+                                               useProxy = 0, proxyHost="", proxyPort = -1, proxyUID = "", proxyPWD = "", ...) {
   loadNamespace("stringr")
   # if platform is Linux use predefined one
   if(Sys.info()["sysname"]=="Linux"){
@@ -707,6 +708,22 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
     connectionString <- stringr::str_c(connectionString, ";workgroup=", workgroup)
   }
 
+  if (useProxy == 1) {
+    connectionString <- stringr::str_c(connectionString, ";UseProxy=", useProxy)
+    if (proxyHost != "") {
+      connectionString <- stringr::str_c(connectionString, ";ProxyHost=", proxyHost)
+    }
+    if (proxyPort != -1) {
+      connectionString <- stringr::str_c(connectionString, ";ProxyPort=", proxyPort)
+    }
+    if (proxyUID != "") {
+      connectionString <- stringr::str_c(connectionString, ";ProxyUID=", proxyUID)
+    }
+    if (proxyPWD != "") {
+      connectionString <- stringr::str_c(connectionString, ";ProxyPWD=", proxyPWD)
+    }
+  }
+
   # For Windows, set encoding to make sure non-ascii data is handled properly.
   # ref: https://github.com/r-dbi/odbc/issues/153
   if (is.win <- Sys.info()['sysname'] == 'Windows') {
@@ -722,7 +739,9 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
 
 #' Returns a Amazon Athena connection.
 #' @export
-getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "", ...) {
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "",
+                                      user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",
+                                      useProxy = 0, proxyHost = "", proxyPort = -1, proxyUID = "", proxyPWD = "", ...) {
   loadNamespace("odbc")
   loadNamespace("stringr")
   if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
@@ -737,7 +756,12 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
                                                          additionalParams = additionalParams,
                                                          timezone = timezone,
                                                          endpointOverride = endpointOverride,
-                                                         workgroup = workgroup)
+                                                         workgroup = workgroup,
+                                                         useProxy = useProxy,
+                                                         proxyHost = proxyHost,
+                                                         proxyPort = proxyPort,
+                                                         proxyUID = proxyUID,
+                                                         proxyPWD = proxyPWD)
 
   conn <- NULL
   if (user_env$pool_connection) {
@@ -777,7 +801,9 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
 #' Clears AWS Athena Connection.
 #' @export
-clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",  ...){
+clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "",
+                                        user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", workgroup = "",
+                                        useProxy = 0, proxyHost = "",  proxyPort = -1, proxyUID = "", proxyPWD = "", ...){
 
   key <- createAmazonAthenaConnectionString(driver = driver,
                                             region = region,
@@ -788,7 +814,12 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
                                             additionalParams = additionalParams,
                                             timezone = timezone,
                                             endpointOverride = endpointOverride,
-                                            workgroup = workgroup)
+                                            workgroup = workgroup,
+                                            useProxy = useProxy,
+                                            proxyHost = proxyHost,
+                                            proxyPort = proxyPort,
+                                            proxyUID = proxyUID,
+                                            proxyPWD = proxyPWD)
 
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
@@ -1603,9 +1634,16 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, timezone = "", endpointOverride = "", workgroup = "", ...){
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "",
+                              user = "", password = "", additionalParams = "", query = "", numOfRows = -1,
+                              stringsAsFactors = FALSE, as.is = TRUE, timezone = "", endpointOverride = "", workgroup = "",
+                              useProxy = 0, proxyHost="", proxyPort = -1, proxyUID = "", proxyPWD = "", ...){
   if(!requireNamespace("odbc")){stop("package RODBC must be installed.")}
-  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams, timezone = timezone, endpointOverride = endpointOverride, workgroup = workgroup)
+  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType,
+                                    s3OutputLocation = s3OutputLocation, user = user, password = password,
+                                    additionalParams = additionalParams, timezone = timezone,
+                                    endpointOverride = endpointOverride, workgroup = workgroup,
+                                    useProxy = useProxy, proxyHost = proxyHost, proxyPort = proxyPort, proxyUID = proxyUID, proxyPWD = proxyPWD)
   tryCatch({
     # For backward compatibility, if 0 is passed as numOfRows, change it to -1.
     # Previously with RODBC package, passing 0 means getting all rows. With odbc package, it needs to be -1 to get all rows.
@@ -1621,7 +1659,8 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
       clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                        user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride, workgroup = workgroup)
+                        user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride,
+                        workgroup = workgroup, useProxy = useProxy, proxyHost = proxyHost, proxyPort = proxyPort, proxyUID = proxyUID, proxyPWD = proxyPWD)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
@@ -1636,7 +1675,8 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
     clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                       user = user, password = password, additionalParams = additionalParams)
+                       user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride, workgroup = workgroup,
+                       useProxy = useProxy, proxyHost = proxyHost, proxyPort = proxyPort, proxyUID = proxyUID, proxyPWD = proxyPWD)
     stop(err)
   })
   DBI::dbClearResult(resultSet)
