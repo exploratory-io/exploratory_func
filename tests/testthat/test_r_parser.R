@@ -1,7 +1,9 @@
 context("test R parser")
 test_that("get_refs_in_script", {
-  refs <- get_refs_in_script("df1") # Just a name.
-  expect_equal(refs, c('df1'))
+  refs <- get_refs_in_script("dplyr::mutate_if(bit64::is.integer64, as.integer)", after_pipe = TRUE)
+  expect_equal(refs, NULL)
+  refs <- get_refs_in_script("dplyr::mutate_if(df, bit64::is.integer64, as.integer)", after_pipe = FALSE)
+  expect_equal(refs, NULL)
   refs <- get_refs_in_script("select(cyl)")
   expect_equal(refs, NULL)
   refs <- get_refs_in_script("mutate(cyl2 = cyl)")
