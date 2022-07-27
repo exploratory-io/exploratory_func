@@ -3401,7 +3401,11 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
                                   inside_mutate_and_friends = FALSE,
                                   inside_bang = FALSE, # Passes down the state of inside a single bang.
                                   inside_bang_bang = FALSE) { # Passes down the state of inside a consecutive bang bang.
-  if (call_name_str %in% select_and_friends) {
+  if (is.null(call_name_str)) { # :: operator as in bit64::is.integer64 gives NULL call name for some reason.
+    # We assume it is a :: operator, and in this case there should not be a reference since the args are namespace and function name.
+    res <- c()
+  }
+  else if (call_name_str %in% select_and_friends) {
     res <- c()
   }
   else {
@@ -3521,6 +3525,10 @@ get_refs_in_call <- function(call,
                                             inside_mutate_and_friends = inside_mutate_and_friends,
                                             inside_bang = inside_bang,
                                             inside_bang_bang = inside_bang_bang)
+  }
+  else if (is.null(call_name_str)) { # :: operator as in bit64::is.integer64 gives NULL call name for some reason.
+    # We assume it is a :: operator, and in this case there should not be a reference since the args are namespace and function name.
+    res <- c()
   }
   else if (call_name_str == '%>%') {
     res1 <- get_refs_in_call_args_basic(call_name_str, args[1])
