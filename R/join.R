@@ -1,6 +1,6 @@
 #' @ref{https://gist.github.com/jimhester/a060323a05b40c6ada34}
 #' @export
-insensitive_join <- function(fun = dplyr::left_join, type = "LEFT", suffix =  c(".x", ".y")) {
+insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
   new_fun <- fun
   body(new_fun) <- substitute({
     by <- dplyr:::common_by(by, x, y)

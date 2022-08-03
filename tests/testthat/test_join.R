@@ -178,3 +178,8 @@ test_that("anti_join with case sensitive", {
   # 6       f1c               6
   expect_equal(unlist(df12 %>% filter(lower_col == "d1a") %>% select(value_lower_col))[[1]], 4)
 })
+
+test_that("column suffix argument with case sensitive", {
+  df13 <- mtcars %>% left_join(mtcars, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("1", "2"), ignorecase = TRUE)
+  expect_equal(df13 %>% dplyr::filter(mpg1 > 21) %>% nrow(), 71)
+})
