@@ -23,11 +23,7 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
 
 #' Wrapper function for dplyr's inner_join to support case insensitive join.
 #' @export
-inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, source_columns = NULL, target_columns = NULL, ...){
-  # Limit source columns to use for join when source_columns are set.
-  if (!is.null(source_columns)) {
-    x <- x %>% dplyr::select(source_columns)
-  }
+inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     y <- y %>% dplyr::select(target_columns)
@@ -41,11 +37,7 @@ inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
 
 #' @export
 #' Wrapper function for dplyr's left_join to support case insensitive join.
-left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, source_columns = NULL, target_columns = NULL, ...){
-  # Limit source columns to use for join when source_columns are set.
-  if (!is.null(source_columns)) {
-    x <- x %>% dplyr::select(source_columns)
-  }
+left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     y <- y %>% dplyr::select(target_columns)
@@ -59,11 +51,7 @@ left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ign
 
 #' @export
 #' Wrapper function for dplyr's right_join to support case insensitive join.
-right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, source_columns = NULL, target_columns = NULL, ...){
-  # Limit source columns to use for join when source_columns are set.
-  if (!is.null(source_columns)) {
-    x <- x %>% dplyr::select(source_columns)
-  }
+right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     y <- y %>% dplyr::select(target_columns)
@@ -77,11 +65,7 @@ right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
 
 #' @export
 #' Wrapper function for dplyr's full_join to support case insensitive join.
-full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, source_columns = NULL, target_columns = NULL, ...) {
-  # Limit source columns to use for join when source_columns are set.
-  if (!is.null(source_columns)) {
-    x <- x %>% dplyr::select(source_columns)
-  }
+full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...) {
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     y <- y %>% dplyr::select(target_columns)
@@ -95,12 +79,7 @@ full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ign
 
 #' @export
 #' Wrapper function for dplyr's semi_join to support case insensitive join.
-semi_join <- function(x, y, by = NULL, copy = FALSE, ignorecase = FALSE, source_columns = NULL, ...) {
-  # Limit source columns to use for join when source_columns are set.
-  # For semi_join, it does not bring target columns so it only supports source_columns argument.
-  if (!is.null(source_columns)) {
-    x <- x %>% dplyr::select(source_columns)
-  }
+semi_join <- function(x, y, by = NULL, copy = FALSE, ignorecase = FALSE, ...) {
   if(ignorecase) {
     insensitive_join(dplyr::semi_join)(x = x, y = y, by = by, copy = copy)
   } else {
@@ -110,12 +89,7 @@ semi_join <- function(x, y, by = NULL, copy = FALSE, ignorecase = FALSE, source_
 
 #' @export
 #' Wrapper function for dplyr's anti_join to support case insensitive join.
-anti_join <- function(x, y, by = NULL, copy = FALSE, ignorecase = FALSE, source_columns = NULL, ...) {
-  # Limit source columns to use for join when source_columns are set.
-  # For anit_join, it does not bring target columns so it only supports source_columns argument.
-  if (!is.null(source_columns)) {
-    x <- x %>% dplyr::select(source_columns)
-  }
+anti_join <- function(x, y, by = NULL, copy = FALSE, ignorecase = FALSE, ...) {
   if(ignorecase) {
     insensitive_join(dplyr::anti_join)(x = x, y = y, by = by, copy = copy)
   } else {
