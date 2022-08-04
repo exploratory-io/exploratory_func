@@ -17,16 +17,14 @@ context("test case insensitive join functions")
 test_that("left_join with case insensitive", {
   df1 <- lower_df %>% left_join(upper_df, by = c("lower_col" = "upper_col"),
                                 ignorecase = TRUE,
-                                source_columns = c("lower_col","value_lower_col"),
                                 target_columns = c("upper_col","value_upper_col"))
-  # > df1
-  # lower_col value_lower_col value_upper_col
-  # 1         a               1               8
-  # 2         b               2               7
-  # 3         c               3               6
-  # 4       d1a               4               5
-  # 5       1eb               5               4
-  # 6       f1c               6               3
+  # lower_col value_lower_col other_lower_col value_upper_col
+  # 1         a               1              aa               8
+  # 2         b               2              bb               7
+  # 3         c               3              cc               6
+  # 4       d1a               4              dd               5
+  # 5       1eb               5              ee               4
+  # 6       f1c               6              ff               3
   expect_equal(unlist(df1 %>% filter(lower_col == "d1a") %>% select(value_upper_col))[[1]], 5)
 })
 
