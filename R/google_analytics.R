@@ -59,6 +59,12 @@ getGoogleAnalyticsSegmentList <- function(){
   googleAnalyticsR::ga_segment_list()
 }
 
+#' API to get time zone information for the property
+#'
+#' @param accountId - account id.
+#' @param webPropertyId - property id
+#' @param viewId - for V3 only.
+#'
 getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""){
   token <- getGoogleTokenForAnalytics();
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
