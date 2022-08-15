@@ -65,6 +65,7 @@ getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""
   if (viewId == "") { # it means v4
     res <- exploratory:::getGoogleAnalyticsV4Property(accountId)
     df <- data.frame(res)
+    # Make sure to filter the result by webPropertyId. (NOTE: name column contains property id as properties/123345 style.)
     df <- df %>% dplyr::filter(stringr::str_detect(name, webPropertyId))
     # for V4, timezone is stored in timeZone
     df$timeZone
