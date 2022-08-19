@@ -77,8 +77,11 @@ getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""
     df$timeZone
   } else {
     res <- googleAnalyticsR::ga_view(accountId, webPropertyId, viewId)
+    df <- data.frame(res)
+    # Timezone info is set for COLLABORATE,EDIT, MANAGE_USERS, and READ_AND_ANALYZE but we only need timezone for READ_AND_ANALYZE.
+    df <- df %>% dplyr::filter(effective == "READ_AND_ANALYZE")
     # for V3, timezone is stored in timezone
-    res$timezone
+    df$timezone
   }
 }
 
