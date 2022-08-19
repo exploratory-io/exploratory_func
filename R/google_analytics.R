@@ -7,20 +7,7 @@ getGoogleProfile <- function(tokenFileId = ""){
   token <- getGoogleTokenForAnalytics(tokenFileId);
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
   df <- googleAnalyticsR::ga_account_list()
-  # For each view, we want to get a timezone so iterate the result of the googleAnalyticsR::ga_account_list().
-  if (nrow(df) > 0) {
-    accountId <- df$accountId
-    webPropertyId <- df$webPropertyId
-    viewId <- df$viewId
-    argList <- list(accountId, webPropertyId, viewId)
-    # Get timezone for each viewId
-    newdf <- purrr::pmap_dfr(argList, function(accountId, webPropertyId, viewId){
-      # Timezone info is set for COLLABORATE,EDIT, MANAGE_USERS, and READ_AND_ANALYZE but we only need timezone for READ_AND_ANALYZE.
-      data.frame(googleAnalyticsR::ga_view(accountId, webPropertyId, viewId)) %>% dplyr::filter(effective == "READ_AND_ANALYZE") %>% dplyr::select(id, accountId, webPropertyId, timezone)
-    })
-    # Join the timezone column to the original data frame and only select the columns required for Exploratory Desktop UI.
-    df <- df %>% dplyr::left_join(newdf, by = c("accountId" = "accountId", "webPropertyId" = "webPropertyId", "viewId" = "id")) %>% dplyr::select(accountId, accountName, webPropertyId, webPropertyName, viewId, viewName, timezone)
-  }
+  df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
   # get V4 Account
   v4df <- data.frame()
   tryCatch({
@@ -35,12 +22,7 @@ getGoogleProfile <- function(tokenFileId = ""){
     }
   })
   if (nrow(v4df) > 0) {
-    v4newdf <- purrr::map_dfr(v4df$accountId, function(id){
-      # account looks like accounts/123456 so get rid of accounts/ to get account ID part. As for property, it looks like properties/123345 so remove properties/ to get property id.
-      getGoogleAnalyticsV4Property(id) %>% dplyr::mutate(accountId = stringr::str_replace(parent, "accounts/", ""), webPropertyId = stringr::str_replace(name, "properties/", ""))
-    })
-    v4newdf <- v4newdf %>% dplyr::distinct(accountId, name, .keep_all = T)
-    v4df <- v4df %>% dplyr::left_join(v4newdf, by = c("accountId" = "accountId", "propertyId" = "webPropertyId")) %>% dplyr::select(accountId, account_name, propertyId, property_name, timeZone) %>% dplyr::rename(webPropertyId = propertyId, webPropertyName = property_name, accountName = account_name, timezone = timeZone)
+    v4df <- v4df %>% dplyr::rename(accountName = account_name, webPropertyId = propertyId, webPropertyName = property_name)
     df <- df %>% dplyr::bind_rows(v4df)
   }
 
@@ -75,6 +57,29 @@ getGoogleAnalyticsSegmentList <- function(){
   token <- getGoogleTokenForAnalytics(tokenFileId);
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
   googleAnalyticsR::ga_segment_list()
+}
+
+#' API to get time zone information for the property
+#'
+#' @param accountId - account id.
+#' @param webPropertyId - property id
+#' @param viewId - for V3 only.
+#'
+getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""){
+  token <- getGoogleTokenForAnalytics();
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  if (viewId == "") { # it means v4
+    res <- exploratory:::getGoogleAnalyticsV4Property(accountId)
+    df <- data.frame(res)
+    # Make sure to filter the result by webPropertyId. (NOTE: name column contains property id as properties/123345 style.)
+    df <- df %>% dplyr::filter(stringr::str_detect(name, webPropertyId))
+    # for V4, timezone is stored in timeZone
+    df$timeZone
+  } else {
+    res <- googleAnalyticsR::ga_view(accountId, webPropertyId, viewId)
+    # for V3, timezone is stored in timezone
+    res$timezone
+  }
 }
 
 #' @export
