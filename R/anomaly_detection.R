@@ -1,4 +1,3 @@
-
 #' NSE version of do_anomaly_detection_
 #' @export
 do_anomaly_detection <- function(df, time, value = NULL, ...){
