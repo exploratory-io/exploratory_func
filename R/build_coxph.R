@@ -952,7 +952,14 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   # Predict survival probability on the specified date (pred_time).
   if (!is.null(pred_time)) {
     time_unit_days <- get_time_unit_days(x$time_unit)
-    ret <- ret %>% dplyr::mutate(time1 = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+    if (x$clean_end_time_col %in% colnames(ret)) {
+      # End time column is in the input. Calculate time1 based off of it. 
+      ret <- ret %>% dplyr::mutate(time1 = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+    }
+    else {
+      # End time column is not in the input. Assume that all we know is the observation started at the start Calculate time1 based off of it. 
+      ret <- ret %>% dplyr::mutate(time1 = 0)
+    }
     ret <- ret %>% dplyr::mutate(time2 = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
     ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(time1) - bh_fun(time2))*exp(.fitted)))
     if (x$clean_status_col %in% colnames(ret)) {
