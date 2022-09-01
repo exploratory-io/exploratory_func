@@ -903,7 +903,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       predictor_variables <- c(all.vars(x$terms)[c(-1, -2)], x$clean_start_time_col) # c(-1, -2) to skip time and status columns.
     }
     # If end time column is in newdata, use it.
-    if (x$terms_mapping[x$clean_end_time_col] %in% colnames(newdata)) {
+    if (!is.null(x$clean_end_time_col) && x$terms_mapping[x$clean_end_time_col] %in% colnames(newdata)) {
       predictor_variables <- c(predictor_variables, x$clean_end_time_col)
     }
 
@@ -958,8 +958,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   # Add (0,0) to avoid letting the function return NA when 0 is in.
   bh_fun <- approxfun(c(0, bh$time), c(0, bh$hazard))
 
-  # Predict survival probability on the specified date (pred_time).
   if (!is.null(pred_time)) {
+    # Predict survival probability on the specified date (pred_time).
     time_unit_days <- get_time_unit_days(x$time_unit)
     if (x$clean_end_time_col %in% colnames(ret)) {
       # End time column is in the input. Calculate time1 based off of it. 
@@ -979,28 +979,29 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       # If time2 is earlier than time 1, return 1.0.
       ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(time1 > time2, 1.0, predicted_survival_rate))
     }
+    ret <- ret %>% dplyr::mutate(time_for_prediction = pred_time)
+  }
+  else {
+    # Predict survival probability on the specified duration (pred_survival_time).
+    cumhaz_base = bh_fun(pred_survival_time)
+    # transform linear predictor (.fitted) into predicted_survival.
+    ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
+                                 predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
+                                 predicted_survival = predicted_survival_rate > pred_survival_threshold)
   }
 
-  # Commented out legacy code.
-  # cumhaz_base = bh_fun(pred_survival_time)
-  # # transform linear predictor (.fitted) into predicted_survival.
-  # ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
-  #                              predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
-  #                              predicted_survival = predicted_survival_rate > pred_survival_threshold)
-  # if (!is.null(ret$.fitted)) {
-  #   # Bring those columns as the first of the prediction result related additional columns.
-  #   ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate", "predicted_survival")), .before=.fitted)
-  # }
+  if (!is.null(ret$.fitted)) {
+    # Bring those columns as the first of the prediction result related additional columns.
+    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate")), .before=.fitted)
+  }
 
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
-
-  # Commented out legacy code.
-  # colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
-  # colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
-  # colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+  colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Time for Prediction"
+  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
