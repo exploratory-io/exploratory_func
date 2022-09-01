@@ -896,9 +896,17 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
 
-    # Commenting out legacy code
-    # predictor_variables <- all.vars(x$terms)[c(-1,-2)] # c(-1,-2) to skip time and status columns.
-    predictor_variables <- c(all.vars(x$terms)[c(-1)], x$clean_start_time_col, x$clean_end_time_col) # c(-1) to skip time.
+    if (x$terms_mapping[x$clean_status_col] %in% colnames(newdata)) {
+      predictor_variables <- c(all.vars(x$terms)[c(-1)], x$clean_start_time_col) # c(-1) to skip just time.
+    }
+    else {
+      predictor_variables <- c(all.vars(x$terms)[c(-1, -2)], x$clean_start_time_col) # c(-1, -2) to skip time and status columns.
+    }
+    # If end time column is in newdata, use it.
+    if (x$terms_mapping[x$clean_end_time_col] %in% colnames(newdata)) {
+      predictor_variables <- c(predictor_variables, x$clean_end_time_col)
+    }
+
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
     # Rename columns via predictor_variables_orig, which is a named vector.
