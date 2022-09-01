@@ -611,6 +611,12 @@ build_coxph.fast <- function(df,
         model$predictor_funs <- predictor_funs
       }
 
+      # Add cleaned column names. Used for prediction of survival rate on the specified day, and date the survival probability drops to the specified rate. 
+      model$clean_start_time_col <- clean_start_time_col
+      model$clean_end_time_col <- clean_end_time_col
+      model$clean_time_col <- clean_time_col
+      model$clean_status_col <- clean_status_col
+
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
       model
