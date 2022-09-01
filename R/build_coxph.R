@@ -953,9 +953,16 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   if (!is.null(pred_time)) {
     time_unit_days <- get_time_unit_days(x$time_unit)
     ret <- ret %>% dplyr::mutate(time1 = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-    # pmax is to avoid probability larger than 1 when time2 happens to be earlier time1.
-    ret <- ret %>% dplyr::mutate(time2 = pmax(time1, as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days))
+    ret <- ret %>% dplyr::mutate(time2 = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
     ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(time1) - bh_fun(time2))*exp(.fitted)))
+    if (x$clean_status_col %in% colnames(ret)) {
+      # If time2 is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
+      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(time1 > time2, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
+    }
+    else {
+      # If time2 is earlier than time 1, return 1.0.
+      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(time1 > time2, 1.0, predicted_survival_rate))
+    }
   }
 
   # Commented out legacy code.
