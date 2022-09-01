@@ -616,6 +616,7 @@ build_coxph.fast <- function(df,
       model$clean_end_time_col <- clean_end_time_col
       model$clean_time_col <- clean_time_col
       model$clean_status_col <- clean_status_col
+      model$time_unit <- time_unit
 
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
@@ -895,7 +896,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
 
-    predictor_variables <- all.vars(x$terms)[c(-1,-2)] # c(-1,-2) to skip time and status columns.
+    # Commenting out legacy code
+    # predictor_variables <- all.vars(x$terms)[c(-1,-2)] # c(-1,-2) to skip time and status columns.
+    predictor_variables <- c(all.vars(x$terms)[c(-1)], x$clean_start_time_col, x$clean_end_time_col) # c(-1) to skip time.
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
     # Rename columns via predictor_variables_orig, which is a named vector.
@@ -946,7 +949,13 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   # create a function to interpolate function that returns cumulative hazard.
   bh_fun <- approxfun(bh$time, bh$hazard)
 
-
+  # Predict survival probability on the specified date (pred_time).
+  if (!is.null(pred_time)) {
+    time_unit_days <- get_time_unit_days(x$time_unit)
+    ret <- ret %>% dplyr::mutate(time1 = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+    ret <- ret %>% dplyr::mutate(time2 = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+    ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(time1) - bh_fun(time2))*exp(.fitted)))
+  }
 
   # Commented out legacy code.
   # cumhaz_base = bh_fun(pred_survival_time)
