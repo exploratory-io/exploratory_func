@@ -985,14 +985,14 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     # Predict survival probability on the specified duration (pred_survival_time).
     cumhaz_base = bh_fun(pred_survival_time)
     # transform linear predictor (.fitted) into predicted_survival.
-    ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
+    ret <- ret %>% dplyr::mutate(survival_time_for_prediction = pred_survival_time,
                                  predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
                                  predicted_survival = predicted_survival_rate > pred_survival_threshold)
   }
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("survival_time_for_prediction", "time_for_prediction", "predicted_survival_rate")), .before=.fitted)
   }
 
   # Prettify names.
@@ -1000,6 +1000,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+  colnames(ret)[colnames(ret) == "survival_time_for_prediction"] <- "Survival Time for Prediction"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Time for Prediction"
   colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
 
