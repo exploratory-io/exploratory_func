@@ -954,8 +954,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
 
   # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
-  # create a function to interpolate function that returns cumulative hazard.
-  bh_fun <- approxfun(bh$time, bh$hazard)
+  # Create a function to interpolate function that returns cumulative hazard.
+  # Add (0,0) to avoid letting the function return NA when 0 is in.
+  bh_fun <- approxfun(c(0, bh$time), c(0, bh$hazard))
 
   # Predict survival probability on the specified date (pred_time).
   if (!is.null(pred_time)) {
