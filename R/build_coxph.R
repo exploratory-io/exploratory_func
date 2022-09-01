@@ -953,7 +953,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   if (!is.null(pred_time)) {
     time_unit_days <- get_time_unit_days(x$time_unit)
     ret <- ret %>% dplyr::mutate(time1 = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-    ret <- ret %>% dplyr::mutate(time2 = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+    # pmax is to avoid probability larger than 1 when time2 happens to be earlier time1.
+    ret <- ret %>% dplyr::mutate(time2 = pmax(time1, as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days))
     ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(time1) - bh_fun(time2))*exp(.fitted)))
   }
 
