@@ -1,5 +1,4 @@
 context("test build_coxph")
-
 test_that("build_coxph.fast basic", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
@@ -57,8 +56,15 @@ test_that("build_coxph.fast with start_time and end_time", {
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% build_coxph.fast(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog="none", ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
-  ret <- model_df %>% prediction2(pretty.name=TRUE)
-  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
+
+  ret <- model_df %>% prediction2(pretty.name=TRUE) #TODO: Does this test still make sense?
+
+  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-06-01"))
+  # Without status column in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
+  # Without status column and end date colum in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
+
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
   ret <- model_df %>% prediction2()
   ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","Survival Time","sta tus", at=NULL, grid=10, revert=TRUE)
@@ -96,7 +102,6 @@ test_that("build_coxph.fast with start_time and end_time", {
                  "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
-
 test_that("build_coxph.fast basic with group-by", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
