@@ -881,7 +881,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_time = NULL, pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
   # For predict() to find the prediction method, survival needs to be loaded beforehand.
   # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
   loadNamespace("survival")
@@ -945,23 +945,29 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   bh <- survival::basehaz(x)
   # create a function to interpolate function that returns cumulative hazard.
   bh_fun <- approxfun(bh$time, bh$hazard)
-  cumhaz_base = bh_fun(pred_survival_time)
-  # transform linear predictor (.fitted) into predicted_survival.
-  ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
-                               predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
-                               predicted_survival = predicted_survival_rate > pred_survival_threshold)
 
-  if (!is.null(ret$.fitted)) {
-    # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate", "predicted_survival")), .before=.fitted)
-  }
+
+
+  # Commented out legacy code.
+  # cumhaz_base = bh_fun(pred_survival_time)
+  # # transform linear predictor (.fitted) into predicted_survival.
+  # ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
+  #                              predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
+  #                              predicted_survival = predicted_survival_rate > pred_survival_threshold)
+  # if (!is.null(ret$.fitted)) {
+  #   # Bring those columns as the first of the prediction result related additional columns.
+  #   ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate", "predicted_survival")), .before=.fitted)
+  # }
+
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
-  colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
-  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
-  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+
+  # Commented out legacy code.
+  # colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
+  # colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
+  # colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
