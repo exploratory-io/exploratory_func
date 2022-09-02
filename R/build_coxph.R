@@ -995,7 +995,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       if (x$clean_status_col %in% colnames(ret)) {
         ret <- ret %>% dplyr::mutate(predicted_survival_time = if_else(!!rlang::sym(x$clean_status_col), NA_real_, predicted_survival_time))
       }
-      ret <- ret %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(as.integer(predicted_survival_time*time_unit_days)))
+      # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing.
+      ret <- ret %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
     }
   }
   # Predict survival probability on the specified duration (pred_survival_time). Still used in the Analytics View itself.
