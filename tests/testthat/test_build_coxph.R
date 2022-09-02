@@ -62,6 +62,7 @@ test_that("build_coxph.fast with start_time and end_time", {
   # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
   ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
 
+  # Point-of-time-based prediction.
   ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-06-01"))
   # Without status column in the new data.
   ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
