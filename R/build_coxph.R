@@ -962,22 +962,22 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     # Predict survival probability on the specified date (pred_time).
     time_unit_days <- get_time_unit_days(x$time_unit)
     if (x$clean_end_time_col %in% colnames(ret)) {
-      # End time column is in the input. Calculate time1 based off of it. 
-      ret <- ret %>% dplyr::mutate(time1 = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+      # End time column is in the input. Calculate current_survival_time based off of it. 
+      ret <- ret %>% dplyr::mutate(current_survival_time = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
     }
     else {
-      # End time column is not in the input. Assume that all we know is the observation started at the start Calculate time1 based off of it. 
-      ret <- ret %>% dplyr::mutate(time1 = 0)
+      # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
+      ret <- ret %>% dplyr::mutate(current_survival_time = 0)
     }
-    ret <- ret %>% dplyr::mutate(time2 = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-    ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(time1) - bh_fun(time2))*exp(.fitted)))
+    ret <- ret %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+    ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(current_survival_time) - bh_fun(survival_time_for_prediction))*exp(.fitted)))
     if (x$clean_status_col %in% colnames(ret)) {
-      # If time2 is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
-      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(time1 > time2, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
+      # If survival_time_for_prediction is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
+      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
     }
     else {
-      # If time2 is earlier than time 1, return 1.0.
-      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(time1 > time2, 1.0, predicted_survival_rate))
+      # If survival_time_for_prediction is earlier than current_survival_time, return 1.0.
+      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, predicted_survival_rate))
     }
     ret <- ret %>% dplyr::mutate(time_for_prediction = pred_time)
   }
@@ -992,7 +992,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("survival_time_for_prediction", "time_for_prediction", "predicted_survival_rate")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("current_survival_time", "survival_time_for_prediction", "time_for_prediction", "predicted_survival_rate")), .before=.fitted)
   }
 
   # Prettify names.
@@ -1000,6 +1000,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+  colnames(ret)[colnames(ret) == "current_survival_time"] <- "Current Survival Time"
   colnames(ret)[colnames(ret) == "survival_time_for_prediction"] <- "Survival Time for Prediction"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Time for Prediction"
   colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
