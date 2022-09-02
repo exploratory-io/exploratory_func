@@ -51,7 +51,7 @@ test_that("build_coxph.fast basic", {
 test_that("build_coxph.fast with start_time and end_time", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
-  df <- df %>% mutate(start = as.Date("2021-01-01"), end = start + lubridate::days(time))
+  df <- df %>% mutate(start = as.POSIXct("2021-01-01"), end = start + lubridate::days(time))
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
@@ -62,7 +62,14 @@ test_that("build_coxph.fast with start_time and end_time", {
   # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
   ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
 
-  # Point-of-time-based prediction.
+  # Survival-rate-based event time prediction.
+  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+  # Without status column in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+  # Without status column and end date colum in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+
+  # Point-of-time-based survival rate prediction.
   ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-06-01"))
   # Without status column in the new data.
   ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
