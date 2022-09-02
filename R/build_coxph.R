@@ -958,6 +958,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   # Add (0,0) to avoid letting the function return NA when 0 is in.
   bh_fun <- approxfun(c(0, bh$time), c(0, bh$hazard))
 
+  # Predict survival probability on the specified date (pred_time),
+  # or predict the day that the survival rate drops to the specified value (pred_survival_rate).
+  # Used for prediction step based on the model from the Analytics View.
   if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
     # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
     time_unit_days <- get_time_unit_days(x$time_unit)
@@ -991,8 +994,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       ret <- ret %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(as.integer(predicted_survival_time*time_unit_days)))
     }
   }
+  # Predict survival probability on the specified duration (pred_survival_time). Still used in the Analytics View itself.
   else {
-    # Predict survival probability on the specified duration (pred_survival_time).
     cumhaz_base = bh_fun(pred_survival_time)
     # transform linear predictor (.fitted) into predicted_survival.
     ret <- ret %>% dplyr::mutate(survival_time_for_prediction = pred_survival_time,
