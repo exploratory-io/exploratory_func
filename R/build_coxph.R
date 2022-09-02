@@ -991,6 +991,10 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       rev_bh_fun <- approxfun(c(0, bh$hazard), c(0, bh$time))
       ret <- ret %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
       ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(bh_fun(current_survival_time) - log(survival_rate_for_prediction)/exp(.fitted)))
+      # If status column is available, set NA for the predictions for already dead observations.
+      if (x$clean_status_col %in% colnames(ret)) {
+        ret <- ret %>% dplyr::mutate(predicted_survival_time = if_else(!!rlang::sym(x$clean_status_col), NA_real_, predicted_survival_time))
+      }
       ret <- ret %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(as.integer(predicted_survival_time*time_unit_days)))
     }
   }
