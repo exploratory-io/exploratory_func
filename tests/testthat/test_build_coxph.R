@@ -1,71 +1,79 @@
 context("test build_coxph")
 
 test_that("build_coxph.fast with start_time and end_time", {
-  df <- survival::lung # this data has NAs.
-  df <- df %>% mutate(status = status==2)
-  df <- df %>% mutate(start = as.POSIXct("2021-01-01"), end = start + lubridate::days(time))
-  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
-  df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
-  df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
-  model_df <- df %>% build_coxph.fast(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog="none", ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
-  expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
+  # Repeat the same test for Date input and POSIXct input. We do not support units like hour, min, sec, but still it should work with POSIXct type time input.
+  for (type in c("Date", "POSIXct")) {
+    df <- survival::lung # this data has NAs.
+    df <- df %>% mutate(status = status==2)
+    if (type == "Date") {
+      df <- df %>% mutate(start = as.Date("2021-01-01"), end = start + lubridate::days(time))
+    }
+    else {
+      df <- df %>% mutate(start = as.POSIXct("2021-01-01"), end = start + lubridate::days(time))
+    }
+    df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
+    df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
+    df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
+    model_df <- df %>% build_coxph.fast(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog="none", ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
+    expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
 
-  # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
-  df2 <- df %>% select(-`ti me`, -`sta tus`)
-  ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
-  expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
+    # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
+    df2 <- df %>% select(-`ti me`, -`sta tus`)
+    ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
+    expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
 
-  # Survival-rate-based event time prediction.
-  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
-  # Without status column in the new data.
-  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
-  # Without status column and end date colum in the new data.
-  ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+    # Survival-rate-based event time prediction.
+    ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+    # Without status column in the new data.
+    ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+    # Without status column and end date colum in the new data.
+    ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
 
-  # Point-of-time-based survival rate prediction.
-  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-06-01"))
-  # Without status column in the new data.
-  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
-  # Without status column and end date colum in the new data.
-  ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
+    # Point-of-time-based survival rate prediction.
+    ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-06-01"))
+    # Without status column in the new data.
+    ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
+    # Without status column and end date colum in the new data.
+    ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
 
-  # prediction2, which is used for ROC, and Data tab in the Analytics View.
-  ret <- model_df %>% prediction2(pretty.name=TRUE)
-  ret <- model_df %>% prediction2()
-  ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","Survival Time","sta tus", at=NULL, grid=10, revert=TRUE)
-  # Most of the time, true positive rate should be larger than false positive rate. If this is 
-  expect_true(sum((ret2 %>% mutate(positive=true_positive_rate >= false_positive_rate))$positive) > 0.8 * nrow(ret2))
+    # prediction2, which is used for ROC, and Data tab in the Analytics View.
+    ret <- model_df %>% prediction2(pretty.name=TRUE)
+    ret <- model_df %>% prediction2()
+    ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","Survival Time","sta tus", at=NULL, grid=10, revert=TRUE)
+    # Most of the time, true positive rate should be larger than false positive rate. If this is 
+    expect_true(sum((ret2 %>% mutate(positive=true_positive_rate >= false_positive_rate))$positive) > 0.8 * nrow(ret2))
 
-  ret <- model_df %>% evaluation(pretty.name=TRUE)
-  expect_false("Data Type" %in% colnames(ret))
-  ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
-  ret2 <- model_df %>% tidy_rowwise(model, type='partial_dependence')
-  variables <- (ret %>% arrange(desc(importance)))$term
-  names(variables) <- NULL
-  expect_equal(unique(ret2$variable), variables) # Factor order of the PDP should be the same as the importance.
-  expect_true(all(c("estimate", "p.value") %in% colnames(ret2))) # Make sure that estimate and p.value are joined to the result for hover on Prediction tab.
-  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
-  ret <- model_df %>% tidy_rowwise(model, type='vif')
-  ret <- model_df %>% tidy_rowwise(model)
-  expect_equal(colnames(ret),
-               c("term","estimate","std_error","t_ratio",
-                 "p_value","conf_low","conf_high","hazard_ratio","base.level"))
-  # Verify that base levels are not NA for `se-x` (testing - in the name) columns.
-  ret2 <- ret %>% dplyr::filter(stringr::str_detect(term,"(se-x)")) %>% dplyr::summarize(na_count=sum(is.na(base.level)))
-  expect_equal(ret2$na_count, 0)
+    ret <- model_df %>% evaluation(pretty.name=TRUE)
+    expect_false("Data Type" %in% colnames(ret))
+    ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
+    ret2 <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+    variables <- (ret %>% arrange(desc(importance)))$term
+    names(variables) <- NULL
+    expect_equal(unique(ret2$variable), variables) # Factor order of the PDP should be the same as the importance.
+    expect_true(all(c("estimate", "p.value") %in% colnames(ret2))) # Make sure that estimate and p.value are joined to the result for hover on Prediction tab.
+    ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
+    ret <- model_df %>% tidy_rowwise(model, type='vif')
+    ret <- model_df %>% tidy_rowwise(model)
+    expect_equal(colnames(ret),
+                 c("term","estimate","std_error","t_ratio",
+                   "p_value","conf_low","conf_high","hazard_ratio","base.level"))
+    # Verify that base levels are not NA for `se-x` (testing - in the name) columns.
+    ret2 <- ret %>% dplyr::filter(stringr::str_detect(term,"(se-x)")) %>% dplyr::summarize(na_count=sum(is.na(base.level)))
+    expect_equal(ret2$na_count, 0)
 
-  ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
-  expect_equal(colnames(ret),
-               c("Concordance","Std Error Concordance",
-                 "Time-dependent AUC",
-                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
-                 "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
-                 # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max",
-                 "Log Likelihood","AIC","BIC",
-                 "VIF Max",
-                 "Number of Rows","Number of Events")) 
-  ret <- model_df %>% augment_rowwise(model)
+    ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
+    expect_equal(colnames(ret),
+                 c("Concordance","Std Error Concordance",
+                   "Time-dependent AUC",
+                   "Likelihood Ratio Test","Likelihood Ratio Test P Value",
+                   "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
+                   # "Robust Statistic","Robust P Value", # These columns are hidden for now.
+                   "R Squared","R Squared Max",
+                   "Log Likelihood","AIC","BIC",
+                   "VIF Max",
+                   "Number of Rows","Number of Events")) 
+    ret <- model_df %>% augment_rowwise(model)
+  }
 })
 test_that("build_coxph.fast basic with group-by", {
   df <- survival::lung # this data has NAs.
