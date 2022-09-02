@@ -882,7 +882,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_time = NULL, pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_time = NULL, pred_survival_time = NULL, pred_survival_rate = NULL, pred_survival_threshold = NULL, ...) {
   # For predict() to find the prediction method, survival needs to be loaded beforehand.
   # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
   loadNamespace("survival")
@@ -958,8 +958,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   # Add (0,0) to avoid letting the function return NA when 0 is in.
   bh_fun <- approxfun(c(0, bh$time), c(0, bh$hazard))
 
-  if (!is.null(pred_time)) {
-    # Predict survival probability on the specified date (pred_time).
+  if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
+    # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
     time_unit_days <- get_time_unit_days(x$time_unit)
     if (x$clean_end_time_col %in% colnames(ret)) {
       # End time column is in the input. Calculate current_survival_time based off of it. 
@@ -969,17 +969,26 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
       ret <- ret %>% dplyr::mutate(current_survival_time = 0)
     }
-    ret <- ret %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-    ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(current_survival_time) - bh_fun(survival_time_for_prediction))*exp(.fitted)))
-    if (x$clean_status_col %in% colnames(ret)) {
-      # If survival_time_for_prediction is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
-      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
+    # Predict survival probability on the specified date (pred_time).
+    if (!is.null(pred_time)) {
+      ret <- ret %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+      ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(current_survival_time) - bh_fun(survival_time_for_prediction))*exp(.fitted)))
+      if (x$clean_status_col %in% colnames(ret)) {
+        # If survival_time_for_prediction is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
+        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
+      }
+      else {
+        # If survival_time_for_prediction is earlier than current_survival_time, return 1.0.
+        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, predicted_survival_rate))
+      }
+      ret <- ret %>% dplyr::mutate(time_for_prediction = pred_time)
     }
+    # pred_survival_rate should be there.
     else {
-      # If survival_time_for_prediction is earlier than current_survival_time, return 1.0.
-      ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, predicted_survival_rate))
+      rev_bh_fun <- approxfun(c(0, bh$hazard), c(0, bh$time))
+      ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(bh_fun(current_survival_time) - log(pred_survival_rate)/exp(.fitted)))
+      ret <- ret %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(as.integer(predicted_survival_time*time_unit_days)))
     }
-    ret <- ret %>% dplyr::mutate(time_for_prediction = pred_time)
   }
   else {
     # Predict survival probability on the specified duration (pred_survival_time).
