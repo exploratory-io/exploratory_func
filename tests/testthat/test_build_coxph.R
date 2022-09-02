@@ -56,11 +56,11 @@ test_that("build_coxph.fast with start_time and end_time", {
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% build_coxph.fast(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog="none", ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
-
-  ret <- model_df %>% prediction2(pretty.name=TRUE) #TODO: Does this test still make sense?
+  expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
 
   # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
   ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
+  expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
 
   # Survival-rate-based event time prediction.
   ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
@@ -76,7 +76,8 @@ test_that("build_coxph.fast with start_time and end_time", {
   # Without status column and end date colum in the new data.
   ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
 
-  expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
+  # prediction2, which is used for ROC, and Data tab in the Analytics View.
+  ret <- model_df %>% prediction2(pretty.name=TRUE)
   ret <- model_df %>% prediction2()
   ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","Survival Time","sta tus", at=NULL, grid=10, revert=TRUE)
   # Most of the time, true positive rate should be larger than false positive rate. If this is 
