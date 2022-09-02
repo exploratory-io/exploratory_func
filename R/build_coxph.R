@@ -983,10 +983,11 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       }
       ret <- ret %>% dplyr::mutate(time_for_prediction = pred_time)
     }
-    # pred_survival_rate should be there.
+    # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
     else {
       rev_bh_fun <- approxfun(c(0, bh$hazard), c(0, bh$time))
-      ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(bh_fun(current_survival_time) - log(pred_survival_rate)/exp(.fitted)))
+      ret <- ret %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
+      ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(bh_fun(current_survival_time) - log(survival_rate_for_prediction)/exp(.fitted)))
       ret <- ret %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(as.integer(predicted_survival_time*time_unit_days)))
     }
   }
@@ -1001,7 +1002,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("current_survival_time", "survival_time_for_prediction", "time_for_prediction", "predicted_survival_rate")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("current_survival_time", "survival_time_for_prediction",
+                                            "time_for_prediction", "predicted_survival_rate",
+                                            "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time")), .before=.fitted)
   }
 
   # Prettify names.
@@ -1013,6 +1016,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   colnames(ret)[colnames(ret) == "survival_time_for_prediction"] <- "Survival Time for Prediction"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Time for Prediction"
   colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "survival_rate_for_prediction"] <- "Survival Rate for Prediction"
+  colnames(ret)[colnames(ret) == "predicted_survival_time"] <- "Predicted Survival Time"
+  colnames(ret)[colnames(ret) == "predicted_event_time"] <- "Predicted Event Time"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
