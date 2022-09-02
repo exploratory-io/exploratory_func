@@ -59,7 +59,8 @@ test_that("build_coxph.fast with start_time and end_time", {
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
 
   # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
-  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
+  df2 <- df %>% select(-`ti me`, -`sta tus`)
+  ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
   expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
 
   # Survival-rate-based event time prediction.
