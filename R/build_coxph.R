@@ -882,7 +882,10 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_time = NULL, pred_survival_time = NULL, pred_survival_rate = NULL, pred_survival_threshold = NULL, ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
+                                      pred_time = NULL, pred_time_type = "value", # For point-in-time-based survival rate prediction. pred_time_type can be "value", "from_max", or "from_today".
+                                      pred_survival_rate = NULL, # For survival-rate-based event time prediction.
+                                      pred_survival_time = NULL, pred_survival_threshold = NULL, ...) { # For survival-time-based survival rate prediction.
   # For predict() to find the prediction method, survival needs to be loaded beforehand.
   # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
   loadNamespace("survival")
@@ -974,6 +977,15 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     }
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
+      if (pred_time_type == "from_max") {
+        # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
+        max_time <- max(c(cleaned_data[[x$clean_start_time_col]], cleaned_data[[x$clean_end_time_col]]))
+        pred_time <- max_time + lubridate::days(ceiling(pred_time * time_unit_days));
+      }
+      else if (pred_time_type == "from_today") {
+        # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
+        pred_time <- lubridate::today() + lubridate::days(ceiling(pred_time * time_unit_days));
+      }
       ret <- ret %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
       ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(current_survival_time) - bh_fun(survival_time_for_prediction))*exp(.fitted)))
       if (x$clean_status_col %in% colnames(ret)) {
