@@ -79,6 +79,7 @@ test_that("build_coxph.fast with start_time and end_time", {
     ret <- model_df %>% augment_rowwise(model)
   }
 })
+
 test_that("build_coxph.fast basic with group-by", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
