@@ -66,7 +66,9 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
 partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
-  times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
+  #times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
+  # WIP - Adjust some more on times, e.g. whether to include 0 or what should be the max, or ceil or floor.
+  times <- as.integer(min(data[[time_col]], na.rm=TRUE)):as.integer(max(data[[time_col]], na.rm=TRUE))
 
   predict.fun <- function(object, newdata) {
     res <- tryCatch({
@@ -87,18 +89,42 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     # 3    12    224       1        0      0.969      0.972      0.977      0.977      0.975      0.969
     # 4    13    223       2        0      0.957      0.961      0.968      0.967      0.966      0.957
 
-    # TODO: There is info on confidence interval, but we are not making use of them here.
-    est <- as.data.frame(t(res %>% select(starts_with('estimate.'))))
+    # Adjuct values in time with approxfun. WIP.
+    res0 <- res %>% select(starts_with('estimate.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      afun <- approxfun(res$time, res0[[i]])
+      res1[[paste0('estimate.', i)]] <- afun(times)
+    }
+    est <- as.data.frame(t(res1 %>% dplyr::select(-time)))
+
     #                   V1        V2        V3        V4        V5        V6        V7        V8
     # estimate.1 0.9937747 0.9751551 0.9689481 0.9565364 0.9503338 0.9441345 0.9379359 0.9317387
     # estimate.2 0.9943782 0.9775431 0.9719241 0.9606775 0.9550519 0.9494257 0.9437965 0.9381650
     # estimate.3 0.9954157 0.9816588 0.9770575 0.9678330 0.9632114 0.9585842 0.9539495 0.9493078
     # estimate.4 0.9953371 0.9813465 0.9766677 0.9672892 0.9625909 0.9578874 0.9531767 0.9484592
     # estimate.5 0.9950931 0.9803774 0.9754587 0.9656028 0.9606673 0.9557276 0.9507815 0.9458296
-    high <- as.data.frame(t(res %>% select(starts_with('conf.high.'))))
+
+    # Same for conf.high
+    res0 <- res %>% select(starts_with('conf.high.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      afun <- approxfun(res$time, res0[[i]])
+      res1[[paste0('conf.high.', i)]] <- afun(times)
+    }
+    high <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     high <- high %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'H'), starts_with('V'))
-    low <- as.data.frame(t(res %>% select(starts_with('conf.low.'))))
+
+    # Same for conf.low
+    res0 <- res %>% select(starts_with('conf.low.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      afun <- approxfun(res$time, res0[[i]])
+      res1[[paste0('conf.low.', i)]] <- afun(times)
+    }
+    low <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     low <- low %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'L'), starts_with('V'))
+
     res <- dplyr::bind_cols(est, high, low)
     res
   }
