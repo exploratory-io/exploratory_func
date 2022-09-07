@@ -66,9 +66,16 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
 partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
-  #times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
-  # WIP - Adjust some more on times, e.g. whether to include 0 or what should be the max, or ceil or floor.
-  times <- as.integer(min(data[[time_col]], na.rm=TRUE)):as.integer(max(data[[time_col]], na.rm=TRUE))
+  # Come up with appropriate time-axis values (times).
+  grid <- 40 # 40 grid point is what we display on the Analytics View.
+  step <- max(data[[time_col]], na.rm=TRUE) %/% grid
+  if (step >= 2) {
+    times <- (0:(max(data[[time_col]], na.rm=TRUE) %/% step)) * step
+  }
+  else {
+    # Use floor so that the number is within the range that is covered by the approxfun we create.
+    times <- 0:floor(max(data[[time_col]], na.rm=TRUE))
+  }
 
   predict.fun <- function(object, newdata) {
     res <- tryCatch({
@@ -93,7 +100,13 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     res0 <- res %>% select(starts_with('estimate.'))
     res1 <- tibble::tibble(time = times)
     for (i in 1:length(res0)) {
-      afun <- approxfun(res$time, res0[[i]])
+      # If the time does not start with 0, add (0,1.0) in the data, since this means no one was dead on arrival.
+      if (res$time[1] != 0) {
+        afun <- approxfun(c(0, res$time), c(1.0, res0[[i]]))
+      }
+      else {
+        afun <- approxfun(res$time, res0[[i]])
+      }
       res1[[paste0('estimate.', i)]] <- afun(times)
     }
     est <- as.data.frame(t(res1 %>% dplyr::select(-time)))
