@@ -755,20 +755,6 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
         })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
-
-      # Reduce number of unique x-axis values for better chart drawing performance, and not to overflow it.
-      grid <- 40
-      divider <- max(ret$period) %/% grid
-      if (divider >= 2) {
-        ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
-          group_by(variable, value, chart_type, value_index, period) %>%
-          # max is used to pick up the value from the minimum time that fell in the bucket.
-          # na.rm=TRUE is intentionally not used since we do not want to set confidence interval value
-          # for time 0 (which can be NA) from other time in the bucket.
-          dplyr::summarize(survival=max(survival), conf.high=max(conf.high), conf.low=max(conf.low)) %>%
-          dplyr::ungroup()
-      }
-
       ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
