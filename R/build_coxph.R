@@ -762,7 +762,10 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       if (divider >= 2) {
         ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
           group_by(variable, value, chart_type, value_index, period) %>%
-          dplyr::summarize(survival=max(survival)) %>%
+          # max is used to pick up the value from the minimum time that fell in the bucket.
+          # na.rm=TRUE is intentionally not used since we do not want to set confidence interval value
+          # for time 0 (which can be NA) from other time in the bucket.
+          dplyr::summarize(survival=max(survival), conf.high=max(conf.high), conf.low=max(conf.low)) %>%
           dplyr::ungroup()
       }
 
