@@ -450,6 +450,13 @@ exp_survival_forest <- function(df,
                                df[[clean_time_col]], df[[clean_status_col]], pred_survival_time,
                                revert=TRUE)
 
+      # Add cleaned column names. Used for prediction of survival rate on the specified day, and date the survival probability drops to the specified rate. 
+      model$clean_start_time_col <- clean_start_time_col
+      model$clean_end_time_col <- clean_end_time_col
+      model$clean_time_col <- clean_time_col
+      model$clean_status_col <- clean_status_col
+      model$time_unit <- time_unit
+
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
@@ -604,7 +611,10 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 }
 
 #' @export
-augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
+augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training",
+                                                pred_time = NULL, pred_time_type = "value", # For point-in-time-based survival rate prediction. pred_time_type can be "value", "from_max", or "from_today".
+                                                pred_survival_rate = NULL, # For survival-rate-based event time prediction.
+                                                pred_survival_time = NULL, pred_survival_threshold = NULL, ...) { # For survival-time-based survival rate prediction.
   # For predict() to find the prediction method, ranger needs to be loaded beforehand.
   # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
   loadNamespace("ranger")
@@ -619,6 +629,13 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     }
 
     predictor_variables <- attr(x$df,"predictors")
+    # If start/end time column is in newdata, use it.
+    if (!is.null(x$clean_start_time_col) && x$terms_mapping[x$clean_start_time_col] %in% colnames(newdata)) {
+      predictor_variables <- c(predictor_variables, x$clean_start_time_col)
+    }
+    if (!is.null(x$clean_end_time_col) && x$terms_mapping[x$clean_end_time_col] %in% colnames(newdata)) {
+      predictor_variables <- c(predictor_variables, x$clean_end_time_col)
+    }
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
     # Rename columns via predictor_variables_orig, which is a named vector.
@@ -656,11 +673,47 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     pred_survival_threshold <- x$pred_survival_threshold
   }
 
+  # Predict survival probability on the specified date (pred_time),
+  # or predict the day that the survival rate drops to the specified value (pred_survival_rate).
+  # Used for prediction step based on the model from the Analytics View.
+  if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
+    browser()
+    # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
+    time_unit_days <- get_time_unit_days(x$time_unit)
+    if (x$clean_end_time_col %in% colnames(data)) {
+      # End time column is in the input. Calculate current_survival_time based off of it. 
+      data <- data %>% dplyr::mutate(current_survival_time = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+    }
+    else {
+      # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
+      data <- data %>% dplyr::mutate(current_survival_time = 0)
+    }
+    # Predict survival probability on the specified date (pred_time).
+    if (!is.null(pred_time)) {
+      if (pred_time_type == "from_max") {
+        browser()
+        # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
+        max_time <- max(c(data[[x$clean_start_time_col]], data[[x$clean_end_time_col]]))
+        pred_time <- max_time + lubridate::days(ceiling(pred_time * time_unit_days));
+      }
+      else if (pred_time_type == "from_today") {
+        # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
+        pred_time <- lubridate::today() + lubridate::days(ceiling(pred_time * time_unit_days));
+      }
+      browser()
+      data <- data %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+      browser()
+      # TODO: Do the rest.
+    }
+  }
+
+  browser()
   unique_death_times <- x$forest$unique.death.times
   survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
   survival_time_index <- match(survival_time, unique_death_times)
   predicted_survival_rate <- pred$survival[,survival_time_index]
   predicted_survival <- predicted_survival_rate > pred_survival_threshold
+  browser()
   ret <- data
   ret$`Survival Time for Prediction`<- pred_survival_time
   ret$`Predicted Survival Rate`<- predicted_survival_rate
