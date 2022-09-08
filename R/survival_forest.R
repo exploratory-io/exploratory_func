@@ -610,6 +610,20 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   }
 }
 
+survival_time_to_predicted_rate <- function(survival_mat, time_vec, time_index_fun) {
+  index_vec <- time_index_fun(time_vec)
+  index_vec_floor <- floor(index_vec)
+  index_vec_ceiling <- ceiling(index_vec)
+  index_vec_residual <- index_vec - index_vec_floor
+  index_matrix_floor <- cbind(1:length(time_vec), index_vec_floor)
+  index_matrix_ceiling <- cbind(1:length(time_vec), index_vec_ceiling)
+  survival_rate_floor <- survival_mat[index_matrix_floor]
+  survival_rate_ceiling <- survival_mat[index_matrix_ceiling]
+  # interpolate between survival_rate_floor and survival_rate_ceiling.
+  survival_rate <- survival_rate_floor + (survival_rate_ceiling - survival_rate_floor)*index_vec_residual
+  survival_rate
+}
+
 #' @export
 augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training",
                                                 pred_time = NULL, pred_time_type = "value", # For point-in-time-based survival rate prediction. pred_time_type can be "value", "from_max", or "from_today".
@@ -705,24 +719,10 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       browser()
       # TODO: Do the rest.
       time_index_fun <- approxfun(x$unique.death.times, 1:length(x$unique.death.times))
-      index_vec <- time_index_fun(data$current_survival_time)
-      index_vec_floor <- floor(index_vec)
-      index_vec_ceiling <- ceiling(index_vec)
-      index_vec_residual <- index_vec - index_vec_floor
-      index_matrix_floor <- cbind(1:nrow(data), index_vec_floor)
-      index_matrix_ceiling <- cbind(1:nrow(data), index_vec_ceiling)
-      current_survival_rate_floor <- pred$survival[index_matrix_floor]
-      current_survival_rate_ceiling <- pred$survival[index_matrix_ceiling]
-      current_survival_rate <- current_survival_rate_floor + (current_survival_rate_ceiling - current_survival_rate_floor)*index_vec_residual
-
-      index_matrix <- cbind(1:nrow(data),floor(time_index_fun(data$survival_time_for_prediction)))
-      target_time_survival_rate <- pred$survival[index_matrix]
-
-      data$predicted_survival_rate <- target_time_survival_rate / current_survival_rate
+      current_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$current_survival_time, time_index_fun)
+      target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$survival_time_for_prediction, time_index_fun)
+      data$predicted_survival_rate <- target_survival_rate / current_survival_rate
       browser()
-
-
-
 
     }
   }
