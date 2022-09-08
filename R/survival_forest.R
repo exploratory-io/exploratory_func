@@ -704,6 +704,26 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       data <- data %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
       browser()
       # TODO: Do the rest.
+      time_index_fun <- approxfun(x$unique.death.times, 1:length(x$unique.death.times))
+      index_vec <- time_index_fun(data$current_survival_time)
+      index_vec_floor <- floor(index_vec)
+      index_vec_ceiling <- ceiling(index_vec)
+      index_vec_residual <- index_vec - index_vec_floor
+      index_matrix_floor <- cbind(1:nrow(data), index_vec_floor)
+      index_matrix_ceiling <- cbind(1:nrow(data), index_vec_ceiling)
+      current_survival_rate_floor <- pred$survival[index_matrix_floor]
+      current_survival_rate_ceiling <- pred$survival[index_matrix_ceiling]
+      current_survival_rate <- current_survival_rate_floor + (current_survival_rate_ceiling - current_survival_rate_floor)*index_vec_residual
+
+      index_matrix <- cbind(1:nrow(data),floor(time_index_fun(data$survival_time_for_prediction)))
+      target_time_survival_rate <- pred$survival[index_matrix]
+
+      data$predicted_survival_rate <- target_time_survival_rate / current_survival_rate
+      browser()
+
+
+
+
     }
   }
 
