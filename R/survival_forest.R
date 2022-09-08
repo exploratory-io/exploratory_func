@@ -722,8 +722,16 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       current_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$current_survival_time, time_index_fun)
       target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$survival_time_for_prediction, time_index_fun)
       data$predicted_survival_rate <- target_survival_rate / current_survival_rate
+      if (x$clean_status_col %in% colnames(data)) {
+        # If survival_time_for_prediction is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
+        data <- data %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
+      }
+      else {
+        # If survival_time_for_prediction is earlier than current_survival_time, return 1.0.
+        data <- data %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, predicted_survival_rate))
+      }
+      data <- data %>% dplyr::mutate(time_for_prediction = pred_time)
       browser()
-
     }
   }
 
