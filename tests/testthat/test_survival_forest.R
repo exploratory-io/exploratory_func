@@ -1,33 +1,4 @@
 context("test exp_survival_forest")
-test_that("exp_survival_forest basic", {
-  df <- survival::lung # this data has NAs.
-  df <- df %>% mutate(status = status==2)
-  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
-  df <- df %>% mutate(ph.ecog = factor(ph.ecog))
-  df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
-  model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss,
-                                         predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog=rlang::expr(forcats::fct_relevel(.,"1")), ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
-  ret <- model_df %>% prediction2(pretty.name=TRUE)
-
-  df2 <- df %>% select(-`ti me`, -`sta tus`)
-  ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
-  expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
-
-  ret <- model_df %>% evaluation()
-  expect_false("Data Type" %in% colnames(ret))
-  ret <- model_df %>% prediction2()
-  ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","ti me","sta tus", at=NULL, grid=10, revert=TRUE, with_auc=TRUE)
-  # Most of the time, true positive rate should be larger than false positive rate. If this is 
-  expect_true(sum((ret2 %>% mutate(positive=true_positive_rate >= false_positive_rate))$positive) > 0.8 * nrow(ret2))
-
-  ret <- model_df %>% glance_rowwise(model)
-  ret <- model_df %>% augment_rowwise(model)
-
-  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
-  expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))
-  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
-  ret <- model_df %>% tidy_rowwise(model, type='importance')
-})
 
 test_that("exp_survival_forest basic with start_time and end_time", {
   df <- survival::lung # this data has NAs.
