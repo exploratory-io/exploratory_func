@@ -709,7 +709,6 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
   # or predict the day that the survival rate drops to the specified value (pred_survival_rate).
   # Used for prediction step based on the model from the Analytics View.
   if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
-    browser()
     # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
     time_unit_days <- get_time_unit_days(x$time_unit)
     if (x$clean_end_time_col %in% colnames(data)) {
@@ -725,7 +724,6 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
       if (pred_time_type == "from_max") {
-        browser()
         # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
         max_time <- max(c(data[[x$clean_start_time_col]], data[[x$clean_end_time_col]]))
         pred_time <- max_time + lubridate::days(ceiling(pred_time * time_unit_days));
@@ -734,9 +732,7 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
         # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
         pred_time <- lubridate::today() + lubridate::days(ceiling(pred_time * time_unit_days));
       }
-      browser()
       data <- data %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-      browser()
       # TODO: Do the rest.
       current_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$current_survival_time, time_index_fun)
       target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$survival_time_for_prediction, time_index_fun)
@@ -753,7 +749,6 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     }
     # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
     else {
-      browser()
       data <- data %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
 
       # Survival rate at current period
@@ -763,28 +758,34 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       # Predicted survival period
       index_time_fun <- approxfun(1:length(x$unique.death.times), x$unique.death.times)
       data$predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, target_survival_rates, index_time_fun)
-      browser()
       # If status column is available, set NA for the predictions for already dead observations.
       if (x$clean_status_col %in% colnames(data)) {
         data <- data %>% dplyr::mutate(predicted_survival_time = if_else(!!rlang::sym(x$clean_status_col), NA_real_, predicted_survival_time))
       }
       # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing.
       data <- data %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
-      browser()
     }
   }
-
-  browser()
-  unique_death_times <- x$forest$unique.death.times
-  survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
-  survival_time_index <- match(survival_time, unique_death_times)
-  predicted_survival_rate <- pred$survival[,survival_time_index]
-  predicted_survival <- predicted_survival_rate > pred_survival_threshold
-  browser()
+  # Predict survival probability on the specified duration (pred_survival_time). Still used in the Analytics View itself.
+  else {
+    unique_death_times <- x$forest$unique.death.times
+    survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
+    survival_time_index <- match(survival_time, unique_death_times)
+    predicted_survival_rate <- pred$survival[,survival_time_index]
+    predicted_survival <- predicted_survival_rate > pred_survival_threshold
+    data$survival_time_for_prediction <- pred_survival_time
+    data$predicted_survival_rate <- predicted_survival_rate
+    data$predicted_survival <- predicted_survival
+  }
   ret <- data
-  ret$`Survival Time for Prediction`<- pred_survival_time
-  ret$`Predicted Survival Rate`<- predicted_survival_rate
-  ret$`Predicted Survival`<- predicted_survival
+  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+  colnames(ret)[colnames(ret) == "current_survival_time"] <- "Current Survival Time"
+  colnames(ret)[colnames(ret) == "survival_time_for_prediction"] <- "Survival Time for Prediction"
+  colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Time for Prediction"
+  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "survival_rate_for_prediction"] <- "Survival Rate for Prediction"
+  colnames(ret)[colnames(ret) == "predicted_survival_time"] <- "Predicted Survival Time"
+  colnames(ret)[colnames(ret) == "predicted_event_time"] <- "Predicted Event Time"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
