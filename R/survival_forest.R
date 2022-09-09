@@ -624,7 +624,7 @@ survival_time_to_predicted_rate <- function(survival_mat, time_vec, time_index_f
   survival_rate
 }
 
-survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rates) {
+survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rates, index_time_fun) {
   time_indice <- rep(NA_real_, nrow(survival_mat))
   for (i in 1:nrow(survival_mat)) {
     # Since survival curve monotonously decreases, we can use findInterval that does O(logN) binary search.
@@ -638,7 +638,8 @@ survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rates) {
     }
     time_indice[i] <- idx
   }
-  time_indice
+  res <- index_time_fun(time_indice)
+  res
 }
 
 #' @export
@@ -760,7 +761,8 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       # Target survival rate on the survival curve
       target_survival_rates <- current_survival_rates * pred_survival_rate
       # Predicted survival period
-      predicted_survival_time_indice <- survival_rate_to_predicted_time(pred$survival, target_survival_rates)
+      index_time_fun <- approxfun(1:length(x$unique.death.times), x$unique.death.times)
+      predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, target_survival_rates, index_time_fun)
       # Predicted date of event
       browser()
     }
