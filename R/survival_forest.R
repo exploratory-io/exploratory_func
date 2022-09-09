@@ -630,7 +630,13 @@ survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rate) {
     surv <- survival_mat[i,]
     # Since survival curve monotonously decreases, we can use findInterval that does O(logN) binary search.
     idx <- findInterval(-pred_survival_rate, -surv)
-    # TODO: interpolate
+    # Interpolate if possible.
+    if (idx < ncol(survival_mat)) {
+      denom <- survival_mat[i,idx+1] - survival_mat[i,idx]
+      if (denom != 0) {
+        idx <- idx + (pred_survival_rate - survival_mat[i,idx])/denom
+      }
+    }
     time_indice[i] <- idx
   }
   time_indice
