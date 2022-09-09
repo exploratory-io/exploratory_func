@@ -702,6 +702,8 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
       data <- data %>% dplyr::mutate(current_survival_time = 0)
     }
+
+    time_index_fun <- approxfun(x$unique.death.times, 1:length(x$unique.death.times))
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
       if (pred_time_type == "from_max") {
@@ -718,7 +720,6 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       data <- data %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
       browser()
       # TODO: Do the rest.
-      time_index_fun <- approxfun(x$unique.death.times, 1:length(x$unique.death.times))
       current_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$current_survival_time, time_index_fun)
       target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$survival_time_for_prediction, time_index_fun)
       data$predicted_survival_rate <- target_survival_rate / current_survival_rate
@@ -731,6 +732,20 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
         data <- data %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, predicted_survival_rate))
       }
       data <- data %>% dplyr::mutate(time_for_prediction = pred_time)
+    }
+    # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
+    else {
+      browser()
+      data <- data %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
+
+      # Experiment - get time from rate
+      time_indice <- rep(NA_real_, nrow(data))
+      for (i in 1:nrow(data)) {
+        surv <- pred$survival[i,]
+        idx <- findInterval(-pred_survival_rate, -surv)
+        # TODO: interpolate
+        time_indice[i] <- idx
+      }
       browser()
     }
   }
