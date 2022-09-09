@@ -237,7 +237,9 @@ exp_survival_forest <- function(df,
     time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
     time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
     # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
-    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
+    # This is to make resulting survival curve to have integer data point in the specified time unit.
+    # This also results in faster training of survival forest, since it reduces the number of distinct death times.
+    # Though, it does give undesirable bias to longer survival time when the time unit is larger.
     df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
     time_col <- ".time"
   }
