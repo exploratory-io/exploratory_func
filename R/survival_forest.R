@@ -624,6 +624,18 @@ survival_time_to_predicted_rate <- function(survival_mat, time_vec, time_index_f
   survival_rate
 }
 
+survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rate) {
+  time_indice <- rep(NA_real_, nrow(survival_mat))
+  for (i in 1:nrow(survival_mat)) {
+    surv <- survival_mat[i,]
+    # Since survival curve monotonously decreases, we can use findInterval that does O(logN) binary search.
+    idx <- findInterval(-pred_survival_rate, -surv)
+    # TODO: interpolate
+    time_indice[i] <- idx
+  }
+  time_indice
+}
+
 #' @export
 augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training",
                                                 pred_time = NULL, pred_time_type = "value", # For point-in-time-based survival rate prediction. pred_time_type can be "value", "from_max", or "from_today".
@@ -739,13 +751,7 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       data <- data %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
 
       # Experiment - get time from rate
-      time_indice <- rep(NA_real_, nrow(data))
-      for (i in 1:nrow(data)) {
-        surv <- pred$survival[i,]
-        idx <- findInterval(-pred_survival_rate, -surv)
-        # TODO: interpolate
-        time_indice[i] <- idx
-      }
+      time_indice <- survival_rate_to_predicted_time(pred$survival, pred_survival_rate)
       browser()
     }
   }
