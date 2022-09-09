@@ -1,5 +1,4 @@
 context("test exp_survival_forest")
-
 test_that("exp_survival_forest basic", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
@@ -39,8 +38,31 @@ test_that("exp_survival_forest basic with start_time and end_time", {
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", 
                                          predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog=rlang::expr(forcats::fct_relevel(.,"1")), ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
+
+  # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
+  df2 <- df %>% select(-`ti me`, -`sta tus`)
+  ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
+  expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
+
+  # Survival-rate-based event time prediction.
+  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+  # Without status column in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+  # Without status column and end date colum in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+
+  # Point-of-time-based survival rate prediction.
+  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-06-01"))
+  # Without status column in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
+  # Without status column and end date colum in the new data.
+  ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
+  # Prediction at n-days from the max date that appears in the data 
+  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time_type="from_max", pred_time=5)
+  # Prediction at n-days from today
+  ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time_type="from_today", pred_time=5)
+
   ret <- model_df %>% prediction2(pretty.name=TRUE)
-  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
   ret <- model_df %>% evaluation()
   expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% prediction2()
