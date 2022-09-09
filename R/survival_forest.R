@@ -762,8 +762,14 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       target_survival_rates <- current_survival_rates * pred_survival_rate
       # Predicted survival period
       index_time_fun <- approxfun(1:length(x$unique.death.times), x$unique.death.times)
-      predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, target_survival_rates, index_time_fun)
-      # Predicted date of event
+      data$predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, target_survival_rates, index_time_fun)
+      browser()
+      # If status column is available, set NA for the predictions for already dead observations.
+      if (x$clean_status_col %in% colnames(data)) {
+        data <- data %>% dplyr::mutate(predicted_survival_time = if_else(!!rlang::sym(x$clean_status_col), NA_real_, predicted_survival_time))
+      }
+      # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing.
+      data <- data %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
       browser()
     }
   }
