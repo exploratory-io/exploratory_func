@@ -186,3 +186,8 @@ test_that("column suffix argument with case insensitive and empty source suffix"
   df14 <- mtcars %>% left_join(mtcars, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("", "_1"), ignorecase = TRUE)
   expect_equal(df14 %>% dplyr::filter(mpg > 21) %>% nrow(), 71)
 })
+
+test_that("column suffix argument with case insensitive and empty source suffix and exclude_selected_columns", {
+  df15 <- mtcars %>% left_join(mtcars, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("", "_1"), ignorecase = TRUE, target_columns = c("mpg", "am", "vs"), exclude_target_columns = TRUE)
+  expect_equal(df15 %>% dplyr::filter(carb_1 > 4) %>% nrow(), 3)
+})
