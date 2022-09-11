@@ -13,7 +13,7 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
       y[[by$y[[i]]]] <- NULL
     }
 
-    res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix)
+    res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy)
     res[tmp_by_x] <- list(NULL)
 
     res
@@ -23,10 +23,14 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
 
 #' Wrapper function for dplyr's inner_join to support case insensitive join.
 #' @export
-inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...){
+inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
-    y <- y %>% dplyr::select(target_columns)
+    if (exclude_target_columns) {
+      y <- y %>% dplyr::select(-dplyr::one_of(target_columns))
+    } else {
+      y <- y %>% dplyr::select(dplyr::one_of(target_columns))
+    }
   }
   if(ignorecase) {
     insensitive_join(dplyr::inner_join)(x = x, y = y, by = by, copy = copy, suffix = suffix)
@@ -37,10 +41,14 @@ inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
 
 #' @export
 #' Wrapper function for dplyr's left_join to support case insensitive join.
-left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...){
+left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
-    y <- y %>% dplyr::select(target_columns)
+    if (exclude_target_columns) {
+      y <- y %>% dplyr::select(-dplyr::one_of(target_columns))
+    } else {
+      y <- y %>% dplyr::select(dplyr::one_of(target_columns))
+    }
   }
   if(ignorecase) {
     insensitive_join(dplyr::left_join)(x = x, y = y, by = by, copy = copy, suffix = suffix)
@@ -51,10 +59,14 @@ left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ign
 
 #' @export
 #' Wrapper function for dplyr's right_join to support case insensitive join.
-right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...){
+right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
-    y <- y %>% dplyr::select(target_columns)
+    if (exclude_target_columns) {
+      y <- y %>% dplyr::select(-dplyr::one_of(target_columns))
+    } else {
+      y <- y %>% dplyr::select(dplyr::one_of(target_columns))
+    }
   }
   if(ignorecase) {
     insensitive_join(dplyr::right_join, "RIGHT")(x, y, by = by, copy = copy, suffix = suffix)
@@ -65,10 +77,14 @@ right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
 
 #' @export
 #' Wrapper function for dplyr's full_join to support case insensitive join.
-full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, ...) {
+full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...) {
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
-    y <- y %>% dplyr::select(target_columns)
+    if (exclude_target_columns) {
+      y <- y %>% dplyr::select(-dplyr::one_of(target_columns))
+    } else {
+      y <- y %>% dplyr::select(dplyr::one_of(target_columns))
+    }
   }
   if(ignorecase) {
     insensitive_join(dplyr::full_join)(x = x, y = y, by = by, copy = copy, suffix = suffix)
