@@ -179,15 +179,18 @@ test_that("anti_join with case sensitive", {
 
 test_that("column suffix argument with case insensitive", {
   df13 <- mtcars %>% left_join(mtcars, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("1", "2"), ignorecase = TRUE)
-  expect_equal(df13 %>% dplyr::filter(mpg1 > 21) %>% nrow(), 71)
+  expect_equal("mpg1" %in% colnames(df13) , TRUE)
+  expect_equal("mpg2" %in% colnames(df13) , TRUE)
 })
 
 test_that("column suffix argument with case insensitive and empty source suffix", {
   df14 <- mtcars %>% left_join(mtcars, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("", "_1"), ignorecase = TRUE)
-  expect_equal(df14 %>% dplyr::filter(mpg > 21) %>% nrow(), 71)
+  expect_equal("mpg" %in% colnames(df14) , TRUE)
+  expect_equal("mpg_1" %in% colnames(df14) , TRUE)
 })
 
 test_that("column suffix argument with case insensitive and empty source suffix and exclude_selected_columns", {
   df15 <- mtcars %>% left_join(mtcars, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("", "_1"), ignorecase = TRUE, target_columns = c("mpg", "am", "vs"), exclude_target_columns = TRUE)
+  expect_equal("carb" %in% colnames(df15) , TRUE)
   expect_equal("carb_1" %in% colnames(df15) , TRUE)
 })
