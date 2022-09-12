@@ -713,18 +713,17 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
   if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
     # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
     time_unit_days <- get_time_unit_days(x$time_unit)
-    if (x$clean_end_time_col %in% colnames(data)) {
-      # End time column is in the input. Calculate current_survival_time based off of it. 
-      data <- data %>% dplyr::mutate(current_survival_time = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-    }
-    else {
-      # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
-      data <- data %>% dplyr::mutate(current_survival_time = 0)
-    }
-
     time_index_fun <- approxfun(x$unique.death.times, 1:length(x$unique.death.times))
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
+      if (x$clean_end_time_col %in% colnames(data)) {
+        # End time column is in the input. Calculate current_survival_time based off of it. 
+        data <- data %>% dplyr::mutate(current_survival_time = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+      }
+      else {
+        # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
+        data <- data %>% dplyr::mutate(current_survival_time = 0)
+      }
       if (pred_time_type == "from_max") {
         # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
         max_time <- max(c(data[[x$clean_start_time_col]], data[[x$clean_end_time_col]]))
@@ -752,14 +751,9 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
     else {
       data <- data %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
-
-      # Survival rate at current period
-      current_survival_rates <- survival_time_to_predicted_rate(pred$survival, data$current_survival_time, time_index_fun)
-      # Target survival rate on the survival curve
-      target_survival_rates <- current_survival_rates * pred_survival_rate
       # Predicted survival period
       index_time_fun <- approxfun(1:length(x$unique.death.times), x$unique.death.times)
-      data$predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, target_survival_rates, index_time_fun)
+      data$predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, pred_survival_rate, index_time_fun)
       # If status column is available, set NA for the predictions for already dead observations.
       if (x$clean_status_col %in% colnames(data)) {
         data <- data %>% dplyr::mutate(predicted_survival_time = if_else(!!rlang::sym(x$clean_status_col), NA_real_, predicted_survival_time))
