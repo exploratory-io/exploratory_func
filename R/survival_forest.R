@@ -734,8 +734,8 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
         # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
         pred_time <- lubridate::today() + lubridate::days(ceiling(pred_time * time_unit_days));
       }
-      data <- data %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-      # TODO: Do the rest.
+      # as.Date is to handle the case where the start time column is in POSIXct.
+      data <- data %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
       current_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$current_survival_time, time_index_fun)
       target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$survival_time_for_prediction, time_index_fun)
       data$predicted_survival_rate <- target_survival_rate / current_survival_rate
