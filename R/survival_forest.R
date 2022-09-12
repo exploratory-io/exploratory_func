@@ -716,6 +716,7 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     time_index_fun <- approxfun(x$unique.death.times, 1:length(x$unique.death.times))
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
+      data <- data %>% dplyr::mutate(time_for_prediction = pred_time)
       if (x$clean_end_time_col %in% colnames(data)) {
         # End time column is in the input. Calculate current_survival_time based off of it. 
         data <- data %>% dplyr::mutate(current_survival_time = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
@@ -738,15 +739,18 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       current_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$current_survival_time, time_index_fun)
       target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$survival_time_for_prediction, time_index_fun)
       data$predicted_survival_rate <- target_survival_rate / current_survival_rate
+      # NA means that the specified time is not covered by the predicted survival curve. 
+      data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve", NA_character_))
       if (x$clean_status_col %in% colnames(data)) {
         # If survival_time_for_prediction is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
         data <- data %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
+        data <- data %>% dplyr::mutate(note = if_else(current_survival_time > survival_time_for_prediction, "Before the end time", if_else(!!rlang::sym(x$clean_status_col), "After the event time", note)))
       }
       else {
         # If survival_time_for_prediction is earlier than current_survival_time, return 1.0.
         data <- data %>% dplyr::mutate(predicted_survival_rate = if_else(current_survival_time > survival_time_for_prediction, 1.0, predicted_survival_rate))
+        data <- data %>% dplyr::mutate(note = if_else(current_survival_time > survival_time_for_prediction, "Before the end time", note))
       }
-      data <- data %>% dplyr::mutate(time_for_prediction = pred_time)
     }
     # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
     else {
@@ -754,6 +758,8 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       # Predicted survival period
       index_time_fun <- approxfun(1:length(x$unique.death.times), x$unique.death.times)
       data$predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, pred_survival_rate, index_time_fun)
+      # NA means that the specified survival rate is not covered by the predicted survival curve. 
+      data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Out of range of the predicted survival curve", NA_character_))
       # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing.
       data <- data %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
     }
@@ -778,6 +784,7 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
   colnames(ret)[colnames(ret) == "survival_rate_for_prediction"] <- "Survival Rate for Prediction"
   colnames(ret)[colnames(ret) == "predicted_survival_time"] <- "Predicted Survival Time"
   colnames(ret)[colnames(ret) == "predicted_event_time"] <- "Predicted Event Time"
+  colnames(ret)[colnames(ret) == "note"] <- "Note"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
