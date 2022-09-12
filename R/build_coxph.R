@@ -1020,7 +1020,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
         # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
         pred_time <- lubridate::today() + lubridate::days(ceiling(pred_time * time_unit_days));
       }
-      ret <- ret %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+      # as.Date is to handle the case where the start time column is in POSIXct.
+      ret <- ret %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
       ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(current_survival_time) - bh_fun(survival_time_for_prediction))*exp(.fitted)))
       if (x$clean_status_col %in% colnames(ret)) {
         # If survival_time_for_prediction is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
