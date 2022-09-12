@@ -1001,16 +1001,16 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
     # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
     time_unit_days <- get_time_unit_days(x$time_unit)
-    if (x$clean_end_time_col %in% colnames(ret)) {
-      # End time column is in the input. Calculate current_survival_time based off of it. 
-      ret <- ret %>% dplyr::mutate(current_survival_time = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
-    }
-    else {
-      # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
-      ret <- ret %>% dplyr::mutate(current_survival_time = 0)
-    }
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
+      if (x$clean_end_time_col %in% colnames(ret)) {
+        # End time column is in the input. Calculate current_survival_time based off of it. 
+        ret <- ret %>% dplyr::mutate(current_survival_time = as.numeric(!!rlang::sym(x$clean_end_time_col) - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+      }
+      else {
+        # End time column is not in the input. Assume that all we know is the observation started at the start Calculate current_survival_time based off of it. 
+        ret <- ret %>% dplyr::mutate(current_survival_time = 0)
+      }
       if (pred_time_type == "from_max") {
         # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
         max_time <- max(c(cleaned_data[[x$clean_start_time_col]], cleaned_data[[x$clean_end_time_col]]))
@@ -1037,7 +1037,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     else {
       rev_bh_fun <- approxfun(c(0, bh$hazard), c(0, bh$time))
       ret <- ret %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
-      ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(bh_fun(current_survival_time) - log(survival_rate_for_prediction)/exp(.fitted)))
+      ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(-log(survival_rate_for_prediction)/exp(.fitted)))
       # If status column is available, set NA for the predictions for already dead observations.
       if (x$clean_status_col %in% colnames(ret)) {
         ret <- ret %>% dplyr::mutate(predicted_survival_time = if_else(!!rlang::sym(x$clean_status_col), NA_real_, predicted_survival_time))
