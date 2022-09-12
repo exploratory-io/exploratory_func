@@ -66,7 +66,16 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
 partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
-  times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
+  # Come up with appropriate time-axis values (times).
+  grid <- 40 # 40 grid point is what we display on the Analytics View.
+  step <- max(data[[time_col]], na.rm=TRUE) %/% grid
+  if (step >= 2) {
+    times <- (0:(max(data[[time_col]], na.rm=TRUE) %/% step)) * step
+  }
+  else {
+    # Use floor so that the number is within the range that is covered by the approxfun we create.
+    times <- 0:floor(max(data[[time_col]], na.rm=TRUE))
+  }
 
   predict.fun <- function(object, newdata) {
     res <- tryCatch({
@@ -87,18 +96,48 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     # 3    12    224       1        0      0.969      0.972      0.977      0.977      0.975      0.969
     # 4    13    223       2        0      0.957      0.961      0.968      0.967      0.966      0.957
 
-    # TODO: There is info on confidence interval, but we are not making use of them here.
-    est <- as.data.frame(t(res %>% select(starts_with('estimate.'))))
+    # Adjuct values in time with approxfun. WIP.
+    res0 <- res %>% select(starts_with('estimate.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      # If the time does not start with 0, add (0,1.0) in the data, since this means no one was dead on arrival.
+      if (res$time[1] != 0) {
+        afun <- approxfun(c(0, res$time), c(1.0, res0[[i]]))
+      }
+      else {
+        afun <- approxfun(res$time, res0[[i]])
+      }
+      res1[[paste0('estimate.', i)]] <- afun(times)
+    }
+    est <- as.data.frame(t(res1 %>% dplyr::select(-time)))
+
     #                   V1        V2        V3        V4        V5        V6        V7        V8
     # estimate.1 0.9937747 0.9751551 0.9689481 0.9565364 0.9503338 0.9441345 0.9379359 0.9317387
     # estimate.2 0.9943782 0.9775431 0.9719241 0.9606775 0.9550519 0.9494257 0.9437965 0.9381650
     # estimate.3 0.9954157 0.9816588 0.9770575 0.9678330 0.9632114 0.9585842 0.9539495 0.9493078
     # estimate.4 0.9953371 0.9813465 0.9766677 0.9672892 0.9625909 0.9578874 0.9531767 0.9484592
     # estimate.5 0.9950931 0.9803774 0.9754587 0.9656028 0.9606673 0.9557276 0.9507815 0.9458296
-    high <- as.data.frame(t(res %>% select(starts_with('conf.high.'))))
+
+    # Same for conf.high
+    res0 <- res %>% select(starts_with('conf.high.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      afun <- approxfun(res$time, res0[[i]])
+      res1[[paste0('conf.high.', i)]] <- afun(times)
+    }
+    high <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     high <- high %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'H'), starts_with('V'))
-    low <- as.data.frame(t(res %>% select(starts_with('conf.low.'))))
+
+    # Same for conf.low
+    res0 <- res %>% select(starts_with('conf.low.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      afun <- approxfun(res$time, res0[[i]])
+      res1[[paste0('conf.low.', i)]] <- afun(times)
+    }
+    low <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     low <- low %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'L'), starts_with('V'))
+
     res <- dplyr::bind_cols(est, high, low)
     res
   }
@@ -376,9 +415,7 @@ build_coxph.fast <- function(df,
     end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
     time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
     time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
-    # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
-    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
-    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
+    df <- df %>% dplyr::mutate(.time = as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days)
     time_col <- ".time"
   }
     
@@ -718,17 +755,6 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
         })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
-
-      # Reduce number of unique x-axis values for better chart drawing performance, and not to overflow it.
-      grid <- 40
-      divider <- max(ret$period) %/% grid
-      if (divider >= 2) {
-        ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
-          group_by(variable, value, chart_type, value_index, period) %>%
-          dplyr::summarize(survival=max(survival)) %>%
-          dplyr::ungroup()
-      }
-
       ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
