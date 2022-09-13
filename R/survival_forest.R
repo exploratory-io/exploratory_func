@@ -626,16 +626,24 @@ survival_time_to_predicted_rate <- function(survival_mat, time_vec, time_index_f
   survival_rate
 }
 
-survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rates, index_time_fun) {
+survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rate, index_time_fun) {
   time_indice <- rep(NA_real_, nrow(survival_mat))
   for (i in 1:nrow(survival_mat)) {
     # Since survival curve monotonously decreases, we can use findInterval that does O(logN) binary search.
-    idx <- findInterval(-pred_survival_rates[i], -survival_mat[i,])
+    idx <- findInterval(-pred_survival_rate, -survival_mat[i,])
     # Interpolate if possible.
-    if (!is.na(idx) && idx < ncol(survival_mat)) {
+    # When pred_survival_rate is larger than the first survival rate that appear in survivL_mat[i,].
+    if (idx == 0) {
+      denom <- survival_mat[i,idx+1] - 1.0
+      if (!is.na(denom) && denom != 0) {
+        idx <- idx + (pred_survival_rate - 1.0)/denom
+      }
+    }
+    # General case
+    else if (!is.na(idx) && idx < ncol(survival_mat)) {
       denom <- survival_mat[i,idx+1] - survival_mat[i,idx]
       if (!is.na(denom) && denom != 0) {
-        idx <- idx + (pred_survival_rates[i] - survival_mat[i,idx])/denom
+        idx <- idx + (pred_survival_rate - survival_mat[i,idx])/denom
       }
     }
     time_indice[i] <- idx
@@ -739,7 +747,7 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     else {
       data <- data %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
       # Predicted survival period
-      index_time_fun <- approxfun(1:length(x$unique.death.times), x$unique.death.times)
+      index_time_fun <- approxfun(0:length(x$unique.death.times), c(0, x$unique.death.times))
       data$predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, pred_survival_rate, index_time_fun)
       # NA means that the specified survival rate is not covered by the predicted survival curve. 
       data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Didn't meet the threshold.", NA_character_))
