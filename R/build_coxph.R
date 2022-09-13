@@ -1004,14 +1004,14 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
       if (base_time_type == "max") {
-        base_time <- max(cleaned_data[[x$clean_start_time_col]])
+        base_time <- as.Date(max(cleaned_data[[x$clean_start_time_col]])) # as.Date is to take care of POSIXct column.
       }
       else if (base_time_type == "today") {
         base_time <- lubridate::today()
       } # if base_time_type is "value", use the argument value as is.
       # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
       pred_time <- base_time + lubridate::days(ceiling(pred_time * time_unit_days));
-      ret <- ret %>% dplyr::mutate(base_survival_time = as.numeric(!!base_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
+      ret <- ret %>% dplyr::mutate(base_survival_time = as.numeric(!!base_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
       # as.Date is to handle the case where the start time column is in POSIXct.
       ret <- ret %>% dplyr::mutate(prediction_survival_time = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
       ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(base_survival_time) - bh_fun(prediction_survival_time))*exp(.fitted)))
