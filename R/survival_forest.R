@@ -732,7 +732,8 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       data$predicted_survival_rate <- target_survival_rate / base_survival_rate
       # NA means that the specified time is not covered by the predicted survival curve. 
       data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve", NA_character_))
-      data <- data %>% dplyr::mutate(base_time = base_time)
+      data <- data %>% dplyr::mutate(base_time = !!base_time)
+      data <- data %>% dplyr::mutate(prediction_time = !!pred_time)
     }
     # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
     else {
@@ -758,6 +759,10 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     data$predicted_survival <- predicted_survival
   }
   ret <- data
+  # Move those columns as the last columns.
+  ret <- ret %>% dplyr::relocate(any_of(c("base_time", "base_survival_time", "prediction_time", "prediction_survival_time",
+                                          "predicted_survival_rate",
+                                          "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time", "note")), .after=last_col())
   colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
   colnames(ret)[colnames(ret) == "base_survival_time"] <- "Base Survival Time"
   colnames(ret)[colnames(ret) == "prediction_survival_time"] <- "Prediction Survival Time"
