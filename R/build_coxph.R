@@ -1017,16 +1017,6 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(base_survival_time) - bh_fun(prediction_survival_time))*exp(.fitted)))
       # NA means that the specified time is not covered by the predicted survival curve. 
       ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve", NA_character_))
-      if (x$clean_status_col %in% colnames(ret)) {
-        # If prediction_survival_time is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
-        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(base_survival_time > prediction_survival_time, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
-        ret <- ret %>% dplyr::mutate(note = if_else(base_survival_time > prediction_survival_time, "Before the end time", if_else(!!rlang::sym(x$clean_status_col), "After the event time", note)))
-      }
-      else {
-        # If prediction_survival_time is earlier than base_survival_time, return 1.0.
-        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(base_survival_time > prediction_survival_time, 1.0, predicted_survival_rate))
-        ret <- ret %>% dplyr::mutate(note = if_else(base_survival_time > prediction_survival_time, "Before the end time", note))
-      }
       ret <- ret %>% dplyr::mutate(base_time = base_time)
       ret <- ret %>% dplyr::mutate(prediction_time = pred_time)
     }
