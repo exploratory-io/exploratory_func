@@ -1043,7 +1043,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       ret <- ret %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
       ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(-log(survival_rate_for_prediction)/exp(.fitted)))
       # NA means that the specified survival rate is not covered by the predicted survival curve. 
-      ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Out of range of the predicted survival curve", NA_character_))
+      ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Didn't meet the threshold.", NA_character_))
       # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing. TODO: Adjust this.
       ret <- ret %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
     }
