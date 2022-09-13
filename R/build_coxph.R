@@ -1016,7 +1016,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       ret <- ret %>% dplyr::mutate(prediction_survival_time = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
       ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(base_survival_time) - bh_fun(prediction_survival_time))*exp(.fitted)))
       # NA means that the specified time is not covered by the predicted survival curve. 
-      ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve", NA_character_))
+      ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve.", NA_character_))
       ret <- ret %>% dplyr::mutate(base_time = base_time)
       ret <- ret %>% dplyr::mutate(prediction_time = pred_time)
     }

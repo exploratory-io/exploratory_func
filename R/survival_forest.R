@@ -739,7 +739,7 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$prediction_survival_time, time_index_fun)
       data$predicted_survival_rate <- target_survival_rate / base_survival_rate
       # NA means that the specified time is not covered by the predicted survival curve. 
-      data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve", NA_character_))
+      data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve.", NA_character_))
       data <- data %>% dplyr::mutate(base_time = !!base_time)
       data <- data %>% dplyr::mutate(prediction_time = !!pred_time)
     }
