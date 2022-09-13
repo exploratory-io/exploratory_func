@@ -29,16 +29,12 @@ test_that("build_coxph.fast with start_time and end_time", {
     # Without status column and end date colum in the new data.
     ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
 
-    # Point-of-time-based survival rate prediction.
-    ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-06-01"))
-    # Without status column in the new data.
-    ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
-    # Without status column and end date colum in the new data.
-    ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_time=as.Date("2023-01-01"))
-    # Prediction at n-days from the max date that appears in the data 
-    ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time_type="from_max", pred_time=5)
-    # Prediction at n-days from today
-    ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_time_type="from_today", pred_time=5)
+    # Point-of-time-based survival rate prediction with base time specified as a specific date.
+    ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="value", base_time=as.Date("2022-01-01"), pred_time=5)
+    # Point-of-time-based survival rate prediction with base time specified as the max of start time column.
+    ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="max", pred_time=5)
+    # Point-of-time-based survival rate prediction with base time specified as today.
+    ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="today", pred_time=5)
 
     # prediction2, which is used for ROC, and Data tab in the Analytics View.
     ret <- model_df %>% prediction2(pretty.name=TRUE)
