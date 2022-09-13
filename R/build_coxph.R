@@ -1046,7 +1046,6 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
                                             "predicted_survival_rate",
                                             "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time")), .before=.fitted)
   }
-  ret <- ret %>% dplyr::select(-.fitted, -.se.fit) # Hide from the result.
 
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
