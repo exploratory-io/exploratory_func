@@ -1013,22 +1013,22 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       pred_time <- base_time + lubridate::days(ceiling(pred_time * time_unit_days));
       ret <- ret %>% dplyr::mutate(base_survival_time = as.numeric(!!base_time - !!rlang::sym(x$clean_start_time_col), units = "days")/time_unit_days)
       # as.Date is to handle the case where the start time column is in POSIXct.
-      ret <- ret %>% dplyr::mutate(survival_time_for_prediction = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
-      ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(base_survival_time) - bh_fun(survival_time_for_prediction))*exp(.fitted)))
+      ret <- ret %>% dplyr::mutate(prediction_survival_time = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
+      ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(base_survival_time) - bh_fun(prediction_survival_time))*exp(.fitted)))
       # NA means that the specified time is not covered by the predicted survival curve. 
       ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve", NA_character_))
       if (x$clean_status_col %in% colnames(ret)) {
-        # If survival_time_for_prediction is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
-        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(base_survival_time > survival_time_for_prediction, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
-        ret <- ret %>% dplyr::mutate(note = if_else(base_survival_time > survival_time_for_prediction, "Before the end time", if_else(!!rlang::sym(x$clean_status_col), "After the event time", note)))
+        # If prediction_survival_time is earlier than time 1, return 1.0. If status column is there, drop the rate for dead observations to 0.
+        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(base_survival_time > prediction_survival_time, 1.0, if_else(!!rlang::sym(x$clean_status_col), 0, predicted_survival_rate)))
+        ret <- ret %>% dplyr::mutate(note = if_else(base_survival_time > prediction_survival_time, "Before the end time", if_else(!!rlang::sym(x$clean_status_col), "After the event time", note)))
       }
       else {
-        # If survival_time_for_prediction is earlier than base_survival_time, return 1.0.
-        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(base_survival_time > survival_time_for_prediction, 1.0, predicted_survival_rate))
-        ret <- ret %>% dplyr::mutate(note = if_else(base_survival_time > survival_time_for_prediction, "Before the end time", note))
+        # If prediction_survival_time is earlier than base_survival_time, return 1.0.
+        ret <- ret %>% dplyr::mutate(predicted_survival_rate = if_else(base_survival_time > prediction_survival_time, 1.0, predicted_survival_rate))
+        ret <- ret %>% dplyr::mutate(note = if_else(base_survival_time > prediction_survival_time, "Before the end time", note))
       }
       ret <- ret %>% dplyr::mutate(base_time = base_time)
-      ret <- ret %>% dplyr::mutate(time_for_prediction = pred_time)
+      ret <- ret %>% dplyr::mutate(prediction_time = pred_time)
     }
     # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
     else {
@@ -1045,14 +1045,14 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   else {
     cumhaz_base = bh_fun(pred_survival_time)
     # transform linear predictor (.fitted) into predicted_survival.
-    ret <- ret %>% dplyr::mutate(survival_time_for_prediction = pred_survival_time,
+    ret <- ret %>% dplyr::mutate(prediction_survival_time = pred_survival_time,
                                  predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
                                  predicted_survival = predicted_survival_rate > pred_survival_threshold)
   }
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("base_time", "base_survival_time", "time_for_prediction", "survival_time_for_prediction",
+    ret <- ret %>% dplyr::relocate(any_of(c("base_time", "base_survival_time", "prediction_time", "prediction_survival_time",
                                             "predicted_survival_rate",
                                             "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time")), .before=.fitted)
   }
@@ -1063,9 +1063,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
   colnames(ret)[colnames(ret) == "base_survival_time"] <- "Base Survival Time"
-  colnames(ret)[colnames(ret) == "survival_time_for_prediction"] <- "Survival Time for Prediction"
+  colnames(ret)[colnames(ret) == "prediction_survival_time"] <- "Prediction Survival Time"
   colnames(ret)[colnames(ret) == "base_time"] <- "Base Time"
-  colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Time for Prediction"
+  colnames(ret)[colnames(ret) == "prediction_time"] <- "Prediction Time"
   colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
   colnames(ret)[colnames(ret) == "survival_rate_for_prediction"] <- "Survival Rate for Prediction"
   colnames(ret)[colnames(ret) == "predicted_survival_time"] <- "Predicted Survival Time"
