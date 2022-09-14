@@ -1,4 +1,4 @@
-#' coxph wrapper with do
+#' coxph wrapper with do 
 #' @return deta frame which has coxph model
 #' @param data Data frame to be used as data
 #' @param formula Formula for coxph
