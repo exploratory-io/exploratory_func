@@ -13,6 +13,10 @@ test_that("exp_survival_forest basic with start_time and end_time", {
   df2 <- df %>% select(-`ti me`, -`sta tus`)
   ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
   expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
+  expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog",
+                         "ph.karno", "pat.karno", "meal.cal", "wt.loss",
+                         "start", "end", "Prediction Survival Time", "Predicted Survival Rate", "Predicted Survival")
+  expect_equal(colnames(ret), expected_colnames)
 
   # Survival-rate-based event time prediction.
   ret <- df %>% select(-`ti me`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)

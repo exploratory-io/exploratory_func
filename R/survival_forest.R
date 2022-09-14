@@ -764,14 +764,14 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     survival_time_index <- match(survival_time, unique_death_times)
     predicted_survival_rate <- pred$survival[,survival_time_index]
     predicted_survival <- predicted_survival_rate > pred_survival_threshold
-    data$survival_time_for_prediction <- pred_survival_time
+    data$prediction_survival_time <- pred_survival_time
     data$predicted_survival_rate <- predicted_survival_rate
     data$predicted_survival <- predicted_survival
   }
   ret <- data
   # Move those columns as the last columns.
   ret <- ret %>% dplyr::relocate(any_of(c("base_time", "base_survival_time", "prediction_time", "prediction_survival_time",
-                                          "predicted_survival_rate",
+                                          "predicted_survival_rate", "predicted_survival",
                                           "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time", "note")), .after=last_col())
   colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
   colnames(ret)[colnames(ret) == "base_survival_time"] <- "Base Survival Time"

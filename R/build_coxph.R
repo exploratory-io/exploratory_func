@@ -1043,7 +1043,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
     ret <- ret %>% dplyr::relocate(any_of(c("base_time", "base_survival_time", "prediction_time", "prediction_survival_time",
-                                            "predicted_survival_rate",
+                                            "predicted_survival_rate", "predicted_survival",
                                             "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time")), .before=.fitted)
   }
 
