@@ -619,8 +619,9 @@ survival_time_to_predicted_rate <- function(survival_mat, time_vec, time_index_f
   index_vec_residual <- index_vec - index_vec_floor
   index_matrix_floor <- cbind(1:length(time_vec), index_vec_floor)
   index_matrix_ceiling <- cbind(1:length(time_vec), index_vec_ceiling)
-  survival_rate_floor <- survival_mat[index_matrix_floor]
-  survival_rate_ceiling <- survival_mat[index_matrix_ceiling]
+  survival_mat_adjusted <- cbind(rep(1,nrow(survival_mat)), survival_mat)
+  survival_rate_floor <- survival_mat_adjusted[index_matrix_floor]
+  survival_rate_ceiling <- survival_mat_adjusted[index_matrix_ceiling]
   # interpolate between survival_rate_floor and survival_rate_ceiling.
   survival_rate <- survival_rate_floor + (survival_rate_ceiling - survival_rate_floor)*index_vec_residual
   survival_rate
@@ -721,7 +722,8 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
   if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
     # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
     time_unit_days <- get_time_unit_days(x$time_unit)
-    time_index_fun <- approxfun(x$unique.death.times, 1:length(x$unique.death.times))
+    # Function to convert time to index. Extended to cover 0.
+    time_index_fun <- approxfun(c(0, x$unique.death.times), 1:(length(x$unique.death.times)+1))
     # Predict survival probability on the specified date (pred_time).
     if (!is.null(pred_time)) {
       if (base_time_type == "max") {

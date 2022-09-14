@@ -9,7 +9,6 @@ test_that("exp_survival_forest basic with start_time and end_time", {
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", 
                                          predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog=rlang::expr(forcats::fct_relevel(.,"1")), ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
-
   # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
   df2 <- df %>% select(-`ti me`, -`sta tus`)
   ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
@@ -21,13 +20,28 @@ test_that("exp_survival_forest basic with start_time and end_time", {
   ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
   # Without status column and end date colum in the new data.
   ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
-
+  expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog", "ph.karno", "pat.karno", "meal.cal", "wt.loss", "start",
+                         "Survival Rate for Prediction", "Predicted Survival Time", "Predicted Event Time", "Note")
+  expect_equal(colnames(ret), expected_colnames)
+  expect_equal(sum(is.na(ret$`Predicted Event Time`)), 0)
   # Point-of-time-based survival rate prediction with base time specified as a specific date.
   ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="value", base_time=as.Date("2022-01-01"), pred_time=5)
+  expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog", "ph.karno", "pat.karno", "meal.cal", "wt.loss",
+                         "start", "Base Time", "Base Survival Time", "Prediction Time", "Prediction Survival Time",
+                         "Predicted Survival Rate", "Note")
+  expect_equal(colnames(ret), expected_colnames)
+  expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
   # Point-of-time-based survival rate prediction with base time specified as the max of start time column.
   ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="max", pred_time=5)
+  expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog", "ph.karno", "pat.karno", "meal.cal", "wt.loss",
+                         "start", "Base Time", "Base Survival Time", "Prediction Time", "Prediction Survival Time",
+                         "Predicted Survival Rate", "Note")
+  expect_equal(colnames(ret), expected_colnames)
+  expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
   # Point-of-time-based survival rate prediction with base time specified as today.
   ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="today", pred_time=5)
+  expect_equal(colnames(ret), expected_colnames)
+  expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
 
   ret <- model_df %>% prediction2(pretty.name=TRUE)
   ret <- model_df %>% evaluation()
