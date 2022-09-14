@@ -754,7 +754,7 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
       # NA means that the specified survival rate is not covered by the predicted survival curve. 
       data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Didn't meet the threshold.", NA_character_))
       # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing.
-      data <- data %>% dplyr::mutate(predicted_event_time = !!rlang::sym(x$clean_start_time_col) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
+      data <- data %>% dplyr::mutate(predicted_event_time = as.Date(!!rlang::sym(x$clean_start_time_col)) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
     }
   }
   # Predict survival probability on the specified duration (pred_survival_time). Still used in the Analytics View itself.
