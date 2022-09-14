@@ -1,3 +1,4 @@
+
 context("test build_coxph")
 
 test_that("build_coxph.fast with start_time and end_time", {
@@ -28,19 +29,34 @@ test_that("build_coxph.fast with start_time and end_time", {
     ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
     # Without status column and end date colum in the new data.
     ret <- df %>% select(-`ti me`, -`sta tus`, -end) %>% add_prediction(model_df=model_df, pred_survival_rate=0.5)
+    expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog", "ph.karno", "pat.karno", "meal.cal", "wt.loss",
+                           "start", "Survival Rate for Prediction", "Predicted Survival Time", "Predicted Event Time",
+                           "Linear Predictor", "Std Error", "Note")
+    expect_equal(colnames(ret), expected_colnames)
+    expect_equal(sum(is.na(ret$`Predicted Event Time`)), 0)
 
     # Point-of-time-based survival rate prediction with base time specified as a specific date.
     ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="value", base_time=as.Date("2022-01-01"), pred_time=5)
+    expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog", "ph.karno", "pat.karno", "meal.cal", "wt.loss",
+                           "start", "Base Time", "Base Survival Time", "Prediction Time",
+                           "Prediction Survival Time", "Predicted Survival Rate", "Linear Predictor", "Std Error",
+                           "Note")
+    expect_equal(colnames(ret), expected_colnames)
+    expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
     # Point-of-time-based survival rate prediction with base time specified as the max of start time column.
     ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="max", pred_time=5)
+    expect_equal(colnames(ret), expected_colnames)
+    expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
     # Point-of-time-based survival rate prediction with base time specified as today.
     ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="today", pred_time=5)
+    expect_equal(colnames(ret), expected_colnames)
+    expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
 
     # prediction2, which is used for ROC, and Data tab in the Analytics View.
     ret <- model_df %>% prediction2(pretty.name=TRUE)
     ret <- model_df %>% prediction2()
     ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","Survival Time","sta tus", at=NULL, grid=10, revert=TRUE)
-    # Most of the time, true positive rate should be larger than false positive rate. If this is 
+    # Most of the time, true positive rate should be larger than false positive rate. If this is
     expect_true(sum((ret2 %>% mutate(positive=true_positive_rate >= false_positive_rate))$positive) > 0.8 * nrow(ret2))
 
     ret <- model_df %>% evaluation(pretty.name=TRUE)
@@ -71,7 +87,7 @@ test_that("build_coxph.fast with start_time and end_time", {
                    "R Squared","R Squared Max",
                    "Log Likelihood","AIC","BIC",
                    "VIF Max",
-                   "Number of Rows","Number of Events")) 
+                   "Number of Rows","Number of Events"))
     ret <- model_df %>% augment_rowwise(model)
   }
 })
@@ -108,7 +124,7 @@ test_that("build_coxph.fast basic with group-by", {
                  "R Squared","R Squared Max",
                  "Log Likelihood","AIC","BIC",
                  "VIF Max",
-                 "Number of Rows","Number of Events")) 
+                 "Number of Rows","Number of Events"))
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -145,7 +161,7 @@ test_that("test build_coxph.fast with test mode", {
                  "R Squared","R Squared Max",
                  "Log Likelihood","AIC","BIC",
                  "VIF Max",
-                 "Number of Rows","Number of Events")) 
+                 "Number of Rows","Number of Events"))
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -180,7 +196,7 @@ test_that("test build_coxph.fast with test mode with group-by", {
                  "R Squared","R Squared Max",
                  "Log Likelihood","AIC","BIC",
                  "VIF Max",
-                 "Number of Rows","Number of Events")) 
+                 "Number of Rows","Number of Events"))
   ret <- model_df %>% augment_rowwise(model)
 })
 
