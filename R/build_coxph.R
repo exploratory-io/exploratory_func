@@ -1027,7 +1027,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(-log(survival_rate_for_prediction)/exp(.fitted)))
       # NA means that the specified survival rate is not covered by the predicted survival curve. 
       ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Didn't meet the threshold.", NA_character_))
-      # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing. TODO: Adjust this.
+      # For casting the survival time to an integer days, we use floor just to be consistent with survival forest.
+      # In survival forest, we do so to compensate that we ceil in the preprocessing, which is necessary for speed for survival forest, though we do not ceil for Cox regression.
       ret <- ret %>% dplyr::mutate(predicted_event_time = as.Date(!!rlang::sym(x$clean_start_time_col)) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
     }
   }
