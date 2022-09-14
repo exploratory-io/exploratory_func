@@ -1,4 +1,3 @@
-
 context("test build_coxph")
 
 test_that("build_coxph.fast with start_time and end_time", {
@@ -43,20 +42,26 @@ test_that("build_coxph.fast with start_time and end_time", {
                            "Note")
     expect_equal(colnames(ret), expected_colnames)
     expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
+    expect_true(max(ret$`Predicted Survival Rate`) <= 1)
+    expect_true(min(ret$`Predicted Survival Rate`) >= 0)
     # Point-of-time-based survival rate prediction with base time specified as the max of start time column.
     ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="max", pred_time=5)
     expect_equal(colnames(ret), expected_colnames)
     expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
+    expect_true(max(ret$`Predicted Survival Rate`) <= 1)
+    expect_true(min(ret$`Predicted Survival Rate`) >= 0)
     # Point-of-time-based survival rate prediction with base time specified as today.
     ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="today", pred_time=5)
     expect_equal(colnames(ret), expected_colnames)
     expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
+    expect_true(max(ret$`Predicted Survival Rate`) <= 1)
+    expect_true(min(ret$`Predicted Survival Rate`) >= 0)
 
     # prediction2, which is used for ROC, and Data tab in the Analytics View.
     ret <- model_df %>% prediction2(pretty.name=TRUE)
     ret <- model_df %>% prediction2()
     ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","Survival Time","sta tus", at=NULL, grid=10, revert=TRUE)
-    # Most of the time, true positive rate should be larger than false positive rate. If this is
+    # Most of the time, true positive rate should be larger than false positive rate.
     expect_true(sum((ret2 %>% mutate(positive=true_positive_rate >= false_positive_rate))$positive) > 0.8 * nrow(ret2))
 
     ret <- model_df %>% evaluation(pretty.name=TRUE)

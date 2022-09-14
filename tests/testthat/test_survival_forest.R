@@ -31,6 +31,8 @@ test_that("exp_survival_forest basic with start_time and end_time", {
                          "Predicted Survival Rate", "Note")
   expect_equal(colnames(ret), expected_colnames)
   expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
+  expect_true(max(ret$`Predicted Survival Rate`) <= 1)
+  expect_true(min(ret$`Predicted Survival Rate`) >= 0)
   # Point-of-time-based survival rate prediction with base time specified as the max of start time column.
   ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="max", pred_time=5)
   expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog", "ph.karno", "pat.karno", "meal.cal", "wt.loss",
@@ -38,10 +40,14 @@ test_that("exp_survival_forest basic with start_time and end_time", {
                          "Predicted Survival Rate", "Note")
   expect_equal(colnames(ret), expected_colnames)
   expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
+  expect_true(max(ret$`Predicted Survival Rate`) <= 1)
+  expect_true(min(ret$`Predicted Survival Rate`) >= 0)
   # Point-of-time-based survival rate prediction with base time specified as today.
   ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="today", pred_time=5)
   expect_equal(colnames(ret), expected_colnames)
   expect_equal(sum(is.na(ret$`Predicted Survival Rate`)), 0)
+  expect_true(max(ret$`Predicted Survival Rate`) <= 1)
+  expect_true(min(ret$`Predicted Survival Rate`) >= 0)
 
   ret <- model_df %>% prediction2(pretty.name=TRUE)
   ret <- model_df %>% evaluation()
