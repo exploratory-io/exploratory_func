@@ -96,7 +96,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     # 3    12    224       1        0      0.969      0.972      0.977      0.977      0.975      0.969
     # 4    13    223       2        0      0.957      0.961      0.968      0.967      0.966      0.957
 
-    # Adjuct values in time with approxfun. WIP.
+    # Adjuct values in time with approxfun.
     res0 <- res %>% select(starts_with('estimate.'))
     res1 <- tibble::tibble(time = times)
     for (i in 1:length(res0)) {
