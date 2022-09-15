@@ -66,7 +66,16 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
 partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
-  times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
+  # Come up with appropriate time-axis values (times).
+  grid <- 40 # 40 grid point is what we display on the Analytics View.
+  step <- max(data[[time_col]], na.rm=TRUE) %/% grid
+  if (step >= 2) {
+    times <- (0:(max(data[[time_col]], na.rm=TRUE) %/% step)) * step
+  }
+  else {
+    # Use floor so that the number is within the range that is covered by the approxfun we create.
+    times <- 0:floor(max(data[[time_col]], na.rm=TRUE))
+  }
 
   predict.fun <- function(object, newdata) {
     res <- tryCatch({
@@ -87,18 +96,48 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     # 3    12    224       1        0      0.969      0.972      0.977      0.977      0.975      0.969
     # 4    13    223       2        0      0.957      0.961      0.968      0.967      0.966      0.957
 
-    # TODO: There is info on confidence interval, but we are not making use of them here.
-    est <- as.data.frame(t(res %>% select(starts_with('estimate.'))))
+    # Adjuct values in time with approxfun.
+    res0 <- res %>% select(starts_with('estimate.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      # If the time does not start with 0, add (0,1.0) in the data, since this means no one was dead on arrival.
+      if (res$time[1] != 0) {
+        afun <- approxfun(c(0, res$time), c(1.0, res0[[i]]))
+      }
+      else {
+        afun <- approxfun(res$time, res0[[i]])
+      }
+      res1[[paste0('estimate.', i)]] <- afun(times)
+    }
+    est <- as.data.frame(t(res1 %>% dplyr::select(-time)))
+
     #                   V1        V2        V3        V4        V5        V6        V7        V8
     # estimate.1 0.9937747 0.9751551 0.9689481 0.9565364 0.9503338 0.9441345 0.9379359 0.9317387
     # estimate.2 0.9943782 0.9775431 0.9719241 0.9606775 0.9550519 0.9494257 0.9437965 0.9381650
     # estimate.3 0.9954157 0.9816588 0.9770575 0.9678330 0.9632114 0.9585842 0.9539495 0.9493078
     # estimate.4 0.9953371 0.9813465 0.9766677 0.9672892 0.9625909 0.9578874 0.9531767 0.9484592
     # estimate.5 0.9950931 0.9803774 0.9754587 0.9656028 0.9606673 0.9557276 0.9507815 0.9458296
-    high <- as.data.frame(t(res %>% select(starts_with('conf.high.'))))
+
+    # Same for conf.high
+    res0 <- res %>% select(starts_with('conf.high.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      afun <- approxfun(res$time, res0[[i]])
+      res1[[paste0('conf.high.', i)]] <- afun(times)
+    }
+    high <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     high <- high %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'H'), starts_with('V'))
-    low <- as.data.frame(t(res %>% select(starts_with('conf.low.'))))
+
+    # Same for conf.low
+    res0 <- res %>% select(starts_with('conf.low.'))
+    res1 <- tibble::tibble(time = times)
+    for (i in 1:length(res0)) {
+      afun <- approxfun(res$time, res0[[i]])
+      res1[[paste0('conf.low.', i)]] <- afun(times)
+    }
+    low <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     low <- low %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'L'), starts_with('V'))
+
     res <- dplyr::bind_cols(est, high, low)
     res
   }
@@ -376,9 +415,7 @@ build_coxph.fast <- function(df,
     end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
     time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
     time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
-    # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
-    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
-    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
+    df <- df %>% dplyr::mutate(.time = as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days)
     time_col <- ".time"
   }
     
@@ -611,6 +648,13 @@ build_coxph.fast <- function(df,
         model$predictor_funs <- predictor_funs
       }
 
+      # Add cleaned column names. Used for prediction of survival rate on the specified day, and date the survival probability drops to the specified rate. 
+      model$clean_start_time_col <- clean_start_time_col
+      model$clean_end_time_col <- clean_end_time_col
+      model$clean_time_col <- clean_time_col
+      model$clean_status_col <- clean_status_col
+      model$time_unit <- time_unit
+
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
       model
@@ -711,17 +755,6 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
         })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
-
-      # Reduce number of unique x-axis values for better chart drawing performance, and not to overflow it.
-      grid <- 40
-      divider <- max(ret$period) %/% grid
-      if (divider >= 2) {
-        ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
-          group_by(variable, value, chart_type, value_index, period) %>%
-          dplyr::summarize(survival=max(survival)) %>%
-          dplyr::ungroup()
-      }
-
       ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
@@ -875,7 +908,10 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
+                                      base_time = NULL, base_time_type = "max", pred_time = NULL, # For point-in-time-based survival rate prediction. base_time_type can be "value", "from_max", or "from_today".
+                                      pred_survival_rate = NULL, # For survival-rate-based event time prediction.
+                                      pred_survival_time = NULL, pred_survival_threshold = NULL, ...) { # For survival-time-based survival rate prediction.
   # For predict() to find the prediction method, survival needs to be loaded beforehand.
   # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
   loadNamespace("survival")
@@ -889,9 +925,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
 
-    predictor_variables <- all.vars(x$terms)[c(-1,-2)] # c(-1,-2) to skip time and status columns.
+    predictor_variables <- c(all.vars(x$terms)[c(-1, -2)], x$clean_start_time_col) # c(-1, -2) to skip time and status columns.
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
-
     # Rename columns via predictor_variables_orig, which is a named vector.
     #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
     cleaned_data <- newdata %>% dplyr::rename(predictor_variables_orig)
@@ -937,25 +972,85 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
 
   # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
-  # create a function to interpolate function that returns cumulative hazard.
-  bh_fun <- approxfun(bh$time, bh$hazard)
-  cumhaz_base = bh_fun(pred_survival_time)
-  # transform linear predictor (.fitted) into predicted_survival.
-  ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
-                               predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
-                               predicted_survival = predicted_survival_rate > pred_survival_threshold)
+  # Create a function to interpolate function that returns cumulative hazard.
+  # If the time does not start with 0, add (0,0) to avoid letting the function return NA when 0 is in.
+  # This should be appropriate because missing the value for time 0 means that no event happened at time 0,
+  # which means we can assume that the accumulated hazard at time 0 is 0.
+  if (bh$time[1] != 0) {
+    bh_fun <- approxfun(c(0, bh$time), c(0, bh$hazard))
+  }
+  else {
+    bh_fun <- approxfun(bh$time, bh$hazard)
+  }
+
+
+  # Predict survival probability on a specific date.
+  # or predict the day that the survival rate drops to the specified value (pred_survival_rate).
+  # Used for prediction step based on the model from the Analytics View.
+  if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
+    # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
+    time_unit_days <- get_time_unit_days(x$time_unit)
+    # Predict survival probability on the specified date (pred_time).
+    if (!is.null(pred_time)) {
+      if (base_time_type == "max") {
+        base_time <- as.Date(max(cleaned_data[[x$clean_start_time_col]])) # as.Date is to take care of POSIXct column.
+      }
+      else if (base_time_type == "today") {
+        base_time <- lubridate::today()
+      } # if base_time_type is "value", use the argument value as is.
+      # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
+      pred_time <- base_time + lubridate::days(ceiling(pred_time * time_unit_days));
+      ret <- ret %>% dplyr::mutate(base_survival_time = as.numeric(!!base_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
+      # as.Date is to handle the case where the start time column is in POSIXct.
+      ret <- ret %>% dplyr::mutate(prediction_survival_time = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
+      ret <- ret %>% dplyr::mutate(predicted_survival_rate = exp((bh_fun(base_survival_time) - bh_fun(prediction_survival_time))*exp(.fitted)))
+      # NA means that the specified time is not covered by the predicted survival curve. 
+      ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve.", NA_character_))
+      ret <- ret %>% dplyr::mutate(base_time = base_time)
+      ret <- ret %>% dplyr::mutate(prediction_time = pred_time)
+    }
+    # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
+    else {
+      rev_bh_fun <- approxfun(c(0, bh$hazard), c(0, bh$time))
+      ret <- ret %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
+      ret <- ret %>% dplyr::mutate(predicted_survival_time = rev_bh_fun(-log(survival_rate_for_prediction)/exp(.fitted)))
+      # NA means that the specified survival rate is not covered by the predicted survival curve. 
+      ret <- ret %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Didn't meet the threshold.", NA_character_))
+      # For casting the survival time to an integer days, we use floor just to be consistent with survival forest.
+      # In survival forest, we do so to compensate that we ceil in the preprocessing, which is necessary for speed for survival forest, though we do not ceil for Cox regression.
+      ret <- ret %>% dplyr::mutate(predicted_event_time = as.Date(!!rlang::sym(x$clean_start_time_col)) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
+    }
+  }
+  # Predict survival probability on the specified duration (pred_survival_time). Still used in the Analytics View itself.
+  else {
+    cumhaz_base = bh_fun(pred_survival_time)
+    # transform linear predictor (.fitted) into predicted_survival.
+    ret <- ret %>% dplyr::mutate(prediction_survival_time = pred_survival_time,
+                                 predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
+                                 predicted_survival = predicted_survival_rate > pred_survival_threshold)
+  }
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate", "predicted_survival")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("base_time", "base_survival_time", "prediction_time", "prediction_survival_time",
+                                            "predicted_survival_rate", "predicted_survival",
+                                            "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time")), .before=.fitted)
   }
+
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
-  colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
-  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
   colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+  colnames(ret)[colnames(ret) == "base_survival_time"] <- "Base Survival Time"
+  colnames(ret)[colnames(ret) == "prediction_survival_time"] <- "Prediction Survival Time"
+  colnames(ret)[colnames(ret) == "base_time"] <- "Base Time"
+  colnames(ret)[colnames(ret) == "prediction_time"] <- "Prediction Time"
+  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "survival_rate_for_prediction"] <- "Survival Rate for Prediction"
+  colnames(ret)[colnames(ret) == "predicted_survival_time"] <- "Predicted Survival Time"
+  colnames(ret)[colnames(ret) == "predicted_event_time"] <- "Predicted Event Time"
+  colnames(ret)[colnames(ret) == "note"] <- "Note"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {

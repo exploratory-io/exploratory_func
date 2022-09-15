@@ -237,7 +237,9 @@ exp_survival_forest <- function(df,
     time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
     time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
     # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
-    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
+    # This is to make resulting survival curve to have integer data point in the specified time unit.
+    # This also results in faster training of survival forest, since it reduces the number of distinct death times.
+    # Though, it does give undesirable bias to longer survival time when the time unit is larger.
     df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
     time_col <- ".time"
   }
@@ -450,6 +452,13 @@ exp_survival_forest <- function(df,
                                df[[clean_time_col]], df[[clean_status_col]], pred_survival_time,
                                revert=TRUE)
 
+      # Add cleaned column names. Used for prediction of survival rate on the specified day, and date the survival probability drops to the specified rate. 
+      model$clean_start_time_col <- clean_start_time_col
+      model$clean_end_time_col <- clean_end_time_col
+      model$clean_time_col <- clean_time_col
+      model$clean_status_col <- clean_status_col
+      model$time_unit <- time_unit
+
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
@@ -603,8 +612,61 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   }
 }
 
+# Extracts and interpolates survival rate from survival_mat, for the time specified for each observation by time_vec. 
+# survival_mat - Predicted survival curve data obtained from the prediction. 
+# time_vec - Time to extract the prediction from the survival_mat for each observation.
+# time_index_fun - Function to convert time into the column index + 1 of the survival_mat matrix.
+#                  +1 is because we insert a column for time 0 to the matrix to cover the time before the first event. 
+survival_time_to_predicted_rate <- function(survival_mat, time_vec, time_index_fun) {
+  index_vec <- time_index_fun(time_vec)
+  index_vec_floor <- floor(index_vec)
+  index_vec_ceiling <- ceiling(index_vec)
+  # Will use this index_vec_residual for interpolation between the values for index_vec_floor and index_vec_ceiling.
+  index_vec_residual <- index_vec - index_vec_floor
+  # 2-column matrix to pass to the survival_mat_adjusted to extract its elements as a vector.
+  index_matrix_floor <- cbind(1:length(time_vec), index_vec_floor)
+  index_matrix_ceiling <- cbind(1:length(time_vec), index_vec_ceiling)
+  # Insert a column for time 0 to cover the time between 0 and the first event.
+  survival_mat_adjusted <- cbind(rep(1,nrow(survival_mat)), survival_mat)
+  # Extract the values from the matrix as vectors.
+  survival_rate_floor <- survival_mat_adjusted[index_matrix_floor]
+  survival_rate_ceiling <- survival_mat_adjusted[index_matrix_ceiling]
+  # interpolate between survival_rate_floor and survival_rate_ceiling.
+  survival_rate <- survival_rate_floor + (survival_rate_ceiling - survival_rate_floor)*index_vec_residual
+  survival_rate
+}
+
+survival_rate_to_predicted_time <- function(survival_mat, pred_survival_rate, index_time_fun) {
+  time_indice <- rep(NA_real_, nrow(survival_mat))
+  for (i in 1:nrow(survival_mat)) {
+    # Since survival curve monotonously decreases, we can use findInterval that does O(logN) binary search.
+    idx <- findInterval(-pred_survival_rate, -survival_mat[i,])
+    # Interpolate if possible.
+    # When pred_survival_rate is larger than the first survival rate that appear in survivL_mat[i,].
+    if (idx == 0) {
+      denom <- survival_mat[i,idx+1] - 1.0
+      if (!is.na(denom) && denom != 0) {
+        idx <- idx + (pred_survival_rate - 1.0)/denom
+      }
+    }
+    # General case
+    else if (!is.na(idx) && idx < ncol(survival_mat)) {
+      denom <- survival_mat[i,idx+1] - survival_mat[i,idx]
+      if (!is.na(denom) && denom != 0) {
+        idx <- idx + (pred_survival_rate - survival_mat[i,idx])/denom
+      }
+    }
+    time_indice[i] <- idx
+  }
+  res <- index_time_fun(time_indice)
+  res
+}
+
 #' @export
-augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
+augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training",
+                                                base_time = NULL, base_time_type = "max", pred_time = NULL, # For point-in-time-based survival rate prediction. base_time_type can be "value", "max", or "today".
+                                                pred_survival_rate = NULL, # For survival-rate-based event time prediction.
+                                                pred_survival_time = NULL, pred_survival_threshold = NULL, ...) { # For survival-time-based survival rate prediction.
   # For predict() to find the prediction method, ranger needs to be loaded beforehand.
   # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
   loadNamespace("ranger")
@@ -619,6 +681,10 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     }
 
     predictor_variables <- attr(x$df,"predictors")
+    # If start time column is in newdata, use it.
+    if (!is.null(x$clean_start_time_col) && x$terms_mapping[x$clean_start_time_col] %in% colnames(newdata)) {
+      predictor_variables <- c(predictor_variables, x$clean_start_time_col)
+    }
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
     # Rename columns via predictor_variables_orig, which is a named vector.
@@ -656,15 +722,73 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     pred_survival_threshold <- x$pred_survival_threshold
   }
 
-  unique_death_times <- x$forest$unique.death.times
-  survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
-  survival_time_index <- match(survival_time, unique_death_times)
-  predicted_survival_rate <- pred$survival[,survival_time_index]
-  predicted_survival <- predicted_survival_rate > pred_survival_threshold
+  # Predict survival probability on a specific date.
+  # or predict the day that the survival rate drops to the specified value (pred_survival_rate).
+  # Used for prediction step based on the model from the Analytics View.
+  if (!is.null(pred_time) || !is.null(pred_survival_rate)) {
+    # Common logic between point-of-time-based survival rate prediction and rate-based event time prediction.
+    time_unit_days <- get_time_unit_days(x$time_unit)
+    # Function to convert time to index. Extended to cover 0.
+    time_index_fun <- approxfun(c(0, x$unique.death.times), 1:(length(x$unique.death.times)+1))
+    # Predict survival probability on the specified date (pred_time).
+    if (!is.null(pred_time)) {
+      if (base_time_type == "max") {
+        base_time <- as.Date(max(cleaned_data[[x$clean_start_time_col]])) # as.Date is to take care of POSIXct column.
+      }
+      else if (base_time_type == "today") {
+        base_time <- lubridate::today()
+      } # if base_time_type is "value", use the argument value as is.
+      # For casting the time for prediction to an integer days, use ceil to compensate that we ceil in the preprocessing.
+      pred_time <- base_time + lubridate::days(ceiling(pred_time * time_unit_days));
+      data <- data %>% dplyr::mutate(base_survival_time = as.numeric(!!base_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
+      # as.Date is to handle the case where the start time column is in POSIXct.
+      data <- data %>% dplyr::mutate(prediction_survival_time = as.numeric(pred_time - as.Date(!!rlang::sym(x$clean_start_time_col)), units = "days")/time_unit_days)
+      base_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$base_survival_time, time_index_fun)
+      target_survival_rate <- survival_time_to_predicted_rate(pred$survival, data$prediction_survival_time, time_index_fun)
+      data$predicted_survival_rate <- target_survival_rate / base_survival_rate
+      # NA means that the specified time is not covered by the predicted survival curve. 
+      data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_rate), "Out of range of the predicted survival curve.", NA_character_))
+      data <- data %>% dplyr::mutate(base_time = !!base_time)
+      data <- data %>% dplyr::mutate(prediction_time = !!pred_time)
+    }
+    # Predict the day that the survival rate drops to the specified value. (pred_survival_rate should be there.)
+    else {
+      data <- data %>% dplyr::mutate(survival_rate_for_prediction = !!pred_survival_rate)
+      # Predicted survival period
+      index_time_fun <- approxfun(0:length(x$unique.death.times), c(0, x$unique.death.times))
+      data$predicted_survival_time <- survival_rate_to_predicted_time(pred$survival, pred_survival_rate, index_time_fun)
+      # NA means that the specified survival rate is not covered by the predicted survival curve. 
+      data <- data %>% dplyr::mutate(note = if_else(is.na(predicted_survival_time), "Didn't meet the threshold.", NA_character_))
+      # For casting the survival time to an integer days, use floor to compensate that we ceil in the preprocessing.
+      data <- data %>% dplyr::mutate(predicted_event_time = as.Date(!!rlang::sym(x$clean_start_time_col)) + lubridate::days(floor(predicted_survival_time*time_unit_days)))
+    }
+  }
+  # Predict survival probability on the specified duration (pred_survival_time). Still used in the Analytics View itself.
+  else {
+    unique_death_times <- x$forest$unique.death.times
+    survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
+    survival_time_index <- match(survival_time, unique_death_times)
+    predicted_survival_rate <- pred$survival[,survival_time_index]
+    predicted_survival <- predicted_survival_rate > pred_survival_threshold
+    data$prediction_survival_time <- pred_survival_time
+    data$predicted_survival_rate <- predicted_survival_rate
+    data$predicted_survival <- predicted_survival
+  }
   ret <- data
-  ret$`Survival Time for Prediction`<- pred_survival_time
-  ret$`Predicted Survival Rate`<- predicted_survival_rate
-  ret$`Predicted Survival`<- predicted_survival
+  # Move those columns as the last columns.
+  ret <- ret %>% dplyr::relocate(any_of(c("base_time", "base_survival_time", "prediction_time", "prediction_survival_time",
+                                          "predicted_survival_rate", "predicted_survival",
+                                          "survival_rate_for_prediction", "predicted_survival_time", "predicted_event_time", "note")), .after=last_col())
+  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
+  colnames(ret)[colnames(ret) == "base_survival_time"] <- "Base Survival Time"
+  colnames(ret)[colnames(ret) == "prediction_survival_time"] <- "Prediction Survival Time"
+  colnames(ret)[colnames(ret) == "base_time"] <- "Base Time"
+  colnames(ret)[colnames(ret) == "prediction_time"] <- "Prediction Time"
+  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "survival_rate_for_prediction"] <- "Survival Rate for Prediction"
+  colnames(ret)[colnames(ret) == "predicted_survival_time"] <- "Predicted Survival Time"
+  colnames(ret)[colnames(ret) == "predicted_event_time"] <- "Predicted Event Time"
+  colnames(ret)[colnames(ret) == "note"] <- "Note"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
