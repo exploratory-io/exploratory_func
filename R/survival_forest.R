@@ -612,14 +612,23 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   }
 }
 
+# Extracts and interpolates survival rate from survival_mat, for the time specified for each observation by time_vec. 
+# survival_mat - Predicted survival curve data obtained from the prediction. 
+# time_vec - Time to extract the prediction for from the survival_mat for each observation.
+# time_index_fun - Function to convert time into the column index + 1 of the survival_mat matrix.
+#                  +1 is because we insert a column for time 0 to the matrix to cover the time before the first event. 
 survival_time_to_predicted_rate <- function(survival_mat, time_vec, time_index_fun) {
   index_vec <- time_index_fun(time_vec)
   index_vec_floor <- floor(index_vec)
   index_vec_ceiling <- ceiling(index_vec)
+  # Will use this index_vec_residual for interpolation between the values for index_vec_floor and index_vec_ceiling.
   index_vec_residual <- index_vec - index_vec_floor
+  # 2-column matrix to pass to the survival_mat_adjusted to extract its elements as a vector.
   index_matrix_floor <- cbind(1:length(time_vec), index_vec_floor)
   index_matrix_ceiling <- cbind(1:length(time_vec), index_vec_ceiling)
+  # Insert a column for time 0 to cover the time between 0 and the first event.
   survival_mat_adjusted <- cbind(rep(1,nrow(survival_mat)), survival_mat)
+  # Extract the values from the matrix as vectors.
   survival_rate_floor <- survival_mat_adjusted[index_matrix_floor]
   survival_rate_ceiling <- survival_mat_adjusted[index_matrix_ceiling]
   # interpolate between survival_rate_floor and survival_rate_ceiling.
