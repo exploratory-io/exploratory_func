@@ -321,7 +321,13 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     }
   })
   ret <- add_confint(ret, conf_int)
-  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
+  # For Analytics View for GLM (including logistic regression), rename .fitted to linear_predictor.
+  if ("glm_exploratory" %in% class(model_df$model[[1]])) {
+    colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "linear_predictor")
+  }
+  else {
+    colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
+  }
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
   colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residual")
   # For Analytics View for GLM binomial (including logistic regression), rename predicted_response to predicted_probability.
