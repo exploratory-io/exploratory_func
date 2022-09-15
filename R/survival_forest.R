@@ -681,12 +681,9 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     }
 
     predictor_variables <- attr(x$df,"predictors")
-    # If start/end time column is in newdata, use it.
+    # If start time column is in newdata, use it.
     if (!is.null(x$clean_start_time_col) && x$terms_mapping[x$clean_start_time_col] %in% colnames(newdata)) {
       predictor_variables <- c(predictor_variables, x$clean_start_time_col)
-    }
-    if (!is.null(x$clean_end_time_col) && x$terms_mapping[x$clean_end_time_col] %in% colnames(newdata)) {
-      predictor_variables <- c(predictor_variables, x$clean_end_time_col)
     }
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 

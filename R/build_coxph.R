@@ -925,19 +925,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
 
-    if (x$terms_mapping[x$clean_status_col] %in% colnames(newdata)) {
-      predictor_variables <- c(all.vars(x$terms)[c(-1)], x$clean_start_time_col) # c(-1) to skip just time.
-    }
-    else {
-      predictor_variables <- c(all.vars(x$terms)[c(-1, -2)], x$clean_start_time_col) # c(-1, -2) to skip time and status columns.
-    }
-    # If end time column is in newdata, use it.
-    if (!is.null(x$clean_end_time_col) && x$terms_mapping[x$clean_end_time_col] %in% colnames(newdata)) {
-      predictor_variables <- c(predictor_variables, x$clean_end_time_col)
-    }
-
+    predictor_variables <- c(all.vars(x$terms)[c(-1, -2)], x$clean_start_time_col) # c(-1, -2) to skip time and status columns.
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
-
     # Rename columns via predictor_variables_orig, which is a named vector.
     #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
     cleaned_data <- newdata %>% dplyr::rename(predictor_variables_orig)
