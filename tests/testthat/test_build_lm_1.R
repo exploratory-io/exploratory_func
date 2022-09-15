@@ -659,7 +659,7 @@ test_that("add_prediction with logistic regression", {
                                      model_type = "glm",
                                      importance_measure="firm")
   ret <- test_data %>% select(-`CANCELLED X`) %>% add_prediction(model_df=model_df)
-  expect_true(all(c("predicted_probability", "predicted_value","predicted_label") %in% colnames(ret)))
+  expect_true(all(c("predicted_probability", "linear_predictor","predicted_label") %in% colnames(ret)))
 })
 
 test_that("Logistic Regression with test_rate", {
