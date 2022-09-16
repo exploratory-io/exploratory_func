@@ -662,8 +662,9 @@ exp_topic_model <- function(df, text, category = NULL,
     model <- list()
     model$model <- lda_model
 
-    doc_df <- doc_df %>% dplyr::rename(!!topic_map)
     doc_df <- doc_df %>% dplyr::mutate(max_topic=topic_map_int[as.character(max_topic)])
+    # This relocate renames the columns too.
+    doc_df <- doc_df %>% relocate(!!topic_map, .before=max_topic)
     doc_word_df <- doc_word_df %>% dplyr::rename(!!topic_map)
     words_topics_df <- words_topics_df %>% dplyr::rename(!!topic_map)
 
