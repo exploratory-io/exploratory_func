@@ -617,6 +617,7 @@ exp_topic_model <- function(df, text, category = NULL,
     docs_topics <- lda_model$theta # theta is the documents-topics matrix.
 
     # Create a data frame whose row represents a document, with topic info.
+    browser()
     docs_topics_df <- as.data.frame(lda_model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
     doc_df <- df %>% dplyr::bind_cols(docs_topics_df) # TODO: What if df already has columns like topic_max??
@@ -672,12 +673,11 @@ exp_topic_model <- function(df, text, category = NULL,
 #' @param num_top_words - Number of top words for each topic in the output of topic_words type.
 #' @param word_topic_probability_threshold - The probability of the topic of the word required to be highlighted in the output of doc_topics_tagged type.
 tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, word_topic_probability_threshold = 0, ...) {
+  browser()
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
-    docs_topics_df <- as.data.frame(x$model$theta)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max.safe))
-    res <- docs_topics_df %>% dplyr::select(topic) %>% dplyr::group_by(topic) %>% dplyr::summarize(n=n())
+    res <- x$doc_df %>% dplyr::select(max_topic) %>% dplyr::group_by(max_topic) %>% dplyr::summarize(n=n())
     # In case some topic do not have any doc that "belongs to" it, we still want to show a row for the topic with n with 0 value.
-    res <- res %>% tidyr::complete(topic = 1:x$model$k, fill = list(n=0))
+    res <- res %>% tidyr::complete(max_topic = 1:x$model$k, fill = list(n=0)) %>% dplyr::rename(topic = max_topic)
   }
   else if (type == "word_topics") {
     terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
