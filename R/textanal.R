@@ -625,8 +625,8 @@ exp_topic_model <- function(df, text, category = NULL,
     topic_map_df <- topic_map_df %>% tidyr::complete(max_topic = 1:lda_model$k, fill = list(n=0)) %>% dplyr::arrange(desc(n))
     topic_map <- paste0("topic", topic_map_df$max_topic)
     names(topic_map) <- paste0("topic", 1:length(topic_map))
-    topic_map_int <- 1:length(topic_map_df$max_topic)
-    names(topic_map_int) <- topic_map_df$max_topic
+    topic_map_df <- topic_map_df %>% dplyr::mutate(rank = 1:n()) %>% dplyr::arrange(max_topic)
+    topic_map_int <- topic_map_df$rank
 
     # Create a data frame whose row represents a word in a document, from quanteda tokens (x$tokens).
     doc_word_df <- tibble::tibble(document=seq(length(as.list(tokens))), lst=as.list(tokens))
@@ -662,7 +662,7 @@ exp_topic_model <- function(df, text, category = NULL,
     model <- list()
     model$model <- lda_model
 
-    doc_df <- doc_df %>% dplyr::mutate(max_topic=topic_map_int[as.character(max_topic)])
+    doc_df <- doc_df %>% dplyr::mutate(max_topic=topic_map_int[max_topic])
     # This relocate renames the columns too.
     doc_df <- doc_df %>% relocate(!!topic_map, .before=max_topic)
     doc_word_df <- doc_word_df %>% dplyr::rename(!!topic_map)
