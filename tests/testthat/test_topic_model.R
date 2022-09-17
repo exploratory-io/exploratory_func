@@ -53,9 +53,9 @@ test_that("exp_topic_model", {
 
 test_that("tidy.textmodel_lda_exploratory to complete topic with no document belonging to it.", {
   # Create a dummy model_df. We haven't seen this situation from real data yet.
-  theta <- matrix(c(0.9, 0.9, 0.1, 0.1), 2, 2, dimnames=list(c('text1','text2'),c('topic1','topic2')))
-  model <- list(theta=theta, k=2)
-  x <- list(model=model)
+  model <- list(k=2)
+  doc_df <- tibble::tibble(max_topic=c(1,1))
+  x <- list(model=model, doc_df=doc_df)
   class(x) <- "textmodel_lda_exploratory"
   model_df <- tibble::tibble(model = list(x))
   res <- model_df %>% tidy_rowwise(model, type="topics_summary")

@@ -693,6 +693,7 @@ exp_topic_model <- function(df, text, category = NULL,
 #' @param word_topic_probability_threshold - The probability of the topic of the word required to be highlighted in the output of doc_topics_tagged type.
 tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, word_topic_probability_threshold = 0, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
+    browser()
     res <- x$doc_df %>% dplyr::select(max_topic) %>% dplyr::group_by(max_topic) %>% dplyr::summarize(n=n())
     # In case some topic do not have any doc that "belongs to" it, we still want to show a row for the topic with n with 0 value.
     res <- res %>% tidyr::complete(max_topic = 1:x$model$k, fill = list(n=0)) %>% dplyr::rename(topic = max_topic)
