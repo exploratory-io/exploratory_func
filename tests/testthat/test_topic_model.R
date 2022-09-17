@@ -14,8 +14,9 @@ test_that("exp_topic_model with Japanese twitter data", {
   doc_topics_res <- model_df %>% tidy_rowwise(model, type="doc_topics")
   # Ensure the max_topic values from model$doc_df make sense, after the topic name mapping. slice is there to avoid the case with ties,
   # in which case the result can differ because of the randomness.
-  expect_true(all((doc_topics_res %>% slice(1:70) %>% dplyr::mutate(max_topic_2 = summarize_row(across(starts_with("topic")), which.max.safe)) %>%
-                   mutate(test_res = max_topic==max_topic_2))$test_res))
+  test_res <- (doc_topics_res %>% slice(1:70) %>% dplyr::mutate(max_topic_2 = summarize_row(across(starts_with("topic")), which.max.safe)) %>%
+               mutate(test_res = max_topic==max_topic_2))$test_res
+  expect_true(sum(test_res)/length(test_res) > 0.9) # Give room for randomness for tie
   expect_equal(colnames(doc_topics_res), c("created_at", "screen_name", "text", "source", "topic1", "topic2", "topic3", "max_topic", "topic_max"))
   expect_equal(nrow(doc_topics_res), 5000) # NA should be filtered, but empty string should be kept.
 
