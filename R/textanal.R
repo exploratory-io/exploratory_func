@@ -621,11 +621,15 @@ exp_topic_model <- function(df, text, category = NULL,
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
     doc_df <- df %>% dplyr::bind_cols(docs_topics_df) # TODO: What if df already has columns like topic_max??
 
+    # Create mapping between the original topic ids and the topic ids sorted by frequency.
     topic_map_df <- doc_df %>% dplyr::select(max_topic) %>% dplyr::group_by(max_topic) %>% dplyr::summarize(n=n())
+    # In case some topic do not have any doc that "belongs to" it, complete the table with such topics too to make the mapping complete. (lda_model$k is the number of topics.)
     topic_map_df <- topic_map_df %>% tidyr::complete(max_topic = 1:lda_model$k, fill = list(n=0)) %>% dplyr::arrange(desc(n))
+    # The mapping for column names like "topic1".
     topic_map <- paste0("topic", topic_map_df$max_topic)
     names(topic_map) <- paste0("topic", 1:length(topic_map))
     topic_map_df <- topic_map_df %>% dplyr::mutate(rank = 1:n()) %>% dplyr::arrange(max_topic)
+    # The mapping for integer topic id.
     topic_map_int <- topic_map_df$rank
 
     # Create a data frame whose row represents a word in a document, from quanteda tokens (x$tokens).
