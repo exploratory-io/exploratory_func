@@ -621,6 +621,17 @@ exp_topic_model <- function(df, text, category = NULL,
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
     doc_df <- df %>% dplyr::bind_cols(docs_topics_df) # TODO: What if df already has columns like topic_max??
 
+    # Create mapping between the original topic ids and the topic ids sorted by frequency.
+    topic_map_df <- doc_df %>% dplyr::select(max_topic) %>% dplyr::group_by(max_topic) %>% dplyr::summarize(n=n())
+    # In case some topic do not have any doc that "belongs to" it, complete the table with such topics too to make the mapping complete. (lda_model$k is the number of topics.)
+    topic_map_df <- topic_map_df %>% tidyr::complete(max_topic = 1:lda_model$k, fill = list(n=0)) %>% dplyr::arrange(desc(n))
+    # The mapping for column names like "topic1".
+    topic_map <- paste0("topic", topic_map_df$max_topic)
+    names(topic_map) <- paste0("topic", 1:length(topic_map))
+    topic_map_df <- topic_map_df %>% dplyr::mutate(rank = 1:n()) %>% dplyr::arrange(max_topic)
+    # The mapping for integer topic id.
+    topic_map_int <- topic_map_df$rank
+
     # Create a data frame whose row represents a word in a document, from quanteda tokens (x$tokens).
     doc_word_df <- tibble::tibble(document=seq(length(as.list(tokens))), lst=as.list(tokens))
     doc_word_df <- doc_word_df %>% tidyr::unnest_longer(lst, values_to = "word")
@@ -648,12 +659,25 @@ exp_topic_model <- function(df, text, category = NULL,
     # docs_dist_mat <- dist(docs_topics_sampled)
     # docs_coordinates <- cmdscale(docs_dist_mat)
 
+    words_topics_df <- as.data.frame(t(lda_model$phi))
+    words <- rownames(words_topics_df)
+    words_topics_df <- words_topics_df %>% dplyr::mutate(word = !!words) %>% dplyr::relocate(word, .before=NULL)
+
     model <- list()
     model$model <- lda_model
+
+    doc_df <- doc_df %>% dplyr::mutate(max_topic=topic_map_int[max_topic])
+    # This relocate renames the columns too.
+    doc_df <- doc_df %>% relocate(!!topic_map, .before=max_topic)
+    doc_word_df <- doc_word_df %>% dplyr::rename(!!topic_map)
+    words_topics_df <- words_topics_df %>% dplyr::rename(!!topic_map)
+
     # model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     # model$docs_sample_index <- docs_sample_index
     model$doc_df <- doc_df
     model$doc_word_df <- doc_word_df
+    model$words_topics_df <- words_topics_df
+    model$topic_map <- topic_map
     model$text_col <- text_col
     model$category_col <- category_col
     model$sampled_nrow <- sampled_nrow
@@ -673,23 +697,15 @@ exp_topic_model <- function(df, text, category = NULL,
 #' @param word_topic_probability_threshold - The probability of the topic of the word required to be highlighted in the output of doc_topics_tagged type.
 tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, word_topic_probability_threshold = 0, ...) {
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
-    docs_topics_df <- as.data.frame(x$model$theta)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max.safe))
-    res <- docs_topics_df %>% dplyr::select(topic) %>% dplyr::group_by(topic) %>% dplyr::summarize(n=n())
+    res <- x$doc_df %>% dplyr::select(max_topic) %>% dplyr::group_by(max_topic) %>% dplyr::summarize(n=n())
     # In case some topic do not have any doc that "belongs to" it, we still want to show a row for the topic with n with 0 value.
-    res <- res %>% tidyr::complete(topic = 1:x$model$k, fill = list(n=0))
+    res <- res %>% tidyr::complete(max_topic = 1:x$model$k, fill = list(n=0)) %>% dplyr::rename(topic = max_topic)
   }
   else if (type == "word_topics") {
-    terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
-    terms <- rownames(terms_topics_df)
-    terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
-    res <- tibble::tibble(word=terms) %>% dplyr::bind_cols(terms_topics_df)
+    res <- x$words_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max.safe), topic_max = summarize_row(across(starts_with("topic")), max))
   }
   else if (type == "topic_words") { # Similar to the above but this is pivotted and sampled. TODO: Organize.
-    terms_topics_df <- as.data.frame(t(x$model$phi))
-    words <- rownames(terms_topics_df)
-    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word = words)
-    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
+    terms_topics_df <- x$words_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
     res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
   }
   else if (type == "doc_topics") {
@@ -735,10 +751,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     })))
   }
   else if (type == "doc_word_category") {
-    terms_topics_df <- as.data.frame(t(x$model$phi))
-    words <- rownames(terms_topics_df)
-    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word = words)
-    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
+    terms_topics_df <- x$words_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
     top_words_df <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
     top_words_df <- top_words_df %>% mutate(topic=parse_number(topic))
     doc_df <- x$doc_df %>% dplyr::mutate(doc_id=row_number()) %>% dplyr::select(doc_id, document_max_topic=max_topic, !!rlang::sym(x$category_col))
