@@ -86,9 +86,20 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
   times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
+  # Add time 0 if times does not start with 0.
+  time_zero_added <- FALSE
+  if (times[1] != 0) {
+    times <- c(0, times)
+    time_zero_added <- TRUE
+  }
 
   predict.fun <- function(object, newdata) {
-    predict(object, data=newdata)$survival
+    res <- predict(object, data=newdata)$survival
+    # If time 0 is added, add the column of 100% survival.
+    if (time_zero_added) {
+      res <- cbind(rep(1,nrow(res)),res)
+    }
+    res
   }
 
   aggregate.fun <- function(x) {
