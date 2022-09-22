@@ -778,15 +778,16 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
     # For Windows, set encoding to make sure non-ascii data is handled properly.
     # ref: https://github.com/r-dbi/odbc/issues/153
-    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
-      # Encoding and Timezone are need to be passed as a explict argument.
+    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+      # For the legacy mode where we use non-UTF8 Windows encoding.
+      # Encoding and Timezone need to be passed as explicit arguments.
       conn <- DBI::dbConnect(odbc::odbc(),
                              encoding           = encoding[[1]][[2]],
                              timezone           = timezone,
                              timezone_out       = timezone,
                              .connection_string = connectionString)
     } else {
-      # Encoding and Timezone are need to be passed as a explict argument.
+      # Timezone needs to be passed as a explicit argument.
       conn <- DBI::dbConnect(odbc::odbc(),
                              timezone           = timezone,
                              timezone_out       = timezone,
