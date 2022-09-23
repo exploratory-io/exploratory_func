@@ -730,7 +730,7 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
     loc <- Sys.getlocale(category = "LC_CTYPE")
     # loc looks like "Japanese_Japan.932", so split it with dot ".".
     encoding <- stringr::str_split(loc, pattern = "\\.")
-    if (length(encoding[[1]]) == 2) {
+    if (length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
       connectionString <- stringr::str_c(connectionString, ";encoding=", encoding[[1]][[2]])
     }
   }
