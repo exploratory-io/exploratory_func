@@ -730,7 +730,7 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
     loc <- Sys.getlocale(category = "LC_CTYPE")
     # loc looks like "Japanese_Japan.932", so split it with dot ".".
     encoding <- stringr::str_split(loc, pattern = "\\.")
-    if (length(encoding[[1]]) == 2) {
+    if (length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
       connectionString <- stringr::str_c(connectionString, ";encoding=", encoding[[1]][[2]])
     }
   }
@@ -778,15 +778,16 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
     # For Windows, set encoding to make sure non-ascii data is handled properly.
     # ref: https://github.com/r-dbi/odbc/issues/153
-    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
-      # Encoding and Timezone are need to be passed as a explict argument.
+    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+      # For the legacy mode where we use non-UTF8 Windows encoding.
+      # Encoding and Timezone need to be passed as explicit arguments.
       conn <- DBI::dbConnect(odbc::odbc(),
                              encoding           = encoding[[1]][[2]],
                              timezone           = timezone,
                              timezone_out       = timezone,
                              .connection_string = connectionString)
     } else {
-      # Encoding and Timezone are need to be passed as a explict argument.
+      # Timezone needs to be passed as a explicit argument.
       conn <- DBI::dbConnect(odbc::odbc(),
                              timezone           = timezone,
                              timezone_out       = timezone,
@@ -1160,7 +1161,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
             # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
             connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
         }
@@ -1241,7 +1242,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           conn <- DBI::dbConnect(odbc::odbc(),
                                  Driver = driver,
@@ -1323,7 +1324,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           conn <- DBI::dbConnect(odbc::odbc(),
                                  Driver = driver,
