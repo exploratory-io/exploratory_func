@@ -1161,7 +1161,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
             # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
             connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
         }
@@ -1242,7 +1242,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           conn <- DBI::dbConnect(odbc::odbc(),
                                  Driver = driver,
@@ -1324,7 +1324,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           conn <- DBI::dbConnect(odbc::odbc(),
                                  Driver = driver,
