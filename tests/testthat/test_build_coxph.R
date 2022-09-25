@@ -16,6 +16,8 @@ test_that("build_coxph.fast with start_time and end_time", {
     df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
     model_df <- df %>% build_coxph.fast(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog="none", ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
     expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
+    # Make sure the auto-picked prediction survival time is an integer.
+    expect_equal(model_df$model[[1]]$pred_survival_time, floor(model_df$model[[1]]$pred_survival_time))
 
     # Survival-time-based prediction. Still used in the Analytics View, for example, for ROC chart.
     df2 <- df %>% select(-`ti me`, -`sta tus`)
