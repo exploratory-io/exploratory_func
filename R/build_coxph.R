@@ -467,8 +467,10 @@ build_coxph.fast <- function(df,
     # By default, use mean of observations with event.
     # median gave a point where survival rate was still predicted 100% in one of our test case.
     pred_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
-    # Pick maximum of existing values equal or less than the actual mean.
-    pred_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!pred_survival_time))[[time_col]], na.rm=TRUE)
+    # Pick the integer value equal or less than the actual mean.
+    pred_survival_time <- floor(pred_survival_time)
+    # Since 0 is most likely meaningless as a prediction time, pick 1 if the above gives 0.
+    if (pred_survival_time == 0) pred_survival_time <- 1
   }
 
   # cols will be filtered to remove invalid columns
