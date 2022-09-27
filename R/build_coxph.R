@@ -122,8 +122,15 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     res0 <- res %>% select(starts_with('conf.high.'))
     res1 <- tibble::tibble(time = times)
     for (i in 1:length(res0)) {
-      afun <- approxfun(res$time, res0[[i]])
-      res1[[paste0('conf.high.', i)]] <- afun(times)
+      # conf.high values can be NA, and if at least 2 non-NA values are not there, approxfun fails.
+      # Handle such case by outputting NAs.
+      if (sum(!is.na(res0[[i]])) > 2) {
+        afun <- approxfun(res$time, res0[[i]])
+        res1[[paste0('conf.high.', i)]] <- afun(times)
+      }
+      else {
+        res1[[paste0('conf.high.', i)]] <- rep(NA, length(times))
+      }
     }
     high <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     high <- high %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'H'), starts_with('V'))
@@ -132,8 +139,15 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     res0 <- res %>% select(starts_with('conf.low.'))
     res1 <- tibble::tibble(time = times)
     for (i in 1:length(res0)) {
-      afun <- approxfun(res$time, res0[[i]])
-      res1[[paste0('conf.low.', i)]] <- afun(times)
+      # conf.low values can be NA, and if at least 2 non-NA values are not there, approxfun fails.
+      # Handle such case by outputting NAs.
+      if (sum(!is.na(res0[[i]])) > 2) {
+        afun <- approxfun(res$time, res0[[i]])
+        res1[[paste0('conf.low.', i)]] <- afun(times)
+      }
+      else {
+        res1[[paste0('conf.low.', i)]] <- rep(NA, length(times))
+      }
     }
     low <- as.data.frame(t(res1 %>% dplyr::select(-time)))
     low <- low %>% dplyr::rename_with(~stringr::str_replace(., 'V', 'L'), starts_with('V'))
