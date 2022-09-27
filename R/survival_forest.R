@@ -74,7 +74,9 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
     ret <- broom:::tidy.survfit(fit)
     ret
   })
-  ret <- data.table::rbindlist(curve_dfs_list)
+  # Bind the data frames in the list. fill=TRUE is needed because it is possible that strata column is missing for some of the data frames
+  # if var has only one value for all the rows.
+  ret <- data.table::rbindlist(curve_dfs_list, fill=TRUE)
   ret <- ret %>% tidyr::separate(strata, into = c('variable','value'), sep='=') %>% rename(survival=estimate, period=time)
   ret <- ret %>% dplyr::mutate(chart_type = chart_type_map[variable])
   ret <- ret %>% dplyr::mutate(x_type = x_type_map[variable])
