@@ -5,6 +5,9 @@ twitter_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6
 
 test_that("exp_topic_model with Japanese twitter data", {
   model_df <- twitter_df %>% exp_topic_model(text, category=source, stopwords_lang = "japanese")
+  # For doc_topics_tagged tidier to work, column order of topics must be sorted.
+  expect_equal(colnames(model_df$model[[1]]$doc_word_df), c("document","word","topic1","topic2","topic3"))
+  expect_equal(colnames(model_df$model[[1]]$words_topics_df), c("word","topic1","topic2","topic3"))
   res <- model_df %>% tidy_rowwise(model, type="doc_topics_tagged", word_topic_probability_threshold=0.4)
   res <- model_df %>% tidy_rowwise(model, type="topics_summary")
   expect_equal(colnames(res), c("topic", "n"))
@@ -27,8 +30,7 @@ test_that("exp_topic_model with Japanese twitter data", {
   res <- model_df %>% tidy_rowwise(model, type="topic_words")
   expect_equal(colnames(res), c("word", "topic", "probability"))
   res <- model_df %>% tidy_rowwise(model, type="word_topics")
-  # Ingnoring order since column order is expected to be messed up here because of topic name mapping.
-  expect_true(all(colnames(res) %in% c("word", "topic1", "topic2", "topic3", "max_topic", "topic_max")))
+  expect_equal(colnames(res), c("word", "topic1", "topic2", "topic3", "max_topic", "topic_max"))
 })
 
 test_that("exp_topic_model", {

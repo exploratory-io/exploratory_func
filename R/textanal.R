@@ -667,10 +667,11 @@ exp_topic_model <- function(df, text, category = NULL,
     model$model <- lda_model
 
     doc_df <- doc_df %>% dplyr::mutate(max_topic=topic_map_int[max_topic])
-    # This relocate renames the columns too.
-    doc_df <- doc_df %>% relocate(!!topic_map, .before=max_topic)
-    doc_word_df <- doc_word_df %>% dplyr::rename(!!topic_map)
-    words_topics_df <- words_topics_df %>% dplyr::rename(!!topic_map)
+    # These relocate renames the columns as well as sorting the column order.
+    # Especially, for doc_topics_tagged tidier to work, column order of topics in doc_word_df must be sorted.
+    doc_df <- doc_df %>% dplyr::relocate(!!topic_map, .before=max_topic)
+    doc_word_df <- doc_word_df %>% dplyr::relocate(!!topic_map, .after=word)
+    words_topics_df <- words_topics_df %>% dplyr::relocate(!!topic_map, .after=word)
 
     # model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     # model$docs_sample_index <- docs_sample_index
