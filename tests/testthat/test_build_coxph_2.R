@@ -11,4 +11,7 @@ test_that("Verify Cox regression issue fixed by a86c5507 (conf.int NA handling) 
   df3 <- df2 %>% filter(`UA または AA表`)
   model_df <- df3 %>% build_coxph.fast(NULL, `遅れ た表`, `航空 会社表`, `距 離表`, `航空 会社名表`, `年 度表`, `天候による 遅れ表`, `キャンセル コード表`, `キャン セル表`, `出発 空港表`, `出発 都市名表`, `出発 州表`, `到着 空港表`, `到着 都市名表`, `到着 州表`, `出発 時刻表`, `出発 遅れ表`, predictor_funs = list(`航空 会社表`="none", `距 離表`="none", `航空 会社名表`="none", `年 度表`="none", `天候による 遅れ表`="none", `キャンセル コード表`="none", `キャン セル表`="none", `出発 空港表`="none", `出発 都市名表`="none", `出発 州表`="none", `到着 空港表`="none", `到着 都市名表`="none", `到着 州表`="none", `出発 時刻表`="none", `出発 遅れ表`="none"), start_time = `フライト 日表`, end_time = `終了 時表`, time_unit = "auto", test_split_type = "random", test_rate = 0.3)
   expect_true(!is.null(model_df$model))
+  # Originally the issue was found from Cox regression, but run the same test on survival forest which has similar logic.
+  model_df <- df3 %>% exp_survival_forest(NULL, `遅れ た表`, `航空 会社表`, `距 離表`, `航空 会社名表`, `年 度表`, `天候による 遅れ表`, `キャンセル コード表`, `キャン セル表`, `出発 空港表`, `出発 都市名表`, `出発 州表`, `到着 空港表`, `到着 都市名表`, `到着 州表`, `出発 時刻表`, `出発 遅れ表`, predictor_funs = list(`航空 会社表`="none", `距 離表`="none", `航空 会社名表`="none", `年 度表`="none", `天候による 遅れ表`="none", `キャンセル コード表`="none", `キャン セル表`="none", `出発 空港表`="none", `出発 都市名表`="none", `出発 州表`="none", `到着 空港表`="none", `到着 都市名表`="none", `到着 州表`="none", `出発 時刻表`="none", `出発 遅れ表`="none"), start_time = `フライト 日表`, end_time = `終了 時表`, time_unit = "auto", test_split_type = "random", test_rate = 0.3)
+  expect_true(!is.null(model_df$model))
 })
