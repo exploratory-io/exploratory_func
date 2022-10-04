@@ -80,6 +80,8 @@ test_that("build_coxph.fast with start_time and end_time", {
     expect_equal(unique(ret2$variable), variables) # Factor order of the PDP should be the same as the importance.
     expect_true(all(c("estimate", "p.value") %in% colnames(ret2))) # Make sure that estimate and p.value are joined to the result for hover on Prediction tab.
     ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
+    # Verify that period starts with 0. (If the input data does not, we add a data point for time 0.)
+    expect_equal(ret$period[1], 0)
     ret <- model_df %>% tidy_rowwise(model, type='vif')
     ret <- model_df %>% tidy_rowwise(model)
     expect_equal(colnames(ret),
