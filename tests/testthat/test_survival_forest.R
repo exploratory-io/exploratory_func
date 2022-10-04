@@ -11,8 +11,6 @@ test_that("exp_survival_forest basic with start_time and end_time", {
     else {
       df <- df %>% mutate(start = as.POSIXct("2021-01-01"), end = start + lubridate::days(time))
     }
-    df <- df %>% mutate(status = status==2)
-    df <- df %>% mutate(start = as.Date("2021-01-01"), end = start + lubridate::days(time))
     df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
     df <- df %>% mutate(ph.ecog = factor(ph.ecog))
     df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
