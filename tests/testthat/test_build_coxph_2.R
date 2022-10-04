@@ -1,8 +1,8 @@
+context("Cox regression test part 2")
 # This test case detected the following 2 error cases that are fixed in the following commits.
 # a86c5507 - Error in `approxfun(res$time, res0[[i]])`: need at least two non-NA values to interpolate
 # 0603e434 - Error in `data.table::rbindlist(curve_dfs_list)`: Item 11 has 8 columns, inconsistent with item 1 which has 9 columns. To fill missing columns use fill=TRUE.
-context("Verify Cox regression issue fixed by a86c5507 (conf.int NA handling) and 0603e434 (error fron rbindlist) ")
-test_that("exp_arima with aggregation", {
+test_that("Verify Cox regression issue fixed by a86c5507 (conf.int NA handling) and 0603e434 (error fron rbindlist)", {
   df <- exploratory::read_delim_file("https://www.dropbox.com/s/6tmbwv0hbcxda0f/airline_2013_10_tricky_v4_ja_damemoji.csv?dl=1" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE) %>%
     readr::type_convert() %>%
     exploratory::clean_data_frame() %>%
