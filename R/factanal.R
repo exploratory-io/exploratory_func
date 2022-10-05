@@ -169,11 +169,11 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # which is the source of uniqueness in the output from tidy.factanal.
     res <- res %>% dplyr::mutate(communality=1-uniqueness)
     res <- res %>% tidyr::pivot_longer(cols=c(starts_with(factor_loading_prefix), "communality", "uniqueness"), names_to="factor", values_to="value")
-    res <- res %>% dplyr::mutate(factor = case_when(factor=="communality"~"Communality", factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,paste0("^", !!factor_loading_prefix),"Factor "))) # e.g. replaces "MR2" with "Factor 2"
+    res <- res %>% dplyr::mutate(factor = dplyr::case_when(factor=="communality"~"Communality", factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,paste0("^", !!factor_loading_prefix),"Factor "))) # e.g. replaces "MR2" with "Factor 2"
     res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
     # Set factor level to the variable column based on the top factor and value within the variables with the same top factor.
     res <- res %>% dplyr::mutate(factor = forcats::fct_drop(factor), variable=forcats::fct_reorder2(variable, factor, value, .fun=function(x,y) {
-      df=(tibble::tibble(factor=x,value=abs(y)) %>% filter(factor %nin% c('Communality','Uniqueness')) %>% arrange(factor)); max(df$value) - 10*which.max(df$value)
+      df=(tibble::tibble(factor=x,value=abs(y)) %>% dplyr::filter(factor %nin% c('Communality','Uniqueness')) %>% dplyr::arrange(factor)); max(df$value) - 10*which.max(df$value)
     }, .desc=TRUE))
   }
   else if (type == "biplot") {
