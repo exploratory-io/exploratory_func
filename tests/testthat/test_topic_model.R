@@ -12,9 +12,9 @@ test_that("exp_topic_model with Japanese twitter data", {
   # Testing how the result is processed by the Analytics View. #TODO: When it's settled, we might want to move it from the Desktop to here.
   # Make sure that factor levels set on document id is sorted by top topic. 
   # The first level should be an doc ID whose top topic is topic 1.
-  res2 <- res %>% slice_max(topic_max, n=5000) %>% mutate(ID = seq(n())) %>% select(ID, tagged_text, matches('^topic[0-9]+')) %>% pivot_longer(names_to='Topics', values_to='Proportion', matches('^topic[0-9]+$')) %>% mutate(Topics=str_extract(Topics,'[0-9]+')) %>% mutate(Topics=as.numeric(str_extract(Topics,'[0-9]+'))) %>% mutate(ID=factor(ID), ID=forcats::fct_reorder2(ID, Topics, Proportion, .fun=function(x,y){max(y) - 10*x[which.max(y)]}, .desc=TRUE)) %>% rename(Text=tagged_text)
+  res2 <- res %>% dplyr::slice_max(topic_max, n=5000) %>% dplyr::mutate(ID = seq(n())) %>% dplyr::select(ID, tagged_text, matches('^topic[0-9]+')) %>% tidyr::pivot_longer(names_to='Topics', values_to='Proportion', matches('^topic[0-9]+$')) %>% dplyr::mutate(Topics=str_extract(Topics,'[0-9]+')) %>% dplyr::mutate(Topics=as.numeric(str_extract(Topics,'[0-9]+'))) %>% dplyr::mutate(ID=factor(ID), ID=forcats::fct_reorder2(ID, Topics, Proportion, .fun=function(x,y){max(y) - 10*x[which.max(y)]}, .desc=TRUE)) %>% dplyr::rename(Text=tagged_text)
   topic_1_top_doc_id <- levels(res2$ID)[[1]]
-  expect_equal((res2 %>% filter(ID==!!topic_1_top_doc_id) %>% arrange(desc(Proportion)))$Topics[[1]], 1)
+  expect_equal((res2 %>% dplyr::filter(ID==!!topic_1_top_doc_id) %>% dplyr::arrange(desc(Proportion)))$Topics[[1]], 1)
 
   res <- model_df %>% tidy_rowwise(model, type="topics_summary")
   expect_equal(colnames(res), c("topic", "n"))
