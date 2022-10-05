@@ -13,6 +13,10 @@ test_that("exp_factanal", {
     expect_equal(colnames(res),
                  c("SS loadings", "Proportion Var", "Cumulative Var", "Proportion Explained", "Cumulative Proportion", "Factor", "% Variance", "Cummulated % Variance"))
     res <- model_df %>% tidy_rowwise(model, type="loadings")
+    # Make sure that factor levels set on variable column is sorted by top factor.
+    # The first level should be a variable whose top factor is factor 1.
+    factor_1_top_var <- levels(res$variable)[1]
+    expect_equal(as.character((res %>% dplyr::filter(variable==!!factor_1_top_var & factor %nin% c("Communality","Uniqueness")) %>% dplyr::arrange(desc(abs(value))))$factor[1]), "Factor 1")
     expect_equal(colnames(res),
                  c("variable", "factor", "value"))
     expect_equal(levels(res$factor), c("Factor 1", "Factor 2", "Factor 3", "Communality", "Uniqueness")) # Verify that order of factor levels are in order.

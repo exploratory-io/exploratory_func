@@ -4,11 +4,18 @@ context("test topic model function, exp_topic_model")
 twitter_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
 
 test_that("exp_topic_model with Japanese twitter data", {
-  model_df <- twitter_df %>% exp_topic_model(text, category=source, stopwords_lang = "japanese")
+  model_df <- twitter_df %>% exp_topic_model(text, category=source, stopwords_lang = "japanese", max_nrow = 5000)
   # For doc_topics_tagged tidier to work, column order of topics must be sorted.
   expect_equal(colnames(model_df$model[[1]]$doc_word_df), c("document","word","topic1","topic2","topic3"))
   expect_equal(colnames(model_df$model[[1]]$words_topics_df), c("word","topic1","topic2","topic3"))
   res <- model_df %>% tidy_rowwise(model, type="doc_topics_tagged", word_topic_probability_threshold=0.4)
+  # Testing how the result is processed by the Analytics View. #TODO: When it's settled, we might want to move it from the Desktop to here.
+  # Make sure that factor levels set on document id is sorted by top topic. 
+  # The first level should be an doc ID whose top topic is topic 1.
+  res2 <- res %>% dplyr::slice_max(topic_max, n=5000) %>% dplyr::mutate(ID = seq(n())) %>% dplyr::select(ID, tagged_text, matches('^topic[0-9]+')) %>% tidyr::pivot_longer(names_to='Topics', values_to='Proportion', matches('^topic[0-9]+$')) %>% dplyr::mutate(Topics=stringr::str_extract(Topics,'[0-9]+')) %>% dplyr::mutate(Topics=as.numeric(stringr::str_extract(Topics,'[0-9]+'))) %>% dplyr::mutate(ID=factor(ID), ID=forcats::fct_reorder2(ID, Topics, Proportion, .fun=function(x,y){max(y) - 10*x[which.max(y)]}, .desc=TRUE)) %>% dplyr::rename(Text=tagged_text)
+  topic_1_top_doc_id <- levels(res2$ID)[[1]]
+  expect_equal((res2 %>% dplyr::filter(ID==!!topic_1_top_doc_id) %>% dplyr::arrange(desc(Proportion)))$Topics[[1]], 1)
+
   res <- model_df %>% tidy_rowwise(model, type="topics_summary")
   expect_equal(colnames(res), c("topic", "n"))
   expect_equal(sum(res$n), 5000)
