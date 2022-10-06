@@ -109,6 +109,18 @@ test_that("calc_feature_imp(regression) evaluate training and test with permutat
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
+test_that("calc_feature_imp() with test_split_type = ordered and test_rate = 0, which used to have an issue of creating test data set of 1 row.", {
+  set.seed(1) # For stability of result.
+  model_df <- flight %>%
+                calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
+                                 test_rate = 0,
+                                 importance_measure = "firm",
+                                 test_split_type = "ordered", pd_with_bin_means = TRUE) # testing ordered split too.
+
+  ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
+  expect_equal(nrow(ret), 1) # Should be 1 only for trainning set. Test set should not be created.
+})
+
 test_that("calc_feature_imp(binary) evaluate training and test with FIRM importance", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.

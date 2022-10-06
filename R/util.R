@@ -635,6 +635,8 @@ expand_args <- function(call, exclude = c()) {
 #' get sampled indice from data frame
 #' @export
 sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
+  # Return NULL (empty vector) for rate 0 case. If we go on, ordered case would return the index for the last row.
+  if (rate == 0) return(NULL)
   if (!ordered) {
     if(!is.null(seed)){
       set.seed(seed)
