@@ -118,7 +118,7 @@ test_that("calc_feature_imp() with test_split_type = ordered and test_rate = 0, 
                                  test_split_type = "ordered", pd_with_bin_means = TRUE) # testing ordered split too.
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
-  expect_equal(nrow(ret), 1) # Should be 1 only for trainning set. Test set should not be created.
+  expect_equal(nrow(ret), 1) # Should be 1 only for training set. Test set should not be created.
 })
 
 test_that("calc_feature_imp(binary) evaluate training and test with FIRM importance", {
