@@ -1251,6 +1251,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                  UID = username,
                                  PWD = password,
                                  Port = port,
+                                 Encrypt = "optional", # Experimental
                                  encoding = encoding[[1]][[2]],
                                  timezone = timezone,
                                  timezone_out = timezone,
@@ -1263,6 +1264,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                  UID = username,
                                  PWD = password,
                                  Port = port,
+                                 Encrypt = "optional", # Experimental
                                  timezone = timezone,
                                  timezone_out = timezone,
                                  bigint = "numeric")
