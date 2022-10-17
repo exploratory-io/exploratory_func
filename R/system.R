@@ -1249,22 +1249,22 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
-       if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
-          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-           conn <- DBI::dbConnect(odbc::odbc(),
-                                  .connection_string = connectionString,
-                                  encoding = encoding[[1]][[2]],
-                                  timezone = timezone,
-                                  timezone_out = timezone,
-                                  bigint = "numeric"
-          )
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+        conn <- DBI::dbConnect(odbc::odbc(),
+                              .connection_string = connectionString,
+                               encoding = encoding[[1]][[2]],
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       } else { # Without encoding
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 .connection_string = connectionString,
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric"
-          )
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       }
       connection_pool[[key]] <- conn
     }
