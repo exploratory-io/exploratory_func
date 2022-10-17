@@ -1205,7 +1205,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # So make sure odbc package is installed.
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
-    key <- paste("mssqlserver", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("mssqlserver", host, port, databaseName, username, timezone, additionalParams, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -1241,31 +1241,30 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       loc <- Sys.getlocale(category = "LC_CTYPE")
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
+      connectionString <- stringr::str_c(
+        "Driver=", driver, ";Server=tcp:", host, ",", port, ";Database=", databaseName,
+        ";Uid=", username, ";Pwd=", password
+      );
+      if (additionalParams != "") {
+        connectionString <- stringr::str_c(connectionString, ";", additionalParams);
+      }
 
       if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
-          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
-                                 encoding = encoding[[1]][[2]],
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric")
+        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+        conn <- DBI::dbConnect(odbc::odbc(),
+                              .connection_string = connectionString,
+                               encoding = encoding[[1]][[2]],
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       } else { # Without encoding
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric")
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       }
       connection_pool[[key]] <- conn
     }
@@ -1292,7 +1291,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
 
-    key <- paste("snowflake", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("snowflake", host, port, databaseName, username, timezone, additionalParams, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1324,30 +1323,30 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
 
+      connectionString <- stringr::str_c(
+        "Driver=", driver, ";Server=", host, ";Port=", port, ";Database=", databaseName,
+        ";UID=", username, ";PWD=", password
+      );
+      if (additionalParams != "") {
+        connectionString <- stringr::str_c(connectionString, ";", additionalParams);
+      }
+
       if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
-                                 encoding = encoding[[1]][[2]],
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric")
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               encoding = encoding[[1]][[2]],
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       } else { # Without encoding
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric")
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       }
       connection_pool[[key]] <- conn
     }
@@ -3465,7 +3464,7 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
           names
         }
         else {
-          c(names, as.character(arg)) 
+          c(names, as.character(arg))
         }
       }
       else if (rlang::is_call(arg)) {
@@ -3500,7 +3499,7 @@ get_refs_in_call_args_basic <- function(call_name_str, args) {
 
   res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
     if (rlang::is_symbol(arg)) {
-      c(names, as.character(arg)) 
+      c(names, as.character(arg))
     }
     else if (rlang::is_call(arg)) {
       c(names, get_refs_in_call(arg))
@@ -3517,7 +3516,7 @@ get_refs_in_call <- function(call,
                              inside_mutate_and_friends = FALSE,
                              inside_bang = FALSE, # Passes down the state of inside a single bang.
                              inside_bang_bang = FALSE, # Passes down the state of inside a consecutive bang bang.
-                             after_pipe = FALSE 
+                             after_pipe = FALSE
                              ) {
   args <- rlang::call_args(call)
   call_name_str <- rlang::call_name(call)
@@ -3564,7 +3563,7 @@ get_refs_in_script <- function(script, after_pipe = TRUE) {
         c(names, get_refs_in_call(expr, after_pipe = after_pipe))
       }
       else if (rlang::is_symbol(expr)) {
-        c(names, as.character(expr)) 
+        c(names, as.character(expr))
       }
     }, .init = c())
     res
