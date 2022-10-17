@@ -1205,7 +1205,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # So make sure odbc package is installed.
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
-    key <- paste("mssqlserver", host, port, databaseName, username, Encrypt, timezone, Encrypt, sep = ":")
+    key <- paste("mssqlserver", host, port, databaseName, username, Encrypt, timezone, Encrypt, additionalParams, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -3464,7 +3464,7 @@ get_refs_in_call_args_after_pipe <- function(call_name_str,
           names
         }
         else {
-          c(names, as.character(arg)) 
+          c(names, as.character(arg))
         }
       }
       else if (rlang::is_call(arg)) {
@@ -3499,7 +3499,7 @@ get_refs_in_call_args_basic <- function(call_name_str, args) {
 
   res <- purrr::reduce2(args, names(args), function(names, arg, arg_name) {
     if (rlang::is_symbol(arg)) {
-      c(names, as.character(arg)) 
+      c(names, as.character(arg))
     }
     else if (rlang::is_call(arg)) {
       c(names, get_refs_in_call(arg))
@@ -3516,7 +3516,7 @@ get_refs_in_call <- function(call,
                              inside_mutate_and_friends = FALSE,
                              inside_bang = FALSE, # Passes down the state of inside a single bang.
                              inside_bang_bang = FALSE, # Passes down the state of inside a consecutive bang bang.
-                             after_pipe = FALSE 
+                             after_pipe = FALSE
                              ) {
   args <- rlang::call_args(call)
   call_name_str <- rlang::call_name(call)
@@ -3563,7 +3563,7 @@ get_refs_in_script <- function(script, after_pipe = TRUE) {
         c(names, get_refs_in_call(expr, after_pipe = after_pipe))
       }
       else if (rlang::is_symbol(expr)) {
-        c(names, as.character(expr)) 
+        c(names, as.character(expr))
       }
     }, .init = c())
     res
