@@ -1246,7 +1246,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         ";Uid=", username, ";Pwd=", password, ";Encrypt=", Encrypt
       );
       if (additionalParams != "") {
-        connectionString <- stringr::str_c(connectionString, additionalParams);
+        connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
@@ -1291,7 +1291,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
 
-    key <- paste("snowflake", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("snowflake", host, port, databaseName, username, timezone, additionalParams, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1328,7 +1328,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         ";UID=", username, ";PWD=", password
       );
       if (additionalParams != "") {
-        connectionString <- stringr::str_c(connectionString, additionalParams);
+        connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
       if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
