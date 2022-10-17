@@ -1246,7 +1246,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         ";Uid=", username, ";Pwd=", password, ";Encrypt=", Encrypt
       );
       if (additionalParams != "") {
-        connectionString <- string::str_c(connectionString, additionalParams);
+        connectionString <- stringr::str_c(connectionString, additionalParams);
       }
 
        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
@@ -1323,30 +1323,30 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
 
+      connectionString <- stringr::str_c(
+        "Driver=", driver, ";Server=", host, ";Port=", port, ";Database=", databaseName,
+        ";UID=", username, ";PWD=", password
+      );
+      if (additionalParams != "") {
+        connectionString <- stringr::str_c(connectionString, additionalParams);
+      }
+
       if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
-                                 encoding = encoding[[1]][[2]],
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric")
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               encoding = encoding[[1]][[2]],
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       } else { # Without encoding
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric")
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
       }
       connection_pool[[key]] <- conn
     }
