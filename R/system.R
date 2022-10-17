@@ -838,7 +838,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
-                            subType = NULL, sslClientCertKey = "", sslCA = "") {
+                            subType = NULL, sslClientCertKey = "", sslCA = "", Encrypt="optional") {
 
   drv = NULL
   conn = NULL
@@ -1205,7 +1205,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # So make sure odbc package is installed.
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
-    key <- paste("mssqlserver", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("mssqlserver", host, port, databaseName, username, Encrypt, timezone, Encrypt, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -1241,31 +1241,30 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       loc <- Sys.getlocale(category = "LC_CTYPE")
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
+      connectionString <- stringr::str_c(
+        "Driver=", driver, ";Server=tcp:", host,",", port, ";Database=", databaseName,
+        ";Uid=", username, ";Pwd=", password, ";Encrypt=", Encrypt
+      );
+      if (additionalParams != "") {
+        connectionString <- string::str_c(connectionString, additionalParams);
+      }
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+       if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
-                                 encoding = encoding[[1]][[2]],
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric")
+           conn <- DBI::dbConnect(odbc::odbc(),
+                                  .connection_string = connectionString,
+                                  encoding = encoding[[1]][[2]],
+                                  timezone = timezone,
+                                  timezone_out = timezone,
+                                  bigint = "numeric"
+          )
       } else { # Without encoding
           conn <- DBI::dbConnect(odbc::odbc(),
-                                 Driver = driver,
-                                 Server = host,
-                                 Database = databaseName,
-                                 UID = username,
-                                 PWD = password,
-                                 Port = port,
+                                 .connection_string = connectionString,
                                  timezone = timezone,
                                  timezone_out = timezone,
-                                 bigint = "numeric")
+                                 bigint = "numeric"
+          )
       }
       connection_pool[[key]] <- conn
     }
@@ -1703,7 +1702,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param catalog - For Snowflake's Warehouse.
 #' @param timezone - For database session timezone.
 #'
-queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", ...){
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", Encrypt="optional", ...){
   if(type == "") {
     type <- "odbc"
   }
@@ -1712,7 +1711,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   if (type == "dbiodbc" && numOfRows == 0) {
     numOfRows = -1;
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, Encrypt=Encrypt)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
