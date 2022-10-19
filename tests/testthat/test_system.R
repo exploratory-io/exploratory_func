@@ -473,25 +473,22 @@ test_that("read_delim_file with text data", {
   expect_equal(ncol(df),2)
 })
 
-# TODO: For now the below test fails on Linux so skip it for Linux.
-if (Sys.info()["sysname"] !="Linux") {
-  test_that("case_when mixed data types error message", {
-    tryCatch({
-      Global_Sales_1_source1 <- exploratory::read_excel_file("https://www.dropbox.com/s/t9ou9hmbqdxj75f/Global_Sales.xlsx?dl=1")
-      Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
-    }, error = function(e) {
-      if (!is.null(e$parent)) {
-        # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
-        # Once the issue is fixed, we will update the test with the original condition.
-        expect_equal(stringr::str_detect(e$parent$message, "must be a double vector|must be the same length as the vector"),TRUE)
-      } else {
-        # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
-        # Once the issue is fixed, we will update the test with the original condition.
-        expect_equal(stringr::str_detect(e$message, "must be a double vector|must be the same length as the vector"),TRUE)
-      }
-    })
+test_that("case_when mixed data types error message", {
+  tryCatch({
+    Global_Sales_1_source1 <- exploratory::read_excel_file("https://www.dropbox.com/s/t9ou9hmbqdxj75f/Global_Sales.xlsx?dl=1")
+    Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
+  }, error = function(e) {
+    if (!is.null(e$parent)) {
+      # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
+      # Once the issue is fixed, we will update the test with the original condition.
+      expect_equal(stringr::str_detect(e$parent$message, "must be a double vector|must be the same length as the vector"),TRUE)
+    } else {
+      # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
+      # Once the issue is fixed, we will update the test with the original condition.
+      expect_equal(stringr::str_detect(e$message, "must be a double vector|must be the same length as the vector"),TRUE)
+    }
   })
-}
+})
 
 test_that("read_excel_file downlod failed error message", {
   tryCatch({
