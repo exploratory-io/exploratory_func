@@ -1176,7 +1176,49 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         }
         conn <- eval(parse(text=connstr))
       } else if (host != "") {
-        # TODO: Implement direct connect
+        connectionString <- stringr::str_c(
+          "Driver=", driver, ";Server=", host, ":Port=", port, ";Database=", databaseName,
+          ";UID=", username, ";PWD=", password
+        );
+        if (additionalParams != "") {
+          # The "additionalParas" is passed as 'a=1,b=2,c=3'. Replace"," with ";" so that connection string because a=1;b=2;c=3
+          connectionString <- stringr::str_c(connectionString, ";", stringr::str_replace(additionalParams,",", ";"));
+        }
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                .connection_string = connectionString,
+                                 encoding = encoding[[1]][[2]],
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric"
+                                )
+        } else {
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 .connection_string = connectionString,
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric"
+          )
+        }
+      } else if (!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'connectionString')) {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 .connection_string = connectionString,
+                                 encoding = encoding[[1]][[2]],
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric"
+          )
+        } else {
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 .connection_string = connectionString,
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric"
+          )
+        }
       }
       if (is.null(conn)) {
         # capture warning and throw error with the message.
