@@ -1177,11 +1177,11 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         conn <- eval(parse(text=connstr))
       } else if (host != "") {
         connectionString <- stringr::str_c(
-          "Driver=", driver, ";Server=", host, ":Port=", port, ";Database=", databaseName,
+          "Driver=", driver, ";Server=", host, ";Port=", port, ";Database=", databaseName,
           ";UID=", username, ";PWD=", password
         );
         if (additionalParams != "") {
-          # The "additionalParas" is passed as 'a=1,b=2,c=3'. Replace"," with ";" so that connection string because a=1;b=2;c=3
+          # The "additionalParams" is passed as 'a=1,b=2,c=3'. Replace"," with ";" so that connection string because a=1;b=2;c=3
           connectionString <- stringr::str_c(connectionString, ";", stringr::str_replace(additionalParams,",", ";"));
         }
         if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
