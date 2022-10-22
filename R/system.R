@@ -1186,38 +1186,56 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         }
         if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                .connection_string = connectionString,
-                                 encoding = encoding[[1]][[2]],
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric"
-                                )
+          if (timezone != "") {
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                  .connection_string = connectionString,
+                                   encoding = encoding[[1]][[2]],
+                                   timezone = timezone,
+                                   timezone_out = timezone,
+                                   bigint = "numeric")
+          } else {
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                   .connection_string = connectionString,
+                                   encoding = encoding[[1]][[2]],
+                                   bigint = "numeric")
+          }
+        } else if (timezone != "") {
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                   .connection_string = connectionString,
+                                   timezone = timezone,
+                                   timezone_out = timezone,
+                                   bigint = "numeric")
         } else {
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 .connection_string = connectionString,
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric"
-          )
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                   .connection_string = connectionString,
+                                   bigint = "numeric")
         }
       } else if (!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'connectionString')) {
         if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 .connection_string = connectionString,
-                                 encoding = encoding[[1]][[2]],
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric"
-          )
-        } else {
-          conn <- DBI::dbConnect(odbc::odbc(),
-                                 .connection_string = connectionString,
-                                 timezone = timezone,
-                                 timezone_out = timezone,
-                                 bigint = "numeric"
-          )
+          if (timezone != "") { # both encoding and timezone.
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                   .connection_string = connectionString,
+                                   encoding = encoding[[1]][[2]],
+                                   timezone = timezone,
+                                   timezone_out = timezone,
+                                   bigint = "numeric")
+          } else { # encoding only
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                   .connection_string = connectionString,
+                                   encoding = encoding[[1]][[2]],
+                                   bigint = "numeric")
+          }
+        } else if (timezone != "") { # no encoding but timezone.
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                   .connection_string = connectionString,
+                                   timezone = timezone,
+                                   timezone_out = timezone,
+                                   bigint = "numeric")
+        } else { # no encoding no timezone.
+            conn <- DBI::dbConnect(odbc::odbc(),
+                                   .connection_string = connectionString,
+                                   bigint = "numeric")
         }
       }
       if (is.null(conn)) {
@@ -1744,7 +1762,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param catalog - For Snowflake's Warehouse.
 #' @param timezone - For database session timezone.
 #'
-queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", ...){
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  ...){
   if(type == "") {
     type <- "odbc"
   }
@@ -1753,7 +1771,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   if (type == "dbiodbc" && numOfRows == 0) {
     numOfRows = -1;
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
