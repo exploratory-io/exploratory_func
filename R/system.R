@@ -1112,7 +1112,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!is.null(host)) {
       hoststr = host;
     }
-    key <- paste(type, dsn, hoststr, username, additionalParams, driver, timezone, sep = ":")
+    key <- paste(type, subType, dsn, hoststr, username, additionalParams, driver, timezone, connectionString, sep = ":")
     conn <- connection_pool[[key]]
     conn <- NULL
     if (!is.null(conn)){
@@ -1603,7 +1603,11 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     }
   }
   else if(type %in% c("odbc","dbiodbc", "teradata", "access")) { # odbc
-    key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
+    if (type == "dbiodbc") {
+      key <- paste(type, subType, dsn, hoststr, username, additionalParams, driver, timezone, connectionString, sep = ":")
+    } else {
+      key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
+    }
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({ # try to close connection and ignore error
