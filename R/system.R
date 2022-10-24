@@ -1112,7 +1112,11 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!is.null(host)) {
       hoststr = host;
     }
-    key <- paste(type, subType, dsn, hoststr, username, additionalParams, driver, timezone, connectionString, sep = ":")
+    driverstr = ""
+    if(!is.null(driver)) {
+      driverstr = driver;
+    }
+    key <- paste(type, subType, dsn, hoststr, username, additionalParams, driverstr, timezone, connectionString, sep = ":")
     conn <- connection_pool[[key]]
     conn <- NULL
     if (!is.null(conn)){
@@ -1550,7 +1554,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
-                              sslClientCertKey = "", sslCA = "") {
+                              sslClientCertKey = "", sslCA = "", subType = NULL, driver = "") {
   key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
@@ -1604,6 +1608,10 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
   }
   else if(type %in% c("odbc","dbiodbc", "teradata", "access")) { # odbc
     if (type == "dbiodbc") {
+      hoststr = ""
+      if(!is.null(host)) {
+        hoststr = host;
+      }
       key <- paste(type, subType, dsn, hoststr, username, additionalParams, driver, timezone, connectionString, sep = ":")
     } else {
       key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
@@ -1896,7 +1904,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param catalog - For Snowflake's Warehouse.
 #' @param timezone - For database session timezone.
 #'
-queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  ...){
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", ...){
   if(type == "") {
     type <- "odbc"
   }
@@ -1905,7 +1913,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   if (type == "dbiodbc" && numOfRows == 0) {
     numOfRows = -1;
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString, subType = subType)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
