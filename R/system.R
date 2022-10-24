@@ -1150,7 +1150,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       })
     }
     connect <- function() {
-      if(is.null(subType) || subType == '' || subType == "dsn"){ #
+      if(is.null(subType) || subType == '' || subType == "dsn"){ # for dsn based connection case.
         connstr <- stringr::str_c("DBI::dbConnect(odbc::odbc(), dsn = '", dsn , "'")
         if(username != ""){
           connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
@@ -1179,7 +1179,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
         }
         conn <- eval(parse(text=connstr))
-      } else if (subType == "conn_str_kv") {
+      } else if (subType == "conn_str_kv") { # for key/value connection string case. (e.g. host=server1)
         connectionString <- ""
         hasArgument <- FALSE
         if (!is.null(driver) && driver != "") {
@@ -1254,7 +1254,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                  .connection_string = connectionString,
                                  bigint = "numeric")
         }
-      } else if (!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'conn_str_text')) {
+      } else if (!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'conn_str_text')) { # For manually entered connection string case.
         if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           if (timezone != "") { # both encoding and timezone.
