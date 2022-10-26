@@ -189,9 +189,11 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
                                        na = c("", "NA"), quoted_na = TRUE,
                                        comment = "", trim_ws = FALSE,
                                        skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                                       shared_with_me = FALSE,
+                                       team_drive_id = NULL,
                                        progress = interactive()) {
   tryCatch({
-    items <- exploratory::listItemsInGoogleDrive(path = folderId, type =  c("csv", "tsv", "txt"))
+    items <- exploratory::listItemsInGoogleDrive(path = folderId, type =  c("csv", "tsv", "txt"), sharedWithMe = shared_with_me, teamDriveId = team_drive_id)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "File not found")) {
       # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
@@ -250,10 +252,13 @@ getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE,
 
 #'API that imports multiple Excel files from Google Drive
 #'@export
-searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
+searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", forPreview = FALSE, sheet = 1, col_names = TRUE,
+                                                  col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL,
+                                                  detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE,
+                                                  convertDataTypeToChar = TRUE, tzone = NULL, shared_with_me = FALSE, team_drive_id = NULL, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   tryCatch({
-    items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"))
+    items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"), sharedWithMe = shared_with_me, teamDriveId = team_drive_id)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "File not found")) {
       # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
