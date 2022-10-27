@@ -1150,6 +1150,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       })
     }
     connect <- function() {
+      loc <- Sys.getlocale(category = "LC_CTYPE")
+      # loc looks like "Japanese_Japan.932", so split it with dot ".".
+      encoding <- stringr::str_split(loc, pattern = "\\.")
+
       if(is.null(subType) || subType == '' || subType == "dsn"){ # for dsn based connection case.
         connstr <- stringr::str_c("DBI::dbConnect(odbc::odbc(), dsn = '", dsn , "'")
         if(username != ""){
@@ -1159,9 +1163,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
         }
 
-        loc <- Sys.getlocale(category = "LC_CTYPE")
-        # loc looks like "Japanese_Japan.932", so split it with dot ".".
-        encoding <- stringr::str_split(loc, pattern = "\\.")
 
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
@@ -1904,7 +1905,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param catalog - For Snowflake's Warehouse.
 #' @param timezone - For database session timezone.
 #'
-queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", ...){
+queryODBC <- function(dsn="", username="", password="", additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", ...){
   if(type == "") {
     type <- "odbc"
   }
