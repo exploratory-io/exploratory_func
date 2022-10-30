@@ -260,7 +260,7 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
       )
     )
   } else {
-    stop("OAuth token is not set for Google BigQuery.")
+    stop("OAuth token is not set for Google Cloud Storage")
   }
 }
 
@@ -268,6 +268,42 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
 #' @export
 refreshGoogleTokenForBigQuery <- function(tokenFileId){
   getGoogleTokenForBigQuery(tokenFileId, FALSE)
+}
+
+#' @export
+getGoogleTokenForCloudStorage <- function(useCache=TRUE){
+  if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
+
+  appName = "google"
+  # retrieve token info from environment
+  # main purpose is to enable server refresh
+  token_info <- getTokenInfo("googlecloudstorage")
+  if(!is.null(token_info)){
+    HttrOAuthToken2.0$new(
+      authorize = "https://accounts.google.com/o/oauth2/auth",
+      access = "https://accounts.google.com/o/oauth2/token",
+      validate = "https://www.googleapis.com/oauth2/v1/tokeninfo",
+      revoke = "https://accounts.google.com/o/oauth2/revoke",
+      appname = appName,
+      credentials = list(
+        access_token = token_info$access_token,
+        refresh_token = token_info$refresh_token,
+        token_type = token_info$token_type,
+        expires_in = token_info$expires_in
+      )
+    )
+  } else {
+    stop("OAuth token is not set for Google Cloud Storage")
+  }
+}
+
+#' API to refresh token
+#' @export
+refreshGoogleTokenForCloudStorage <- function(){
+  getGoogleTokenForBigQuery(FALSE)
 }
 
 

@@ -2111,10 +2111,15 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
 
 #' API to get a list of buckets from Google Cloud Storage
 #' @export
-listGoogleCloudStorageBuckets <- function(project, tokenFileId){
+listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", shouldUseCloudStorageToken = FALSE){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId)
+  token <- '';
+  if (shouldUseCloudStorageToken) {
+    token <- getGoogleTokenForCloudStorage();
+  } else {
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+  }
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
   # make sure to pass "noAcl" as projection so that Google won't limit maxResults as 200.
   # ref: https://cloud.google.com/storage/docs/json_api/v1/buckets/list
@@ -2220,7 +2225,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
 
 #' API to get projects for current oauth token
 #' @export
-getGoogleBigQueryProjects <- function(tokenFileId=""){
+getGoogleBigQueryProjects <- function(tokenFileId="", shouldUseCloudStorageToken = FALSE){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2229,7 +2234,12 @@ getGoogleBigQueryProjects <- function(tokenFileId=""){
     warningMessage <<- w
   }
   main <- function(){
-    token <- getGoogleTokenForBigQuery(tokenFileId);
+    token <- ''
+    if (shouldUseCloudStorageToken) {
+      token <- getGoogleTokenForCloudStorage();
+    } else {
+      token <- getGoogleTokenForBigQuery(tokenFileId);
+    }
     bigrquery::set_access_cred(token)
     bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
   }
