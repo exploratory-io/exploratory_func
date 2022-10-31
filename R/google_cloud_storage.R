@@ -14,13 +14,13 @@ getGoogleCloudStorageFolders <- function(bucket, prefix = NULL, ...) {
 }
 
 
-#' API to download remote data file (excel, csv) from Amazon S3 and cache it if necessary
+#' API to download remote data file (excel, csv) from Google Cloud Storage and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
-#' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
-downloadDataFileFromGoogleCloudStorage <- function(bucket, fileName){
+#' and a R variable with name of hashed bucket, file are  assigned to the path given by tempfile.
+downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
   shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
-  hash <- digest::digest(stringr::str_c(bucket, fileName, sep = ":"), "md5", serialize = FALSE)
+  hash <- digest::digest(stringr::str_c(bucket, file, sep = ":"), "md5", serialize = FALSE)
   tryCatch({
     filepath <- getDownloadedFilePath(hash)
   }, error = function(e){
@@ -32,7 +32,7 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, fileName){
   if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)) {
     filepath
   } else {
-    ext <- stringr::str_to_lower(tools::file_ext(fileName))
+    ext <- stringr::str_to_lower(tools::file_ext(file))
     tmp <- tempfile(fileext = stringr::str_c(".", ext))
 
     # In case of using Rserve on linux, somehow it doesn't create a temporary
@@ -49,7 +49,7 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, fileName){
     dir.create(tempdir(), showWarnings = FALSE)
 
     # download file to temporary location
-    googleCloudStorageR::gcs_get_object(fileName, bucket = bucket, saveToDisk = tmp)
+    googleCloudStorageR::gcs_get_object(file, bucket = bucket, saveToDisk = tmp)
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
       setDownloadedFilePath(hash, tmp)
@@ -71,9 +71,9 @@ listItemsInGoogleCloudStorageBucket <- function(bucket, prefix, delimiter){
 #' @param bucket
 #' @param filenName
 #' @export
-clearGoogleCloudStorageCacheFile <- function(bucket, fileName){
+clearGoogleCloudStorageCacheFile <- function(bucket, file){
   options(tam.should.cache.datafile = FALSE)
-  hash <- digest::digest(stringr::str_c(bucket, fileName, sep = ":"), "md5", serialize = FALSE)
+  hash <- digest::digest(stringr::str_c(bucket, file, sep = ":"), "md5", serialize = FALSE)
   tryCatch({
     filepath <- eval(as.name(hash))
     do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
@@ -84,17 +84,17 @@ clearGoogleCloudStorageCacheFile <- function(bucket, fileName){
 
 #'Wrapper for readr::guess_encoding to support Google Cloud Storage csv file
 #'@export
-guessFileEncodingForGoogleCloudStorageFile <- function(bucket, fileName, nNax = 1e4, threshold = 0.20){
+guessFileEncodingForGoogleCloudStorageFile <- function(bucket, file, n_max = 1e4, threshold = 0.20){
   loadNamespace("readr")
-  filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, fileName = fileName)
-  readr::guess_encoding(filePath, nMax, threshold)
+  filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
+  readr::guess_encoding(filePath, n_max, threshold)
 
 }
 
 
 #'API that imports a CSV file from Google Cloud Storage.
 #'@export
-getCSVFileFromGoogleCloudStorage <- function(fileName, bucket, delim, quote = '"',
+getCSVFileFromGoogleCloudStorage <- function(file, bucket, delim, quote = '"',
                              escape_backslash = FALSE, escape_double = TRUE,
                              col_names = TRUE, col_types = NULL,
                              locale = readr::default_locale(),
@@ -103,13 +103,13 @@ getCSVFileFromGoogleCloudStorage <- function(fileName, bucket, delim, quote = '"
                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                              progress = interactive()) {
   tryCatch({
-    filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, fileName = fileName)
+    filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, fileName)), ' :: There is no such file in the AWS S3 bucket.'))
+      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, file)), ' :: There is no such file in the AWS S3 bucket.'))
     }
     else {
       stop(e)
@@ -131,7 +131,7 @@ getCSVFileFromGoogleCloudStorage <- function(fileName, bucket, delim, quote = '"
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-getCSVFilesFromGoogleCloudStorage <- function(files, bucket, forPreview = FALSE, delim, quote = '"',
+getCSVFilesFromGoogleCloudStorage <- function(files, bucket, for_preview = FALSE, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
                               col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
@@ -140,7 +140,7 @@ getCSVFilesFromGoogleCloudStorage <- function(files, bucket, forPreview = FALSE,
                               skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                               progress = interactive()) {
   # for preview mode, just use the first file.
-  if (forPreview & length(files) > 0) {
+  if (for_preview & length(files) > 0) {
     files <- files[1]
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
@@ -192,7 +192,7 @@ searchAndGetCSVFilesFromGoogleCloudStorage <- function(bucket = "", folder = "",
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getCSVFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, forPreview = for_preview, delim = delim, quote = quote,
+  getCSVFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, for_preview = for_preview, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
                     skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
 
@@ -201,15 +201,15 @@ searchAndGetCSVFilesFromGoogleCloudStorage <- function(bucket = "", folder = "",
 
 #'API that imports a Excel file from AWS S3.
 #'@export
-getExcelFileFromGoogleCloudStorage <- function(fileName, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...) {
+getExcelFileFromGoogleCloudStorage <- function(file, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...) {
   tryCatch({
-    filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, fileName = fileName)
+    filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, fileName)), ' :: There is no such file in the AWS S3 bucket.'))
+      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, file)), ' :: There is no such file in the AWS S3 bucket.'))
     }
     else {
       stop(e)
@@ -244,7 +244,7 @@ searchAndGetExcelFilesFromGoogleCloudStorage <- function(bucket = '', folder = '
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  exploratory::getExcelFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, forPreview = for_preview, sheet = sheet,
+  exploratory::getExcelFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, for_preview = for_preview, sheet = sheet,
                                    col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                    use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols,
                                    check.names = check.names, tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, ...)
@@ -252,9 +252,9 @@ searchAndGetExcelFilesFromGoogleCloudStorage <- function(bucket = '', folder = '
 
 #'API that imports multiple Excel files from AWS S3.
 #'@export
-getExcelFilesFromGoogleCloudStorage <- function(files, bucket, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+getExcelFilesFromGoogleCloudStorage <- function(files, bucket, for_preview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # for preview mode, just use the first file.
-  if (forPreview & length(files) > 0) {
+  if (for_preview & length(files) > 0) {
     files <- files[1]
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
@@ -272,7 +272,7 @@ getExcelFilesFromGoogleCloudStorage <- function(files, bucket, forPreview = FALS
 
 #'Wrapper for readxl::excel_sheets to support AWS S3 Excel file
 #'@export
-getExcelSheetsFromGoogleCloudStorageExcelFile <- function(fileName, bucket){
-  filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, fileName = fileName)
+getExcelSheetsFromGoogleCloudStorageExcelFile <- function(file, bucket){
+  filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
   readxl::excel_sheets(filePath)
 }
