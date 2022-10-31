@@ -18,6 +18,9 @@ getGoogleCloudStorageFolders <- function(bucket, prefix = NULL, ...) {
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed bucket, file are  assigned to the path given by tempfile.
 downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
+  token <- exploratory:::getGoogleTokenForCloudStorage()
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+
   shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
   hash <- digest::digest(stringr::str_c(bucket, file, sep = ":"), "md5", serialize = FALSE)
