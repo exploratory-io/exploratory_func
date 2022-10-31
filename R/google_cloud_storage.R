@@ -131,7 +131,7 @@ getCSVFileFromGoogleCloudStorage <- function(fileName, bucket, delim, quote = '"
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-getCSVFilesFromGoogleCloudStorage <- function(files, project, bucket, forPreview = FALSE, delim, quote = '"',
+getCSVFilesFromGoogleCloudStorage <- function(files, bucket, forPreview = FALSE, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
                               col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
@@ -145,7 +145,7 @@ getCSVFilesFromGoogleCloudStorage <- function(files, project, bucket, forPreview
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
-  df <- purrr::map_dfr(files, exploratory::getCSVFileFromGoogleCloudStorage, project = project, bucket = bucket, delim = delim, quote = quote,
+  df <- purrr::map_dfr(files, exploratory::getCSVFileFromGoogleCloudStorage, bucket = bucket, delim = delim, quote = quote,
                        escape_backslash = escape_backslash, escape_double = escape_double,
                        col_names = col_names, col_types = col_types,
                        locale = locale,
@@ -166,7 +166,7 @@ getCSVFilesFromGoogleCloudStorage <- function(files, project, bucket, forPreview
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-searchAndGetCSVFilesFromGoogleClooudStorage <- function(searchKeyword,  bucket, forPreview = FALSE, delim, quote = '"',
+searchAndGetCSVFilesFromGoogleCloudStorage <- function(bucket = "", folder = "", search_keyword = "", for_preview = FALSE, delim, quote = '"',
                                        escape_backslash = FALSE, escape_double = TRUE,
                                        col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                                        locale = readr::default_locale(),
@@ -177,14 +177,13 @@ searchAndGetCSVFilesFromGoogleClooudStorage <- function(searchKeyword,  bucket, 
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
-    files <- aws.s3::get_bucket_df(project = project, bucket = bucket,max= Inf) %>%
-      filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+    files <- googleCloudStorageR::gcs_list_objects(bucket = bucket, detail= "more", prefix = folder, delimiter = "/") %>%
+      filter(str_detect(name, stringr::str_c("(?i)", search_keyword)))
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
-      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
-      # or "Not Found (HTTP 404).".
+    if (stringr::str_detect(e$message, "(http_404 The specified bucket does not exist)")) {
+      # Looking for error that looks like "http_404 The specified bucket does not exist",
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-7 :: ', jsonlite::toJSON(bucket), ' :: The specified AWS S3 bucket does not exist.'))
+      stop(paste0('EXP-DATASRC-7 :: ', jsonlite::toJSON(bucket), ' :: The specified Google Cloud Storage bucket does not exist.'))
     }
     else {
       stop(e)
@@ -193,7 +192,7 @@ searchAndGetCSVFilesFromGoogleClooudStorage <- function(searchKeyword,  bucket, 
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getCSVFilesFromGoogleCloudStorage(files = files$Key, project = project, bucket = bucket, forPreview = forPreview, delim = delim, quote = quote,
+  getCSVFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, forPreview = for_preview, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
                     skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
 
