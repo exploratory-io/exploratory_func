@@ -84,10 +84,10 @@ clearGoogleCloudStorageCacheFile <- function(bucket, fileName){
 
 #'Wrapper for readr::guess_encoding to support Google Cloud Storage csv file
 #'@export
-guessFileEncodingForGoogleCloudStorageFile <- function(bucket, fileName, n_max = 1e4, threshold = 0.20){
+guessFileEncodingForGoogleCloudStorageFile <- function(bucket, fileName, nNax = 1e4, threshold = 0.20){
   loadNamespace("readr")
   filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, fileName = fileName)
-  readr::guess_encoding(filePath, n_max, threshold)
+  readr::guess_encoding(filePath, nMax, threshold)
 
 }
 
