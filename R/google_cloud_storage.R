@@ -97,11 +97,14 @@ getCSVFileFromGoogleCloudStorage <- function(file, bucket, delim, quote = '"',
   tryCatch({
     filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
-      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
-      # or "Not Found (HTTP 404).".
+    if (stringr::str_detect(e$message, "http_404 The specified bucket does not exist")) {
+      # Looking for error that looks like "http_404 The specified bucket does not exist.".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, file)), ' :: There is no such file in the AWS S3 bucket.'))
+      stop(paste0('EXP-DATASRC-18 :: ', jsonlite::toJSON(c(bucket)), ' :: The Google Cloud Storage bucket does not exist.'))
+    } else if (stringr::str_detect(e$message, "http_404 Unspecified error")) {
+      # Looking for error that looks like "http_404 Unspecified error".
+      # This seems to be returned when the file does not exist.
+      stop(paste0('EXP-DATASRC-19 :: ', jsonlite::toJSON(c(bucket, file)), ' :: There is no file in the Google Cloud Storage bucket that matches with the name.'))
     }
     else {
       stop(e)
@@ -172,17 +175,21 @@ searchAndGetCSVFilesFromGoogleCloudStorage <- function(bucket = "", folder = "",
     files <- googleCloudStorageR::gcs_list_objects(bucket = bucket, detail= "more", prefix = folder, delimiter = "/") %>%
       filter(str_detect(name, stringr::str_c("(?i)", search_keyword)))
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(http_404 The specified bucket does not exist)")) {
-      # Looking for error that looks like "http_404 The specified bucket does not exist",
+    if (stringr::str_detect(e$message, "http_404 The specified bucket does not exist")) {
+      # Looking for error that looks like "http_404 The specified bucket does not exist.".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-7 :: ', jsonlite::toJSON(bucket), ' :: The specified Google Cloud Storage bucket does not exist.'))
+      stop(paste0('EXP-DATASRC-18 :: ', jsonlite::toJSON(c(bucket)), ' :: The Google Cloud Storage bucket does not exist.'))
+    } else if (stringr::str_detect(e$message, "http_404 Unspecified error")) {
+      # Looking for error that looks like "http_404 Unspecified error".
+      # This seems to be returned when the file does not exist.
+      stop(paste0('EXP-DATASRC-19 :: ', jsonlite::toJSON(c(bucket)), ' :: There is no file in the Google Cloud Storage bucket that matches with the file name.'))
     }
     else {
       stop(e)
     }
   })
   if (nrow(files) == 0) {
-    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+    stop(paste0('EXP-DATASRC-19 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
   getCSVFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, for_preview = for_preview, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
