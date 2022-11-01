@@ -45,9 +45,10 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
   }
 }
 
-#' API to list items inside a bucket.
+#' API to list items inside a Google Cloud Storage Bucket.
 #' @param bucket
-#' @param filenName
+#' @param prefix
+#' @param delimiter
 #' @export
 listItemsInGoogleCloudStorageBucket <- function(bucket, prefix, delimiter){
   googleCloudStorageR::gcs_list_objects(bucket = bucket, detail="more", prefix = prefix, delimiter = delimiter)
@@ -56,7 +57,7 @@ listItemsInGoogleCloudStorageBucket <- function(bucket, prefix, delimiter){
 
 #' API to clear Google Cloud Storage cache file
 #' @param bucket
-#' @param filenName
+#' @param file
 #' @export
 clearGoogleCloudStorageCacheFile <- function(bucket, file){
   options(tam.should.cache.datafile = FALSE)
@@ -70,6 +71,10 @@ clearGoogleCloudStorageCacheFile <- function(bucket, file){
 }
 
 #'Wrapper for readr::guess_encoding to support Google Cloud Storage csv file
+#'@param bucket
+#'@param file
+#'@param n_max
+#'@param threshold
 #'@export
 guessFileEncodingForGoogleCloudStorageFile <- function(bucket, file, n_max = 1e4, threshold = 0.20){
   loadNamespace("readr")
