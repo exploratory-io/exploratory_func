@@ -260,7 +260,7 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
       )
     )
   } else {
-    stop("OAuth token is not set for Google BigQuery")
+    stop("OAuth token is not set for Google BigQuery.")
   }
 }
 
