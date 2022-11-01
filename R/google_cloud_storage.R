@@ -1,19 +1,3 @@
-#' API to get folder names for the S3 Bucket
-#' @param bucket
-#' @param prefix
-#' @export
-getGoogleCloudStorageFolders <- function(bucket, prefix = NULL, ...) {
-
-  token <- getGoogleTokenForCloudStorage()
-  df <- googleCloudStorageR::gcs_list_objects(bucket = bucket, detail = 'more')
-  if (nrow(df) > 0) {
-    df # TODO
-  } else { # if no folder is found, return empty data frame.
-    data.frame()
-  }
-}
-
-
 #' API to download remote data file (excel, csv) from Google Cloud Storage and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed bucket, file are  assigned to the path given by tempfile.
