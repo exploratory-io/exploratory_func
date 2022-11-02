@@ -2111,13 +2111,13 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
 
 #' API to get a list of buckets from Google Cloud Storage
 #' @export
-listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", shouldUseCloudStorageToken = FALSE){
+listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "BigQuery"){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
   token <- '';
-  if (shouldUseCloudStorageToken) {
+  if (service == "CloudStorage") {
     token <- getGoogleTokenForCloudStorage();
-  } else {
+  } else if (service == "BigQuery") {
     token <- getGoogleTokenForBigQuery(tokenFileId)
   }
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
@@ -2223,9 +2223,14 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
   })
 }
 
-#' API to get projects for current oauth token
+#' API to get billing projects for the OAuth token set to the current session.
+#' The resulting billing projects are common between Big Query and Cloud Storage.
+#' Since this API is called from Exploratory Desktop for both Big Query Setup UI and
+#' Google Cloud Storage File list, it controls which OAuth token should be used for this
+#' by the service argument.
+#'
 #' @export
-getGoogleBigQueryProjects <- function(tokenFileId="", shouldUseCloudStorageToken = FALSE){
+getGoogleBigQueryProjects <- function(tokenFileId="", service = "BigQuery"){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2235,9 +2240,9 @@ getGoogleBigQueryProjects <- function(tokenFileId="", shouldUseCloudStorageToken
   }
   main <- function(){
     token <- ''
-    if (shouldUseCloudStorageToken) {
+    if (service == "CloudStorage") {
       token <- getGoogleTokenForCloudStorage();
-    } else {
+    } else if (service == "BigQuery") {
       token <- getGoogleTokenForBigQuery(tokenFileId);
     }
     bigrquery::set_access_cred(token)
