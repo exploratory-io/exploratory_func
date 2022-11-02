@@ -303,7 +303,7 @@ getGoogleTokenForCloudStorage <- function(useCache=TRUE){
 #' API to refresh token
 #' @export
 refreshGoogleTokenForCloudStorage <- function(){
-  getGoogleTokenForBigQuery(FALSE)
+  getGoogleTokenForCloudStorage(FALSE)
 }
 
 

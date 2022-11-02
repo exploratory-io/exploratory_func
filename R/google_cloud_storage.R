@@ -51,7 +51,7 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
 #' @param delimiter
 #' @export
 listItemsInGoogleCloudStorageBucket <- function(bucket, prefix, delimiter){
-  googleCloudStorageR::gcs_list_objects(bucket = bucket, detail="more", prefix = prefix, delimiter = delimiter)
+  googleCloudStorageR::gcs_list_objects(bucket = bucket, detail = "more", prefix = prefix, delimiter = delimiter)
 }
 
 
@@ -198,7 +198,7 @@ searchAndGetCSVFilesFromGoogleCloudStorage <- function(bucket = "", folder = "",
 }
 
 
-#'API that imports a Excel file from AWS S3.
+#'API that imports a Excel file from Google Cloud Storage.
 #'@export
 getExcelFileFromGoogleCloudStorage <- function(file, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...) {
   tryCatch({
