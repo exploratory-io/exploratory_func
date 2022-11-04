@@ -2111,13 +2111,13 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
 
 #' API to get a list of buckets from Google Cloud Storage
 #' @export
-listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "BigQuery"){
+listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "bigquery"){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
   token <- '';
-  if (service == "CloudStorage") {
+  if (service == "cloudstorage") {
     token <- getGoogleTokenForCloudStorage();
-  } else if (service == "BigQuery") {
+  } else if (service == "bigquery") {
     token <- getGoogleTokenForBigQuery(tokenFileId)
   }
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
@@ -2230,7 +2230,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
 #' by the service argument.
 #'
 #' @export
-getGoogleBigQueryProjects <- function(tokenFileId="", service = "BigQuery"){
+getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery"){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2240,9 +2240,9 @@ getGoogleBigQueryProjects <- function(tokenFileId="", service = "BigQuery"){
   }
   main <- function(){
     token <- ''
-    if (service == "CloudStorage") {
+    if (service == "cloudstorage") {
       token <- getGoogleTokenForCloudStorage();
-    } else if (service == "BigQuery") {
+    } else if (service == "bigquery") {
       token <- getGoogleTokenForBigQuery(tokenFileId);
     }
     bigrquery::set_access_cred(token)
