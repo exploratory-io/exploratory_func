@@ -2111,10 +2111,15 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
 
 #' API to get a list of buckets from Google Cloud Storage
 #' @export
-listGoogleCloudStorageBuckets <- function(project, tokenFileId){
+listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "bigquery"){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId)
+  token <- '';
+  if (service == "cloudstorage") {
+    token <- getGoogleTokenForCloudStorage();
+  } else if (service == "bigquery") {
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+  }
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
   # make sure to pass "noAcl" as projection so that Google won't limit maxResults as 200.
   # ref: https://cloud.google.com/storage/docs/json_api/v1/buckets/list
@@ -2218,9 +2223,14 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
   })
 }
 
-#' API to get projects for current oauth token
+#' API to get billing projects for the OAuth token set to the current session.
+#' The resulting billing projects are common between Big Query and Cloud Storage.
+#' Since this API is called from Exploratory Desktop for both Big Query Setup UI and
+#' Google Cloud Storage File list, it controls which OAuth token should be used for this
+#' by the service argument.
+#'
 #' @export
-getGoogleBigQueryProjects <- function(tokenFileId=""){
+getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery"){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2229,7 +2239,12 @@ getGoogleBigQueryProjects <- function(tokenFileId=""){
     warningMessage <<- w
   }
   main <- function(){
-    token <- getGoogleTokenForBigQuery(tokenFileId);
+    token <- ''
+    if (service == "cloudstorage") {
+      token <- getGoogleTokenForCloudStorage();
+    } else if (service == "bigquery") {
+      token <- getGoogleTokenForBigQuery(tokenFileId);
+    }
     bigrquery::set_access_cred(token)
     bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
   }
