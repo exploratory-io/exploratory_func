@@ -72,3 +72,15 @@ test_that("tidy.textmodel_lda_exploratory to complete topic with no document bel
   expect_equal(res$topic, c(1,2))
   expect_equal(res$n, c(2,0))
 })
+
+test_that("exp_topic_model with pre-parsed data", {
+  df <- tibble::tibble(word=c(
+    "Jack", "and", "Jill", "went", "up", "the", "hill",
+    "To", "fetch", "a", "pail", "of", "water",
+    NA,
+    "",
+    "Jack", "fell", "down", "and", "broke", "his", "crown",
+    "And", "Jill", "came", "tumbling", "after"),
+    doc = c(rep("one",13), rep("two",1), rep("three",1), rep("four", 12)))
+  model_df <- df %>% exp_topic_model(, word=word, document_id=doc) # Testing both lower and upper case for compound_token.
+})
