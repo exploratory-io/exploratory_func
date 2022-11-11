@@ -616,9 +616,15 @@ exp_topic_model <- function(df, text = NULL,
                                           compound_tokens = compound_tokens)
     }
     else { # Assuming word and document_id is set as the input instead of text column.
-      sampled_nrow <- NULL
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(word_col)))
       df <- df %>% dplyr::group_by(!!rlang::sym(document_id_col)) %>% dplyr::summarize(tokens=list(!!rlang::sym(word_col)))
+      # sample the data for performance if data size (number of documents) is too large.
+      sampled_nrow <- NULL
+      if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+        # Record that sampling happened.
+        sampled_nrow <- max_nrow
+        df <- df %>% sample_rows(max_nrow)
+      }
       tokens <- quanteda::tokens(df$tokens)
     }
 
