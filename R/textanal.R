@@ -581,6 +581,7 @@ exp_topic_model <- function(df, text = NULL,
                             seed = 1,
                             ...) {
   text_col <- tidyselect::vars_select(names(df), !! rlang::enquo(text))
+  names(text_col) <- NULL # strip names that cause error in tidier
   word_col <- tidyselect::vars_select(names(df), !! rlang::enquo(word))
   document_id_col <- tidyselect::vars_select(names(df), !! rlang::enquo(document_id))
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
@@ -617,7 +618,13 @@ exp_topic_model <- function(df, text = NULL,
     }
     else { # Assuming word and document_id is set as the input instead of text column.
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(word_col)))
-      df <- df %>% dplyr::group_by(!!rlang::sym(document_id_col)) %>% dplyr::summarize(tokens=list(!!rlang::sym(word_col)))
+      df <- df %>% dplyr::group_by(!!rlang::sym(document_id_col))
+      if (is.null(category_col)) {
+        df <- df %>% dplyr::summarize(tokens=list(!!rlang::sym(word_col)))
+      }
+      else {
+        df <- df %>% dplyr::summarize(tokens=list(!!rlang::sym(word_col)), !!rlang::sym(category_col):=first(!!rlang::sym(category_col)))
+      }
       # sample the data for performance if data size (number of documents) is too large.
       sampled_nrow <- NULL
       if (!is.null(max_nrow) && nrow(df) > max_nrow) {

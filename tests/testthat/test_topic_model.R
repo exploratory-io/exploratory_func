@@ -82,5 +82,45 @@ test_that("exp_topic_model with pre-parsed data", {
     "Jack", "fell", "down", "and", "broke", "his", "crown",
     "And", "Jill", "came", "tumbling", "after"),
     doc = c(rep("one",13), rep("two",1), rep("three",1), rep("four", 12)))
-  model_df <- df %>% exp_topic_model(, word=word, document_id=doc) # Testing both lower and upper case for compound_token.
+  model_df <- df %>% exp_topic_model(text=NULL, word=word, document_id=doc)
+})
+
+test_that("exp_topic_model with pre-parsed data with category", {
+  df <- tibble::tibble(word=c(
+    "Jack", "and", "Jill", "went", "up", "the", "hill",
+    "To", "fetch", "a", "pail", "of", "water",
+    NA,
+    "",
+    "Jack", "fell", "down", "and", "broke", "his", "crown",
+    "And", "Jill", "came", "tumbling", "after"),
+    doc = c(rep("one",13), rep("two",1), rep("three",1), rep("four", 12)),
+    cat = c(rep("A",13), rep("A",1), rep("B",1), rep("B", 12))
+  )
+  model_df <- df %>% exp_topic_model(text=NULL, word=word, document_id=doc, category=cat)
+  # For doc_topics_tagged tidier to work, column order of topics must be sorted.
+  expect_equal(colnames(model_df$model[[1]]$doc_word_df), c("document","word","topic1","topic2","topic3"))
+  expect_equal(colnames(model_df$model[[1]]$words_topics_df), c("word","topic1","topic2","topic3"))
+
+  res <- model_df %>% tidy_rowwise(model, type="topics_summary")
+  expect_equal(colnames(res), c("topic", "n"))
+  expect_equal(sum(res$n), 3)
+  # Ensure that topics are named according to the frequency to make sure topic name mapping on doc_df is correct.
+  expect_equal((res %>% dplyr::arrange(desc(n)))$topic, c(1,2,3))
+  doc_topics_res <- model_df %>% tidy_rowwise(model, type="doc_topics")
+  # Ensure the max_topic values from model$doc_df make sense, after the topic name mapping. slice is there to avoid the case with ties,
+  # in which case the result can differ because of the randomness.
+  test_res <- (doc_topics_res %>% slice(1:70) %>% dplyr::mutate(max_topic_2 = summarize_row(across(starts_with("topic")), which.max.safe)) %>%
+               mutate(test_res = max_topic==max_topic_2))$test_res
+  expect_true(sum(test_res)/length(test_res) > 0.9) # Give room for randomness for tie
+  expect_equal(colnames(doc_topics_res), c("doc", "tokens", "cat", "topic1", "topic2", "topic3", "max_topic", "topic_max"))
+  expect_equal(nrow(doc_topics_res), 3) # NA should be filtered, but empty string should be kept.
+
+  doc_word_res <- model_df %>% tidy_rowwise(model, type="doc_word_category")
+  # Ensure that the document max topic from model$doc_df joined with doc_word_df corresponds with the one from model$doc_df.
+  expect_true(all((doc_word_res %>% group_by(document) %>% summarise(document_max_topic=first(document_max_topic)))$document_max_topic == doc_topics_res$max_topic))
+
+  res <- model_df %>% tidy_rowwise(model, type="topic_words")
+  expect_equal(colnames(res), c("word", "topic", "probability"))
+  res <- model_df %>% tidy_rowwise(model, type="word_topics")
+  expect_equal(colnames(res), c("word", "topic1", "topic2", "topic3", "max_topic", "topic_max"))
 })
