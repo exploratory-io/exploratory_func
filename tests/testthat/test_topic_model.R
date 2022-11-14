@@ -1,6 +1,7 @@
 # how to run this test:
 # devtools::test(filter="textanal")
 context("test topic model function, exp_topic_model")
+if(F){
 twitter_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
 
 test_that("exp_topic_model with Japanese twitter data", {
@@ -84,7 +85,7 @@ test_that("exp_topic_model with pre-parsed data", {
     doc = c(rep("one",13), rep("two",1), rep("three",1), rep("four", 12)))
   model_df <- df %>% exp_topic_model(text=NULL, word=word, document_id=doc)
 })
-
+}
 test_that("exp_topic_model with pre-parsed data with category", {
   df <- tibble::tibble(word=c(
     "Jack", "and", "Jill", "went", "up", "the", "hill",
