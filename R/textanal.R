@@ -632,7 +632,6 @@ exp_topic_model <- function(df, text = NULL,
         sampled_nrow <- max_nrow
         df <- df %>% sample_rows(max_nrow)
       }
-      browser()
       names(df$tokens) <- df[[document_id_col]]
       tokens <- quanteda::tokens(df$tokens)
     }
