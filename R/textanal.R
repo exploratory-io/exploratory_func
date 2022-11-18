@@ -619,6 +619,8 @@ exp_topic_model <- function(df, text = NULL,
     else { # Assuming word and document_id is set as the input instead of text column.
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(word_col)))
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(document_id_col)))
+      # Lowercase the word column so that later join with the terms from the model, which will be lowercased, works for doc_word_category.
+      df <- df %>% dplyr::mutate(!!rlang::sym(word_col):=stringr::str_to_lower(!!rlang::sym(word_col)))
       df <- df %>% dplyr::group_by(!!rlang::sym(document_id_col))
       if (is.null(category_col)) {
         df <- df %>% dplyr::summarize(tokens=list(!!rlang::sym(word_col)))
