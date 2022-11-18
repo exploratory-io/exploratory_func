@@ -632,6 +632,8 @@ exp_topic_model <- function(df, text = NULL,
         # Record that sampling happened.
         sampled_nrow <- max_nrow
         df <- df %>% sample_rows(max_nrow)
+        # Sort here so that the order of doc_df looks good, since sample_rows randomizes the order.
+        df <- df %>% dplyr::arrange(!!rlang::sym(document_id_col))
       }
       names(df$tokens) <- df[[document_id_col]]
       tokens <- quanteda::tokens(df$tokens)
