@@ -562,7 +562,9 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 
 #' Function for Topic Model Analytics View
 #' @export
-exp_topic_model <- function(df, text, category = NULL,
+exp_topic_model <- function(df, text = NULL,
+                            word = NULL, document_id = NULL,
+                            category = NULL,
                             remove_punct = TRUE, remove_numbers = TRUE,
                             remove_alphabets = FALSE,
                             tokenize_tweets = FALSE,
@@ -578,7 +580,10 @@ exp_topic_model <- function(df, text, category = NULL,
                             max_nrow = 5000,
                             seed = 1,
                             ...) {
-  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  text_col <- tidyselect::vars_select(names(df), !! rlang::enquo(text))
+  names(text_col) <- NULL # strip names that cause error in tidier
+  word_col <- tidyselect::vars_select(names(df), !! rlang::enquo(word))
+  document_id_col <- tidyselect::vars_select(names(df), !! rlang::enquo(document_id))
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
   if (length(category_col) == 0) { # It seems that when no category is specified, category_col becomes character(0).
     category_col <- NULL
@@ -590,25 +595,51 @@ exp_topic_model <- function(df, text, category = NULL,
   }
 
   each_func <- function(df) {
-    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
-    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+    if (length(text_col) != 0) { # This means text was NULL
+      # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
 
-    # sample the data for performance if data size is too large.
-    sampled_nrow <- NULL
-    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
-      # Record that sampling happened.
-      sampled_nrow <- max_nrow
-      df <- df %>% sample_rows(max_nrow)
+      # sample the data for performance if data size is too large.
+      sampled_nrow <- NULL
+      if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+        # Record that sampling happened.
+        sampled_nrow <- max_nrow
+        df <- df %>% sample_rows(max_nrow)
+      }
+
+      tokens <- tokenize_with_postprocess(df[[text_col]],
+                                          remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                          remove_alphabets = remove_alphabets,
+                                          tokenize_tweets = tokenize_tweets,
+                                          remove_url = remove_url, remove_twitter = remove_twitter,
+                                          stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
+                                          hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                          compound_tokens = compound_tokens)
     }
-
-    tokens <- tokenize_with_postprocess(df[[text_col]],
-                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
-                                        remove_alphabets = remove_alphabets,
-                                        tokenize_tweets = tokenize_tweets,
-                                        remove_url = remove_url, remove_twitter = remove_twitter,
-                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
-                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
-                                        compound_tokens = compound_tokens)
+    else { # Assuming word and document_id is set as the input instead of text column.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(word_col)))
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(document_id_col)))
+      # Lowercase the word column so that later join with the terms from the model, which will be lowercased, works for doc_word_category.
+      df <- df %>% dplyr::mutate(!!rlang::sym(word_col):=stringr::str_to_lower(!!rlang::sym(word_col)))
+      df <- df %>% dplyr::group_by(!!rlang::sym(document_id_col))
+      if (is.null(category_col)) {
+        df <- df %>% dplyr::summarize(tokens=list(!!rlang::sym(word_col)))
+      }
+      else {
+        df <- df %>% dplyr::summarize(tokens=list(!!rlang::sym(word_col)), !!rlang::sym(category_col):=first(!!rlang::sym(category_col)))
+      }
+      # sample the data for performance if data size (number of documents) is too large.
+      sampled_nrow <- NULL
+      if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+        # Record that sampling happened.
+        sampled_nrow <- max_nrow
+        df <- df %>% sample_rows(max_nrow)
+        # Sort here so that the order of doc_df looks good, since sample_rows randomizes the order.
+        df <- df %>% dplyr::arrange(!!rlang::sym(document_id_col))
+      }
+      names(df$tokens) <- df[[document_id_col]]
+      tokens <- quanteda::tokens(df$tokens)
+    }
 
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
