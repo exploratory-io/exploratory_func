@@ -537,6 +537,22 @@ glance.chisq_exploratory <- function(x) {
   ret
 }
 
+calculate_welch_t <- function(N1, N2, X1, X2, s1, s2) {
+  ret <- (X1 - X2)/sqrt(s1^2/N1 + s2^2/N2)
+  ret
+}
+
+calculate_welch_dof <- function(N1, N2, X1, X2, s1, s2) {
+  ret <- (s1^2/N1 + s2^2/N2)^2/((s1^4/(N1^2)*(N1-1)) + (s2^4/(N2^2)*(N2-1)))
+  ret
+}
+
+calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
+  t <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+  dof <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
+  res <- 1-pt(t,dof)
+  res
+}
 
 #' t-test wrapper for Analytics View
 #' @export
