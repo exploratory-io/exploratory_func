@@ -9,6 +9,24 @@ test_df$list_c <- as.list(seq(20))
 
 test_df[["with space"]] <- seq(20)
 
+test_that("test t.test.aggregated", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  res0 <- t.test(data=test_df, val~cat)
+  res <- t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0)
+  expect_equal(res$statistic, res0$statistic)
+  expect_equal(res$parameter, res0$parameter)
+  #p.value
+  #conf.int
+  #estimate
+  #stderr
+  #null.value
+})
+
+if(F){
 test_that("test two sample t-test with column name", {
   test_df <- data.frame(
     cat=rep(c("cat1", "cat2"), 20),
@@ -540,3 +558,4 @@ test_that("test exp_normality with column with almost always same value", {
   expect_equal(colnames(model_summary),
                c("Column","W Statistic","P Value","Sample Size","Normal Distribution"))
 })
+}

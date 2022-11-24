@@ -558,7 +558,7 @@ calculate_welch_t <- function(N1, N2, X1, X2, s1, s2) {
 }
 
 calculate_welch_dof <- function(N1, N2, X1, X2, s1, s2) {
-  ret <- (s1^2/N1 + s2^2/N2)^2/((s1^4/(N1^2)*(N1-1)) + (s2^4/(N2^2)*(N2-1)))
+  ret <- (s1^2/N1 + s2^2/N2)^2/((s1^4/((N1^2)*(N1-1))) + (s2^4/((N2^2)*(N2-1))))
   ret
 }
 
@@ -577,7 +577,9 @@ calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
 
 t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level, mu) {
   statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+  names(statistic) <- "t"
   parameter <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
+  names(parameter) <- "df"
   p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
   conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level)
   estimate <- c(X1, X2)
