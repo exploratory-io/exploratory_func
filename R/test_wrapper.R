@@ -594,7 +594,10 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level, mu) {
     conf.int=conf.int,
     estimate=estimate,
     stderr=stderr,
-    null.value=null.value)
+    null.value=null.value,
+    method="Welch Two Sample t-test",
+    alternative="two.sided"
+  )
   class(res) <- c('ttest_exploratory', 'htest')
   res
 }
