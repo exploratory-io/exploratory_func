@@ -537,6 +537,21 @@ glance.chisq_exploratory <- function(x) {
   ret
 }
 
+calculate_welch_stderr <- function(N1, N2, s1, s2) {
+  ret <- sqrt(s1^2/N1 + s2^2/N2)
+  ret
+}
+
+calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level) { # TODO: cases other than both ends.
+  alpha <- 1-conf.level
+  dof <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
+  q <- qt(1-alpha/2, dof)
+  ci <- c(-q, q)
+  stderr <- calculate_welch_stderr(N1, N2, s1, s2)
+  res <- X1 - X2 + stderr*ci
+  res
+}
+
 calculate_welch_t <- function(N1, N2, X1, X2, s1, s2) {
   ret <- (X1 - X2)/sqrt(s1^2/N1 + s2^2/N2)
   ret
