@@ -609,6 +609,7 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level, mu) {
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
+#' @param d - Cohen's d to detect in power analysis.
 #' @param common_sd - Used for calculation of Cohen's d.
 #' @param diff_to_detect - Used for calculation of Cohen's d.
 exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
