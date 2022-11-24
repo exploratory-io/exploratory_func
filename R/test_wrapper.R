@@ -550,9 +550,17 @@ calculate_welch_dof <- function(N1, N2, X1, X2, s1, s2) {
 calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
   t <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
   dof <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
-  res <- 1-pt(t,dof)
+  p <- pt(t,dof)
+  # both sides case. TODO: other cases.
+  if (p < 0.5) {
+    res <- 2*p
+  } else {
+    res <- 2*(1-p)
+  }
   res
 }
+
+#exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, test_sig_level = 0.05, # TODO
 
 #' t-test wrapper for Analytics View
 #' @export
