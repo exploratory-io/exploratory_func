@@ -575,6 +575,26 @@ calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
   res
 }
 
+t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level, mu) {
+  statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+  parameter <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
+  p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
+  conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level)
+  estimate <- c(X1, X2)
+  stderr <- calculate_welch_stderr(N1, N2, s1, s2)
+  null.value <- mu
+  res <- list(
+    statistic=statistic,
+    parameter=parameter,
+    p.value=p.value,
+    conf.int=conf.int,
+    estimate=estimate,
+    stderr=stderr,
+    null.value=null.value)
+  class(res) <- c('ttest_exploratory', 'htest')
+  res
+}
+
 #exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, test_sig_level = 0.05, # TODO
 
 #' t-test wrapper for Analytics View
