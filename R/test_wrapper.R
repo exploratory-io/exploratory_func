@@ -602,7 +602,109 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level, mu) {
   res
 }
 
-#exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, test_sig_level = 0.05, # TODO
+exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, test_sig_level = 0.05,
+                                 sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
+                                 ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
+  var2_col <- col_name(substitute(category))
+  n_col <- col_name(substitute(n))
+  mean_col <- col_name(substitute(category_mean))
+  sd_col <- col_name(substitute(category_sd))
+  grouped_cols <- grouped_by(df)
+
+  # For logical explanatory variable, make it a factor and adjust label order so that
+  # the calculated difference is TRUE case - FALSE case, which intuitively makes better sense.
+  if (is.logical(df[[var2_col]])) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
+  }
+
+  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
+  if (n_distinct_res != 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
+    }
+    else {
+      stop("The explanatory variable needs to have 2 unique values.")
+    }
+  }
+
+  ttest_each <- function(df) {
+    tryCatch({
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(n_col)) & !is.na(!!rlang::sym(mean_col)) & !is.na(!!rlang::sym(sd_col))) # Remove NA from the target column.
+      if (nrow(df) == 0) {
+        stop("There is no data left after removing NA.")
+      }
+
+      if(length(grouped_cols) > 0) {
+        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
+        if (n_distinct_res_each != 2) {
+          stop("The explanatory variable needs to have 2 unique values.")
+        }
+      }
+      # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
+      # Check it here, rather than handling it later.
+      min_n <- min(df[[n_col]], na.rm=TRUE)
+      if (min_n <= 1) {
+        e <- simpleError("Not enough data.")
+        class(e) <- c("ttest_exploratory", class(e))
+        e$v1 <- df[[var2_col]][1]
+        e$n1 <- df[[n_col]][1]
+        e$v2 <- df[[var2_col]][2]
+        e$n2 <- df[[n_col]][2]
+        return(e)
+      }
+      # Calculate Cohen's d from data.
+      cohens_d <- calculate_cohens_d_aggregated(df[[n_col]][1], df[[n_col]][2], df[[mean_col]][1], df[[mean_col]][2], df[[sd_col]][1], df[[sd_col]][2])
+      # Get size of Cohen's d to detect for power analysis.
+      # If neither d nor diff_to_detect is specified, use the one calculated from data.
+      if (is.null(d)) {
+        if (is.null(diff_to_detect)) {
+          # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
+          cohens_d_to_detect <- cohens_d
+        }
+        else { # diff_to_detect is specified.
+          if (is.null(common_sd)) {
+            # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
+            cohens_d_to_detect <- diff_to_detect/calculate_common_sd_aggregated(df[[n_col]][1], df[[n_col]][2], df[[sd_col]][1], df[[sd_col]][2])
+          }
+          else {
+            cohens_d_to_detect <- diff_to_detect/common_sd
+          }
+        }
+      }
+      else {
+        cohens_d_to_detect <- d
+      }
+
+      model <- t.test.aggregated(df[[n_col]][1], df[[n_col]][2], df[[mean_col]][1], df[[mean_col]][2], df[[sd_col]][1], df[[sd_col]][2], ...)
+      class(model) <- c("ttest_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model$test_sig_level <- test_sig_level
+      model$sig.level <- sig.level
+      model$cohens_d <- cohens_d # model$d seems to be already used for something.
+      model$cohens_d_to_detect <- cohens_d_to_detect
+      model$power <- power
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("ttest_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
+  }
+  do_on_each_group(df, ttest_each, name = "model", with_unnest = FALSE)
+}
 
 #' t-test wrapper for Analytics View
 #' @export
