@@ -577,14 +577,16 @@ calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
 
 t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level, mu) {
   statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
-  names(statistic) <- "t"
   parameter <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
-  names(parameter) <- "df"
   p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
   conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level)
   estimate <- c(X1, X2)
   stderr <- calculate_welch_stderr(N1, N2, s1, s2)
   null.value <- mu
+  names(statistic) <- "t"
+  names(parameter) <- "df"
+  names(mu) <- "difference in means"
+  attr(conf.int, "conf.level") <- conf.level
   res <- list(
     statistic=statistic,
     parameter=parameter,

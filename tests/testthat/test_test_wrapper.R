@@ -19,11 +19,13 @@ test_that("test t.test.aggregated", {
   res <- t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0)
   expect_equal(res$statistic, res0$statistic)
   expect_equal(res$parameter, res0$parameter)
-  #p.value
-  #conf.int
-  #estimate
-  #stderr
-  #null.value
+  expect_equal(res$p.value, res0$p.value)
+  expect_equal(res$conf.int, res0$conf.int)
+  names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$estimate, res0$estimate)
+  expect_equal(res$stderr, res0$stderr)
+  names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$null.value, res0$null.value)
 })
 
 if(F){
