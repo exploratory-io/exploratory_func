@@ -544,7 +544,7 @@ calculate_welch_stderr <- function(N1, N2, s1, s2) {
 
 calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level) { # TODO: cases other than both ends.
   alpha <- 1-conf.level
-  dof <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
+  dof <- calculate_welch_dof(N1, N2, s1, s2)
   q <- qt(1-alpha/2, dof)
   ci <- c(-q, q)
   stderr <- calculate_welch_stderr(N1, N2, s1, s2)
@@ -557,14 +557,14 @@ calculate_welch_t <- function(N1, N2, X1, X2, s1, s2) {
   ret
 }
 
-calculate_welch_dof <- function(N1, N2, X1, X2, s1, s2) {
+calculate_welch_dof <- function(N1, N2, s1, s2) {
   ret <- (s1^2/N1 + s2^2/N2)^2/((s1^4/((N1^2)*(N1-1))) + (s2^4/((N2^2)*(N2-1))))
   ret
 }
 
 calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
   t <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
-  dof <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
+  dof <- calculate_welch_dof(N1, N2, s1, s2)
   p <- pt(t,dof)
   # both sides case. TODO: other cases.
   if (p < 0.5) {
@@ -587,7 +587,7 @@ calculate_student_t <- function(N1, N2, X1, X2, s1, s2) {
 
 t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alternative = "two.sided", paired = FALSE, var.equal = FALSE) {
   statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
-  parameter <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
+  parameter <- calculate_welch_dof(N1, N2, s1, s2)
   p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
   conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level)
   estimate <- c(X1, X2)
