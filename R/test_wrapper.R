@@ -825,6 +825,10 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model$cohens_d <- cohens_d # model$d seems to be already used for something.
       model$cohens_d_to_detect <- cohens_d_to_detect
       model$power <- power
+      model$v1 <- count_df[[1]][1] 
+      model$n1 <- count_df$n[1]
+      model$v2 <- count_df[[1]][2] 
+      model$n2 <- count_df$n[2]
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -873,12 +877,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     }
 
     # Get sample sizes for the 2 groups (n1, n2).
-    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
-    n1 <- data_summary$n_rows[[1]] # number of 1st class
-    n2 <- data_summary$n_rows[[2]] # number of 2nd class
-    v1 <- data_summary[[x$var2]][[1]] # value for 1st class
-    v2 <- data_summary[[x$var2]][[2]] # value for 2nd class
+    n1 <- x$n1 # number of 1st class
+    n2 <- x$n2 # number of 2nd class
+    v1 <- x$v1 # value for 1st class
+    v2 <- x$v2 # value for 2nd class
     # t.test seems to consider the 2nd category based on alphabetical/numerical/factor sort as the base category.
     # Since group_by/summarize also sorts the group based on alphabetical/numerical/factor order, we can assume that the v2 is the base category.
     ret <- ret %>% dplyr::mutate(base.level = !!v2)
