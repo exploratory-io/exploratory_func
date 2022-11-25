@@ -691,6 +691,10 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
       model$cohens_d <- cohens_d # model$d seems to be already used for something.
       model$cohens_d_to_detect <- cohens_d_to_detect
       model$power <- power
+      model$v1 <- df[[var2_col]][1]
+      model$n1 <- df[[n_col]][1]
+      model$v2 <- df[[var2_col]][2]
+      model$n2 <- df[[n_col]][2]
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
