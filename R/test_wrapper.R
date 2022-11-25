@@ -575,7 +575,17 @@ calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
   res
 }
 
-t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0) {
+calculate_pooled_stderr <- function(N1, N2, s1, s2) {
+  res <- sqrt(((N1-1)*s1^2 + (N2-1)*s2^2)/(N1 + N2 - 2))
+  res
+}
+
+calculate_student_t <- function(N1, N2, X1, X2, s1, s2) {
+  ret <- (X1 - X2)/(calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2))
+  ret
+}
+
+t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alternative = "two.sided", paired = FALSE, var.equal = FALSE) {
   statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
   parameter <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
   p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
