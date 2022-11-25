@@ -575,7 +575,7 @@ calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
   res
 }
 
-t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level, mu) {
+t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0) {
   statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
   parameter <- calculate_welch_dof(N1, N2, X1, X2, s1, s2)
   p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
@@ -683,7 +683,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
 
       model <- t.test.aggregated(df[[n_col]][1], df[[n_col]][2], df[[mean_col]][1], df[[mean_col]][2], df[[sd_col]][1], df[[sd_col]][2], ...)
       class(model) <- c("ttest_exploratory", class(model))
-      model$var1 <- var1_col
+      #model$var1 <- var1_col #TODO cleanup
       model$var2 <- var2_col
       model$data <- df
       model$test_sig_level <- test_sig_level

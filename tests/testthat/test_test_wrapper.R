@@ -9,6 +9,18 @@ test_df$list_c <- as.list(seq(20))
 
 test_df[["with space"]] <- seq(20)
 
+test_that("test exp_ttest_aggregated", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  browser()
+  res <- test_df2 %>% exp_ttest_aggregated(cat, n, mean, sd)
+  browser()
+})
+
+if(F){
 test_that("test t.test.aggregated", {
   test_df <- data.frame(
     cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
@@ -28,7 +40,6 @@ test_that("test t.test.aggregated", {
   expect_equal(res$null.value, res0$null.value)
 })
 
-if(F){
 test_that("test two sample t-test with column name", {
   test_df <- data.frame(
     cat=rep(c("cat1", "cat2"), 20),
