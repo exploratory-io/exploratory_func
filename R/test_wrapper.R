@@ -585,6 +585,24 @@ calculate_student_t <- function(N1, N2, X1, X2, s1, s2) {
   ret
 }
 
+calculate_student_dof <- function(N1, N2) {
+  ret <- N1 + N2 - 2
+  ret
+}
+
+calculate_student_p <- function(N1, N2, X1, X2, s1, s2) {
+  t <- calculate_student_t(N1, N2, X1, X2, s1, s2)
+  dof <- calculate_student_dof(N1, N2)
+  p <- pt(t,dof)
+  # both sides case. TODO: other cases.
+  if (p < 0.5) {
+    res <- 2*p
+  } else {
+    res <- 2*(1-p)
+  }
+  res
+}
+
 t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alternative = "two.sided", paired = FALSE, var.equal = FALSE) {
   statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
   parameter <- calculate_welch_dof(N1, N2, s1, s2)
