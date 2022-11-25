@@ -16,7 +16,12 @@ test_that("test exp_ttest_aggregated", {
   )
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
   browser()
-  res <- test_df2 %>% exp_ttest_aggregated(cat, n, mean, sd)
+  model_df <- test_df2 %>% exp_ttest_aggregated(cat, n, mean, sd)
+  browser()
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_true("Number of Rows" %in% colnames(ret))
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   browser()
 })
 

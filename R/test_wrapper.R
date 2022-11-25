@@ -692,9 +692,14 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
       model$cohens_d_to_detect <- cohens_d_to_detect
       model$power <- power
       model$v1 <- df[[var2_col]][1]
-      model$n1 <- df[[n_col]][1]
       model$v2 <- df[[var2_col]][2]
+      model$n1 <- df[[n_col]][1]
       model$n2 <- df[[n_col]][2]
+      model$s1 <- df[[sd_col]][1]
+      model$s2 <- df[[sd_col]][2]
+      model$m1 <- df[[mean_col]][1]
+      model$m2 <- df[[mean_col]][2]
+      model$data_type <- "aggregated"
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -833,6 +838,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model$n1 <- count_df$n[1]
       model$v2 <- count_df[[1]][2] 
       model$n2 <- count_df$n[2]
+      model$data_type <- "raw"
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -957,27 +963,39 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       return(ret)
     }
     conf_threshold = 1 - (1 - conf_level)/2
-    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
-                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
-                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
-                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
-                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
-                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
-      dplyr::select(!!rlang::sym(x$var2),
-                    `Number of Rows`,
-                    Mean,
-                    `Conf Low`,
-                    `Conf High`,
-                    `Std Error of Mean`,
-                    `Std Deviation`,
-                    `Minimum`,
-                    `Maximum`)
+    if (x$data_type == "raw") {
+      ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+        dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                         Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                         `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                         # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                         `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                         # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                         # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                         `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                         `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                         `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                         `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+        dplyr::select(!!rlang::sym(x$var2),
+                      `Number of Rows`,
+                      Mean,
+                      `Conf Low`,
+                      `Conf High`,
+                      `Std Error of Mean`,
+                      `Std Deviation`,
+                      `Minimum`,
+                      `Maximum`)
+    }
+    else { # x$data_type == "aggregated"
+      ret <- tibble::tibble(
+                      `Number of Rows` = c(x$n1, x$n2),
+                      Mean = c(x$m1, x$m2),
+                      #`Conf Low`,  #TODO
+                      #`Conf High`, #TODO
+                      #`Std Error of Mean`, #TODO
+                      `Std Deviation` = c(x$s1, x$s2)
+      )
+    }
   }
   else if (type == "prob_dist") {
     if ("error" %in% class(x)) {
