@@ -580,6 +580,16 @@ calculate_pooled_stderr <- function(N1, N2, s1, s2) {
   res
 }
 
+calculate_student_confint <- function(N1, N2, X1, X2, s1, s2, conf.level) { # TODO: cases other than both ends.
+  alpha <- 1-conf.level
+  dof <- calculate_student_dof(N1, N2)
+  q <- qt(1-alpha/2, dof)
+  ci <- c(-q, q)
+  stderr <- calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2)
+  res <- X1 - X2 + stderr*ci
+  res
+}
+
 calculate_student_t <- function(N1, N2, X1, X2, s1, s2) {
   ret <- (X1 - X2)/(calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2))
   ret
@@ -604,12 +614,24 @@ calculate_student_p <- function(N1, N2, X1, X2, s1, s2) {
 }
 
 t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alternative = "two.sided", paired = FALSE, var.equal = FALSE) {
-  statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
-  parameter <- calculate_welch_dof(N1, N2, s1, s2)
-  p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
-  conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level)
-  estimate <- c(X1, X2)
-  stderr <- calculate_welch_stderr(N1, N2, s1, s2)
+  if (!var.equal) {
+    method="Welch Two Sample t-test"
+    statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+    parameter <- calculate_welch_dof(N1, N2, s1, s2)
+    p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
+    conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level)
+    estimate <- c(X1, X2)
+    stderr <- calculate_welch_stderr(N1, N2, s1, s2)
+  }
+  else {
+    method="Two Sample t-test"
+    statistic <- calculate_student_t(N1, N2, X1, X2, s1, s2)
+    parameter <- calculate_student_dof(N1, N2)
+    p.value <- calculate_student_p(N1, N2, X1, X2, s1, s2)
+    conf.int <- calculate_student_confint(N1, N2, X1, X2, s1, s2, conf.level)
+    estimate <- c(X1, X2)
+    stderr <- calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2)
+  }
   null.value <- mu
   names(statistic) <- "t"
   names(parameter) <- "df"
@@ -623,7 +645,7 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alt
     estimate=estimate,
     stderr=stderr,
     null.value=null.value,
-    method="Welch Two Sample t-test",
+    method=method,
     alternative="two.sided"
   )
   class(res) <- c('ttest_exploratory', 'htest')
