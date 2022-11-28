@@ -659,7 +659,7 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alt
     stderr=stderr,
     null.value=null.value,
     method=method,
-    alternative="two.sided"
+    alternative=alternative
   )
   class(res) <- c('ttest_exploratory', 'htest')
   res

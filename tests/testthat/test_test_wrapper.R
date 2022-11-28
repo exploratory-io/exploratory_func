@@ -25,6 +25,7 @@ test_that("test t.test.aggregated with 'less' alternative", {
   names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
   expect_equal(res$estimate, res0$estimate)
   expect_equal(res$stderr, res0$stderr)
+  expect_equal(res$alternative, res0$alternative)
   names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
   expect_equal(res$null.value, res0$null.value)
 })
@@ -44,6 +45,7 @@ test_that("test t.test.aggregated with 'greater' alternative", {
   names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
   expect_equal(res$estimate, res0$estimate)
   expect_equal(res$stderr, res0$stderr)
+  expect_equal(res$alternative, res0$alternative)
   names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
   expect_equal(res$null.value, res0$null.value)
 })
