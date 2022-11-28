@@ -1050,12 +1050,14 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Maximum`)
     }
     else { # x$data_type == "aggregated"
+      stderr <- c(x$s1/sqrt(x$n1), x$s2/sqrt(x$n2))
+      ci_radius <- stderr * qt(p=conf_threshold, df=c(x$n1, x$n2)-1)
       ret <- tibble::tibble(
                       `Number of Rows` = c(x$n1, x$n2),
                       Mean = c(x$m1, x$m2),
-                      #`Conf Low`,  #TODO
-                      #`Conf High`, #TODO
-                      #`Std Error of Mean`, #TODO
+                      `Conf Low` = c(x$m1, x$m2) - ci_radius,
+                      `Conf High` = c(x$m1, x$m2) + ci_radius,
+                      `Std Error of Mean` = stderr,
                       `Std Deviation` = c(x$s1, x$s2)
       )
     }
