@@ -1053,6 +1053,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       stderr <- c(x$s1/sqrt(x$n1), x$s2/sqrt(x$n2))
       ci_radius <- stderr * qt(p=conf_threshold, df=c(x$n1, x$n2)-1)
       ret <- tibble::tibble(
+                      group_ = c(x$v1, x$v2),
                       `Number of Rows` = c(x$n1, x$n2),
                       Mean = c(x$m1, x$m2),
                       `Conf Low` = c(x$m1, x$m2) - ci_radius,
@@ -1060,6 +1061,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Std Error of Mean` = stderr,
                       `Std Deviation` = c(x$s1, x$s2)
       )
+      ret <- ret %>% dplyr::rename(!!rlang::sym(x$var2):=group_)
     }
   }
   else if (type == "prob_dist") {
