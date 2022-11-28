@@ -542,11 +542,19 @@ calculate_welch_stderr <- function(N1, N2, s1, s2) {
   ret
 }
 
-calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level) { # TODO: cases other than both ends.
+calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternative = "two.sided") {
   alpha <- 1-conf.level
   dof <- calculate_welch_dof(N1, N2, s1, s2)
-  q <- qt(1-alpha/2, dof)
-  ci <- c(-q, q)
+  if (alternative == "two.sided") {
+    q <- qt(1-alpha/2, dof)
+    ci <- c(-q, q)
+  } else if (alternative == "greater") {
+    q <- qt(1-alpha, dof)
+    ci <- c(NA, q)
+  } else {
+    q <- qt(1-alpha, dof)
+    ci <- c(-q, NA)
+  }
   stderr <- calculate_welch_stderr(N1, N2, s1, s2)
   res <- X1 - X2 + stderr*ci
   res
@@ -562,15 +570,20 @@ calculate_welch_dof <- function(N1, N2, s1, s2) {
   ret
 }
 
-calculate_welch_p <- function(N1, N2, X1, X2, s1, s2) {
+calculate_welch_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
   t <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
   dof <- calculate_welch_dof(N1, N2, s1, s2)
   p <- pt(t,dof)
-  # both sides case. TODO: other cases.
-  if (p < 0.5) {
-    res <- 2*p
+  if (alternative == "two.sided") {
+    if (p < 0.5) {
+      res <- 2*p
+    } else {
+      res <- 2*(1-p)
+    }
+  } else if (alternative == "greater") {
+    res <- 1-p
   } else {
-    res <- 2*(1-p)
+    res <- p
   }
   res
 }
