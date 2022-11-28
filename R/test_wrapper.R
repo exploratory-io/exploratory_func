@@ -549,11 +549,11 @@ calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternat
     q <- qt(1-alpha/2, dof)
     ci <- c(-q, q)
   } else if (alternative == "greater") {
-    q <- qt(1-alpha, dof)
-    ci <- c(NA, q)
+    q <- qt(alpha, dof)
+    ci <- c(q, Inf)
   } else {
     q <- qt(1-alpha, dof)
-    ci <- c(-q, NA)
+    ci <- c(-Inf, q)
   }
   stderr <- calculate_welch_stderr(N1, N2, s1, s2)
   res <- X1 - X2 + stderr*ci
