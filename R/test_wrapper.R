@@ -684,6 +684,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
   # the calculated difference is TRUE case - FALSE case, which intuitively makes better sense.
   if (is.logical(df[[var2_col]])) {
     df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
+    df <- df %>% dplyr::arrange(!!rlang::sym(var2_col))
   }
 
   n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
