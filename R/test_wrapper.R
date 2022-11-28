@@ -631,8 +631,8 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alt
     method="Welch Two Sample t-test"
     statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
     parameter <- calculate_welch_dof(N1, N2, s1, s2)
-    p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2)
-    conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level)
+    p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2, alternative = alternative)
+    conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level, alternative = alternative)
     estimate <- c(X1, X2)
     stderr <- calculate_welch_stderr(N1, N2, s1, s2)
   }
