@@ -722,9 +722,12 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
 
   ttest_each <- function(df) {
     tryCatch({
+      if (nrow(df) != 2) {
+        stop("Number of rows of the aggregated input data must be 2.")
+      }
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(n_col)) & !is.na(!!rlang::sym(mean_col)) & !is.na(!!rlang::sym(sd_col))) # Remove NA from the target column.
-      if (nrow(df) == 0) {
-        stop("There is no data left after removing NA.")
+      if (nrow(df) != 2) {
+        stop("There is NA in the aggregated input data.")
       }
 
       if(length(grouped_cols) > 0) {
