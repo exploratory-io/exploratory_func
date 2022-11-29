@@ -9,6 +9,140 @@ test_df$list_c <- as.list(seq(20))
 
 test_df[["with space"]] <- seq(20)
 
+test_that("test t.test.aggregated with two.sided alternative (default)", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  res0 <- stats::t.test(data=test_df, val~cat)
+  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0)
+  expect_equal(res$statistic, res0$statistic)
+  expect_equal(res$parameter, res0$parameter)
+  expect_equal(res$p.value, res0$p.value)
+  expect_equal(res$conf.int, res0$conf.int)
+  names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$estimate, res0$estimate)
+  expect_equal(res$stderr, res0$stderr)
+  names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$null.value, res0$null.value)
+})
+
+test_that("test t.test.aggregated with 'less' alternative", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  res0 <- stats::t.test(data=test_df, val~cat, alternative="less")
+  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, alternative="less")
+  expect_equal(res$statistic, res0$statistic)
+  expect_equal(res$parameter, res0$parameter)
+  expect_equal(res$p.value, res0$p.value)
+  expect_equal(res$conf.int, res0$conf.int)
+  names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$estimate, res0$estimate)
+  expect_equal(res$stderr, res0$stderr)
+  expect_equal(res$alternative, res0$alternative)
+  names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$null.value, res0$null.value)
+})
+test_that("test t.test.aggregated with 'greater' alternative", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  res0 <- stats::t.test(data=test_df, val~cat, alternative="greater")
+  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, alternative="greater")
+  expect_equal(res$statistic, res0$statistic)
+  expect_equal(res$parameter, res0$parameter)
+  expect_equal(res$p.value, res0$p.value)
+  expect_equal(res$conf.int, res0$conf.int)
+  names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$estimate, res0$estimate)
+  expect_equal(res$stderr, res0$stderr)
+  expect_equal(res$alternative, res0$alternative)
+  names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$null.value, res0$null.value)
+})
+
+test_that("test t.test.aggregated with equal variance assumption with two.sided alternative", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  res0 <- stats::t.test(data=test_df, val~cat, var.equal=TRUE)
+  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE)
+  expect_equal(res$statistic, res0$statistic)
+  expect_equal(res$parameter, res0$parameter)
+  expect_equal(res$p.value, res0$p.value)
+  expect_equal(res$conf.int, res0$conf.int)
+  names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$estimate, res0$estimate)
+  expect_equal(res$stderr, res0$stderr)
+  names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$null.value, res0$null.value)
+})
+
+test_that("test t.test.aggregated with equal variance assumption with greater alternative", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  res0 <- stats::t.test(data=test_df, val~cat, var.equal=TRUE, alternative='greater')
+  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE, alternative='greater')
+  expect_equal(res$statistic, res0$statistic)
+  expect_equal(res$parameter, res0$parameter)
+  expect_equal(res$p.value, res0$p.value)
+  expect_equal(res$conf.int, res0$conf.int)
+  names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$estimate, res0$estimate)
+  expect_equal(res$stderr, res0$stderr)
+  names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$null.value, res0$null.value)
+})
+
+test_that("test t.test.aggregated with equal variance assumption with less alternative", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  res0 <- stats::t.test(data=test_df, val~cat, var.equal=TRUE, alternative='less')
+  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE, alternative='less')
+  expect_equal(res$statistic, res0$statistic)
+  expect_equal(res$parameter, res0$parameter)
+  expect_equal(res$p.value, res0$p.value)
+  expect_equal(res$conf.int, res0$conf.int)
+  names(res0$estimate) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$estimate, res0$estimate)
+  expect_equal(res$stderr, res0$stderr)
+  names(res0$null.value) <- NULL # Ignore names difference, which we did not implement.
+  expect_equal(res$null.value, res0$null.value)
+})
+
+test_that("test exp_ttest_aggregated", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
+  model_df <- test_df2 %>% exp_ttest_aggregated(cat, n, mean, sd)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_true("Number of Rows" %in% colnames(ret))
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+})
+
 test_that("test two sample t-test with column name", {
   test_df <- data.frame(
     cat=rep(c("cat1", "cat2"), 20),

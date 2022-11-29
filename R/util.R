@@ -2125,6 +2125,17 @@ calculate_common_sd <- function(var1, var2) {
   csd <- sqrt(csd) # common sd computation
 }
 
+#'Calculate common standard deviation from aggregated data.
+calculate_common_sd_aggregated <- function(N1, N2, s1, s2) {
+  lx <- N1 - 1
+  ly <- N2 - 1
+  vx <- s1^2
+  vy <- s2^2
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+}
+
 # Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
 #'Calculate Cohen's d
 #'@export
@@ -2139,6 +2150,21 @@ calculate_cohens_d <- function(var1, var2) {
   my <- summarized$m[[2]]
   vx <- summarized$v[[1]]
   vy <- summarized$v[[2]]
+  md  <- abs(mx - my) # mean difference (numerator)
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+  cd  <- md/csd # cohen's d
+}
+
+#'Calculate Cohen's d basd on aggregated data.
+calculate_cohens_d_aggregated <- function(N1, N2, X1, X2, s1, s2) {
+  lx <- N1 - 1
+  ly <- N2 - 1
+  mx <- X1
+  my <- X2
+  vx <- s1^2
+  vy <- s2^2
   md  <- abs(mx - my) # mean difference (numerator)
   csd <- lx * vx + ly * vy
   csd <- csd/(lx + ly)

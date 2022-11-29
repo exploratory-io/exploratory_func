@@ -537,12 +537,297 @@ glance.chisq_exploratory <- function(x) {
   ret
 }
 
+# Calculate standard error of difference between means for Welch's t-test.
+calculate_welch_stderr <- function(N1, N2, s1, s2) {
+  ret <- sqrt(s1^2/N1 + s2^2/N2)
+  ret
+}
+
+# Calculate confidence interval of difference between means for Welch's t-test.
+calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternative = "two.sided") {
+  alpha <- 1-conf.level
+  dof <- calculate_welch_dof(N1, N2, s1, s2)
+  if (alternative == "two.sided") {
+    q <- qt(1-alpha/2, dof)
+    ci <- c(-q, q)
+  } else if (alternative == "greater") {
+    q <- qt(alpha, dof)
+    ci <- c(q, Inf)
+  } else {
+    q <- qt(1-alpha, dof)
+    ci <- c(-Inf, q)
+  }
+  stderr <- calculate_welch_stderr(N1, N2, s1, s2)
+  res <- X1 - X2 + stderr*ci
+  res
+}
+
+# Calculate t statistic for Welch's t-test.
+calculate_welch_t <- function(N1, N2, X1, X2, s1, s2) {
+  ret <- (X1 - X2)/sqrt(s1^2/N1 + s2^2/N2)
+  ret
+}
+
+# Calculate degree of freedom for Welch's t-test.
+calculate_welch_dof <- function(N1, N2, s1, s2) {
+  ret <- (s1^2/N1 + s2^2/N2)^2/((s1^4/((N1^2)*(N1-1))) + (s2^4/((N2^2)*(N2-1))))
+  ret
+}
+
+# Calculate p value for Welch's t-test.
+calculate_welch_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
+  t <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+  dof <- calculate_welch_dof(N1, N2, s1, s2)
+  p <- pt(t,dof)
+  if (alternative == "two.sided") {
+    if (p < 0.5) {
+      res <- 2*p
+    } else {
+      res <- 2*(1-p)
+    }
+  } else if (alternative == "greater") {
+    res <- 1-p
+  } else {
+    res <- p
+  }
+  res
+}
+
+# Calculate pooled standard error for Student's t-test.
+calculate_pooled_stderr <- function(N1, N2, s1, s2) {
+  res <- sqrt(((N1-1)*s1^2 + (N2-1)*s2^2)/(N1 + N2 - 2))
+  res
+}
+
+# Calculate confidence interval of difference between means for Student's t-test.
+calculate_student_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternative = "two.sided") {
+  alpha <- 1-conf.level
+  dof <- calculate_student_dof(N1, N2)
+  if (alternative == "two.sided") {
+    q <- qt(1-alpha/2, dof)
+    ci <- c(-q, q)
+  } else if (alternative == "greater") {
+    q <- qt(alpha, dof)
+    ci <- c(q, Inf)
+  } else {
+    q <- qt(1-alpha, dof)
+    ci <- c(-Inf, q)
+  }
+  stderr <- calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2)
+  res <- X1 - X2 + stderr*ci
+  res
+}
+
+# Calculate t statistic for Student's t-test.
+calculate_student_t <- function(N1, N2, X1, X2, s1, s2) {
+  ret <- (X1 - X2)/(calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2))
+  ret
+}
+
+# Calculate degree of freedom for Student's t-test.
+calculate_student_dof <- function(N1, N2) {
+  ret <- N1 + N2 - 2
+  ret
+}
+
+# Calculate p value for Student's t-test.
+calculate_student_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
+  t <- calculate_student_t(N1, N2, X1, X2, s1, s2)
+  dof <- calculate_student_dof(N1, N2)
+  p <- pt(t,dof)
+  if (alternative == "two.sided") {
+    if (p < 0.5) {
+      res <- 2*p
+    } else {
+      res <- 2*(1-p)
+    }
+  } else if (alternative == "greater") {
+    res <- 1-p
+  } else {
+    res <- p
+  }
+  res
+}
+
+# A function that gives the same output as stats::t.test, but takes aggregated data as the input.
+# N1, N2 - Sample sizes
+# X1, X2 - Means
+# s1, s2 - Standard Deviations
+t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alternative = "two.sided", paired = FALSE, var.equal = FALSE) {
+  if (!var.equal) {
+    method="Welch Two Sample t-test"
+    statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+    parameter <- calculate_welch_dof(N1, N2, s1, s2)
+    p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2, alternative = alternative)
+    conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level, alternative = alternative)
+    estimate <- c(X1, X2)
+    stderr <- calculate_welch_stderr(N1, N2, s1, s2)
+  }
+  else {
+    method="Two Sample t-test"
+    statistic <- calculate_student_t(N1, N2, X1, X2, s1, s2)
+    parameter <- calculate_student_dof(N1, N2)
+    p.value <- calculate_student_p(N1, N2, X1, X2, s1, s2, alternative = alternative)
+    conf.int <- calculate_student_confint(N1, N2, X1, X2, s1, s2, conf.level, alternative = alternative)
+    estimate <- c(X1, X2)
+    stderr <- calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2)
+  }
+  null.value <- mu
+  names(statistic) <- "t"
+  names(parameter) <- "df"
+  names(mu) <- "difference in means"
+  attr(conf.int, "conf.level") <- conf.level
+  res <- list(
+    statistic=statistic,
+    parameter=parameter,
+    p.value=p.value,
+    conf.int=conf.int,
+    estimate=estimate,
+    stderr=stderr,
+    null.value=null.value,
+    method=method,
+    alternative=alternative
+  )
+  class(res) <- c('ttest_exploratory', 'htest')
+  res
+}
+
+#' t-test wrapper for Analytics View. Almost the same as exp_ttest, but takes already aggregated data.
+#' @export
+#' @param category - Column of the categories.
+#' @param n - Column of the sample sizes.
+#' @param category_mean - Column of the means of the caterories.
+#' @param category_sd - Column of the standard deviations of the caterories.
+#' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+#' @param test_sig_level - Significance level for the t-test ifself.
+#' @param sig.level - Significance level for power analysis.
+#' @param d - Cohen's d to detect in power analysis.
+#' @param common_sd - Used for calculation of Cohen's d.
+#' @param diff_to_detect - Used for calculation of Cohen's d.
+exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, test_sig_level = 0.05,
+                                 sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
+                                 ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
+  var2_col <- col_name(substitute(category))
+  n_col <- col_name(substitute(n))
+  mean_col <- col_name(substitute(category_mean))
+  sd_col <- col_name(substitute(category_sd))
+  grouped_cols <- grouped_by(df)
+
+  # For logical explanatory variable, make it a factor and adjust label order so that
+  # the calculated difference is TRUE case - FALSE case, which intuitively makes better sense.
+  if (is.logical(df[[var2_col]])) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
+    df <- df %>% dplyr::arrange(!!rlang::sym(var2_col))
+  }
+
+  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
+  if (n_distinct_res != 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
+    }
+    else {
+      stop("The explanatory variable needs to have 2 unique values.")
+    }
+  }
+
+  ttest_each <- function(df) {
+    tryCatch({
+      if (nrow(df) != 2) {
+        stop("Number of rows of the aggregated input data must be 2.")
+      }
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(n_col)) & !is.na(!!rlang::sym(mean_col)) & !is.na(!!rlang::sym(sd_col))) # Remove NA from the target column.
+      if (nrow(df) != 2) {
+        stop("There is NA in the aggregated input data.")
+      }
+
+      if(length(grouped_cols) > 0) {
+        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
+        if (n_distinct_res_each != 2) {
+          stop("The explanatory variable needs to have 2 unique values.")
+        }
+      }
+      # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
+      # Check it here, rather than handling it later.
+      min_n <- min(df[[n_col]], na.rm=TRUE)
+      if (min_n <= 1) {
+        e <- simpleError("Not enough data.")
+        class(e) <- c("ttest_exploratory", class(e))
+        e$v1 <- df[[var2_col]][1]
+        e$n1 <- df[[n_col]][1]
+        e$v2 <- df[[var2_col]][2]
+        e$n2 <- df[[n_col]][2]
+        return(e)
+      }
+      # Calculate Cohen's d from data.
+      cohens_d <- calculate_cohens_d_aggregated(df[[n_col]][1], df[[n_col]][2], df[[mean_col]][1], df[[mean_col]][2], df[[sd_col]][1], df[[sd_col]][2])
+      # Get size of Cohen's d to detect for power analysis.
+      # If neither d nor diff_to_detect is specified, use the one calculated from data.
+      if (is.null(d)) {
+        if (is.null(diff_to_detect)) {
+          # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
+          cohens_d_to_detect <- cohens_d
+        }
+        else { # diff_to_detect is specified.
+          if (is.null(common_sd)) {
+            # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
+            cohens_d_to_detect <- diff_to_detect/calculate_common_sd_aggregated(df[[n_col]][1], df[[n_col]][2], df[[sd_col]][1], df[[sd_col]][2])
+          }
+          else {
+            cohens_d_to_detect <- diff_to_detect/common_sd
+          }
+        }
+      }
+      else {
+        cohens_d_to_detect <- d
+      }
+
+      model <- t.test.aggregated(df[[n_col]][1], df[[n_col]][2], df[[mean_col]][1], df[[mean_col]][2], df[[sd_col]][1], df[[sd_col]][2], ...)
+      class(model) <- c("ttest_exploratory", class(model))
+      model$var2 <- var2_col
+      model$data <- df
+      model$test_sig_level <- test_sig_level
+      model$sig.level <- sig.level
+      model$cohens_d <- cohens_d # model$d seems to be already used for something.
+      model$cohens_d_to_detect <- cohens_d_to_detect
+      model$power <- power
+      model$v1 <- df[[var2_col]][1]
+      model$v2 <- df[[var2_col]][2]
+      model$n1 <- df[[n_col]][1]
+      model$n2 <- df[[n_col]][2]
+      model$s1 <- df[[sd_col]][1]
+      model$s2 <- df[[sd_col]][2]
+      model$m1 <- df[[mean_col]][1]
+      model$m2 <- df[[mean_col]][2]
+      model$data_type <- "aggregated"
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("ttest_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
+  }
+  do_on_each_group(df, ttest_each, name = "model", with_unnest = FALSE)
+}
 
 #' t-test wrapper for Analytics View
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
+#' @param d - Cohen's d to detect in power analysis.
+#' @param common_sd - Used for calculation of Cohen's d.
+#' @param diff_to_detect - Used for calculation of Cohen's d.
 exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
@@ -654,6 +939,11 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model$cohens_d <- cohens_d # model$d seems to be already used for something.
       model$cohens_d_to_detect <- cohens_d_to_detect
       model$power <- power
+      model$v1 <- count_df[[1]][1] 
+      model$n1 <- count_df$n[1]
+      model$v2 <- count_df[[1]][2] 
+      model$n2 <- count_df$n[2]
+      model$data_type <- "raw"
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -702,12 +992,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     }
 
     # Get sample sizes for the 2 groups (n1, n2).
-    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
-    n1 <- data_summary$n_rows[[1]] # number of 1st class
-    n2 <- data_summary$n_rows[[2]] # number of 2nd class
-    v1 <- data_summary[[x$var2]][[1]] # value for 1st class
-    v2 <- data_summary[[x$var2]][[2]] # value for 2nd class
+    n1 <- x$n1 # number of 1st class
+    n2 <- x$n2 # number of 2nd class
+    v1 <- x$v1 # value for 1st class
+    v2 <- x$v2 # value for 2nd class
     # t.test seems to consider the 2nd category based on alphabetical/numerical/factor sort as the base category.
     # Since group_by/summarize also sorts the group based on alphabetical/numerical/factor order, we can assume that the v2 is the base category.
     ret <- ret %>% dplyr::mutate(base.level = !!v2)
@@ -780,27 +1068,43 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       return(ret)
     }
     conf_threshold = 1 - (1 - conf_level)/2
-    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
-                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
-                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
-                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
-                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
-                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
-      dplyr::select(!!rlang::sym(x$var2),
-                    `Number of Rows`,
-                    Mean,
-                    `Conf Low`,
-                    `Conf High`,
-                    `Std Error of Mean`,
-                    `Std Deviation`,
-                    `Minimum`,
-                    `Maximum`)
+    if (x$data_type == "raw") {
+      ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+        dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                         Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                         `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                         # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                         `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                         # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                         # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                         `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                         `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                         `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                         `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+        dplyr::select(!!rlang::sym(x$var2),
+                      `Number of Rows`,
+                      Mean,
+                      `Conf Low`,
+                      `Conf High`,
+                      `Std Error of Mean`,
+                      `Std Deviation`,
+                      `Minimum`,
+                      `Maximum`)
+    }
+    else { # x$data_type == "aggregated"
+      stderr <- c(x$s1/sqrt(x$n1), x$s2/sqrt(x$n2))
+      ci_radius <- stderr * qt(p=conf_threshold, df=c(x$n1, x$n2)-1)
+      ret <- tibble::tibble(
+                      group_ = c(x$v1, x$v2),
+                      `Number of Rows` = c(x$n1, x$n2),
+                      Mean = c(x$m1, x$m2),
+                      `Conf Low` = c(x$m1, x$m2) - ci_radius,
+                      `Conf High` = c(x$m1, x$m2) + ci_radius,
+                      `Std Error of Mean` = stderr,
+                      `Std Deviation` = c(x$s1, x$s2)
+      )
+      ret <- ret %>% dplyr::rename(!!rlang::sym(x$var2):=group_)
+    }
   }
   else if (type == "prob_dist") {
     if ("error" %in% class(x)) {
