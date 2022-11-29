@@ -649,6 +649,10 @@ calculate_student_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided
   res
 }
 
+# A function that gives the same output as stats::t.test, but takes aggregated data as the input.
+# N1, N2 - Sample sizes
+# X1, X2 - Means
+# s1, s2 - Standard Deviations
 t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alternative = "two.sided", paired = FALSE, var.equal = FALSE) {
   if (!var.equal) {
     method="Welch Two Sample t-test"
@@ -688,6 +692,18 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alt
   res
 }
 
+#' t-test wrapper for Analytics View. Almost the same as exp_ttest, but takes already aggregated data.
+#' @export
+#' @param category - Column of the categories.
+#' @param n - Column of the sample sizes.
+#' @param category_mean - Column of the means of the caterories.
+#' @param category_sd - Column of the standard deviations of the caterories.
+#' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+#' @param test_sig_level - Significance level for the t-test ifself.
+#' @param sig.level - Significance level for power analysis.
+#' @param d - Cohen's d to detect in power analysis.
+#' @param common_sd - Used for calculation of Cohen's d.
+#' @param diff_to_detect - Used for calculation of Cohen's d.
 exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, test_sig_level = 0.05,
                                  sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
                                  ...) {

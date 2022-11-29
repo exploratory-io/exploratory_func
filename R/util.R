@@ -2125,6 +2125,7 @@ calculate_common_sd <- function(var1, var2) {
   csd <- sqrt(csd) # common sd computation
 }
 
+#'Calculate common standard deviation from aggregated data.
 calculate_common_sd_aggregated <- function(N1, N2, s1, s2) {
   lx <- N1 - 1
   ly <- N2 - 1
@@ -2156,6 +2157,7 @@ calculate_cohens_d <- function(var1, var2) {
   cd  <- md/csd # cohen's d
 }
 
+#'Calculate Cohen's d basd on aggregated data.
 calculate_cohens_d_aggregated <- function(N1, N2, X1, X2, s1, s2) {
   lx <- N1 - 1
   ly <- N2 - 1
