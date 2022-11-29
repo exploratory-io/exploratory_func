@@ -593,11 +593,19 @@ calculate_pooled_stderr <- function(N1, N2, s1, s2) {
   res
 }
 
-calculate_student_confint <- function(N1, N2, X1, X2, s1, s2, conf.level) { # TODO: cases other than both ends.
+calculate_student_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternative = "two.sided") {
   alpha <- 1-conf.level
   dof <- calculate_student_dof(N1, N2)
-  q <- qt(1-alpha/2, dof)
-  ci <- c(-q, q)
+  if (alternative == "two.sided") {
+    q <- qt(1-alpha/2, dof)
+    ci <- c(-q, q)
+  } else if (alternative == "greater") {
+    q <- qt(alpha, dof)
+    ci <- c(q, Inf)
+  } else {
+    q <- qt(1-alpha, dof)
+    ci <- c(-Inf, q)
+  }
   stderr <- calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2)
   res <- X1 - X2 + stderr*ci
   res
@@ -613,15 +621,20 @@ calculate_student_dof <- function(N1, N2) {
   ret
 }
 
-calculate_student_p <- function(N1, N2, X1, X2, s1, s2) {
+calculate_student_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
   t <- calculate_student_t(N1, N2, X1, X2, s1, s2)
   dof <- calculate_student_dof(N1, N2)
   p <- pt(t,dof)
-  # both sides case. TODO: other cases.
-  if (p < 0.5) {
-    res <- 2*p
+  if (alternative == "two.sided") {
+    if (p < 0.5) {
+      res <- 2*p
+    } else {
+      res <- 2*(1-p)
+    }
+  } else if (alternative == "greater") {
+    res <- 1-p
   } else {
-    res <- 2*(1-p)
+    res <- p
   }
   res
 }
@@ -640,8 +653,8 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alt
     method="Two Sample t-test"
     statistic <- calculate_student_t(N1, N2, X1, X2, s1, s2)
     parameter <- calculate_student_dof(N1, N2)
-    p.value <- calculate_student_p(N1, N2, X1, X2, s1, s2)
-    conf.int <- calculate_student_confint(N1, N2, X1, X2, s1, s2, conf.level)
+    p.value <- calculate_student_p(N1, N2, X1, X2, s1, s2, alternative = alternative)
+    conf.int <- calculate_student_confint(N1, N2, X1, X2, s1, s2, conf.level, alternative = alternative)
     estimate <- c(X1, X2)
     stderr <- calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2)
   }
@@ -747,7 +760,6 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
 
       model <- t.test.aggregated(df[[n_col]][1], df[[n_col]][2], df[[mean_col]][1], df[[mean_col]][2], df[[sd_col]][1], df[[sd_col]][2], ...)
       class(model) <- c("ttest_exploratory", class(model))
-      #model$var1 <- var1_col #TODO cleanup
       model$var2 <- var2_col
       model$data <- df
       model$test_sig_level <- test_sig_level
