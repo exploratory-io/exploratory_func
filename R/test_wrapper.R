@@ -537,11 +537,13 @@ glance.chisq_exploratory <- function(x) {
   ret
 }
 
+# Calculate standard error of difference between means for Welch's t-test.
 calculate_welch_stderr <- function(N1, N2, s1, s2) {
   ret <- sqrt(s1^2/N1 + s2^2/N2)
   ret
 }
 
+# Calculate confidence interval of difference between means for Welch's t-test.
 calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternative = "two.sided") {
   alpha <- 1-conf.level
   dof <- calculate_welch_dof(N1, N2, s1, s2)
@@ -560,16 +562,19 @@ calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternat
   res
 }
 
+# Calculate t statistic for Welch's t-test.
 calculate_welch_t <- function(N1, N2, X1, X2, s1, s2) {
   ret <- (X1 - X2)/sqrt(s1^2/N1 + s2^2/N2)
   ret
 }
 
+# Calculate degree of freedom for Welch's t-test.
 calculate_welch_dof <- function(N1, N2, s1, s2) {
   ret <- (s1^2/N1 + s2^2/N2)^2/((s1^4/((N1^2)*(N1-1))) + (s2^4/((N2^2)*(N2-1))))
   ret
 }
 
+# Calculate p value for Welch's t-test.
 calculate_welch_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
   t <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
   dof <- calculate_welch_dof(N1, N2, s1, s2)
@@ -588,11 +593,13 @@ calculate_welch_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided")
   res
 }
 
+# Calculate pooled standard error for Student's t-test.
 calculate_pooled_stderr <- function(N1, N2, s1, s2) {
   res <- sqrt(((N1-1)*s1^2 + (N2-1)*s2^2)/(N1 + N2 - 2))
   res
 }
 
+# Calculate confidence interval of difference between means for Student's t-test.
 calculate_student_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternative = "two.sided") {
   alpha <- 1-conf.level
   dof <- calculate_student_dof(N1, N2)
@@ -611,16 +618,19 @@ calculate_student_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, altern
   res
 }
 
+# Calculate t statistic for Student's t-test.
 calculate_student_t <- function(N1, N2, X1, X2, s1, s2) {
   ret <- (X1 - X2)/(calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2))
   ret
 }
 
+# Calculate degree of freedom for Student's t-test.
 calculate_student_dof <- function(N1, N2) {
   ret <- N1 + N2 - 2
   ret
 }
 
+# Calculate p value for Student's t-test.
 calculate_student_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
   t <- calculate_student_t(N1, N2, X1, X2, s1, s2)
   dof <- calculate_student_dof(N1, N2)
