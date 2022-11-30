@@ -240,6 +240,19 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- res %>% tidyr::fill(x$grouped_cols)
     res
   }
+  else if (type == "correlation") {
+    if (!is.null(x$Phi)) {
+      # If x$Phi is available, show its content in the pivot table.
+      # TODO: print.psych.fa.R seems to have logic to calculate it even when x$Phi is not there. Should we do the same here?
+      # But it seems x$Phi is there for most of the oblique rotations. #25435
+      res <- as.data.frame(x$Phi) %>% dplyr::add_rownames("factor1") %>% tidyr::pivot_longer(cols=starts_with(factor_score_prefix), names_to="factor2", values_to="correlation")
+      res <- res %>% dplyr::mutate(factor1=stringr::str_replace(factor1, factor_score_prefix, "Factor "), factor2=stringr::str_replace(factor2, factor_score_prefix, "Factor "))
+    }
+    else {
+      # Return an empty data frame.
+      res <- tibble::tibble()
+    }
+  }
   else { # should be data
     scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
