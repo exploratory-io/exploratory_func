@@ -20,6 +20,9 @@ test_that("exp_factanal", {
     expect_equal(colnames(res),
                  c("variable", "factor", "value"))
     expect_equal(levels(res$factor), c("Factor 1", "Factor 2", "Factor 3", "Communality", "Uniqueness")) # Verify that order of factor levels are in order.
+    res <- model_df %>% tidy_rowwise(model, type="correlation")
+    # For orthogonal rotations, correlation should return empty dataframe.
+    expect_equal(nrow(res), 0)
     res <- model_df %>% tidy_rowwise(model, type="biplot")
     # Factor 3 can be various column names like "MR3" here.
     expect_true(all(c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec", "vs", "am", "gear", "carb", "new_col", ".factor_1", ".factor_2", ".variable", ".factor_2_variable") %in% colnames(res)))
