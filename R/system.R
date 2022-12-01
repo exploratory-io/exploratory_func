@@ -3787,3 +3787,339 @@ get_refs_in_script <- function(script, after_pipe = TRUE) {
     res
   }
 }
+
+# Function to split numbers into groups by equal data range.
+# Mainly for chart bucketing function.
+#
+# Enhanced and customized version of cut function
+# include.lowest=TRUE by default to include the lowest value with
+# the custom breaks based on min/max value in order to avoid
+# having a smaller value than the min value in the actual value.
+exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, include.lowest=TRUE, right=TRUE, lower.range=NA, upper.range=NA, include.outside.range=TRUE) {
+  # Return as is if x is empty.
+  if (length(x) == 0) {
+    return (x)
+  }
+  # If it is not numeric, return a vector of NAs. Since pivot table now
+  # accepts non-numeric for measure values, we need this handling.
+  if (!is.numeric(x)) {
+    return (rep(NA, length(x)))
+  }
+
+  tryCatch({
+    #
+    # If you run the cut function against the 1 length numeric vector which value is '0',
+    # then cut complains like this.
+    #
+    # > cut(c(0), breaks=5, label=F)
+    # Error in cut.default(c(0), breaks = 5, label = F) :
+    #  'breaks' are not unique
+    #
+    # Actually, it happens even with length more than 1 if all of vector values are 0 (#4965)
+    #
+    # > cut(c(0, 0, 0), breaks=5, label=F)
+    # Error in cut.default(c(0), breaks = 5, label = F) :
+    #  'breaks' are not unique
+    #
+    #
+    # If na.rm=FALSE, it return NA if it includes NA and if statement complains.
+    if (all(x==0, na.rm=TRUE)) {
+      if (is.null(labels)) {
+        # mimics the default output like '(0,19835.25]'
+        # TODO: handle length>1 case later
+        v <- as.factor(c('(0,0]'))
+      } else {
+        # In case of labels=FALSE case.
+        # It handles NA as NA, and zero as center value of the given breaks.
+        #
+        # Expected output:
+        # > `_tam_cut`(c(0,NA,0,NA), breaks=5, label=F)
+        # [1]  3 NA  3 NA
+        # > `_tam_cut`(c(0,0), breaks=5, label=F)
+        # [1] 3 3
+        # > `_tam_cut`(c(NA,NA), breaks=5, label=F)
+        # [1] NA NA
+        v <- ifelse(is.na(x), NA, as.integer(ceiling(breaks/2)))
+      }
+      return(v)
+    } else {
+      minv <- min(x, na.rm=TRUE)
+      maxv <- max(x, na.rm=TRUE)
+      # If min and max values of given vector are the same, then seq function
+      # will generate a vector with the same values. That vector cannot be
+      # used for cut custom breaks since the cut function complains if
+      # given vector values are not unique.
+      if (minv == maxv) {
+        # If that's the case, just call cut function with giving number of
+        # breaks param as it used to work before.
+        breaks.with.inf <- breaks
+        # Extreme case, in case all values are all in either -Inf or Inf.
+        if(is.infinite(minv)) {
+          breaks.with.inf <- c(-Inf, Inf)
+        }
+        return (cut(x, breaks=breaks.with.inf, labels=labels, dig.lab=dig.lab, include.lowest=include.lowest, right=right))
+      } else {
+        # cut function doesn't work with infinite values without explicitly
+        # specifying the infinite values in the breaks.
+        #
+        # Examples:
+        # Sample data = c(1,2,3,4,5,6,7,8,9,10,Inf)
+        #
+        # If zero.to.center=FALSE:
+        # - create a value set without Inf values: c(1,2,3,4,5,6,7,8,9,10)
+        # - create breaks without Inf values: c(1,4,7,10)
+        # - append -Inf/Inf on the end like : c(1,4,7.10,Inf)
+        #
+        # - If both ends are infinite, c(-Inf,1,2,3,4,5,6,7,8,9,10,Inf)
+        # - create breaks without Inf values: c(1,5,10)
+        # - append Inf on both ends: c(-Inf,1,5.10,Inf)
+        #
+        #
+        # If zero.to.center=TRUE:
+        # Sample data = c(1,2,3,4,5,6,7,8,9,10,Inf)
+        # - create a value set without Inf values: c(1,2,3,4,5,6,7,8,9,10)
+        # - get the max of abs value, 10.
+        # - create a bucket between -max and max values: c(-10,0,10)
+        # - append -Inf/Inf on both ends: c(-Inf,-10,0.10,Inf)
+        #
+        if (is.infinite(minv) || is.infinite(maxv)) {
+
+          lenout <- breaks
+          x.no.inf <- x[!is.infinite(x)]
+          # If there are only infinite values, add some dummy values.
+          # It is ok since all values are either -Inf or Inf so those won't
+          # fit in this range anyway.
+          if (length(x.no.inf) == 0) {
+            x.no.inf=c(-10, 10)
+          }
+
+          minv.no.inf <- min(x.no.inf, na.rm=TRUE)
+          maxv.no.inf <- max(x.no.inf, na.rm=TRUE)
+          if (zero.to.center) {
+            # Reduce the bucket size to add infinite values on both ends.
+            lenout <- lenout - 1
+            maxv.no.inf <- max(abs(maxv.no.inf), abs(minv.no.inf))
+            minv.no.inf <- -maxv.no.inf
+          } else {
+            # If there's only 1 value available after taking off infinites, we add
+            # another value to have 2 different values for cut. This is because
+            # if you pass the same value for min and max for seq, it returns a vector with
+            # the same values like c(1,1,1,1,1). The cut function will complain about this
+            # because breaks are not uniq.
+            if (minv.no.inf == maxv.no.inf) {
+              maxv.no.inf <- abs(maxv.no.inf)
+              minv.no.inf <- -maxv.no.inf
+            }
+            if  (is.infinite(minv) && is.infinite(maxv)) {
+              # Reduce the bucket size to add infinite values on both ends.
+              lenout <- lenout - 1
+            }
+          }
+
+          # Set custom range if specified.
+          if (!is.na(upper.range)) {
+            maxv.no.inf <- upper.range
+          }
+          if (!is.na(lower.range)) {
+            minv.no.inf <- lower.range
+          }
+
+          breaks.with.inf <- seq(minv.no.inf, maxv.no.inf,  length.out=lenout)
+          if (zero.to.center) {
+            breaks.with.inf <- c( -Inf, breaks.with.inf, Inf)
+          } else {
+            if (is.infinite(minv)) {
+              breaks.with.inf <- c( -Inf, breaks.with.inf)
+            }
+            if (is.infinite(maxv)) {
+              breaks.with.inf <- c(breaks.with.inf, Inf)
+            }
+          }
+
+          # If include.outside.range is TRUE and range value is specified,
+          # add the -Inf and Inf in the breaks.
+          if (include.outside.range) {
+            if (!is.infinite(minv) && !is.na(lower.range)) {
+              breaks.with.inf <- c(-Inf, breaks.with.inf)
+            }
+            if (!is.infinite(maxv) && !is.na(upper.range)) {
+              breaks.with.inf <- c(breaks.with.inf, Inf)
+            }
+          }
+
+          return (cut(x, breaks=breaks.with.inf, labels=labels, dig.lab=dig.lab, include.lowest=include.lowest, right=right))
+        } else {
+          if (zero.to.center) {
+            maxv <- max(abs(maxv), abs(minv))
+            minv <- -maxv
+          }
+
+          # Set custom range if specified.
+          if (!is.na(upper.range)) {
+            maxv <- upper.range
+          }
+          if (!is.na(lower.range)) {
+            minv <- lower.range
+          }
+
+          break_points = seq(minv, maxv, length.out = breaks+1)
+          if (length(unique(break_points)) != breaks+1) {
+            # this happens when minv and maxv is very close and there is not enough expressible floating point values between them.
+            # using such break_points leads to an 'breaks are not unique' error. avoid it by spreading the range for break points a little.
+            base = max(abs(minv),abs(maxv))
+            break_points = seq(minv-(base*0.000000001), maxv+(base*0.000000001), length.out = breaks+1)
+          }
+
+          # If include.outside.range option is specified, add the -Inf and
+          # Inf in the breaks. If it is already there, do nothing.
+          if (include.outside.range) {
+            if (!is.infinite(minv) && !is.na(lower.range)) {
+              break_points <- c( -Inf, break_points)
+            }
+            if (!is.infinite(maxv) && !is.na(upper.range)) {
+              break_points <- c(break_points, Inf)
+            }
+          }
+
+          return (cut(x, breaks=break_points, labels=labels, dig.lab=dig.lab, include.lowest=include.lowest, right=right))
+        }
+      }
+    }
+  }, error = function(e) {
+    # Add a tag at the end of the error message to tell where it comes from.
+    # We will eventually remove this workaround once we implement the chart
+    # data query step-by-step execution. #13715
+    stop(paste0(e$message, " (Binning)"))
+  })
+}
+
+# Cut number by the step specified.
+# @param x
+# @param step
+# @param lower.range Min value to start the bucketing.
+#                    If you don't specify, min(x) will be used.
+# @param upper.range Max value to end the bucketing.
+#                    If you don't specify, max(x) will be used.
+# @param include.outside.range If you set it to TRUE, it will create buckets
+#                              for outside of the upper and lower ranges.
+exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.outside.range=TRUE, right=TRUE, ...) {
+  # If it is not numeric, return a vector of NAs. Since pivot table now
+  # accepts non-numeric for measure values, we need this handling.
+  if (!is.numeric(x)) {
+    return (rep(NA, length(x)))
+  }
+
+  # Remove NA, NaN, Inf, -Inf.
+  x.finite <- x[is.finite(x)]
+
+  # In case there are only NA, NaN, Inf or -Inf values in the vector.
+  if (length(x.finite) == 0) {
+    # The following cut command works like the following.
+    # > x
+    # [1] -Inf  Inf   NA  NaN
+    # > cut(x, breaks=c(-Inf, Inf), include.lowest=T)
+    # [1] [-Inf, Inf] [-Inf, Inf] <NA>        <NA>
+    # Levels: [-Inf, Inf]
+    return (cut(x, breaks=c(-Inf, Inf), include.lowest=T))
+  }
+
+  lower <- lower.range
+  upper <- upper.range
+
+  # Use the min value for the lower range if not specified.
+  if (is.na(lower.range)) {
+    # Remove inf, NA, NaN etc from the range.
+    lower <- min(x.finite)
+  }
+  # Use the max value for the upper range if not specified.
+  if (is.na(upper.range)) {
+    # Remove inf, NA, NaN etc from the range.
+    upper <- max(x.finite)
+  }
+  # If step is not specified, set the default step which divides
+  # the group into 5.
+  if (is.na(step)) {
+    # If all values are the same, set 1 to avoid the crash.
+    if (upper == lower) {
+      step <- 1
+    } else {
+      step <- ceiling(abs(upper - lower) / 5)
+    }
+  }
+
+  # Create breaks by specifying cut points.
+  breaks <- seq(lower, upper, by=step)
+
+  # min/max values without NA. Those can include Inf/-Inf.
+  min.x <- min(x, na.rm=TRUE)
+  max.x <- max(x, na.rm=TRUE)
+
+  # If the max.breaks doesn't include the upper range value,
+  # add one more bucket. For example, if you set step=10 for 0:15,
+  # we should create 2 buckets, 0-10, 10-20.
+  if (max(breaks) < upper) {
+    breaks <- c(breaks, max(breaks) + step)
+  }
+
+  # Include -Inf/Inf if include.outside.range is TRUE.
+  if (include.outside.range) {
+    # Add lower outside range if;
+    # - lower.range is explicitly specified and lower.range is
+    #   larger than the min value OR
+    # - lower.range is not specified and right=TRUE. In this case,
+    #   the min value won't be included in the buckets so we need
+    #   to add the lower outside range for the min value #25625.
+    #   If all values are the same, we should treat it as a special
+    #   case so we skip it in that case.
+    if (!is.na(lower.range)) {
+      if (right == TRUE && min.x <= min(breaks)) {
+        breaks <- c(-Inf, breaks)
+      } else if (right == FALSE && min.x < min(breaks)) {
+        breaks <- c(-Inf, breaks)
+      }
+    }
+    # lower.range is NULL.
+    else if (right == TRUE && upper != lower) {
+      breaks <- c(-Inf, breaks)
+    }
+    # Add upper outside range if;
+    # - upper.range is explicitly specified and upper range is
+    #   smaller than the max value OR
+    # - upper.range is not specified and right=FALSE. In this case,
+    #   the max value won't be included in the buckets so we need
+    #   to add the upper outside range for the max value #25625.
+    #   If all values are the same, we should treat it as a special
+    #   case so we skip it in that case.
+    if (!is.na(upper.range)) {
+      if (right == TRUE && max.x > max(breaks)) {
+        breaks <- c(breaks, Inf)
+      } else if (right == FALSE && max.x >= max(breaks)) {
+        breaks <- c(breaks, Inf)
+      }
+    }
+    # upper.range is NULL.
+    else if (right == FALSE && upper != lower) {
+      breaks <- c(breaks, Inf)
+    }
+  }
+
+  # If there are -Inf values, include -Inf in the break.
+  # If it is already there, just ignore it.
+  if (min.x == -Inf && min(breaks) != -Inf) {
+    breaks <- c(-Inf, breaks)
+  }
+  # If there are Inf values, include Inf in the break.
+  # If it is already there, just ignore it.
+  if (max.x == Inf && max(breaks) != Inf) {
+    breaks <- c(breaks, Inf)
+  }
+
+  # In that case, pass breaks=2 to let cut command to break it into 2.
+  if (length(breaks) == 1) {
+    breaks <- 2
+  }
+
+  # Call cut with the constructed breaks.
+  cut(x, breaks=breaks, right=right, ...)
+}
+
