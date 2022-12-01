@@ -124,10 +124,15 @@ test_that("setdiff", {
 })
 
 test_that("test pivot with empty data frame", {
-  df <- data.frame()
-  expect_error({
-    pivot(df, row_cols=c("row"), col_cols=c("col"))
-  }, "Input data frame is empty.")
+  # Create an empty data frame
+  df <- mtcars %>% filter(gear > 100)
+  df <- pivot(df, row_cols=c("gear"), col_cols=c("cyl"))
+  # it should return below 0 row df.
+  # > df
+  # A tibble: 0 × 1
+  # … with 1 variable: gear <dbl>
+  expect_equal(nrow(df), 0)
+  expect_equal(ncol(df), 1)
 })
 
 test_that("test upper_gather", {
