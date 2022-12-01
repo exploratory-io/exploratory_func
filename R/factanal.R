@@ -247,6 +247,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # But it seems x$Phi is there for most of the oblique rotations. #25435
       res <- as.data.frame(x$Phi) %>% dplyr::add_rownames("factor1") %>% tidyr::pivot_longer(cols=starts_with(factor_score_prefix), names_to="factor2", values_to="correlation")
       res <- res %>% dplyr::mutate(factor1=stringr::str_replace(factor1, factor_score_prefix, "Factor "), factor2=stringr::str_replace(factor2, factor_score_prefix, "Factor "))
+      res <- res %>% dplyr::mutate(factor1 = forcats::fct_inorder(factor1), factor2 = forcats::fct_inorder(factor2)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
     }
     else {
       # Return an empty data frame.
