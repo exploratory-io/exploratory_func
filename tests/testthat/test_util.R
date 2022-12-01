@@ -123,13 +123,6 @@ test_that("setdiff", {
   expect_equal(nrow(res), 2)
 })
 
-test_that("test pivot with empty data frame", {
-  df <- data.frame()
-  expect_error({
-    pivot(df, row_cols=c("row"), col_cols=c("col"))
-  }, "Input data frame is empty.")
-})
-
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
   mat[[15]] <- NA # inject NA
