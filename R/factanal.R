@@ -136,6 +136,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   names(factor_loading_prefix) <- NULL
 
   # Mapping from factorization method and prefix of score output column name, e.g. MR1, MR2...
+  # Only difference from factor_loading_prefix is the ols case.
   factor_score_prefix_mapping <- c(minres="MR",
                                    ml="ML",
                                    pa="MR",
@@ -147,6 +148,21 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
                                    alpha="MR")
   factor_score_prefix <- factor_score_prefix_mapping[x$fm]
   names(factor_score_prefix) <- NULL
+
+  # Mapping from factorization method and prefix of the first factor of inter-factor correlation result.
+  # The prefix for the second factor of inter-factor correlation result is the same as factor_score_prefix.
+  # Only difference from factor_loading_prefix is the ols case.
+  factor_correlation_prefix_mapping <- c(minres="MR",
+                                         ml="ML",
+                                         pa="MR",
+                                         ols="",
+                                         wls="WLS",
+                                         gls="GLS",
+                                         minchi="MC",
+                                         minrank="MRFA",
+                                         alpha="MR")
+  factor_correlation_prefix <- factor_correlation_prefix_mapping[x$fm]
+  names(factor_correlation_prefix) <- NULL
 
   n_factor <- x$factors # Number of factors.
 
@@ -246,7 +262,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # TODO: print.psych.fa.R seems to have logic to calculate it even when x$Phi is not there. Should we do the same here?
       # But it seems x$Phi is there for most of the oblique rotations. #25435
       res <- as.data.frame(x$Phi) %>% dplyr::add_rownames("factor1") %>% tidyr::pivot_longer(cols=starts_with(factor_score_prefix), names_to="factor2", values_to="correlation")
-      res <- res %>% dplyr::mutate(factor1=stringr::str_replace(factor1, factor_score_prefix, "Factor "), factor2=stringr::str_replace(factor2, factor_score_prefix, "Factor "))
+      res <- res %>% dplyr::mutate(factor1=stringr::str_replace(factor1, paste0("^", factor_correlation_prefix), "Factor "), factor2=stringr::str_replace(factor2, paste0("^", factor_score_prefix), "Factor "))
       res <- res %>% dplyr::mutate(factor1 = forcats::fct_inorder(factor1), factor2 = forcats::fct_inorder(factor2)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
     }
     else {
