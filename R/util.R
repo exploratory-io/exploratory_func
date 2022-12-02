@@ -935,7 +935,6 @@ pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, val
 #' @param cols_sep - If na should be removed from values
 #' @export
 pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
-  validate_empty_data(df)
 
   value_col <- if(!missing(value)){
     tidyselect::vars_select(names(df), !! rlang::enquo(value))

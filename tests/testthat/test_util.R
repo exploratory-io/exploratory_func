@@ -124,11 +124,155 @@ test_that("setdiff", {
 })
 
 test_that("test pivot with empty data frame", {
-  df <- data.frame()
-  expect_error({
-    pivot(df, row_cols=c("row"), col_cols=c("col"))
-  }, "Input data frame is empty.")
+  # Create an empty data frame
+  df <- mtcars %>% filter(gear > 100)
+  df <- pivot(df, row_cols=c("gear"), col_cols=c("cyl"))
+  # it should return below 0 row df.
+  # > df
+  # A tibble: 0 × 1
+  # … with 1 variable: gear <dbl>
+  expect_equal(nrow(df), 0)
+  expect_equal(ncol(df), 1)
 })
+
+test_that("exp_cut", {
+  df <- exploratory::read_delim_file("https://www.dropbox.com/s/ok8m7cpa5cw2lw3/airline_2013_10_tricky.csv?dl=1" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
+  res <- df %>% mutate(c1=exp_cut(ARR_DELAY))
+  expect_equal(class(res$c1),"factor")
+})
+
+test_that("exp_cut upper/lower range support", {
+  expect_equal(levels(exp_cut(4*1:25, breaks=5)), c("[4,23.2]"  , "(23.2,42.4]","(42.4,61.6]","(61.6,80.8]","(80.8,100]" ))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20, upper.range=80)), c( "[-Inf,20]","(20,32]"  ,"(32,44]",  "(44,56]"  ,"(56,68]",  "(68,80]"  ,"(80, Inf]"))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20, upper.range=80, include.outside.range=F)), c("[20,32]","(32,44]","(44,56]","(56,68]","(68,80]"))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20)), c("[-Inf,20]","(20,36]"  ,"(36,52]"  ,"(52,68]" , "(68,84]",  "(84,100]" ))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20, include.outside.range=F)), c("[20,36]" ,"(36,52]", "(52,68]", "(68,84]" ,"(84,100]"))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, upper.range=80)), c("[4,19.2]"  , "(19.2,34.4]","(34.4,49.6]","(49.6,64.8]","(64.8,80]" , "(80,Inf]" ))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, upper.range=80, include.outside.range=F)), c("[4,19.2]",   "(19.2,34.4]","(34.4,49.6]","(49.6,64.8]","(64.8,80]" ))
+
+
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5)), c("[-Inf,4]",   "(4,36]",     "(36,68]",    "(68,100]",   "(100, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20, upper.range=80)),  c("[-Inf,20]", "(20,40]" ,  "(40,60]" ,  "(60,80]",   "(80, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20, upper.range=80, include.outside.range=F)), c("[-Inf,20]", "(20,40]" ,  "(40,60]" ,  "(60,80]",   "(80, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20)), c("[-Inf,20]",   "(20,46.7]",   "(46.7,73.3]", "(73.3,100]",  "(100, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20, include.outside.range=F)), c("[-Inf,20]",   "(20,46.7]",   "(46.7,73.3]", "(73.3,100]",  "(100, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, upper.range=80)), c("[-Inf,4]",    "(4,29.3]",    "(29.3,54.7]", "(54.7,80]",   "(80, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, upper.range=80, include.outside.range=F)), c("[-Inf,4]",    "(4,29.3]",    "(29.3,54.7]", "(54.7,80]",   "(80, Inf]"))
+})
+
+test_that("_tam_cut_by_step", {
+  # Without range.
+
+  # Actual value range: 1-21
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:21, 5)), c("(-Inf,1]" ,"(1,6]"  ,  "(6,11]",   "(11,16]" , "(16,21]"  ))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, include.outside.range=F)), c("(1,6]"  , "(6,11]",  "(11,16]" ,"(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, right=F)), c("[1,6)" ,   "[6,11)" ,  "[11,16)" , "[16,21)" , "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, include.outside.range=F, right=F)), c("[1,6)" ,  "[6,11)" , "[11,16)", "[16,21)"))
+
+  # Actual value range: 1-20
+  # Step = 5
+  # The last bucket should include value 20.
+  expect_equal(levels(exp_cut_by_step(1:20, 5)), c("(-Inf,1]", "(1,6]" ,   "(6,11]"  , "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, include.outside.range=F)), c("(1,6]"  , "(6,11]",  "(11,16]" ,"(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, right=F)), c("[1,6)"  ,  "[6,11)"  , "[11,16)" , "[16,21)",  "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, include.outside.range=F, right=F)), c("[1,6)" ,  "[6,11)",  "[11,16)", "[16,21)"))
+
+  # With step less than 1.
+  # Actual value range: 1-10
+  # Step = 0.8
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8)), c("(-Inf,1]", "(1,1.8]",    "(1.8,2.6]",  "(2.6,3.4]",  "(3.4,4.2]",  "(4.2,5]",    "(5,5.8]",    "(5.8,6.6]",  "(6.6,7.4]",  "(7.4,8.2]",  "(8.2,9]",    "(9,9.8]","(9.8,10.6]" ))
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8, include.outside.range=F)), c("(1,1.8]",   "(1.8,2.6]", "(2.6,3.4]", "(3.4,4.2]", "(4.2,5]",   "(5,5.8]",   "(5.8,6.6]", "(6.6,7.4]", "(7.4,8.2]", "(8.2,9]",   "(9,9.8]","(9.8,10.6]"  ))
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8, right=F)), c( "[1,1.8)",    "[1.8,2.6)" , "[2.6,3.4)" , "[3.4,4.2)" , "[4.2,5)"  ,  "[5,5.8)" ,   "[5.8,6.6)"  ,"[6.6,7.4)" , "[7.4,8.2)" , "[8.2,9)" ,   "[9,9.8)"   , "[9.8,10.6)", "[10.6,Inf)" ))
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8, include.outside.range=F, right=F)), c("[1,1.8)" ,   "[1.8,2.6)"  ,"[2.6,3.4)",  "[3.4,4.2)" , "[4.2,5)" ,   "[5,5.8)"  ,  "[5.8,6.6)" , "[6.6,7.4)" , "[7.4,8.2)" , "[8.2,9)"  ,  "[9,9.8)"  ,  "[9.8,10.6)"   ))
+
+  # With range.
+
+  # Actual value range: 1-20
+  # Range: 5-15
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15)), c("(-Inf,5]" , "(5,10]"  ,  "(10,15]" ,  "(15, Inf]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15, include.outside.range=F)), c(  "(5,10]" , "(10,15]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15, right=F)), c("[-Inf,5)" , "[5,10)"  ,  "[10,15)"  , "[15, Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15, include.outside.range=F, right=F)), c("[5,10)" , "[10,15)"))
+
+  # Actual value range: 1-20
+  # Range: 0-25
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25)), c( "(0,5]" ,  "(5,10]" , "(10,15]", "(15,20]", "(20,25]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25, include.outside.range=F)), c(  "(0,5]"  , "(5,10]",  "(10,15]", "(15,20]" ,"(20,25]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25, right=F)), c("[0,5)" ,  "[5,10)" , "[10,15)", "[15,20)", "[20,25)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25, include.outside.range=F, right=F)), c("[0,5)" ,  "[5,10)",  "[10,15)" ,"[15,20)" ,"[20,25)"))
+
+  # Actual value range: 1-21
+  # Range: 1-21
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21)), c("(-Inf,1]", "(1,6]" ,   "(6,11]",   "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21, include.outside.range=F)), c(  "(1,6]"  , "(6,11]",  "(11,16]", "(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21, right=F)), c("[1,6)"   , "[6,11)" ,  "[11,16)",  "[16,21)" , "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21, include.outside.range=F, right=F)), c("[1,6)"  , "[6,11)",  "[11,16)", "[16,21)"))
+
+  # With step less than 1.
+  # Actual value range: -1 - 10
+  # Range: 0-8
+  # Step = 0.8
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8)), c( "(-Inf,0]" , "(0,0.8]"  , "(0.8,1.6]", "(1.6,2.4]", "(2.4,3.2]" ,"(3.2,4]" ,  "(4,4.8]"  , "(4.8,5.6]", "(5.6,6.4]", "(6.4,7.2]", "(7.2,8]"  , "(8, Inf]"  ))
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8, include.outside.range=F)), c(  "(0,0.8]"  , "(0.8,1.6]", "(1.6,2.4]", "(2.4,3.2]" ,"(3.2,4]" ,  "(4,4.8]"  , "(4.8,5.6]", "(5.6,6.4]" ,"(6.4,7.2]", "(7.2,8]"     ))
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8, right=F)), c("[-Inf,0)"  ,"[0,0.8)" ,  "[0.8,1.6)", "[1.6,2.4)", "[2.4,3.2)", "[3.2,4)"  , "[4,4.8)"  , "[4.8,5.6)" ,"[5.6,6.4)", "[6.4,7.2)", "[7.2,8)" ,  "[8, Inf)" ))
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8, include.outside.range=F, right=F)), c("[0,0.8)",   "[0.8,1.6)" ,"[1.6,2.4)", "[2.4,3.2)" ,"[3.2,4)"  , "[4,4.8)" ,  "[4.8,5.6)" ,"[5.6,6.4)", "[6.4,7.2)", "[7.2,8)"  ))
+
+  # Include infinite values.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4)), c("(-Inf,1]", "(1,5]",    "(5,9]",  "(9,13]"  ,   "(13, Inf]"))
+  # Should be the same result as above.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4, include.outside.range=F)), c("(-Inf,1]", "(1,5]",    "(5,9]", "(9,13]"  ,   "(13, Inf]"))
+
+  # Include infinite values with range.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4, 0, 8)), c("(-Inf,0]", "(0,4]",    "(4,8]",    "(8, Inf]"))
+  # Should be the same result as above.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4, 0, 8, include.outside.range=F)), c("(-Inf,0]", "(0,4]",    "(4,8]",    "(8, Inf]"))
+
+  # Edge case test with no step param.
+  expect_equal(levels(exp_cut_by_step(c())), NULL)
+  expect_equal(levels(exp_cut_by_step(c(), include.outside.range=F)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA))), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA), include.outside.range=F)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NaN))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(NaN), include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf), include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf), include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0))), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0), include.outside.range=F)), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4))), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4), include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4))), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4), include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), include.outside.range=F)), c("[-Inf, Inf]"))
+
+  # Edge case test with step param.
+  expect_equal(levels(exp_cut_by_step(c(), step=5)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(), step=5, include.outside.range=F)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA), step=5)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA), step=5, include.outside.range=F)),NULL)
+  expect_equal(levels(exp_cut_by_step(c(NaN), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(NaN), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0), step=5)), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0), step=5, include.outside.range=F)), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4), step=5)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4), step=5, include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4), step=5)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4), step=5, include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+})
+
+
 
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
