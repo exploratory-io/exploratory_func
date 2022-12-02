@@ -262,8 +262,12 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # TODO: print.psych.fa.R seems to have logic to calculate it even when x$Phi is not there. Should we do the same here?
       # But it seems x$Phi is there for most of the oblique rotations. #25435
       res <- as.data.frame(x$Phi) %>% dplyr::add_rownames("factor1") %>% tidyr::pivot_longer(cols=starts_with(factor_score_prefix), names_to="factor2", values_to="correlation")
-      res <- res %>% dplyr::mutate(factor1=stringr::str_replace(factor1, paste0("^", factor_correlation_prefix), "Factor "), factor2=stringr::str_replace(factor2, paste0("^", factor_score_prefix), "Factor "))
-      res <- res %>% dplyr::mutate(factor1 = forcats::fct_inorder(factor1), factor2 = forcats::fct_inorder(factor2)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
+      res <- res %>% dplyr::mutate(factor1=stringr::str_replace(factor1, paste0("^", factor_correlation_prefix), "Factor "),
+                                   factor2=stringr::str_replace(factor2, paste0("^", factor_score_prefix), "Factor "))
+      # fct_relevel is to make order on chart right, e.g. Factor 2 before Factor 10
+      # Since the factors does not appear in order in x$Phi in some cases with Promax and minch, simply applying fct_inorder is not enough, and fct_relevel is required.
+      res <- res %>% dplyr::mutate(factor1=forcats::fct_relevel(factor1, stringr::str_c("Factor ",1:n_distinct(factor1))),
+                                   factor2=forcats::fct_relevel(factor2, stringr::str_c("Factor ",1:n_distinct(factor2))))
     }
     else {
       # Return an empty data frame.
