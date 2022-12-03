@@ -3131,6 +3131,8 @@ likert_sigma <- function(x) {
   # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x), 
   mapping <- (dnorm(qnorm(p0)) - dnorm(qnorm(p1)))/ratios
   res <- mapping[x]
+  # Convert table class object to numeric.
+  res <- as.numeric(res)
   res
 }
 
