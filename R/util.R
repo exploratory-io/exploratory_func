@@ -3117,3 +3117,22 @@ format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.ma
   res
 }
 
+# Calculates Likert sigma values.
+# Input - Discrete values which can work as ranking but may not have contiguous meaning.
+# Output - Likert sigma values.
+likert_sigma <- function(x) {
+  # Remove NA before calculating the mapping.
+  x1 <- x[!is.na(x)]
+  ratios <- table(x1)/length(x1)
+  p1 <- cumsum(ratios)
+  p0 <- lag(p1)
+  p0[is.na(p0)] <- 0
+  # Reference: https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
+  # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x), 
+  mapping <- (dnorm(qnorm(p0)) - dnorm(qnorm(p1)))/ratios
+  res <- mapping[x]
+  # Convert table class object to numeric.
+  res <- as.numeric(res)
+  res
+}
+
