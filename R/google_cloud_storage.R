@@ -281,3 +281,74 @@ getExcelSheetsFromGoogleCloudStorageExcelFile <- function(file, bucket){
   filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
   readxl::excel_sheets(filePath)
 }
+
+#'API that imports a Parquet file from Google Cloud Storage.
+#'@export
+getParquetFileFromGoogleCloudStorage <- function(file, bucket, col_select = NULL) {
+  tryCatch({
+    filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
+  },  error = function(e) {
+    if (stringr::str_detect(e$message, "http_404 The specified bucket does not exist")) {
+      # Looking for error that looks like "http_404 The specified bucket does not exist.".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-18 :: ', jsonlite::toJSON(c(bucket)), ' :: The Google Cloud Storage bucket does not exist.'))
+    } else if (stringr::str_detect(e$message, "http_404 Unspecified error")) {
+      # Looking for error that looks like "http_404 Unspecified error".
+      # This seems to be returned when the file does not exist.
+      stop(paste0('EXP-DATASRC-19 :: ', jsonlite::toJSON(c(bucket, file)), ' :: There is no file in the Google Cloud Storage bucket that matches with the name.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  exploratory::read_parquet_file(filePath, col_select = col_select)
+}
+
+#'API that imports multiple same structure Parquet files and merge it to a single data frame
+#'
+#'@export
+getParquetFilesFromGoogleCloudStorage <- function(files, bucket, for_preview = FALSE, col_select = NULL) {
+  # for preview mode, just use the first file.
+  if (for_preview & length(files) > 0) {
+    files <- files[1]
+  }
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::getParquetFileFromGoogleCloudStorage, bucket = bucket, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+#'API that search files by search keyword then imports multiple same structure Parquet files and merge it to a single data frame
+#'
+#'@export
+searchAndGetParquetFilesFromGoogleCloudStorage <- function(bucket = '', folder = '', search_keyword, for_preview = FALSE, col_select = NULL) {
+
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  tryCatch({
+    files <- googleCloudStorageR::gcs_list_objects(bucket = bucket, detail= "more", prefix = folder, delimiter = "/") %>%
+      filter(str_detect(name, stringr::str_c("(?i)", search_keyword)))
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "http_404 The specified bucket does not exist")) {
+      # Looking for error that looks like "http_404 The specified bucket does not exist.".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-18 :: ', jsonlite::toJSON(c(bucket)), ' :: The Google Cloud Storage bucket does not exist.'))
+    } else if (stringr::str_detect(e$message, "http_404 Unspecified error")) {
+      # Looking for error that looks like "http_404 Unspecified error".
+      # This seems to be returned when the file does not exist.
+      stop(paste0('EXP-DATASRC-19 :: ', jsonlite::toJSON(c(bucket)), ' :: There is no file in the Google Cloud Storage bucket that matches with the file name.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  if (nrow(files) == 0) {
+    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+  }
+  getParquetFilesFromGoogleCloudStorage(files = files$Key, bucket = bucket, for_preview = for_preview, col_select = col_select)
+
+}
+
