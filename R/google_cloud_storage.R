@@ -348,7 +348,7 @@ searchAndGetParquetFilesFromGoogleCloudStorage <- function(bucket = '', folder =
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getParquetFilesFromGoogleCloudStorage(files = files$Key, bucket = bucket, for_preview = for_preview, col_select = col_select)
+  getParquetFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, for_preview = for_preview, col_select = col_select)
 
 }
 
