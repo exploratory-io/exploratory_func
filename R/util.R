@@ -3133,6 +3133,9 @@ likert_sigma <- function(x) {
   x1 <- x[!is.na(x0)]
   ratios <- as.numeric(table(x1))/length(x1) # as.numeric is to convert table class object to numeric.
   p1 <- cumsum(ratios)
+  # If the ratios do not exactly add up to 1, qnorm(p1) can return NaN instead of Inf, which leads to unexpected NAs in the output.
+  # Set 1 to avoid it.
+  p1[length(p1)] <- 1
   p0 <- lag(p1)
   p0[is.na(p0)] <- 0
   # Reference: https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper

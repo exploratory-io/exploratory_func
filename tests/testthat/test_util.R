@@ -1791,4 +1791,9 @@ test_that("likert_sigma", {
   expected <- c(0.5453997, -1.0907993, 0.5453997)
   expect_equal(res, expected, tolerance=1e-7)
 
+  # Test the case where ratios happens to not add up to exactly 1 due to precision.
+  df <- exploratory::read_delim_file("https://www.dropbox.com/s/ok8m7cpa5cw2lw3/airline_2013_10_tricky.csv?dl=1" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE) %>%
+    filter(`DAY OF MONTH`>3)
+  res <- df %>% mutate(sigma=likert_sigma(`DAY OF MONTH`))
+  expect_true(all(!is.na(res$sigma))) # The output should not have NAs caused by precision issue.
 })
