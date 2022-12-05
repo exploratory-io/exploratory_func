@@ -1775,4 +1775,9 @@ test_that("likert_sigma", {
   # Values from the original 1932 paper - https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
   expected <- c(rep(-1.6272701,13),rep(-0.4252946,43),rep(0.4322558,21),rep(0.9857673,13),rep(1.7549833,10),rep(NA_real_, 5))
   expect_equal(res, expected, tolerance=1e-7)
+
+  # Case where input does not start with 1.
+  res <- likert_sigma(c(5, 4, 3, 5))
+  expected <- c(0.7978846, -0.3246628, -1.2711063, 0.7978846)
+  expect_equal(res, expected, tolerance=1e-7)
 })
