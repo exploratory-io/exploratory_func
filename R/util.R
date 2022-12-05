@@ -3123,7 +3123,12 @@ format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.ma
 likert_sigma <- function(x) {
   # Convert the input into a factor, so that the actual numeric input values would not matter
   # when mapping them into the output sigma values. Note that factor() assigns the levels to the distinct values in ascending sorted order.
-  x0 <- factor(x)
+  if (!is.factor(x)) {
+    x0 <- factor(x)
+  }
+  else {
+    x0 <- x
+  }
   # Remove NA before calculating the mapping.
   x1 <- x[!is.na(x0)]
   ratios <- as.numeric(table(x1))/length(x1) # as.numeric is to convert table class object to numeric.

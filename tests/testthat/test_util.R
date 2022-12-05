@@ -1780,4 +1780,15 @@ test_that("likert_sigma", {
   res <- likert_sigma(c(5, 4, 3, 5))
   expected <- c(0.7978846, -0.3246628, -1.2711063, 0.7978846)
   expect_equal(res, expected, tolerance=1e-7)
+
+  # Work with factor.
+  res <- likert_sigma(factor(c("e","d","c","e"), levels=c("a","b","c","d","e")))
+  expected <- c(0.7978846, -0.3246628, -1.2711063, 0.7978846)
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Work with logical
+  res <- likert_sigma(c(TRUE, FALSE, TRUE))
+  expected <- c(0.5453997, -1.0907993, 0.5453997)
+  expect_equal(res, expected, tolerance=1e-7)
+
 })
