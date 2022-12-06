@@ -1775,4 +1775,25 @@ test_that("likert_sigma", {
   # Values from the original 1932 paper - https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
   expected <- c(rep(-1.6272701,13),rep(-0.4252946,43),rep(0.4322558,21),rep(0.9857673,13),rep(1.7549833,10),rep(NA_real_, 5))
   expect_equal(res, expected, tolerance=1e-7)
+
+  # Case where input does not start with 1.
+  res <- likert_sigma(c(5, 4, 3, 5))
+  expected <- c(0.7978846, -0.3246628, -1.2711063, 0.7978846)
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Work with factor.
+  res <- likert_sigma(factor(c("e","d","c","e"), levels=c("a","b","c","d","e")))
+  expected <- c(0.7978846, -0.3246628, -1.2711063, 0.7978846)
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Work with logical
+  res <- likert_sigma(c(TRUE, FALSE, TRUE))
+  expected <- c(0.5453997, -1.0907993, 0.5453997)
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Test the case where ratios happens to not add up to exactly 1 due to precision.
+  df <- exploratory::read_delim_file("https://www.dropbox.com/s/ok8m7cpa5cw2lw3/airline_2013_10_tricky.csv?dl=1" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE) %>%
+    filter(`DAY OF MONTH`>3)
+  res <- df %>% mutate(sigma=likert_sigma(`DAY OF MONTH`))
+  expect_true(all(!is.na(res$sigma))) # The output should not have NAs caused by precision issue.
 })

@@ -3121,18 +3121,27 @@ format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.ma
 # Input - Discrete values which can work as ranking but may not have contiguous meaning.
 # Output - Likert sigma values.
 likert_sigma <- function(x) {
+  # Convert the input into a factor, so that the actual numeric input values would not matter
+  # when mapping them into the output sigma values. Note that factor() assigns the levels to the distinct values in ascending sorted order.
+  if (!is.factor(x)) {
+    x0 <- factor(x)
+  }
+  else {
+    x0 <- x
+  }
   # Remove NA before calculating the mapping.
-  x1 <- x[!is.na(x)]
-  ratios <- table(x1)/length(x1)
+  x1 <- x[!is.na(x0)]
+  ratios <- as.numeric(table(x1))/length(x1) # as.numeric is to convert table class object to numeric.
   p1 <- cumsum(ratios)
+  # If the ratios do not exactly add up to 1, qnorm(p1) can return NaN instead of Inf, which leads to unexpected NAs in the output.
+  # Set 1 to avoid it.
+  p1[length(p1)] <- 1
   p0 <- lag(p1)
   p0[is.na(p0)] <- 0
   # Reference: https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
   # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x), 
   mapping <- (dnorm(qnorm(p0)) - dnorm(qnorm(p1)))/ratios
-  res <- mapping[x]
-  # Convert table class object to numeric.
-  res <- as.numeric(res)
+  res <- mapping[x0] # Note that factor levels of x0 rather than the face value of x is used for the mapping here.
   res
 }
 
