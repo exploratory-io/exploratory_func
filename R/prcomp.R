@@ -96,7 +96,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
 #' @export
 #' @param n_sample - Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-#' @param with_excluded_rows - Whether to show number of rows excluded at the preprocessing. For k-means analytics view.
+#' @param with_excluded_rows - For "summary" type, whether to show number of rows excluded at the preprocessing. For k-means analytics view.
 tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, with_excluded_rows=FALSE, ...) {
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
