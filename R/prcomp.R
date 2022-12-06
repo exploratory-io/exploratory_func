@@ -96,8 +96,8 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
 #' @export
 #' @param n_sample - Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-#' @param with_excluded_nrow - Whether to show number of rows excluded at the preprocessing. For k-means analytics view.
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, with_excluded_nrow=FALSE, ...) {
+#' @param with_excluded_rows - Whether to show number of rows excluded at the preprocessing. For k-means analytics view.
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, with_excluded_rows=FALSE, ...) {
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
@@ -175,7 +175,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   }
   else if (type == "summary") { # This is only for kmeans case. TODO: We might want to separate PCA code and k-means code.
     res <- broom::tidy(x$kmeans)
-    if (with_excluded_nrow) {
+    if (with_excluded_rows) {
       res <- res %>% tibble::add_row(size=x$excluded_nrow)
     }
   }
