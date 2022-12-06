@@ -174,6 +174,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   }
   else if (type == "summary") { # This is only for kmeans case. TODO: We might want to separate PCA code and k-means code.
     res <- broom::tidy(x$kmeans)
+    res <- res %>% tibble::add_row(size=x$excluded_nrow)
   }
   else if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
