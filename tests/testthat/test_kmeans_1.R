@@ -4,8 +4,12 @@ context("test kmeans analytics view functions")
 
 test_that("exp_kmeans", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+  df <- df %>% tibble::add_row(cyl=5, mpg=NA, hp=100)
   model_df <- exp_kmeans(df, cyl, mpg, hp, max_nrow=30)
   res <- model_df %>% tidy_rowwise(model, type="summary")
+  expect_equal(nrow(res), 3)
+  res <- model_df %>% tidy_rowwise(model, type="summary", with_excluded_rows=TRUE)
+  expect_equal(nrow(res), 4) # With an additional row for the count of excluded rows.
   res <- model_df %>% tidy_rowwise(model, type="variances")
   res <- model_df %>% tidy_rowwise(model, type="loadings")
   res <- model_df %>% tidy_rowwise(model, type="biplot")

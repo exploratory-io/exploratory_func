@@ -71,7 +71,9 @@ exp_kmeans <- function(df, ...,
   # As the name suggests, this preprocessing function was originally designed to be done
   # before sampling, but we found that for this k-means function, that makes the
   # process as a whole slower in the cases we tried. So, we are doing this after sampling.
+  nrow_before_filter <- nrow(df)
   filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+  excluded_nrow <- nrow_before_filter - nrow(filtered_df)
   selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
   df <- filtered_df
 
@@ -100,6 +102,7 @@ exp_kmeans <- function(df, ...,
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
       x$sampled_nrow <- sampled_nrow
+      x$excluded_nrow <- excluded_nrow
       x
     }))
   }
