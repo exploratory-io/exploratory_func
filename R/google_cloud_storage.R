@@ -35,6 +35,10 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
     # http://stackoverflow.com/questions/4216753/check-existence-of-directory-and-create-if-doesnt-exist
     dir.create(tempdir(), showWarnings = FALSE)
 
+    ct <- V8::v8()
+    file <- ct$assign("file", file)
+    file <- ct$eval("encodeURIComponent(file)")
+
     # download file to temporary location
     googleCloudStorageR::gcs_get_object(file, bucket = bucket, saveToDisk = tmp)
     # cache file
