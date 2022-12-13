@@ -3008,6 +3008,8 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
 }
 
 #'API that imports multiple same structure Excel sheets in the Excel Book and merge them to a single data frame
+#'For the "sheets" argument, set the default value as c(1) so that it can at least read the first sheet.
+#'NOTE: readxl package can handle either sheet name or sheet index and the sheet index starts from 1.
 #'@export
 read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1), col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
@@ -3026,13 +3028,14 @@ read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1),
                        skipEmptyRows = skipEmptyRows,
                        skipEmptyCols = skipEmptyCols,
                        check.names = check.names,
-                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar),
-                       .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
+                       tzone = tzone,
+                       convertDataTypeToChar = convertDataTypeToChar),
+                       .id = "exp.sheet.id")
   id_col <- avoid_conflict(colnames(df), "id")
-  # copy internal exp.file.id to the id column.
-  df[[id_col]] <- df[["exp.file.id"]]
+  # copy internal exp.sheet.id to the id column.
+  df[[id_col]] <- df[["exp.sheet.id"]]
   # drop internal column and move the id column to the very beginning.
-  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.sheet.id)
 }
 
 
