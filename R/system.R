@@ -2983,7 +2983,7 @@ searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern 
   sheets <- readxl::excel_sheets(file)
   sheets <- sheets <- sheets[stringr::str_detect(sheets, pattern)]
   if (length(sheets) == 0) {
-    stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(file), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
+    stop(paste0('EXP-DATASRC-20 :: ', jsonlite::toJSON(file), ' :: There is no sheet in the file that matches with the specified condition.'))
   }
   exploratory::read_excel_file_multi_sheets(file = file, forPreview = forPreview, sheets = sheets, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
