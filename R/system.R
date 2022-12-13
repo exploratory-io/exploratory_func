@@ -2981,7 +2981,7 @@ download_data_file <- function(url, type){
 searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern = "", col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   sheets <- readxl::excel_sheets(file)
-  sheets <- sheets <- sheets[stringr::str_detect(sheets, pattern)]
+  sheets <- sheets[stringr::str_detect(sheets, pattern)]
   if (length(sheets) == 0) {
     stop(paste0('EXP-DATASRC-20 :: ', jsonlite::toJSON(file), ' :: There is no sheet in the file that matches with the specified condition.'))
   }
