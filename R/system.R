@@ -2976,7 +2976,7 @@ download_data_file <- function(url, type){
   }
 }
 
-#'API that search and imports multiple same structure Excel Sheets in the Excel Book and merge it to a single data frame
+#'API that searches and imports multiple same structure Excel Sheets in the Excel Book and merge them to a single data frame
 #'@export
 searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern = "", col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
@@ -2990,7 +2990,7 @@ searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern 
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
 }
-#'API that search and imports multiple same structure Excel files and merge it to a single data frame
+#'API that searches and imports multiple same structure Excel files and merge them to a single data frame
 #'@export
 searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
@@ -3007,7 +3007,7 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
 
 }
 
-#'API that imports multiple same structure Excel sheets in the Excel Book and merge it to a single data frame
+#'API that imports multiple same structure Excel sheets in the Excel Book and merge them to a single data frame
 #'@export
 read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1), col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
