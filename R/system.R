@@ -3007,9 +3007,10 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
 
 }
 
-#'API that imports multiple same structure Excel sheets in the Excel Book and merge them to a single data frame
+#'API that imports multiple same structure Excel sheets in the Excel Book and merge them to a single data frame.
 #'For the "sheets" argument, set the default value as c(1) so that it can at least read the first sheet.
-#'NOTE: readxl package can handle either sheet name or sheet index and the sheet index starts from 1.
+#'From the Exploratory Desktop, this argument is set as c("Sheet1", "Sheet2", "Sheet3") style.
+#'NOTE: readxl package can handle either sheet name or sheet index for the "sheet" argument and the sheet index starts from 1.
 #'@export
 read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1), col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
