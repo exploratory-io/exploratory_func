@@ -9,7 +9,9 @@ getGoogleProfile <- function(tokenFileId = ""){
   df <- googleAnalyticsR::ga_account_list()
   if (nrow(df) > 0) {
     df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
-  } else { # it means v3 accounts are empty, so create an empty data frame with below column names since the response does not include all required columns
+  } else {
+    # It means v3 accounts are empty, so create an empty data frame with below column names since the response from
+    # googleAnalyticsR::ga_account_list does not include all required columns when there is no record.
     columns = c("accountId","accountName","viewId", "viewName", "webPropertyId", "webPropertyName")
     df = data.frame(matrix(nrow = 0, ncol = length(columns)))
     colnames(df) = columns
