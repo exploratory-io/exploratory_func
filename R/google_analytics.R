@@ -7,7 +7,13 @@ getGoogleProfile <- function(tokenFileId = ""){
   token <- getGoogleTokenForAnalytics(tokenFileId);
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
   df <- googleAnalyticsR::ga_account_list()
-  df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
+  if (nrow(df) > 0) {
+    df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
+  } else { # it means v3 accounts are empty, so create an empty data frame with below column names since the response does not include all required columns
+    columns = c("accountId","accountName","viewId", "viewName", "webPropertyId", "webPropertyName")
+    df = data.frame(matrix(nrow = 0, ncol = length(columns)))
+    colnames(df) = columns
+  }
   # get V4 Account
   v4df <- data.frame()
   tryCatch({
