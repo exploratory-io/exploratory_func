@@ -1486,7 +1486,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
 
-    key <- paste("snowflake", host, port, databaseName, username, timezone, additionalParams, sep = ":")
+    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, additionalParams, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1517,9 +1517,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       loc <- Sys.getlocale(category = "LC_CTYPE")
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
-
+      # For Snowflake, map catalog argument to "WAREHOUSE".
       connectionString <- stringr::str_c(
-        "Driver=", driver, ";Server=", host, ";Port=", port, ";Database=", databaseName,
+        "Driver=", driver, ";Server=", host, ";Port=", port, ";WAREHOUSE=", catalog, ";Database=", databaseName,
         ";UID=", username, ";PWD=", password
       );
       if (additionalParams != "") {
@@ -1641,7 +1641,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     if (timezone == "") {
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
-    key <- paste("snowflake", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, sep = ":")
   }
   rm(list = key, envir = connection_pool) # Even if there is no matching key, this is harmless.
 }
