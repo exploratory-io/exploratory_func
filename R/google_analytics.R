@@ -6,8 +6,14 @@ getGoogleProfile <- function(tokenFileId = ""){
 
   token <- getGoogleTokenForAnalytics(tokenFileId);
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  # Get V3 account list.
   df <- googleAnalyticsR::ga_account_list()
-  df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
+  if (nrow(df) > 0) { # if there are V3 accounts, only select below columns.
+    df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
+  } else {
+    # It means there are no v3 accounts, so create an empty data frame without columns and bind this to a v4 account data frame.
+    df <- tibble::tibble()
+  }
   # get V4 Account
   v4df <- data.frame()
   tryCatch({
