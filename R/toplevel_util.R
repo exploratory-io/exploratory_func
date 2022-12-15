@@ -3,8 +3,9 @@
 #' @param row_index Row index to use as column names
 #' @param prefix Prefix for new column names
 #' @param clean_name If janitor::clean_names should be used
+#' @param convert_to_ascii If non-ASCII column names should be converted to ASCII.
 #' @export
-row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE){
+row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE, convert_to_ascii = FALSE){
   validate_empty_data(df)
 
   loadNamespace("stringr")
@@ -21,7 +22,8 @@ row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE){
   ret <- safe_slice(df, row_index, remove = TRUE)
   colnames(ret) <- names
   if (clean_names) {
-    ret <- janitor::clean_names(ret, case="parsed")
+    # Pass ascii as FALSE to prevent non-ascii column names converted to ascii.
+    ret <- janitor::clean_names(ret, case="parsed", ascii = convert_to_ascii)
   }
   ret
 }
