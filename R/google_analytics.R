@@ -11,7 +11,7 @@ getGoogleProfile <- function(tokenFileId = ""){
   if (nrow(df) > 0) { # if there are V3 accounts, only select below columns.
     df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
   } else {
-    # It means v3 accounts are empty, so create an empty data frame and bind this to a v4 account data frame.
+    # It means there are no v3 accounts, so create an empty data frame without columns and bind this to a v4 account data frame.
     df <- tibble::tibble()
   }
   # get V4 Account
