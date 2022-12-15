@@ -5,23 +5,31 @@ test_that("test row_as_header", {
     num1 = seq(3),
     num2 = -seq(3),
     char = letters[seq(3)],
+    non_ascii = c("あ!@","い$%","う^&"),
     stringsAsFactors = FALSE
   )
 
   ret <- row_as_header(test_df, row_index = 2)
   ret2 <- row_as_header(test_df, row_index = 2, clean_names = FALSE)
+  ret3 <- row_as_header(test_df, row_index = 2, clean_names = TRUE, convert_to_ascii = TRUE)
 
   expect_equal(ret, structure(
-    list(x2 = c(1L, 3L), x_2 = c(-1L, -3L), b = c("a", "c")),
-    .Names = c("X2", "X2_2", "b"),
+    list(x2 = c(1L, 3L), x_2 = c(-1L, -3L), b = c("a", "c"), い = c("あ!@","う^&")),
+    .Names = c("X2", "X2_2", "b", "い_percent"),
     row.names = c(1L, 3L),
     class = "data.frame"))
 
   expect_equal(ret2, structure(
-    list(`2` = c(1L, 3L), `-2` = c(-1L, -3L), b = c("a", "c")),
-    .Names = c("2", "-2", "b"),
+    list(`2` = c(1L, 3L), `-2` = c(-1L, -3L), b = c("a", "c"), "い$%" = c("あ!@","う^&")),
+    .Names = c("2", "-2", "b", "い$%"),
     row.names = c(1L, 3L),
     class = "data.frame"))
+  expect_equal(ret3, structure(
+    list(x2 = c(1L, 3L), x2_2 = c(-1L, -3L), b = c("a", "c"), i_percent = c("あ!@","う^&")),
+    .Names = c("X2", "X2_2", "b", "i_percent"),
+    row.names = c(1L, 3L),
+    class = "data.frame"))
+
 })
 
 test_that("test row_as_header with factor", {
