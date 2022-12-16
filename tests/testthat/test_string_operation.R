@@ -680,13 +680,16 @@ test_that("str_detect", {
   expect_equal(ret, c(TRUE, FALSE, TRUE))
   ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "Te", ignore_case = TRUE)
   expect_equal(ret, c(TRUE, TRUE, TRUE, FALSE))
-  # When pattern is empty string, it should always match.
-  ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "")
-  expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE))
-  ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "", ignore_case = TRUE)
-  expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE))
-  ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "", negate =TRUE, ignore_case = TRUE)
-  expect_equal(ret, c(FALSE, FALSE, FALSE, FALSE))
+  # When pattern is empty string, it used to always match, but since stringr 1.5.0, it returns error.
+  expect_error({
+    ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "")
+  })
+  expect_error({
+    ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "", ignore_case = TRUE)
+  })
+  expect_error({
+    ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "", negate =TRUE, ignore_case = TRUE)
+  })
   ret <- exploratory::str_detect(c("Aabc", "baadd", "dddd"), stringr::regex(stringr::str_c("AA"), ignore_case=TRUE))
   expect_equal(ret, c(TRUE, TRUE, FALSE))
 
