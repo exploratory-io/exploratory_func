@@ -474,6 +474,7 @@ test_that("read_delim_file with text data", {
 })
 
 test_that("case_when mixed data types error message", {
+  skip("dplyr 1.0.10 has an issue in reporting error in this case, but it is fixed in the latest main branch.")
   tryCatch({
     Global_Sales_1_source1 <- exploratory::read_excel_file("https://www.dropbox.com/s/t9ou9hmbqdxj75f/Global_Sales.xlsx?dl=1")
     Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
