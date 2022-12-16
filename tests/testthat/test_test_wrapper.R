@@ -15,9 +15,9 @@ test_that("test t.test.aggregated with two.sided alternative (default)", {
     val = rep(seq(10), 2)
   )
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
-  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  # Compare the outputs between stats::t.test and exploratory:::t.test.aggregated
   res0 <- stats::t.test(data=test_df, val~cat)
-  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0)
+  res <- exploratory:::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0)
   expect_equal(res$statistic, res0$statistic)
   expect_equal(res$parameter, res0$parameter)
   expect_equal(res$p.value, res0$p.value)
@@ -35,9 +35,9 @@ test_that("test t.test.aggregated with 'less' alternative", {
     val = rep(seq(10), 2)
   )
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
-  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  # Compare the outputs between stats::t.test and exploratory:::t.test.aggregated
   res0 <- stats::t.test(data=test_df, val~cat, alternative="less")
-  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, alternative="less")
+  res <- exploratory:::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, alternative="less")
   expect_equal(res$statistic, res0$statistic)
   expect_equal(res$parameter, res0$parameter)
   expect_equal(res$p.value, res0$p.value)
@@ -55,9 +55,9 @@ test_that("test t.test.aggregated with 'greater' alternative", {
     val = rep(seq(10), 2)
   )
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
-  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  # Compare the outputs between stats::t.test and exploratory:::t.test.aggregated
   res0 <- stats::t.test(data=test_df, val~cat, alternative="greater")
-  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, alternative="greater")
+  res <- exploratory:::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, alternative="greater")
   expect_equal(res$statistic, res0$statistic)
   expect_equal(res$parameter, res0$parameter)
   expect_equal(res$p.value, res0$p.value)
@@ -76,9 +76,9 @@ test_that("test t.test.aggregated with equal variance assumption with two.sided 
     val = rep(seq(10), 2)
   )
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
-  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  # Compare the outputs between stats::t.test and exploratory:::t.test.aggregated
   res0 <- stats::t.test(data=test_df, val~cat, var.equal=TRUE)
-  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE)
+  res <- exploratory:::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE)
   expect_equal(res$statistic, res0$statistic)
   expect_equal(res$parameter, res0$parameter)
   expect_equal(res$p.value, res0$p.value)
@@ -96,9 +96,9 @@ test_that("test t.test.aggregated with equal variance assumption with greater al
     val = rep(seq(10), 2)
   )
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
-  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  # Compare the outputs between stats::t.test and exploratory:::t.test.aggregated
   res0 <- stats::t.test(data=test_df, val~cat, var.equal=TRUE, alternative='greater')
-  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE, alternative='greater')
+  res <- exploratory:::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE, alternative='greater')
   expect_equal(res$statistic, res0$statistic)
   expect_equal(res$parameter, res0$parameter)
   expect_equal(res$p.value, res0$p.value)
@@ -116,9 +116,9 @@ test_that("test t.test.aggregated with equal variance assumption with less alter
     val = rep(seq(10), 2)
   )
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
-  # Compare the outputs between stats::t.test and exploratory::t.test.aggregated
+  # Compare the outputs between stats::t.test and exploratory:::t.test.aggregated
   res0 <- stats::t.test(data=test_df, val~cat, var.equal=TRUE, alternative='less')
-  res <- exploratory::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE, alternative='less')
+  res <- exploratory:::t.test.aggregated(test_df2$n[1],test_df2$n[2],test_df2$mean[1],test_df2$mean[2],test_df2$sd[1],test_df2$sd[2],0.95,0, var.equal=TRUE, alternative='less')
   expect_equal(res$statistic, res0$statistic)
   expect_equal(res$parameter, res0$parameter)
   expect_equal(res$p.value, res0$p.value)
