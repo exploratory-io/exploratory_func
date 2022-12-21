@@ -1,4 +1,6 @@
-#' Wrapper API for riem_measure data soruces
+#' Wrapper API for riem_measure data sources.
+#' This was initially treated as an extension, but we had to include it in this package to make it run on the server,
+#' which effectively makes it not really an extension.
 #' @export
 get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_end = NULL, full_columns = "Yes", tzone = ""){
   loadNamespace("riem")
