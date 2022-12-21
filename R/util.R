@@ -2399,7 +2399,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
   #      summarize_group(group_cols = c(`userid` = "userid"), group_funs = c("none"), count = n()) %>%
   #         mutate(count = case_when(count > 10 ~ 10, TRUE ~ count))
   #
-  ret %>% dplyr::mutate_if(is.integer, as.numeric)
+  ret %>% dplyr::mutate(across(where(is.integer), as.numeric))
 }
 
 # Wrapper function that takes care of dplyr::group_by and dplyr::mutate as a single step.
@@ -2443,7 +2443,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
   # Without this, when the next transform step is a mutate using case_when that contains the # of rows as a condition,
   # case_when command fails due to data type mismatch (integer vs numeric).
   #
-  ret <- ret %>% dplyr::mutate_if(is.integer, as.numeric)
+  ret <- ret %>% dplyr::mutate(across(where(is.integer), as.numeric))
   if (keep_group) {
     ret
   } else { # if keep_group is FALSE, make sure to ungroup result but move the columns used for grouping at the beginning.
@@ -2685,9 +2685,9 @@ mutate_predictors <- function(df, cols, funs) {
 #' with level of "TRUE" and "FALSE". This function reverts such columns back to logical.
 #' @export
 revert_factor_cols_to_logical <- function(df) {
-  dplyr::mutate_if(df, function(col) {
+  dplyr::mutate(df, across(where(function(col) {
     is.factor(col) && length(levels(col)) == 2 && (all(levels(col) == c("TRUE", "FALSE")) || all(levels(col) == c("FALSE", "TRUE")))
-  }, as.logical)
+  }), as.logical))
 }
 
 # Checks if a vector has only integer values.

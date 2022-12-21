@@ -3162,7 +3162,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     #
     df <- df %>% dplyr::mutate_at(vars(colnames(df)[col_types == "date"]), funs(as.Date(., tz="UTC")))
     if(!is.null(tzone)) { # if timezone is specified, force the timezeon to POSIXct columns
-      df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
+      df <- df %>% dplyr::mutate(across(where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
     }
 
     # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,

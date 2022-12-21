@@ -24,7 +24,7 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
 
   df <- riem::riem_measures(station = station, date_start = date_start, date_end = date_end)
   if (tzone != "") {# if timezone for display is specified, convert the timezone with with_tz
-    df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::with_tz(., tzone=tzone)))
+    df <- df %>% dplyr::mutate(across(where(lubridate::is.POSIXct), ~ lubridate::with_tz(.x, tzone=tzone)))
   }
   # make sure to filter the data to the exact date range
   df <- df %>% dplyr::filter(valid >= startDate & valid <= endDate)

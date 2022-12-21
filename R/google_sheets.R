@@ -97,10 +97,10 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
       df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types)
     }
     if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
-      df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
+      df <- df %>% dplyr::mutate(across(where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
     }
     # For list columns, change the data type to characters
-    df <- df %>% dplyr::mutate_if(is.list, funs(as.character))
+    df <- df %>% dplyr::mutate(across(where(is.list), as.character))
 
     df
   }, error = function(e) {
