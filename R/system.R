@@ -3160,9 +3160,9 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     # > as.Date(psx, tz = "UTC")
     # [1] "2020-01-01"  # this is the date we want when converting the POXIct to Date.
     #
-    df <- df %>% dplyr::mutate_at(vars(colnames(df)[col_types == "date"]), funs(as.Date(., tz="UTC")))
+    df <- df %>% dplyr::mutate(dplyr::across(dplyr::all_of(colnames(df)[col_types == "date"]), ~ as.Date(.x, tz="UTC")))
     if(!is.null(tzone)) { # if timezone is specified, force the timezeon to POSIXct columns
-      df <- df %>% dplyr::mutate(across(where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
+      df <- df %>% dplyr::mutate(dplyr::across(dplyr::where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
     }
 
     # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
