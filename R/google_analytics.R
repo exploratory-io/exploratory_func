@@ -247,29 +247,29 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
 
   if("date" %in% colnames(ga.data)){
     # modify date column to Date object from integer like 20140101
-    ga.data <- ga.data %>% dplyr::mutate( date = lubridate::ymd(date) )
+    ga.data <- ga.data %>% dplyr::mutate(date = lubridate::ymd(date))
   }
 
   if("dateHour" %in% colnames(ga.data)){
     # modify date column to POSIXct object from integer like 2014010101
-    ga.data <- ga.data %>% dplyr::mutate( dateHour = lubridate::ymd_h(dateHour) )
+    ga.data <- ga.data %>% dplyr::mutate(dateHour = lubridate::ymd_h(dateHour))
   }
 
 
   if("dateHourMinute" %in% colnames(ga.data)){
     # modify date column to POSIXct object from integer like 202001210000
-    ga.data <- ga.data %>% dplyr::mutate( dateHourMinute = lubridate::ymd_hms(dateHourMinute, truncated = 1) )
+    ga.data <- ga.data %>% dplyr::mutate(dateHourMinute = lubridate::ymd_hms(dateHourMinute, truncated = 1))
   }
 
   if("firstSessionDate" %in% colnames(ga.data)){
     # modify date column to Date object from integer like 20140101
-    ga.data <- ga.data %>% dplyr::mutate( firstSessionDate = lubridate::ymd(firstSessionDate) )
+    ga.data <- ga.data %>% dplyr::mutate(firstSessionDate = lubridate::ymd(firstSessionDate))
   }
 
   if("sessionCount" %in% colnames(ga.data)){
     # sessionCount is sometimes returned as character and numeric other times.
     # let's always cast it to numeric
-    ga.data <- ga.data %>% dplyr::mutate( sessionCount = as.numeric(sessionCount) )
+    ga.data <- ga.data %>% dplyr::mutate(sessionCount = as.numeric(sessionCount))
   }
 
   if("daysSinceLastSession" %in% colnames(ga.data)){
@@ -278,10 +278,10 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     ga.data <- ga.data %>% dplyr::mutate( daysSinceLastSession = as.numeric(daysSinceLastSession) )
   }
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
-    ga.data <- ga.data %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
+    ga.data <- ga.data %>% dplyr::mutate(across(where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
   }
   if (!is.null(tzoneForDisplay)) {# if timezone for display is specified, convert the timezeon with with_tz
-    ga.data <- ga.data %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::with_tz(., tzone=tzoneForDisplay)))
+    ga.data <- ga.data %>% dplyr::mutate(across(where(lubridate::is.POSIXct), ~ lubridate::with_tz(.x, tzone=tzoneForDisplay)))
   }
 
   ga.data
