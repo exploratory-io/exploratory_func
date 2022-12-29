@@ -3160,9 +3160,11 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     # > as.Date(psx, tz = "UTC")
     # [1] "2020-01-01"  # this is the date we want when converting the POXIct to Date.
     #
-    df <- df %>% dplyr::mutate(dplyr::across(dplyr::all_of(colnames(df)[col_types == "date"]), ~ as.Date(.x, tz="UTC")))
+    df <- df %>% dplyr::mutate(dplyr::across(all_of(colnames(df)[col_types == "date"]), ~ as.Date(.x, tz="UTC")))
     if(!is.null(tzone)) { # if timezone is specified, force the timezeon to POSIXct columns
-      df <- df %>% dplyr::mutate(dplyr::across(dplyr::where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
+      # Note that inside across, we do not need to tidyselect namespace to prefix where.
+      # https://stackoverflow.com/questions/64816536/why-the-tidyselect-helper-function-where-can-be-detected-inside-the-dplyr-help
+      df <- df %>% dplyr::mutate(dplyr::across(where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
     }
 
     # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
@@ -3171,7 +3173,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
     # We don't want to rely on readxl::read_excel's col_types argument "text" since this option converts Date or POSIXct column data as number instead of "2021-01-01" style text.
     if (convertDataTypeToChar) {
-      df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
+      df <- df %>% dplyr::mutate(dplyr::across(everything(), as.character));
     }
     df
   }, error = function(e) {
