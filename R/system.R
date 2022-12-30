@@ -1,4 +1,4 @@
-# environment to keep variables for users
+# environment to keep variables for users 
 user_env <- new.env()
 # environment to keep values to create connection
 user_env$token_info <- new.env()
