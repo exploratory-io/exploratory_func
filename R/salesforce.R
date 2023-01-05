@@ -72,7 +72,9 @@ querySalesforceTableDetails <- function(server = NULL, username, password, secur
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token to login
 #' @param query - SOQL query.
-querySalesforceDataWithQuery <- function(server = NULL, username, password, securityToken = NULL, query = "", guessType = TRUE){
+#' @param apiType - it could be either REST, SOAP, Bulk 1.0, or Bulk 2.0. By default it's REST.
+#' Bulk can handle a large data set but it has limitation (ref: https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/asynch_api_concepts_limits.htm)
+querySalesforceDataWithQuery <- function(server = NULL, username, password, securityToken = NULL, query = "", guessType = TRUE, apiType = "REST"){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
@@ -80,7 +82,7 @@ querySalesforceDataWithQuery <- function(server = NULL, username, password, secu
   queryControl <- salesforcer::sf_control(QueryOptions = list(batchSize = 2000))
   loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
   query <- glue_exploratory(query, .transformer=salesforce_glue_transformer, .envir = parent.frame())
-  salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType)
+  salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType, api_type = apiType)
 }
 
 #' API to execute Salesforce Object Query Language (SOQL)

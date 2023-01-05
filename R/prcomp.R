@@ -192,7 +192,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
     column_names <- attr(x$rotation, "dimname")[[1]] 
     if (normalize_data) {
-      res <- res %>% dplyr::mutate_at(column_names, exploratory::normalize)
+      res <- res %>% dplyr::mutate(dplyr::across(dplyr::all_of(column_names), exploratory::normalize))
     }
 
     if (!is.null(n_sample)) { # default is no sampling.

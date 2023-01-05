@@ -294,11 +294,11 @@ export_members <- function(id, dc, apikey, date_since){
         country_code = cc
       ) %>%
       select(-leid, -notes) %>%
-      dplyr::mutate_at(dplyr::vars(
+      dplyr::mutate(dplyr::across(c(
         signup_time,
         confirm_time,
         last_changed
-      ), lubridate::ymd_hms)
+      ), lubridate::ymd_hms))
   }
 }
 
