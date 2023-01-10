@@ -36,6 +36,11 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
   calc_doc_sim_each <- function(df){
     mat <- sparse_cast(df, key_col, subject_col, val = value_col, fun.aggregate = fun.aggregate, count = TRUE)
     sim <- qlcMatrix::cosSparse(mat)
+    # Most likely, because of Matrix upgraded to 1.5-3, output from qlcMatrix::cosSparse loses rownames/colnames.
+    # Set them back.
+    colnames(sim) <- colnames(mat)
+    rownames(sim) <- colnames(mat)
+
     if(distinct){
       if(!diag){
         diag <- NULL
