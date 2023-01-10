@@ -232,10 +232,13 @@ exp_arima <- function(df, time, valueColumn,
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
 
-    if (time_unit %in% c("year")) { #TODO: Take care of other time units too.
+    if (time_unit %in% c("year")) {
       training_tsibble <- tsibble::tsibble(ds = lubridate::year(training_data$ds), y = training_data$y, index=ds)
     }
-    else if (time_unit %in% c("month", "quarter")) { #TODO: Take care of other time units too.
+    else if (time_unit %in% c("quarter")) {
+      training_tsibble <- tsibble::tsibble(ds = tsibble::yearquarter(training_data$ds), y = training_data$y)
+    }
+    else if (time_unit %in% c("month")) {
       training_tsibble <- tsibble::tsibble(ds = tsibble::yearmonth(training_data$ds), y = training_data$y)
     }
     else {
