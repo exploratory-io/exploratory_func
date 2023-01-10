@@ -176,15 +176,7 @@ exp_arima <- function(df, time, valueColumn,
 
     if (!is.null(na_fill_type)) {
       # complete the date time with NA
-      aggregated_data <- if(inherits(aggregated_data$ds, "Date")){
-        aggregated_data %>%
-          tidyr::complete(ds = seq.Date(min(ds), max(ds), by = time_unit))
-      } else if(inherits(aggregated_data$ds, "POSIXct")) {
-        aggregated_data %>%
-          tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = time_unit))
-      } else {
-        stop("time must be Date or POSIXct.")
-      }
+      aggregated_data <- aggregated_data %>% complete_date("ds", time_unit = time_unit)
       # fill NAs in y with zoo
       aggregated_data <- aggregated_data %>% dplyr::mutate(y = fill_ts_na(y, ds, type = na_fill_type, val = na_fill_value))
     }
