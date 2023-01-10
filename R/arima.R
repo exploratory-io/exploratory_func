@@ -365,7 +365,7 @@ exp_arima <- function(df, time, valueColumn,
     # Revive Original column names(time_col, value_col)
 
     # For yearly data, ds was converted to numeric to create a valid tsibble. Cast it back to Date.
-    if (class(forecast_rows$ds) == "numeric") {
+    if (time_unit %in% c("year")) {
       forecast_rows <- forecast_rows %>% dplyr::mutate(ds=as.Date(paste0(forecast_rows$ds,"-01-01")))
     }
     ret_df <- fitted_training_df %>% dplyr::bind_rows(forecast_rows)
