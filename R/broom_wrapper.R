@@ -252,7 +252,12 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
         dplyr::mutate(.test_index=purrr::map(model, function(m){eval(parse(text=aug_fml))})) 
     }, error = function(e) {
       if (!is.null(e$parent)) { # With dplyr 1.0.8, the original error inside mutate is in e$parent. Re-throw that error.
-        stop(e$parent)
+        if (!is.null(e$parent$parent)) { # With dplyr 1.0.10, the original error inside mutate is in e$parent$parent. Re-throw that error.
+          stop(e$parent$parent)
+        }
+        else {
+          stop(e$parent)
+        }
       }
       else {
         stop(e)
