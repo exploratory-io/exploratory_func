@@ -232,7 +232,10 @@ exp_arima <- function(df, time, valueColumn,
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
 
-    if (time_unit %in% c("month", "year", "quarter")) { #TODO: Take care of other time units too.
+    if (time_unit %in% c("year")) { #TODO: Take care of other time units too.
+      training_tsibble <- tsibble::tsibble(ds = lubridate::year(training_data$ds), y = training_data$y, index=ds)
+    }
+    else if (time_unit %in% c("month", "quarter")) { #TODO: Take care of other time units too.
       training_tsibble <- tsibble::tsibble(ds = tsibble::yearmonth(training_data$ds), y = training_data$y)
     }
     else {
@@ -360,6 +363,11 @@ exp_arima <- function(df, time, valueColumn,
 
     # Bind Training Data + Forecast Data
     # Revive Original column names(time_col, value_col)
+
+    # For yearly data, ds was converted to numeric to create a valid tsibble. Cast it back to Date.
+    if (class(forecast_rows$ds) == "numeric") {
+      forecast_rows <- forecast_rows %>% dplyr::mutate(ds=as.Date(paste0(forecast_rows$ds,"-01-01")))
+    }
     ret_df <- fitted_training_df %>% dplyr::bind_rows(forecast_rows)
     if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new"
       time_col <- avoid_conflict(colnames(ret_df), time_col)
