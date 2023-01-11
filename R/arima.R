@@ -176,15 +176,7 @@ exp_arima <- function(df, time, valueColumn,
 
     if (!is.null(na_fill_type)) {
       # complete the date time with NA
-      aggregated_data <- if(inherits(aggregated_data$ds, "Date")){
-        aggregated_data %>%
-          tidyr::complete(ds = seq.Date(min(ds), max(ds), by = time_unit))
-      } else if(inherits(aggregated_data$ds, "POSIXct")) {
-        aggregated_data %>%
-          tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = time_unit))
-      } else {
-        stop("time must be Date or POSIXct.")
-      }
+      aggregated_data <- aggregated_data %>% complete_date("ds", time_unit = time_unit)
       # fill NAs in y with zoo
       aggregated_data <- aggregated_data %>% dplyr::mutate(y = fill_ts_na(y, ds, type = na_fill_type, val = na_fill_value))
     }
@@ -232,7 +224,13 @@ exp_arima <- function(df, time, valueColumn,
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
 
-    if (time_unit %in% c("month", "year", "quarter")) { #TODO: Take care of other time units too.
+    if (time_unit %in% c("year")) {
+      training_tsibble <- tsibble::tsibble(ds = lubridate::year(training_data$ds), y = training_data$y, index=ds)
+    }
+    else if (time_unit %in% c("quarter")) {
+      training_tsibble <- tsibble::tsibble(ds = tsibble::yearquarter(training_data$ds), y = training_data$y)
+    }
+    else if (time_unit %in% c("month")) {
       training_tsibble <- tsibble::tsibble(ds = tsibble::yearmonth(training_data$ds), y = training_data$y)
     }
     else {
@@ -360,6 +358,11 @@ exp_arima <- function(df, time, valueColumn,
 
     # Bind Training Data + Forecast Data
     # Revive Original column names(time_col, value_col)
+
+    # For yearly data, ds was converted to numeric to create a valid tsibble. Cast it back to Date.
+    if (time_unit %in% c("year")) {
+      forecast_rows <- forecast_rows %>% dplyr::mutate(ds=as.Date(paste0(forecast_rows$ds,"-01-01")))
+    }
     ret_df <- fitted_training_df %>% dplyr::bind_rows(forecast_rows)
     if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new"
       time_col <- avoid_conflict(colnames(ret_df), time_col)

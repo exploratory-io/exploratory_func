@@ -16,10 +16,16 @@ test_that("exp_arima with aggregation", {
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "day", auto=FALSE, p=0, d=1, q=0, seasonal=FALSE)
   ret <- raw_data %>%
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "hour")
+  # Test both "min" and "minute". na_fill_type is needed to exercise complete_data function.
   ret <- raw_data %>% tail(100) %>%
-    exp_arima(`time stamp`, `cou nt`, 10, time_unit = "minute")
+    exp_arima(`time stamp`, `cou nt`, 10, time_unit = "min", na_fill_type = "previous")
   ret <- raw_data %>% tail(100) %>%
-    exp_arima(`time stamp`, `cou nt`, 10, time_unit = "second")
+    exp_arima(`time stamp`, `cou nt`, 10, time_unit = "minute", na_fill_type = "previous")
+  # Test both "sec" and "second". na_fill_type is needed to exercise complete_data function.
+  ret <- raw_data %>% tail(100) %>%
+    exp_arima(`time stamp`, `cou nt`, 10, time_unit = "sec", na_fill_type = "previous")
+  ret <- raw_data %>% tail(100) %>%
+    exp_arima(`time stamp`, `cou nt`, 10, time_unit = "second", na_fill_type = "previous")
 
   # test for test mode.
   raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211

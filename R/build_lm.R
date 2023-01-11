@@ -363,25 +363,28 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   }, error = function(e){
     # Error message was changed when upgrading dplyr to 0.7.1
     # so use stringr::str_detect to make these robust.
-    # With dplyr 1.0.8, now it seems that the message is separated into e$message and e$parant$message.
+    # With dplyr 1.0.8, it seems that the message is separated into e$message and e$parant$message.
+    # With dplyr 1.0.10, it seems that the message is further separated into e$message, e$parant$message, and e$parent$parent$message.
+    # First extract the root message text.
     if (!is.null(e$parent)) {
-      if (stringr::str_detect(e$parent$message, "contrasts can be applied only to factors with 2 or more levels")) {
-        stop("more than 1 unique values are expected for categorical columns assigned as predictors")
+      if (!is.null(e$parent$parent)) {
+        message <- e$parent$parent$message
       }
-      if(stringr::str_detect(e$parent$message, "0 \\(non\\-NA\\) cases")){
-        stop("no data after removing NA")
+      else {
+        message <- e$parent$message
       }
-      stop(e$parent$message)
     }
     else { # Handling for before dplyr 1.0.8. (With 6.9.5 we do not bundle dplyr 1.0.8 yet.)
-      if (stringr::str_detect(e$message, "contrasts can be applied only to factors with 2 or more levels")) {
-        stop("more than 1 unique values are expected for categorical columns assigned as predictors")
-      }
-      if(stringr::str_detect(e$message, "0 \\(non\\-NA\\) cases")){
-        stop("no data after removing NA")
-      }
-      stop(e$message)
+      message <- e$message
     }
+    # Run text match on the extracted message.
+    if (stringr::str_detect(message, "contrasts can be applied only to factors with 2 or more levels")) {
+      stop("more than 1 unique values are expected for categorical columns assigned as predictors")
+    }
+    if(stringr::str_detect(message, "0 \\(non\\-NA\\) cases")){
+      stop("no data after removing NA")
+    }
+    stop(message)
   })
   if(augment){
     if(test_rate == 0){
