@@ -669,6 +669,7 @@ safe_slice <- function(data, index, remove = FALSE) {
       data[index, , drop=FALSE]
     }
   }
+  ret
 }
 
 #' Add fitted response value to augment result in prediction functions
