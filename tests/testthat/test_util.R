@@ -1125,11 +1125,18 @@ test_that("test str_count_all", {
 })
 
 test_that("test safe_slice", {
+  # With matrix
   mat <- matrix(c(1,NA,3,NA,5,6,7,8,NA), 3,3)
   ret1 <- safe_slice(mat,1)
   expect_equal(ret1, matrix(c(1,NA,7),1,3))
   ret2 <- safe_slice(mat,1, remove=TRUE)
   expect_equal(ret2, matrix(c(NA,3,5,6,8,NA),2,3))
+  # With data frame
+  df <- tibble::as.tibble(mat)
+  ret1 <- safe_slice(df,1)
+  expect_equal(ret1, tibble::as.tibble(matrix(c(1,NA,7),1,3)))
+  ret2 <- safe_slice(df,1, remove=TRUE)
+  expect_equal(ret2, tibble::as.tibble(matrix(c(NA,3,5,6,8,NA),2,3)))
 })
 
 test_that("test sameple_df_index", {

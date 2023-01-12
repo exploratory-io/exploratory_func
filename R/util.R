@@ -649,7 +649,7 @@ sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
   }
 }
 
-#' slice of 2 dimensional data that can handle empty vector
+#' slice of 2 dimensional data (data frame or matrix) that can handle empty vector
 #' @export
 safe_slice <- function(data, index, remove = FALSE) {
   ret <- if(remove){
@@ -658,24 +658,16 @@ safe_slice <- function(data, index, remove = FALSE) {
     } else if(length(index) == 0){
       data
     } else {
-      data[-index, ]
+      data[-index, , drop=FALSE]
     }
   } else {
     if(is.null(index)){
-      data[c(), ]
+      data[c(), , drop=FALSE]
     } else if(length(index) == 0){
-      data[c(), ]
+      data[c(), , drop=FALSE]
     } else {
-      data[index, ]
+      data[index, , drop=FALSE]
     }
-  }
-
-  if(is.vector(ret)){
-    mat <- matrix(ret, nrow = 1)
-    colnames(mat) <- names(ret)
-    mat
-  } else {
-    ret
   }
 }
 
