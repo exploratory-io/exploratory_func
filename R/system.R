@@ -2004,7 +2004,8 @@ getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFile
                                      unitl = until, locale = locale, geocode = geocode, include_rts = includeRts,
                                      type = resultType,  retryonratelimit=TRUE)
   if(length(tweetList)>0){
-    users <- rtweet::users_data(tweetList) %>%  dplyr::mutate(user_id = id)%>% dplyr::select(-id) %>% rename(
+    users <- rtweet::users_data(tweetList) %>%  dplyr::rename(
+      user_id = id,
       profile_image_url = profile_image_url_https
     )
     # to make column names consistent with existing data frame, rename the in_reply_to_aaa to reply_to_aaa
