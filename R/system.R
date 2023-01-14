@@ -1972,16 +1972,16 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
 }
 
 
-#' Access twitter serch api
+#' Access twitter search api
 #' @param n - Maximum number of tweets.
 #' @param lang - Language to filter result.
 #' @param lastNDays - From how many days ago tweets should be searched.
 #' @param searchString - Query to search.
-#' @param tokenFileId - File id for aut
-#' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
+#' @param tokenFileId - File id for oauth
+#' @param withSentiment - Whether there should be sentiment column calculated by get_sentiment.
 #' @param includeRts - Whether result should include retweets or not.
 #' @export
-getTwitter <- function(n=200, lang=NULL,  lastNDays=7, searchString, tokenFileId=NULL, withSentiment = FALSE, includeRts = FALSE, ...){
+getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFileId=NULL, withSentiment = FALSE, includeRts = FALSE, ...){
   if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
   loadNamespace("lubridate")
   twitter_token = getTwitterToken(tokenFileId)
@@ -2004,6 +2004,41 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=7, searchString, tokenFileId
                                      unitl = until, locale = locale, geocode = geocode, include_rts = includeRts,
                                      type = resultType,  retryonratelimit=TRUE)
   if(length(tweetList)>0){
+    users <- rtweet::users_data(tweetList) %>%  dplyr::rename(
+      user_id = id,
+      profile_image_url = profile_image_url_https
+    )
+    # to make column names consistent with existing data frame, rename the in_reply_to_aaa to reply_to_aaa
+    reply_to_cols <- c(status_id = "id_str",
+                       reply_to_status_id = "in_reply_to_status_id",
+                       reply_to_status_id_str = "in_reply_to_status_id_str",
+                       reply_to_user_id = "in_reply_to_user_id",
+                       reply_to_user_id_str = "in_reply_to_user_id_str",
+                       reply_to_screen_name = "in_reply_to_screen_name")
+    # to make column name consistent with existing data frame, rename below place related columns
+    place_cols <- c(place_id = "place_place_id",
+                    place_url = "place_place_url",
+                    place_name = "place_place_name",
+                    place_full_name = "place_place_full_name",
+                    place_type = "place_place_place_type",
+                    country = "place_place_country",
+                    country_code = "place_place_country_code")
+    # entities column is a list column so extract it to columns.
+    tweetList <- tweetList %>% tidyr::unnest_wider(entities, names_repair = "unique") %>%
+    # It's possible that reply_to_cols are not available in the query result, so use any_of to avoid column does not exist error.
+    # remove id column since it's same as status_id column.
+    dplyr::rename(dplyr::any_of(reply_to_cols)) %>% dplyr::select(-id) %>%
+    # user_mentions column is a list column so extract it to columns.
+    tidyr::unnest_wider(user_mentions, names_sep = "_", names_repair = "unique") %>%
+    # place column is a list column so extract it to columns.
+    tidyr::unnest_wider(place, names_sep = "_", names_repair = "unique") %>%
+    # place_place is created from the above unnest_wider and is a list column so extract it to columns.
+    tidyr::unnest_wider(place_place, names_sep = "_", names_repair = "unique") %>%
+    # It's possible that place_cols are not available in the query result, so use any_of to avoid column does not exist error.
+    dplyr::rename(dplyr::any_of(place_cols))
+    # combine tweet data and user information.
+    tweetList <- cbind(tweetList, users)
+
     if(withSentiment){
       # calculate sentiment
       tweetList %>% dplyr::mutate(sentiment = get_sentiment(text))
