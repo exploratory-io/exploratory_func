@@ -2026,6 +2026,7 @@ getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFile
     # entities column is a list column so extract it to columns.
     tweetList <- tweetList %>% tidyr::unnest_wider(entities, names_repair = "unique") %>%
     # It's possible that reply_to_cols are not available in the query result, so use any_of to avoid column does not exist error.
+    # remove id column since it's same as status_id column.
     dplyr::rename(dplyr::any_of(reply_to_cols)) %>% dplyr::select(-id) %>%
     # user_mentions column is a list column so extract it to columns.
     tidyr::unnest_wider(user_mentions, names_sep = "_", names_repair = "unique") %>%
