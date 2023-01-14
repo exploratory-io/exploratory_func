@@ -2024,6 +2024,7 @@ getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFile
                     country_code = "place_place_country_code")
     # entities column is a list column so extract it to columns.
     tweetList <- tweetList %>% tidyr::unnest_wider(entities, names_repair = "unique") %>%
+    # It's possible that reply_to_cols are not available in the query result, so use any_of to avoid column does not exist error.
     dplyr::rename(dplyr::any_of(reply_to_cols)) %>% dplyr::select(-id) %>%
     # user_mentions column is a list column so extract it to columns.
     tidyr::unnest_wider(user_mentions, names_sep = "_", names_repair = "unique") %>%
@@ -2031,6 +2032,7 @@ getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFile
     tidyr::unnest_wider(place, names_sep = "_", names_repair = "unique") %>%
     # place_place is created from the above unnest_wider and is a list column so extract it to columns.
     tidyr::unnest_wider(place_place, names_sep = "_", names_repair = "unique") %>%
+    # It's possible that place_cols are not available in the query result, so use any_of to avoid column does not exist error.
     dplyr::rename(dplyr::any_of(place_cols))
     # combine tweet data and user information.
     tweetList <- cbind(tweetList, users)
