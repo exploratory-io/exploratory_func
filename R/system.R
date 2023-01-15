@@ -2036,6 +2036,13 @@ getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFile
     tidyr::unnest_wider(place_place, names_sep = "_", names_repair = "unique") %>%
     # It's possible that place_cols are not available in the query result, so use any_of to avoid column does not exist error.
     dplyr::rename(dplyr::any_of(place_cols))
+    # When Include Retweets are set as TRUE, make sure to make below column names unique
+    if (includeRts) {
+      conflictNames <- c(created_at_users = "created_at",
+                         withheld_in_countries_users = "withheld_in_countries",
+                         withheld_scope_users = "withheld_scope")
+      users <- users %>% dplyr::rename(dplyr::any_of(conflictNames))
+    }
     # combine tweet data and user information.
     tweetList <- cbind(tweetList, users)
 
