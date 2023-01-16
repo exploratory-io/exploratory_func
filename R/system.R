@@ -1034,10 +1034,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       )
       if (timezone != "") { #if timezone is set, use it for session.timezone.
         conn <- RPresto::dbConnect(drv, user = username,
-                                   password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = timezone)
+                                   password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = timezone, bigint = "numeric")
       } else {
         conn <- RPresto::dbConnect(drv, user = username,
-                                   password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+                                   password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE), bigint = "numeric")
       }
       connection_pool[[key]] <- conn
     }
