@@ -1033,9 +1033,11 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         httr::add_headers("X-Presto-User"=username)
       )
       if (timezone != "") { #if timezone is set, use it for session.timezone.
+        # As described https://github.com/prestodb/RPresto#bigint-handling, make sure to pass numeric for the bigint argument to avoid the bigint column is treated as integer otherwise values are imported as NA.
         conn <- RPresto::dbConnect(drv, user = username,
                                    password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = timezone, bigint = "numeric")
       } else {
+        # As described https://github.com/prestodb/RPresto#bigint-handling, make sure to pass numeric for the bigint argument to avoid the bigint column is treated as integer otherwise values are imported as NA.
         conn <- RPresto::dbConnect(drv, user = username,
                                    password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE), bigint = "numeric")
       }
