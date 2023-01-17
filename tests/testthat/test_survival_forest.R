@@ -1,6 +1,7 @@
 context("test exp_survival_forest")
 
 test_that("exp_survival_forest basic with start_time and end_time", {
+  Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
   # Repeat the same test for Date input and POSIXct input. We do not support units like hour, min, sec, but still it should work with POSIXct type time input.
   for (type in c("Date", "POSIXct")) {
     df <- survival::lung # this data has NAs.
