@@ -1,5 +1,6 @@
 context("test ARIMA functions")
 test_that("exp_arima with aggregation", {
+  Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
@@ -42,6 +43,7 @@ test_that("exp_arima with aggregation", {
 })
 
 test_that("exp_arima with minutes", {
+  Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
@@ -54,6 +56,7 @@ test_that("exp_arima with minutes", {
 
 # This test is too slow. TODO: make it faster and enable.
 test_that("exp_arima test mode with second as time units", {
+  Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
   ts <- seq(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-01 00:01:00"), by="sec")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts))) %>% dplyr::rename(`time stamp`=timestamp, `da ta`=data)
   raw_data$`da ta`[[length(ts) - 2]] <- NA # inject NA near the end to test #9211
@@ -65,6 +68,7 @@ test_that("exp_arima test mode with second as time units", {
 
 # This test is slow. TODO: make it faster.
 test_that("exp_arima test mode with minute as time units", {
+  Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
   # cannot be much longer than this on win 32bit to avoid memory error.
   ts <- seq(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-08 00:00:00"), by="min")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts))) %>% dplyr::rename(`time stamp`=timestamp, `da ta`=data)
@@ -76,6 +80,7 @@ test_that("exp_arima test mode with minute as time units", {
 })
 
 test_that("exp_arima test mode with hour as time units", {
+  Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
   ts <- seq(as.POSIXct("2010-01-01:00:00:00"), as.POSIXct("2010-01-15:00:00"), by="hour")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts))) %>% dplyr::rename(`time stamp`=timestamp, `da ta`=data)
   raw_data$`da ta`[[length(ts) - 2]] <- NA # inject NA near the end to test #9211
