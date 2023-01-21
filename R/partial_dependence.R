@@ -248,8 +248,13 @@ handle_partial_dependence <- function(x) {
       x_type <- "logical"
       chart_type <- "scatter"
     }
+    # Since we turn charactors into factor in preprocessing (fct_lump), look at orig_class attr to distinguish between character and factor.
+    else if ("character" %in% attr(df[[col]], "orig_class")) {
+      x_type <- "character"
+      chart_type <- "scatter"
+    }
     else {
-      x_type <- "character" # Since we turn charactors into factor in preprocessing (fct_lump) and cannot distinguish the original type at this point, for now, we treat both factors and characters as "characters" here.
+      x_type <- "factor"
       chart_type <- "scatter"
     }
     x_type_map <- c(x_type_map, x_type)
