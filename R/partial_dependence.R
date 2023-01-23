@@ -248,6 +248,10 @@ handle_partial_dependence <- function(x) {
       x_type <- "logical"
       chart_type <- "scatter"
     }
+    else if (!is.null(x$orig_predictor_classes) && "factor" %in% x$orig_predictor_classes[[col]]) {
+      x_type <- "factor"
+      chart_type <- "scatter"
+    }
     else {
       x_type <- "character" # Since we turn charactors into factor in preprocessing (fct_lump) and cannot distinguish the original type at this point, for now, we treat both factors and characters as "characters" here.
       chart_type <- "scatter"
