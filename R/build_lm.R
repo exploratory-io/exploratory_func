@@ -823,6 +823,7 @@ build_lm.fast <- function(df,
       df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
+      orig_predictor_classes <- capture_df_column_classes(df, c_cols)
 
       # Normalize numeric target variable,
       # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
@@ -1111,6 +1112,7 @@ build_lm.fast <- function(df,
       }
 
       model$target_col <- clean_target_col # We use target column info to bring the column next to the predicted value in the prediction() output.
+      model$orig_predictor_classes <- orig_predictor_classes
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
