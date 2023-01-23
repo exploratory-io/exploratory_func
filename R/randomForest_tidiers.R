@@ -2408,7 +2408,6 @@ calc_feature_imp <- function(df,
         model$predictor_funs <- predictor_funs
       }
       model$orig_predictor_classes <- orig_predictor_classes
-      browser()
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
@@ -3119,6 +3118,7 @@ exp_rpart <- function(df,
       # fct_lump is essential here.
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
       clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE, filter_numeric_na=TRUE)
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
@@ -3272,6 +3272,7 @@ exp_rpart <- function(df,
         attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
         model$predictor_funs <- predictor_funs
       }
+      model$orig_predictor_classes <- orig_predictor_classes
 
       if (!is.null(model$terms)) {
         attr(model$terms,".Environment") <- NULL
