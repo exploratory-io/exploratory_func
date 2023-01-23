@@ -447,3 +447,30 @@ test_that("calc_feature_map() error handling for predictor with single unique va
       calc_feature_imp(`FL NUM`, Const, test_rate = 0.3)
   }, "Invalid Predictors: Only one unique value.")
 })
+
+test_that("rf_partial_dependence() output is sorted by factor level when the predictor is factor.", {
+  df <- airquality %>%
+    readr::type_convert() %>%
+    exploratory::clean_data_frame() %>%
+    mutate(Ozone_category = format_cut_output(exp_cut(Ozone, breaks = 10, lower.range = NA, upper.range = NA, include.outside.range = TRUE, dig.lab = 10), decimal.digits = 0), .after = ifelse("Ozone" %in% names(.), "Ozone", last_col()))
+  model_df <- df %>% calc_feature_imp(`Temp`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_category`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, with_boruta = FALSE, test_split_type = "random")
+  res <- model_df %>% rf_partial_dependence()
+  predicted_df <- res %>% filter(y_name=="Predicted")
+  expect_equal(sort(predicted_df$x_value), predicted_df$x_value)
+})
+
+test_that("rf_partial_dependence() output is sorted by value when the predictor is character.", {
+  df <- airquality %>%
+    readr::type_convert() %>%
+    exploratory::clean_data_frame() %>%
+    mutate(Ozone_category = format_cut_output(exp_cut(Ozone, breaks = 10, lower.range = NA, upper.range = NA, include.outside.range = TRUE, dig.lab = 10), decimal.digits = 0), .after = ifelse("Ozone" %in% names(.), "Ozone", last_col()))
+  df <- df %>% mutate(Ozone_char = as.character(Ozone_category))
+  model_df <- df %>% calc_feature_imp(`Temp`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, with_boruta = FALSE, test_split_type = "random")
+  res <- model_df %>% rf_partial_dependence()
+  predicted_df <- res %>% filter(y_name=="Predicted")
+  expect_equal(sort(predicted_df$y_value, decreasing = TRUE), predicted_df$y_value)
+})
+
+
+
+
