@@ -1132,6 +1132,7 @@ exp_xgboost <- function(df,
       # XGBoost can work with NAs in numeric predictors. TODO: verify it.
       # Also, no need to convert logical to factor unlike ranger.
       clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE, convert_logical=FALSE)
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
@@ -1335,6 +1336,7 @@ exp_xgboost <- function(df,
         attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
         model$predictor_funs <- predictor_funs
       }
+      model$orig_predictor_classes <- orig_predictor_classes
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
