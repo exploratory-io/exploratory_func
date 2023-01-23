@@ -1998,6 +1998,14 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
+capture_df_column_classes <- function(df, clean_cols) {
+  res <- purrr::map(clean_cols, function(col) {
+    class(df[[col]])
+  })
+  names(res) <- clean_cols
+  res
+}
+
 cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE, convert_logical=TRUE) {
   df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
                                                  filter_predictor_numeric_na=filter_numeric_na)
@@ -2193,6 +2201,7 @@ calc_feature_imp <- function(df,
       # https://github.com/imbs-hl/ranger/pull/109
       filter_numeric_na = test_rate > 0
       clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=filter_numeric_na)
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
@@ -2398,6 +2407,8 @@ calc_feature_imp <- function(df,
         attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
         model$predictor_funs <- predictor_funs
       }
+      model$orig_predictor_classes <- orig_predictor_classes
+      browser()
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
