@@ -1129,10 +1129,17 @@ exp_xgboost <- function(df,
       else {
         sample_size <- max_nrow
       }
+      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample called inside cleanup_df_per_group,
+      # so that we know the original classes of columns before characters are turned into factors,
+      # so that we can sort the partial dependence data for display accordingly.
+      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
+      # orig_predictor_classes than the partial dependence data.
+      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
+      # that should not happen, since the extraction is already done by mutate_predictors.
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       # XGBoost can work with NAs in numeric predictors. TODO: verify it.
       # Also, no need to convert logical to factor unlike ranger.
       clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE, convert_logical=FALSE)
-      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
