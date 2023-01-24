@@ -393,6 +393,14 @@ exp_survival_forest <- function(df,
         df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_start_time_col), !!rlang::sym(clean_end_time_col), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
       }
 
+      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample,
+      # so that we know the original classes of columns before characters are turned into factors,
+      # so that we can sort the partial dependence data for display accordingly.
+      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
+      # orig_predictor_classes than the partial dependence data.
+      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
+      # that should not happen, since the extraction is already done by mutate_predictors.
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
@@ -454,10 +462,11 @@ exp_survival_forest <- function(df,
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       model$imp_vars <- imp_vars
+      model$orig_predictor_classes <- orig_predictor_classes
       model$partial_dependence <- partial_dependence.ranger_survival_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
       model$pred_survival_threshold <- pred_survival_threshold
-      model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
+      model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars, orig_predictor_classes)
 
       # Calculate concordance.
       # Concordance by model$survival is too bad, most likely because it is out-of-bag prediction. We explictly predict with training data to calculate training concordance.
