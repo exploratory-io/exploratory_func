@@ -1998,14 +1998,6 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
-capture_df_column_classes <- function(df, clean_cols) {
-  res <- purrr::map(clean_cols, function(col) {
-    class(df[[col]])
-  })
-  names(res) <- clean_cols
-  res
-}
-
 cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE, convert_logical=TRUE) {
   df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
                                                  filter_predictor_numeric_na=filter_numeric_na)

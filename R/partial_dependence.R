@@ -248,6 +248,7 @@ handle_partial_dependence <- function(x) {
       x_type <- "logical"
       chart_type <- "scatter"
     }
+    # Since we turn character into factor in preprocess_regression_data_after_sample(), look at the recorded original class.
     else if (!is.null(x$orig_predictor_classes) && "factor" %in% x$orig_predictor_classes[[col]]) {
       x_type <- "factor"
       chart_type <- "scatter"
@@ -304,3 +305,14 @@ handle_partial_dependence <- function(x) {
   ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
   ret
 }
+
+# Common utility function to capture classes of columns of a data frame as a list of the class name character vector named with the column name.
+# Currently used to record the original classes of the predictors so that we can sort partial dependence according to whether a predictor was a factor or a character.
+capture_df_column_classes <- function(df, clean_cols) {
+  res <- purrr::map(clean_cols, function(col) {
+    class(df[[col]])
+  })
+  names(res) <- clean_cols
+  res
+}
+
