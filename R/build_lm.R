@@ -820,10 +820,17 @@ build_lm.fast <- function(df,
                                                 predictor_outlier_filter_type,
                                                 predictor_outlier_filter_threshold)
 
+      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample,
+      # so that we know the original classes of columns before characters are turned into factors,
+      # so that we can sort the partial dependence data for display accordingly.
+      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
+      # orig_predictor_classes than the partial dependence data.
+      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
+      # that should not happen, since the extraction is already done by mutate_predictors.
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
-      orig_predictor_classes <- capture_df_column_classes(df, c_cols)
 
       # Normalize numeric target variable,
       # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
