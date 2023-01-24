@@ -55,3 +55,19 @@ test_that("Test partial dependence by factor predictor with rpart", {
   expect_true(predicted_df$x_value[1] == "1 - 18")
   expect_true(predicted_df$x_value[length(predicted_df$x_value)] == "(Missing)")
 })
+
+test_that("Test partial dependence by character predictor with rpart", {
+  model_df <- aq_data %>% build_lm.fast(`Temp`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "lm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1)
+  res <- model_df %>% lm_partial_dependence()
+  predicted_df <- res %>% filter(y_name=="Predicted")
+  expect_equal(sort(predicted_df$y_value, decreasing = TRUE), predicted_df$y_value)
+})
+
+test_that("Test partial dependence by factor predictor with rpart", {
+  model_df <- aq_data %>% build_lm.fast(`Temp`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "lm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1)
+  res <- model_df %>% lm_partial_dependence()
+  predicted_df <- res %>% filter(y_name=="Predicted")
+  # To verify it is sorted according to the original factor level, check the first level comes first and the last level comes last.
+  expect_true(predicted_df$x_value[1] == "1 - 18")
+  expect_true(predicted_df$x_value[length(predicted_df$x_value)] == "(Missing)")
+})
