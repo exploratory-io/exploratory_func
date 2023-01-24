@@ -39,7 +39,7 @@ calc_permutation_importance_ranger_survival <- function(fit, time_col, status_co
 }
 
 # Calculates survival curves with Kaplan-Meier with strata specified by vars argument.
-calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
+calc_survival_curves_with_strata <- function(df, time_col, status_col, vars, orig_predictor_classes) {
   # Create map from variable name to chart type. TODO: Eliminate duplicated code.
   chart_type_map <- c()
   x_type_map <-c()
@@ -51,6 +51,11 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
     # Since we turn logical into factor in preprocess_regression_data_after_sample(), detect them accordingly.
     else if (is.factor(df[[col]]) && all(levels(df[[col]]) %in% c("TRUE", "FALSE", "(Missing)"))) {
       x_type <- "logical"
+      chart_type <- "scatter"
+    }
+    # Since we turn character into factor in preprocess_regression_data_after_sample(), look at the recorded original class.
+    else if (!is.null(orig_predictor_classes) && "factor" %in% orig_predictor_classes[[col]]) {
+      x_type <- "factor"
       chart_type <- "scatter"
     }
     else {
