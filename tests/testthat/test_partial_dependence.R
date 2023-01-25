@@ -81,6 +81,22 @@ test_that("Test partial dependence by factor predictor with linear regression", 
   expect_true(predicted_df$x_value[length(predicted_df$x_value)] == "(Missing)")
 })
 
+test_that("Test partial dependence by character predictor with logistic regression", {
+  model_df <- aq_data %>% build_lm.fast(`Temp_Over_80`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "glm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1, smote=TRUE)
+  res <- model_df %>% lm_partial_dependence()
+  predicted_df <- res %>% filter(y_name=="Predicted")
+  expect_equal(sort(predicted_df$y_value, decreasing = TRUE), predicted_df$y_value)
+})
+
+test_that("Test partial dependence by factor predictor with logistic regression", {
+  model_df <- aq_data %>% build_lm.fast(`Temp_Over_80`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "glm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1, smote=TRUE)
+  res <- model_df %>% lm_partial_dependence()
+  predicted_df <- res %>% filter(y_name=="Predicted")
+  # To verify it is sorted according to the original factor level, check the first level comes first and the last level comes last.
+  expect_true(predicted_df$x_value[1] == "1 - 18")
+  expect_true(predicted_df$x_value[length(predicted_df$x_value)] == "(Missing)")
+})
+
 test_that("Test partial dependence by character predictor with Cox regression", {
   model_df <- cancer_data %>% build_coxph.fast(NULL, `status`, `age`, `sex_char`, predictor_funs = list(`age`="none", `sex`="none"), start_time = `Start_Date`, end_time = `End_Date`, time_unit = "day", test_split_type = "random")
   res <- model_df %>% tidy_rowwise(model, type='partial_dependence')
