@@ -3135,7 +3135,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
       if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
         new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
-        file.copy(path, new_path)
+        fs::file_copy(path, new_path) # Using file_copy since file.copy fails with some paths with multibyte chars. #26852
         if (n_max != Inf) {
           df <- openxlsx::read.xlsx(xlsxFile = new_path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
         } else {
@@ -3177,7 +3177,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
         # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
         if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
           new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
-          file.copy(path, new_path)
+          fs::file_copy(path, new_path) # Using file_copy since file.copy fails with some paths with multibyte chars. #26852
           df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
           file.remove(new_path)
         }
@@ -3245,7 +3245,7 @@ get_excel_sheets <- function(path){
     # On Windows, if the path has multibyte chars, work around error from readxl::excel_sheets by copying the file to temp directory.
     if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
       new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
-      file.copy(path, new_path)
+      fs::file_copy(path, new_path) # Using file_copy since file.copy fails with some paths with multibyte chars. #26852
       ret <- readxl::excel_sheets(new_path)
       file.remove(new_path)
       ret
