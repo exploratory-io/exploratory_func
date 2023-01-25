@@ -2192,6 +2192,14 @@ calc_feature_imp <- function(df,
       # To keep distribution of training data and test data on par with each other, we are filtering them from training data too.
       # https://github.com/imbs-hl/ranger/pull/109
       filter_numeric_na = test_rate > 0
+      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample called inside cleanup_df_per_group,
+      # so that we know the original classes of columns before characters are turned into factors,
+      # so that we can sort the partial dependence data for display accordingly.
+      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
+      # orig_predictor_classes than the partial dependence data.
+      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
+      # that should not happen, since the extraction is already done by mutate_predictors.
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=filter_numeric_na)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
@@ -2398,6 +2406,7 @@ calc_feature_imp <- function(df,
         attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
         model$predictor_funs <- predictor_funs
       }
+      model$orig_predictor_classes <- orig_predictor_classes
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
@@ -3104,6 +3113,14 @@ exp_rpart <- function(df,
       else {
         sample_size <- max_nrow
       }
+      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample called inside cleanup_df_per_group,
+      # so that we know the original classes of columns before characters are turned into factors,
+      # so that we can sort the partial dependence data for display accordingly.
+      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
+      # orig_predictor_classes than the partial dependence data.
+      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
+      # that should not happen, since the extraction is already done by mutate_predictors.
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
       # especially multiclass classification seems to take forever when number of unique values of predictors are many.
       # fct_lump is essential here.
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
@@ -3261,6 +3278,7 @@ exp_rpart <- function(df,
         attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
         model$predictor_funs <- predictor_funs
       }
+      model$orig_predictor_classes <- orig_predictor_classes
 
       if (!is.null(model$terms)) {
         attr(model$terms,".Environment") <- NULL
