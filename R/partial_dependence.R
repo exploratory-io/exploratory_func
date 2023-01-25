@@ -308,11 +308,11 @@ handle_partial_dependence <- function(x) {
 
 # Common utility function to capture classes of columns of a data frame as a list of the class name character vector named with the column name.
 # Currently used to record the original classes of the predictors so that we can sort partial dependence according to whether a predictor was a factor or a character.
-capture_df_column_classes <- function(df, clean_cols) {
-  res <- purrr::map(clean_cols, function(col) {
+capture_df_column_classes <- function(df, cols) {
+  res <- purrr::map(cols, function(col) {
     class(df[[col]])
   })
-  names(res) <- clean_cols
+  names(res) <- cols
   res
 }
 
