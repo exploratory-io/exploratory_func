@@ -1306,6 +1306,9 @@ exp_anova <- function(df, var1, var2, var3 = NULL, func2 = NULL, test_sig_level 
   if (!missing(var3)) {
     var3_col <- col_name(substitute(var3))
   }
+  else {
+    var3_col <- NULL
+  }
   grouped_cols <- grouped_by(df)
 
   if (!is.null(func2)) {
@@ -1373,6 +1376,9 @@ exp_anova <- function(df, var1, var2, var3 = NULL, func2 = NULL, test_sig_level 
       class(model) <- c("anova_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
+      if (!is.null(var3_col)) {
+        model$var3 <- var3_col
+      }
       model$data <- df
       model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
@@ -1502,6 +1508,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                                  `Sum of Squares`=sumsq,
                                  `Mean Square`=meansq,
                                  `Variable`=term)
+  }
+  if (type == "emmeans") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    formula <- as.formula(paste0('~`', x$var2, '`|`', x$var3, '`'))
+    ret <- emmeans::emmeans(x, formula)
+    ret <- as.tibble(ret)
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
