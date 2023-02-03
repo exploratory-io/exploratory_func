@@ -1490,6 +1490,19 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
+  if (type == "coef") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    ret <- broom:::tidy.aov(x) # TODO: This is called for "model" type too. Might want to optimize.
+    ret <- ret %>% dplyr::rename(`F Value`=statistic,
+                                 `P Value`=p.value,
+                                 `Degree of Freedom`=df,
+                                 `Sum of Squares`=sumsq,
+                                 `Mean Square`=meansq,
+                                 `Variable`=term)
+  }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
