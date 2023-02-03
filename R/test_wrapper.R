@@ -1291,7 +1291,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 #' @export
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
-exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
+exp_anova <- function(df, var1, var2, var3 = NULL, func2 = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       ...) {
@@ -1303,6 +1303,9 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   }
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
+  if (!missing(var3)) {
+    var3_col <- col_name(substitute(var3))
+  }
   grouped_cols <- grouped_by(df)
 
   if (!is.null(func2)) {
@@ -1318,7 +1321,12 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
     stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
 
-  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  if (missing(var3)) {
+    formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  }
+  else {
+    formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', var3_col, '`'))
+  }
 
   anova_each <- function(df) {
     tryCatch({
