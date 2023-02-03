@@ -1325,7 +1325,7 @@ exp_anova <- function(df, var1, var2, var3 = NULL, func2 = NULL, test_sig_level 
     formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
   }
   else {
-    formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', var3_col, '`'))
+    formula <- as.formula(paste0('`', var1_col, '`~`', var3_col, '`+`', var2_col, '`'))
   }
 
   anova_each <- function(df) {
@@ -1420,8 +1420,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     note <- NULL
     ret <- broom:::tidy.aov(x)
-    ret1 <- ret %>% dplyr::slice(1:1)
-    ret2 <- ret %>% dplyr::slice(2:2)
+    nr <- nrow(ret)
+    ret1 <- ret %>% dplyr::slice((nr-1):(nr-1)) # 2nd last row should be about the independent variable.
+    ret2 <- ret %>% dplyr::slice(nr:nr)
     ret <- ret1 %>% mutate(resid.df=!!ret2$df, resid.sumsq=!!ret2$sumsq, resid.meansq=!!ret2$meansq)
 
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
