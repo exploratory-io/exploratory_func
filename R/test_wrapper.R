@@ -1496,7 +1496,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
-  if (type == "coef") {
+  if (type == "anova") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
