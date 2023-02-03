@@ -1518,6 +1518,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- emmeans::emmeans(x, formula)
     ret <- as.tibble(ret)
   }
+  if (type == "multcomp") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
+    ret <- broom::tidy(ret)
+  }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()

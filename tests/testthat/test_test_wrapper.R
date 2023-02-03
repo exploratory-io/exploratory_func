@@ -571,10 +571,11 @@ test_that("test exp_ttest with group-level error (not eough data)", {
 }
 
 test_that("test ANCOVA with exp_anova", {
-  model_df <- exp_anova(mtcars, mpg, am, var3=wt)
+  model_df <- exp_anova(mtcars %>% mutate(am=factor(am)), mpg, am, var3=wt)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="anova")
   ret <- model_df %>% tidy_rowwise(model, type="emmeans")
+  ret <- model_df %>% tidy_rowwise(model, type="multcomp")
   browser()
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
