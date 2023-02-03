@@ -1517,6 +1517,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     formula <- as.formula(paste0('~`', x$var2, '`|`', x$var3, '`'))
     ret <- emmeans::emmeans(x, formula)
     ret <- as.tibble(ret)
+    # Output example:
+    # A tibble: 2 × 7
+    # am       wt emmean    SE    df lower.CL upper.CL
+    # <fct> <dbl>  <dbl> <dbl> <dbl>    <dbl>    <dbl>
+    # 0      3.22   20.1 0.833    29     18.4     21.8
+    # 1      3.22   20.1 1.07     29     17.9     22.3
   }
   if (type == "multcomp") {
     if ("error" %in% class(x)) {
@@ -1525,6 +1531,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
     ret <- broom::tidy(ret)
+    # Output example:
+    # A tibble: 1 × 7
+    # term  contrast null.value estimate std.error statistic adj.p.value
+    # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
+    # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
