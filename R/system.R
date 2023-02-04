@@ -2348,7 +2348,8 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     # Below is just getting a list of table names and not the actual table data.
     bqdataset <- bigrquery::bq_dataset(project = project, dataset = dataset)
     tables <- bigrquery::bq_dataset_tables(bqdataset, page_size = 10000);
-    lapply(tables, function(x){x$table})
+    # We need table name and table type so call bigrquery::bq_table_meta and get type from it.
+    tableDetails <-lapply(tables, function(x){c(x$table, bigrquery::bq_table_meta(x)$type)})
   }
   tables <- withCallingHandlers(main(), warning = warningHandler)
   # If the warning message contains "Unable to refresh token: invalid_client",
