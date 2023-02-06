@@ -1496,7 +1496,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
-  if (type == "anova") {
+  else if (type == "anova") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
@@ -1509,7 +1509,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                                  `Mean Square`=meansq,
                                  `Variable`=term)
   }
-  if (type == "emmeans") {
+  else if (type == "emmeans") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
@@ -1524,7 +1524,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     # 0      3.22   20.1 0.833    29     18.4     21.8
     # 1      3.22   20.1 1.07     29     17.9     22.3
   }
-  if (type == "multcomp") {
+  else if (type == "multcomp") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
