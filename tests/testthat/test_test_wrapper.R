@@ -447,7 +447,6 @@ test_that("test exp_ttest with character explanatory variable", {
   mtcars2$am[[1]] <- NA # test NA filtering
   mtcars2 <- mtcars2 %>% dplyr::mutate(am=as.character(am))
   model_df <- exp_ttest(mtcars2, mpg, am)
-  browser()
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # The majority should be the base
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
