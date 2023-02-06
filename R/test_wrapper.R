@@ -854,7 +854,8 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
 
   # For logical explanatory variable, make it a factor and adjust label order so that
   # the calculated difference is TRUE case - FALSE case, which intuitively makes better sense.
-  if (is.logical(df[[var2_col]])) {
+  var2_logical <- is.logical(df[[var2_col]])
+  if (var2_logical) {
     df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
   }
   
@@ -929,7 +930,16 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         cohens_d_to_detect <- d
       }
 
-      model <- t.test(formula, data = df, ...)
+      # Revert the factor levels since t.test consideres the 2nd level to be the base, which is not what we want.
+      # We keep the original df as is, since we want to keep the original factor order for display purpose.
+      if (!var2_logical) {
+        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(!!rlang::sym(var2_col)))
+      }
+      else {
+        df_test <- df
+      }
+      base.level <- levels(df_test[[var2_col]])[2]
+      model <- t.test(formula, data = df_test, ...)
       class(model) <- c("ttest_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
@@ -943,6 +953,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model$n1 <- count_df$n[1]
       model$v2 <- count_df[[1]][2] 
       model$n2 <- count_df$n[2]
+      model$base.level <- base.level
       model$data_type <- "raw"
       model
     }, error = function(e){
@@ -998,7 +1009,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     v2 <- x$v2 # value for 2nd class
     # t.test seems to consider the 2nd category based on alphabetical/numerical/factor sort as the base category.
     # Since group_by/summarize also sorts the group based on alphabetical/numerical/factor order, we can assume that the v2 is the base category.
-    ret <- ret %>% dplyr::mutate(base.level = !!v2)
+    ret <- ret %>% dplyr::mutate(base.level = !!x$base.level)
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
