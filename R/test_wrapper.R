@@ -800,6 +800,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
       model$v2 <- df[[var2_col]][2]
       model$n1 <- df[[n_col]][1]
       model$n2 <- df[[n_col]][2]
+      model$base.level <- df[[var2_col]][2] # The 2nd row is always the base in case of aggregated.
       model$s1 <- df[[sd_col]][1]
       model$s2 <- df[[sd_col]][2]
       model$m1 <- df[[mean_col]][1]
