@@ -932,11 +932,15 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
 
       # Revert the factor levels since t.test consideres the 2nd level to be the base, which is not what we want.
       # We keep the original df as is, since we want to keep the original factor order for display purpose.
-      if (!var2_logical) {
-        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(!!rlang::sym(var2_col)))
+      if (var2_logical) {
+        df_test <- df
+      }
+      else if (is.numeric(df[[var2_col]])) {
+        # If numeric, we want the smaller number to be the base, e.g. in case of 0, 1, 0 should be the base.
+        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(as.factor(!!rlang::sym(var2_col))))
       }
       else {
-        df_test <- df
+        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(!!rlang::sym(var2_col)))
       }
       base.level <- levels(df_test[[var2_col]])[2]
       model <- t.test(formula, data = df_test, ...)
