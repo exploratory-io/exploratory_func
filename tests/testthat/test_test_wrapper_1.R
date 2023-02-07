@@ -607,6 +607,7 @@ test_that("test exp_ttest with group-level error (not eough data)", {
 test_that("test exp_anova", {
   model_df <- exp_anova(mtcars, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(nrow(ret), 3) # Between Groups, Within Group, and Total.
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   model_df <- exp_anova(mtcars, mpg, gear)
