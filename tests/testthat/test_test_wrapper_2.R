@@ -12,12 +12,47 @@ test_that("test exp_wilcox", {
                  "Minimum","Maximum"))
 })
 
+test_that("test exp_wilcox with factor explanatory variable", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  mtcars2 <- mtcars2 %>% dplyr::mutate(am=as.factor(am))
+  model_df <- exp_wilcox(mtcars2, mpg, am, conf.int=TRUE) # Set conf.int TRUE to check direction of Difference.
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(ret$`Base Level`, "0") # First factor level should be the base.
+  expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
+  expect_true("Number of Rows" %in% colnames(ret))
+  model_df %>% tidy_rowwise(model, type="data_summary")
+})
+
+test_that("test exp_wilcox with numeric explanatory variable", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  model_df <- exp_wilcox(mtcars2, mpg, am, conf.int=TRUE) # Set conf.int TRUE to check direction of Difference.
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(ret$`Base Level`, "0") # The smaller number should be the base.
+  expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
+  expect_true("Number of Rows" %in% colnames(ret))
+  model_df %>% tidy_rowwise(model, type="data_summary")
+})
+
+test_that("test exp_wilcox with character explanatory variable", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  mtcars2 <- mtcars2 %>% dplyr::mutate(am=as.character(am))
+  model_df <- exp_wilcox(mtcars2, mpg, am, conf.int=TRUE) # Set conf.int TRUE to check direction of Difference.
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(ret$`Base Level`, "0") # The majority should be the base
+  expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
+  expect_true("Number of Rows" %in% colnames(ret))
+  model_df %>% tidy_rowwise(model, type="data_summary")
+})
 test_that("test exp_wilcox with logical explanatory variable", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
   mtcars2 <- mtcars2 %>% dplyr::mutate(am=as.logical(am))
   model_df <- exp_wilcox(mtcars2, mpg, am, conf.int=TRUE) # Set conf.int TRUE to check direction of Difference.
   ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(ret$`Base Level`, "FALSE") # FALSE should be the base
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
   expect_true("Number of Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
