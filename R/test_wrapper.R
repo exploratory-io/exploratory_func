@@ -1479,12 +1479,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::select(term, sumsq, df, meansq, statistic, p.value) %>%
         dplyr::mutate(f=c(!!(x$cohens_f), NA), power=c(!!power_val, NA), beta=c(1.0-!!power_val, NA), n=c(!!tot_n_rows, NA))
       ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
+      ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
+      ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
       ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
       ret <- ret %>% dplyr::rename(`Type of Variance`=term,
                                    `F Value`=statistic,
                                    `P Value`=p.value,
                                    `Degree of Freedom`=df,
                                    `Sum of Squares`=sumsq,
+                                   `SS Ratio`=ssr,
                                    `Mean Square`=meansq,
                                    `Effect Size (Cohen's f)`=f,
                                    `Power`=power,
@@ -1504,19 +1507,22 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         dplyr::mutate(f=c(!!(x$cohens_f), NA), power=c(!!(x$power), NA), beta=c(1.0-!!(x$power), NA)) %>%
         dplyr::mutate(current_sample_size=c(!!min_n_rows, NA), required_sample_size=c(!!required_sample_size, NA), n=c(!!tot_n_rows, NA))
       ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
+      ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
+      ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
       ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
-        dplyr::rename(`Type of Variance`=term,
-                      `F Value`=statistic,
-                      `P Value`=p.value,
-                      `Degree of Freedom`=df,
-                      `Sum of Squares`=sumsq,
-                      `Mean Square`=meansq,
-                      `Effect Size (Cohen's f)`=f,
-                      `Target Power`=power,
-                      `Target Probability of Type 2 Error`=beta,
-                      `Current Sample Size (Each Group)`=current_sample_size,
-                      `Required Sample Size (Each Group)`=required_sample_size,
-                      `Number of Rows`=n)
+      ret <- ret %>% dplyr::rename(`Type of Variance`=term,
+                                   `F Value`=statistic,
+                                   `P Value`=p.value,
+                                   `Degree of Freedom`=df,
+                                   `Sum of Squares`=sumsq,
+                                   `SS Ratio`=ssr,
+                                   `Mean Square`=meansq,
+                                   `Effect Size (Cohen's f)`=f,
+                                   `Target Power`=power,
+                                   `Target Probability of Type 2 Error`=beta,
+                                   `Current Sample Size (Each Group)`=current_sample_size,
+                                   `Required Sample Size (Each Group)`=required_sample_size,
+                                   `Number of Rows`=n)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
