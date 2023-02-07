@@ -1456,9 +1456,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     note <- NULL
     ret <- broom:::tidy.aov(x)
-    ret1 <- ret %>% dplyr::slice(1:1)
-    ret2 <- ret %>% dplyr::slice(2:2)
-    ret <- ret1 %>% mutate(resid.df=!!ret2$df, resid.sumsq=!!ret2$sumsq, resid.meansq=!!ret2$meansq)
 
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
@@ -1479,20 +1476,20 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         power_val <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
-        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!power_val), beta=c(1.0-!!power_val), n=!!tot_n_rows) %>%
-        dplyr::rename(`F Value`=statistic,
-                      `P Value`=p.value,
-                      `Degree of Freedom`=df,
-                      `Residual DF`=resid.df,
-                      `Sum of Squares`=sumsq,
-                      `Residual Sum of Squares`=resid.sumsq,
-                      `Mean Square`=meansq,
-                      `Residual Mean Square`=resid.meansq,
-                      `Effect Size (Cohen's f)`=f,
-                      `Power`=power,
-                      `Probability of Type 2 Error`=beta,
-                      `Number of Rows`=n)
+      ret <- ret %>% dplyr::select(term, sumsq, df, meansq, statistic, p.value) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f), NA), power=c(!!power_val, NA), beta=c(1.0-!!power_val, NA), n=c(!!tot_n_rows, NA))
+      ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
+      ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
+      ret <- ret %>% dplyr::rename(`Type of Variance`=term,
+                                   `F Value`=statistic,
+                                   `P Value`=p.value,
+                                   `Degree of Freedom`=df,
+                                   `Sum of Squares`=sumsq,
+                                   `Mean Square`=meansq,
+                                   `Effect Size (Cohen's f)`=f,
+                                   `Power`=power,
+                                   `Probability of Type 2 Error`=beta,
+                                   `Number of Rows`=n)
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
@@ -1503,17 +1500,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         required_sample_size <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
-        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!(x$power)), beta=c(1.0-!!(x$power))) %>%
-        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size), n=!!tot_n_rows) %>%
-        dplyr::rename(`F Value`=statistic,
+      ret <- ret %>% dplyr::select(term, sumsq, df, meansq, statistic, p.value) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f), NA), power=c(!!(x$power), NA), beta=c(1.0-!!(x$power), NA)) %>%
+        dplyr::mutate(current_sample_size=c(!!min_n_rows, NA), required_sample_size=c(!!required_sample_size, NA), n=c(!!tot_n_rows, NA))
+      ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
+      ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
+        dplyr::rename(`Type of Variance`=term,
+                      `F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
-                      `Residual DF`=resid.df,
                       `Sum of Squares`=sumsq,
-                      `Residual Sum of Squares`=resid.sumsq,
                       `Mean Square`=meansq,
-                      `Residual Mean Square`=resid.meansq,
                       `Effect Size (Cohen's f)`=f,
                       `Target Power`=power,
                       `Target Probability of Type 2 Error`=beta,
