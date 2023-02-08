@@ -1362,6 +1362,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
 
+  # Apply preprocessing functions to the covariates.
+  if (!is.null(covariates) && !is.null(covariate_funs)) {
+    df <- df %>% mutate_predictors(covariates, covariate_funs)
+    # Expand the set of modified column names after the mutate_predictors call.
+    covariates <- names(unlist(covariate_funs))
+  }
+
   if (is.null(covariates)) {
     formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
   }
