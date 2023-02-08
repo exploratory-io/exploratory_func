@@ -609,7 +609,10 @@ test_that("test exp_ttest with group-level error (not eough data)", {
 
 test_that("test ANCOVA with exp_anova", {
   mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
-  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"))
+  browser()
+  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
+                                    covariate_funs=c("log", "none"))
+  browser()
   #ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="anova")
   ret <- model_df %>% tidy_rowwise(model, type="emmeans")

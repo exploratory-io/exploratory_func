@@ -1335,7 +1335,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 #' @export
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
-exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, test_sig_level = 0.05,
+exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       ...) {
