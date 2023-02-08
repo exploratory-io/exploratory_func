@@ -1556,7 +1556,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
     ret <- emmeans::emmeans(x, formula)
-    ret <- as.tibble(ret)
+    ret <- tibble::as.tibble(ret)
     # Output example:
     # A tibble: 2 × 7
     # am       wt emmean    SE    df lower.CL upper.CL
@@ -1569,8 +1569,13 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- tibble::tibble()
       return(ret)
     }
-    ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
-    ret <- broom::tidy(ret)
+    formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+    ret <- emmeans::emmeans(x, formula)
+    ret <- graphics::pairs(ret)
+    ret <- tibble::as.tibble(ret)
+    # The version that uses multcomp. It had an issue with column names with spaces.
+    # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
+    # ret <- broom::tidy(ret)
     # Output example:
     # A tibble: 1 × 7
     # term  contrast null.value estimate std.error statistic adj.p.value
