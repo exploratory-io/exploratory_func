@@ -617,6 +617,7 @@ test_that("test ANCOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="multcomp")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="data")
   #model_df <- exp_anova(mtcars, mpg, gear)
   #ret <- model_df %>% tidy_rowwise(model, type="model")
   #ret <- model_df %>% tidy_rowwise(model, type="data_summary")
