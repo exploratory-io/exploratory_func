@@ -1587,6 +1587,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
     ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
+    # Map the column names back to the original.
+    orig_terms <- x$terms_mapping[colnames(ret)]
+    orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
+    colnames(ret) <- orig_terms
     # Output example:
     # A tibble: 2 × 7
     # am       wt emmean    SE    df lower.CL upper.CL

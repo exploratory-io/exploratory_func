@@ -612,9 +612,9 @@ test_that("test ANCOVA with exp_anova", {
   browser()
   model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
                                     covariate_funs=list("w t"="log", "q sec"="none"))
-  browser()
   #ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="anova")
+  browser()
   ret <- model_df %>% tidy_rowwise(model, type="emmeans")
   ret <- model_df %>% tidy_rowwise(model, type="multcomp")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
