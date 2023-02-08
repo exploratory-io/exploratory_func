@@ -1375,9 +1375,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   # Replace column names with names like c1_, c2_...
   clean_df <- df
   names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
-  # this mapping will be used to restore column names
+  # Forward mapping of column names.
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
+  # Reverse mapping of variable names.
+  terms_mapping <- names(name_map)
+  names(terms_mapping) <- name_map
   var1_col <- name_map[var1_col]
   var2_col <- name_map[var2_col]
   covariates <- name_map[covariates]
@@ -1438,6 +1441,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       if (!is.null(covariates)) {
         model$covariates <- covariates
       }
+      model$terms_mapping <- terms_mapping
       model$data <- df
       model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
