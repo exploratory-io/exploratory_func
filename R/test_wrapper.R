@@ -1490,7 +1490,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       return(ret)
     }
     note <- NULL
-    ret <- broom:::tidy.aov(x)
+    if (is.null(x$covariates)) { # ANOVA case
+      ret <- broom:::tidy.aov(x)
+    } else { # ANCOVA case
+      ret <- broom::tidy(car::Anova(x, type="III"))
+    }
 
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
