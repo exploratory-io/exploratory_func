@@ -1607,6 +1607,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- emmeans::emmeans(x, formula)
     ret <- graphics::pairs(ret)
     ret <- tibble::as.tibble(ret)
+    # Map the column names back to the original.
+    orig_terms <- x$terms_mapping[colnames(ret)]
+    orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
+    colnames(ret) <- orig_terms
     # The version that uses multcomp. It had an issue with column names with spaces.
     # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
     # ret <- broom::tidy(ret)
@@ -1643,6 +1647,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+    # Map the column names back to the original.
+    orig_terms <- x$terms_mapping[colnames(ret)]
+    orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
+    colnames(ret) <- orig_terms
   }
   else if (type == "prob_dist") {
     if ("error" %in% class(x)) {
