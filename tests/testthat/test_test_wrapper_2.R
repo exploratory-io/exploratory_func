@@ -15,7 +15,8 @@ test_that("test exp_wilcox", {
 test_that("test exp_wilcox with factor explanatory variable", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  mtcars2 <- mtcars2 %>% dplyr::mutate(am=as.factor(am))
+  # Put unused factor levels too for test.
+  mtcars2 <- mtcars2 %>% dplyr::mutate(am=factor(am, levels=c(-1,0,1,2)))
   model_df <- exp_wilcox(mtcars2, mpg, am, conf.int=TRUE) # Set conf.int TRUE to check direction of Difference.
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # First factor level should be the base.
