@@ -941,8 +941,8 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(as.factor(!!rlang::sym(var2_col))))
       }
       else if (is.factor(df[[var2_col]])) {
-        # For factor, revert the factor levels since we want the first level to be the base, just like linear regression.
-        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(!!rlang::sym(var2_col)))
+        # For factor, drop unused levels and revert the factor levels since we want the first actually used level to be the base, just like linear regression.
+        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(forcats::fct_drop(!!rlang::sym(var2_col))))
       }
       else {
         # For character and others, majority should become the base.
@@ -1204,8 +1204,8 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
         df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(as.factor(!!rlang::sym(var2_col))))
       }
       else if (is.factor(df[[var2_col]])) {
-        # For factor, revert the factor levels since we want the first level to be the base, just like linear regression.
-        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(!!rlang::sym(var2_col)))
+        # For factor, drop unused levels and revert the factor levels since we want the first actually used level to be the base, just like linear regression.
+        df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(forcats::fct_drop(!!rlang::sym(var2_col))))
       }
       else {
         # For character and others, majority should become the base.
