@@ -1383,7 +1383,9 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   names(terms_mapping) <- name_map
   var1_col <- name_map[var1_col]
   var2_col <- name_map[var2_col]
-  covariates <- name_map[covariates]
+  if (!is.null(covariates)) {
+    covariates <- name_map[covariates]
+  }
   df <- clean_df
 
   if (is.null(covariates)) {
