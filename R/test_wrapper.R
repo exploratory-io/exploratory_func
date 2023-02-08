@@ -1369,6 +1369,20 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     covariates <- names(unlist(covariate_funs))
   }
 
+  # Keep only the relevant columns.
+  df <- df %>% dplyr::select(c(var1_col, var2_col, covariates))
+
+  # Replace column names with names like c1_, c2_...
+  clean_df <- df
+  names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
+  # this mapping will be used to restore column names
+  name_map <- colnames(clean_df)
+  names(name_map) <- colnames(df)
+  var1_col <- name_map[var1_col]
+  var2_col <- name_map[var2_col]
+  covariates <- name_map[covariates]
+  df <- clean_df
+
   if (is.null(covariates)) {
     formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
   }
