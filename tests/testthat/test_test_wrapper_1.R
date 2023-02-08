@@ -422,10 +422,11 @@ test_that("test exp_ttest", {
 test_that("test exp_ttest with factor explanatory variable", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  mtcars2 <- mtcars2 %>% dplyr::mutate(am=as.factor(am))
+  # Put unused factor levels too for test.
+  mtcars2 <- mtcars2 %>% dplyr::mutate(am=factor(am, levels=c(-1,0,1,2)))
   model_df <- exp_ttest(mtcars2, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
-  expect_equal(ret$`Base Level`, "0") # First factor level should be the base.
+  expect_equal(ret$`Base Level`, "0") # First *used* factor level should be the base.
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
   expect_true("Number of Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
