@@ -1652,7 +1652,13 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       return(ret)
     }
     # Shapiro-Wilk test for residual normality
-    ret <- broom::tidy(shapiro.test(x$residuals))
+    if (length(x$residuals) > 5000) {
+      resid <- sample(x$residuals, 5000)
+    }
+    else {
+      resid <- x$residuals
+    }
+    ret <- broom::tidy(shapiro.test(resid))
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
