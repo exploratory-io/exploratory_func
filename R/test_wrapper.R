@@ -1638,6 +1638,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
     # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
   }
+  else if (type == "levene") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    # Levene's test of equality of error variances
+    ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]]))
+  }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
