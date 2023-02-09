@@ -1515,23 +1515,25 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         power_val <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(term, sumsq, df, meansq, statistic, p.value) %>%
-        dplyr::mutate(f=c(!!(x$cohens_f), NA), power=c(!!power_val, NA), beta=c(1.0-!!power_val, NA), n=c(!!tot_n_rows, NA))
-      ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
-      ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
-      ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
-      ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
-      ret <- ret %>% dplyr::rename(`Type of Variance`=term,
-                                   `F Value`=statistic,
-                                   `P Value`=p.value,
-                                   `Degree of Freedom`=df,
-                                   `Sum of Squares`=sumsq,
-                                   `SS Ratio`=ssr,
-                                   `Mean Square`=meansq,
-                                   `Effect Size (Cohen's f)`=f,
-                                   `Power`=power,
-                                   `Probability of Type 2 Error`=beta,
-                                   `Number of Rows`=n)
+      ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
+      ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
+      if (is.null(x$covariates)) { # ANOVA case
+        ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
+        ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
+        ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
+        ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
+      }
+      ret <- ret %>% dplyr::rename(any_of(c(`Type of Variance`="term",
+                                   `F Value`="statistic",
+                                   `P Value`="p.value",
+                                   `Degree of Freedom`="df",
+                                   `Sum of Squares`="sumsq",
+                                   `SS Ratio`="ssr",
+                                   `Mean Square`="meansq",
+                                   `Effect Size (Cohen's f)`="f",
+                                   `Power`="power",
+                                   `Probability of Type 2 Error`="beta",
+                                   `Number of Rows`="n")))
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
