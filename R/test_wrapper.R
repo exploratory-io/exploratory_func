@@ -1392,7 +1392,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
   }
   else {
-    formula <- as.formula(paste0('`', var1_col, '`~`', paste(covariates, collapse="`+`"), '`+`', var2_col, '`'))
+    formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', paste(covariates, collapse="`+`"), '`'))
   }
 
   anova_each <- function(df) {
@@ -1494,6 +1494,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- broom:::tidy.aov(x)
     } else { # ANCOVA case
       ret <- broom::tidy(car::Anova(x, type="III"))
+      # Filtering out the intercept row to bring the row for the IV to the first row. TODO: Do we need to keep the info for intercept?
+      ret <- ret %>% filter(term != '(Intercept)')
     }
 
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
