@@ -1646,6 +1646,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     # Levene's test of equality of error variances
     ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]]))
   }
+  else if (type == "shapiro") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    # Shapiro-Wilk test for residual normality
+    ret <- broom::tidy(shapiro.test(x$residuals))
+  }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
