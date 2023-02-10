@@ -1455,6 +1455,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
       model$power <- power
+      model$with_interaction <- with_interaction
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1609,7 +1610,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- tibble::tibble()
       return(ret)
     }
-    formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+    if (!x$with_interaction) {
+      formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+    } else {
+      formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+    }
     ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
     # Map the column names back to the original.
@@ -1628,7 +1633,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- tibble::tibble()
       return(ret)
     }
-    formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+    if (!x$with_interaction) {
+      formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+    } else {
+      formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+    }
     ret <- emmeans::emmeans(x, formula)
     ret <- graphics::pairs(ret)
     ret <- tibble::as.tibble(ret)
