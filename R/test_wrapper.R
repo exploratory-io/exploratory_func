@@ -1369,34 +1369,35 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     covariates <- names(unlist(covariate_funs))
   }
 
-  # Keep only the relevant columns.
-  df <- df %>% dplyr::select(c(var1_col, var2_col, covariates))
-
-  # Replace column names with names like c1_, c2_...
-  clean_df <- df
-  names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
-  # Forward mapping of column names.
-  name_map <- colnames(clean_df)
-  names(name_map) <- colnames(df)
-  # Reverse mapping of variable names.
-  terms_mapping <- names(name_map)
-  names(terms_mapping) <- name_map
-  var1_col <- name_map[var1_col]
-  var2_col <- name_map[var2_col]
-  if (!is.null(covariates)) {
-    covariates <- name_map[covariates]
-  }
-  df <- clean_df
-
-  if (is.null(covariates)) {
-    formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
-  }
-  else {
-    formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', paste(covariates, collapse="`+`"), '`'))
-  }
 
   anova_each <- function(df) {
     tryCatch({
+      # Keep only the relevant columns.
+      df <- df %>% dplyr::select(c(var1_col, var2_col, covariates))
+
+      # Replace column names with names like c1_, c2_...
+      clean_df <- df
+      names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
+      # Forward mapping of column names.
+      name_map <- colnames(clean_df)
+      names(name_map) <- colnames(df)
+      # Reverse mapping of variable names.
+      terms_mapping <- names(name_map)
+      names(terms_mapping) <- name_map
+      var1_col <- name_map[var1_col]
+      var2_col <- name_map[var2_col]
+      if (!is.null(covariates)) {
+        covariates <- name_map[covariates]
+      }
+      df <- clean_df
+
+      if (is.null(covariates)) {
+        formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+      }
+      else {
+        formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', paste(covariates, collapse="`+`"), '`'))
+      }
+
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
       if (nrow(df) == 0) {
         stop("There is no data left after removing NA.")
