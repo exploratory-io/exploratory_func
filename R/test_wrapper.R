@@ -1499,7 +1499,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% filter(term != '(Intercept)')
     }
 
-    # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
+    # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
       dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
