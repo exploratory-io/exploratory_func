@@ -1338,6 +1338,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
+                      with_interaction = FALSE,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
@@ -1395,7 +1396,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
       }
       else {
-        formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', paste(covariates, collapse="`+`"), '`'))
+        if (!with_interaction) {
+          formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', paste(covariates, collapse="`+`"), '`'))
+        }
+        else { # Calculating interaction only with the first covariate for simplicity for now.
+          formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`*`', covariates[1], '`'))
+        }
       }
 
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
