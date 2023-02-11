@@ -1002,7 +1002,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                        password = password, host = host, port = port, bigint = "numeric")
         }
       } else if (sslMode != "") { # if ssl_mode is set make sure to pass it when getting a connection.
-        if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full")) { # for verify-ca and verify-full cases, check the root certificate
+        if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full" || sslMode == "require")) { # for require, verify-ca, and verify-full cases, check the root certificate
           conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
                                        password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode, sslrootcert = sslCA)
         } else {
