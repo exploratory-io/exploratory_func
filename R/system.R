@@ -984,13 +984,17 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
+      # When the Amazon Redshift data source is executed on Linux, it's possible that sslCA parameter is defined, for this case switch it to use seeded crt file for now.
+      if(Sys.info()["sysname"] == "Linux" && type =="redshift" && sslCA != ""){
+        sslCA <- "/etc/ssl/certs/amazon-trust-ca-bundle.crt'";
+      }
       drv <- RPostgres::Postgres()
       if (type == "redshift") {
         drv <- RPostgres::Redshift()
       }
       if (timezone != "") { # if Timezone is set, use it for timezone and timezone_out arguments.
         if (sslMode != "") { # if ssl_mode is set make sure to pass it when getting a connection.
-          if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full")) { # for verify-ca and verify-full cases, check the root certificate
+          if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full" || sslMode == "require")) { # for verify-ca and verify-full cases, check the root certificate
             conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username, timezone = timezone, timezone_out = timezone,
                                          password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode, sslrootcert = sslCA)
           } else {
