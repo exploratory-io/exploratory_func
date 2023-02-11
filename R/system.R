@@ -985,6 +985,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       drv <- RPostgres::Postgres()
+      if (type == "redshift") {
+        drv <- RPostgres::Redshift()
+      }
       if (timezone != "") { # if Timezone is set, use it for timezone and timezone_out arguments.
         if (sslMode != "") { # if ssl_mode is set make sure to pass it when getting a connection.
           if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full")) { # for verify-ca and verify-full cases, check the root certificate
@@ -997,6 +1000,14 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         } else {
           conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username, timezone = timezone, timezone_out = timezone,
                                        password = password, host = host, port = port, bigint = "numeric")
+        }
+      } else if (sslMode != "") { # if ssl_mode is set make sure to pass it when getting a connection.
+        if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full")) { # for verify-ca and verify-full cases, check the root certificate
+          conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
+                                       password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode, sslrootcert = sslCA)
+        } else {
+          conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
+                                       password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode)
         }
       } else {
         conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
