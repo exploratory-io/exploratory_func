@@ -838,7 +838,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
-                            subType = NULL, sslClientCertKey = "", sslCA = "") {
+                            subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "") {
 
   drv = NULL
   conn = NULL
@@ -957,7 +957,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
-    key <- paste("postgres", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("postgres", host, port, databaseName, username, timezone, sslMode, sslCA, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -984,10 +984,35 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
+      # When the Amazon Redshift data source is executed on Linux, it's possible that sslCA parameter is defined, for this case get the file path from environment variable.
+      if(Sys.info()["sysname"] == "Linux" && type =="redshift" && sslCA != ""){
+        sslCA <- Sys.getenv("REDSHIFT_SSL_CERT_FILE");
+      }
       drv <- RPostgres::Postgres()
+      if (type == "redshift") {
+        drv <- RPostgres::Redshift()
+      }
       if (timezone != "") { # if Timezone is set, use it for timezone and timezone_out arguments.
-        conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username, timezone = timezone, timezone_out = timezone,
-                                     password = password, host = host, port = port, bigint = "numeric")
+        if (sslMode != "") { # if ssl_mode is set make sure to pass it when getting a connection.
+          if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full" || sslMode == "require")) { # for verify-ca and verify-full cases, check the root certificate
+            conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username, timezone = timezone, timezone_out = timezone,
+                                         password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode, sslrootcert = sslCA)
+          } else {
+            conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username, timezone = timezone, timezone_out = timezone,
+                                         password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode)
+          }
+        } else {
+          conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username, timezone = timezone, timezone_out = timezone,
+                                       password = password, host = host, port = port, bigint = "numeric")
+        }
+      } else if (sslMode != "") { # if ssl_mode is set make sure to pass it when getting a connection.
+        if (sslCA != "" && (sslMode == "verify-ca" || sslMode == "verify-full" || sslMode == "require")) { # for require, verify-ca, and verify-full cases, check the root certificate
+          conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
+                                       password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode, sslrootcert = sslCA)
+        } else {
+          conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
+                                       password = password, host = host, port = port, bigint = "numeric", sslmode = sslMode)
+        }
       } else {
         conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
                                      password = password, host = host, port = port, bigint = "numeric")
@@ -1557,7 +1582,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
-                              sslClientCertKey = "", sslCA = "", subType = NULL, driver = "") {
+                              sslClientCertKey = "", sslCA = "", subType = NULL, driver = "", sslMode = '') {
   key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
@@ -1678,15 +1703,15 @@ getListOfTablesWithODBC <- function(conn){
 }
 
 #' @export
-getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = "", sslCA = ""){
+getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = "", sslCA = "", sslMode = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema, sslCA = sslCA)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema, sslCA = sslCA, sslMode = sslMode)
 
   tryCatch({
     tables <- DBI::dbListTables(conn)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, sslMode = sslMode, sslCA = sslCA)
     if (!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
@@ -1707,9 +1732,9 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
 }
 
 #' @export
-getListOfColumns <- function(type, host, port, databaseName, username, password, table){
+getListOfColumns <- function(type, host, port, databaseName, username, password, table, sslMode = '', sslCA = ''){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, sslMode = sslMode, sslCA = sslCA)
   tryCatch({
     columns <- DBI::dbListFields(conn, table)
   }, error = function(err) {
@@ -1736,7 +1761,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 
 #' API to execute a query that can be handled with DBI
 #' @export
-executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = "", sslCA = ""){
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = "", sslCA = "", sslMode = "", ...){
   if (type %in% c("mysql", "aurora")) { # In case of MySQL, just use queryMySQL, since it has workaround to read multibyte column names without getting garbled.
     df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query, timezone = timezone, sslCA = sslCA)
     df <- readr::type_convert(df)
@@ -1745,7 +1770,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     return(df)
   }
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema, timezone = timezone)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema, timezone = timezone, sslMode = sslMode, sslCA = sslCA)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -1753,7 +1778,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, timezone = timezone, sslCA = sslCA)
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, timezone = timezone, sslMode = sslMode, sslCA = sslCA)
     if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
@@ -1816,11 +1841,11 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 }
 
 #' @export
-queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", ...){
+queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslMode = '', sslCA = '', ...){
   if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  conn <- getDBConnection(type = "postgres", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone)
+  conn <- getDBConnection(type = "postgres", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslMode = sslMode, sslCA = sslCA)
 
   tryCatch({
     query <- convertUserInputToUtf8(query)
