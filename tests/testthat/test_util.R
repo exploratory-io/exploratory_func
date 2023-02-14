@@ -1725,6 +1725,32 @@ test_that("mutate_group", {
   expect_equal(as.character(head(df27)$hired_date_weekend[[2]]), "Weekday")
   expect_equal(head(df27)$salary_cumsum[[3]], 39727)
 
+  # group by Date - make sure sort is applied.
+  dateDF <- exploratory::read_delim_file(data_text = "date, qty, id
+2023/03/03, 2, 1
+2023/03/02, 7, 2
+2023/03/01, 4, 3
+2023/02/03, 5, 4
+2023/02/02, 2, 1
+2023/02/01, 3, 2
+2023/01/03, 4, 3
+2023/01/02, 1, 4
+2023/01/01, 1, 5
+", delim = NULL, quote = "\"" , col_names = TRUE , na = c('') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
+  df28 <- dateDF %>% mutate_group(group_cols = c(`date_day` = "date"),group_funs = c("day"),qty_cum_sum = cumsum(qty))
+  # here is the ersult and date is sorted.
+  # date_day date         qty    id qty_cum_sum
+  #<dbl> <date>     <dbl> <dbl>       <dbl>
+  # 1        1 2023-01-01     1     5           1
+  # 2        1 2023-02-01     3     2           4
+  # 3        1 2023-03-01     4     3           8
+  # 4        2 2023-01-02     1     4           1
+  # 5        2 2023-02-02     2     1           3
+  # 6        2 2023-03-02     7     2          10
+  # 7        3 2023-01-03     4     3           4
+  # 8        3 2023-02-03     5     4           9
+  # 9        3 2023-03-03     2     1          11
+  expect_equal(head(df28)$qty_cum_sum[[3]], 8)
 
 })
 
