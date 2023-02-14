@@ -2418,7 +2418,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
     groupby_args <- list() # default empty list
     name_list <- list()
     name_index = 1
-    # If group_by columns and associated categorizing functionts are provided,
+    # If group_by columns and associated categorizing functions are provided,
     # quote the columns/functions with rlang::quo so that dplyr can understand them.
     if (!is.null(group_cols) && !is.null(group_funs)) {
       groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
@@ -2428,12 +2428,14 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
         name_list <- group_cols
       }
       names(groupby_args) <- name_list
-      # make sure to sort result by group by columns
-      .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      # Make sure to sort result by group by columns before mutate then sort it by group columns with group function applied.
+      # For example, if "date" column is used for group by and group by function is "year", first arrange it by the "date" column without any group function
+      # then do mutate and arrange it by the "date" + "year" function. In this way, Window calculation such as cumsum shows the correct amount.
+      .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::arrange(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
     } else {
-      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+      if(!is.null(group_cols)) { # In case only group_by columns are provided, group_by with the columns
         # make sure to sort result by group by columns
-        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::arrange(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...)
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% dplyr::mutate(...)
       }
