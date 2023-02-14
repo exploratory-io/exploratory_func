@@ -2435,7 +2435,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provided, group_by with the columns
         # make sure to sort result by group by columns
-        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::arrange(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...)
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!rlang::syms(group_cols))
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% dplyr::mutate(...)
       }
