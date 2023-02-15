@@ -991,7 +991,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           if (sslCA == "") { # if environment variable is not set, fallback to default one.
             sslCA <- "/etc/ssl/certs/amazon-trust-ca-bundle.crt"
           }
-        } else if (type == "posgres") {
+        } else if (type == "postgres") {
           sslCA <- Sys.getenv("POSTGRES_SSL_CERT_FILE")
         }
       }
