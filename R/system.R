@@ -986,7 +986,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       # When the Amazon Redshift data source is executed on Linux, it's possible that sslCA parameter is defined, for this case get the file path from environment variable.
       if(Sys.info()["sysname"] == "Linux" && type =="redshift" && sslCA != ""){
-        sslCA <- Sys.getenv("REDSHIFT_SSL_CERT_FILE");
+        sslCA <- Sys.getenv("REDSHIFT_SSL_CERT_FILE")
+        if (sslCA == "") { # if environment variable is not set, fallback to default one.
+          sslCA <- "/etc/ssl/certs/amazon-trust-ca-bundle.crt"
+        }
       }
       drv <- RPostgres::Postgres()
       if (type == "redshift") {
