@@ -1848,7 +1848,18 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 }
 
 #' @export
-# When querying Redshift, be sure to pass "redshift" as the type parameter so that correct sslCA handling is done for Linux case.
+#' @param host
+#' @param port
+#' @param databaseName
+#' @param username
+#' @param password
+#' @param numOfRows default is -1, which means all rows
+#' @param query
+#' @param timezone
+#' @param sslMode
+#' @param sslCA
+#' @param type (optional) Default is postgres. Set either postgres or redshift for now. When querying against Redshift, be sure to pass "redshift" as the type parameter so that correct sslCA handling is done for Linux case.
+#'
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslMode = '', sslCA = '', type = "postgres", ...){
   if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
