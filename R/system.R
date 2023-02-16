@@ -1848,11 +1848,11 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 }
 
 #' @export
-queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslMode = '', sslCA = '', ...){
+queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslMode = '', sslCA = '', type = "postgres", ...){
   if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  conn <- getDBConnection(type = "postgres", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslMode = sslMode, sslCA = sslCA)
+  conn <- getDBConnection(type = type, host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslMode = sslMode, sslCA = sslCA)
 
   tryCatch({
     query <- convertUserInputToUtf8(query)
