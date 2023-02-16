@@ -1578,27 +1578,27 @@ test_that("is_japanese_holiday", {
 test_that("mutate_group", {
   library(lubridate)
   df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg), mpg_cumsum = cumsum(mpg))
-  expect_equal(head(df)$mpg_cummean[[1]],22.8)
-  expect_equal(head(df)$mpg_cummean[[2]],23.6)
+  expect_equal(head(df)$mpg_cummean[[1]],21.4)
+  expect_equal(head(df)$mpg_cummean[[2]],21.45)
   expect_equal(head(df)$cyl[[1]], 4) # cyl is sorted so first line should be 4
   expect_equal(head(df)$mpg_int10[[1]], 20) # mpg_int10 is sorted so first line should be 20
   expect_equal(head(df, 12)$cyl[[12]], 6) # cyl is sorted and next group (6) starts from line 12
   expect_equal(head(df, 12)$mpg_int10[[12]], 10) # mpg_int10 is sorted and the value for the line 12 is 10
-  expect_equal(head(df)$mpg_cumsum[[1]],22.8)
-  expect_equal(head(df)$mpg_cumsum[[2]],47.2)
+  expect_equal(head(df)$mpg_cumsum[[1]],21.4)
+  expect_equal(head(df)$mpg_cumsum[[2]],42.9)
   df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt), wt_cumsum = cumsum(wt))
-  expect_equal(head(df2)$wt_cummean[[1]],2.32)
+  expect_equal(head(df2)$wt_cummean[[1]],2.78)
   print(head(df2)$wt_cummean[[2]])
-  expect_equal(round(head(df2)$wt_cummean[[2]], digits = 2) ,2.76)
-  expect_equal(head(df2)$wt_cumsum[[1]],2.32)
-  expect_equal(head(df2)$wt_cumsum[[2]],5.51)
+  expect_equal(round(head(df2)$wt_cummean[[2]], digits = 2) ,2.62)
+  expect_equal(head(df2)$wt_cumsum[[1]],2.78)
+  expect_equal(head(df2)$wt_cumsum[[2]],5.245)
   tmp <- tempfile(fileext = ".parquet")
   empDF <- exploratory::read_parquet_file("https://www.dropbox.com/s/n0jkv4wu9dpb4se/Employee_Data_win_calc.parquet?dl=1")
 
     # group by Date - floor to year
   df3 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_year` = "hired_date"),group_funs = c("rtoyear"),salary_cumsum = cumsum(salary))
   expect_equal(head(df3)$hired_date_year[[1]], as.Date("1976-01-01"))
-  expect_equal(head(df3)$salary_cumsum[[3]], 13872)
+  expect_equal(head(df3)$salary_cumsum[[3]], 10169)
 
     # group by Date - floor to half year
   df4 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_halfyear` = "hired_date"),group_funs = c("rtohalfyear"),salary_cumsum = cumsum(salary))
@@ -1638,57 +1638,57 @@ test_that("mutate_group", {
   # group by Date - extract half year
   df11 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_halfyear` = "hired_date"),group_funs = c("halfyear"),salary_cumsum = cumsum(salary))
   expect_equal(head(df11)$hired_date_halfyear[[1]], 1)
-  expect_equal(head(df11)$salary_cumsum[[1]], 2090)
+  expect_equal(head(df11)$salary_cumsum[[1]], 10312)
 
   # group by Date - extract quarter
   df12 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_quarter` = "hired_date"),group_funs = c("quarter"),salary_cumsum = cumsum(salary))
   expect_equal(head(df12)$hired_date_quarter[[1]], 1)
-  expect_equal(head(df12)$salary_cumsum[[1]], 2909)
+  expect_equal(head(df12)$salary_cumsum[[1]], 19845)
 
   # group by Date - extract bi-month
   df13 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_bimon` = "hired_date"),group_funs = c("bimon"),salary_cumsum = cumsum(salary))
   expect_equal(head(df13)$hired_date_bimon[[2]], 1)
-  expect_equal(head(df13)$salary_cumsum[[1]], 2909)
+  expect_equal(head(df13)$salary_cumsum[[1]], 19845)
 
   # group by Date - extract month (number)
   df14 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_mon` = "hired_date"),group_funs = c("mon"),salary_cumsum = cumsum(salary))
   expect_equal(head(df14)$hired_date_mon[[2]], 1)
-  expect_equal(head(df14)$salary_cumsum[[1]], 2426)
+  expect_equal(head(df14)$salary_cumsum[[1]], 19845)
 
   # group by Date - extract month name (short)
   df15 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monname` = "hired_date"),group_funs = c("monname"),salary_cumsum = cumsum(salary))
   expect_equal(as.character(head(df15)$hired_date_monname[[2]]), "Jan")
-  expect_equal(head(df15)$salary_cumsum[[1]], 2426)
+  expect_equal(head(df15)$salary_cumsum[[1]], 19845)
 
   # group by Date - extract month name (long)
   df16 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monnamelong` = "hired_date"),group_funs = c("monnamelong"),salary_cumsum = cumsum(salary))
   expect_equal(as.character(head(df16)$hired_date_monnamelong[[2]]), "January")
-  expect_equal(head(df16)$salary_cumsum[[1]], 2426)
+  expect_equal(head(df16)$salary_cumsum[[1]], 19845)
 
   # group by Date - extract week
   df17 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("week"),salary_cumsum = cumsum(salary))
   expect_equal(head(df17)$hired_date_week[[2]], 1)
-  expect_equal(head(df17)$salary_cumsum[[3]], 31304)
+  expect_equal(head(df17)$salary_cumsum[[3]], 47555)
 
   # group by Date - extract week (Starts from Sun)
   df18 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_epiweek` = "hired_date"),group_funs = c("epiweek"),salary_cumsum = cumsum(salary))
   expect_equal(head(df18)$hired_date_epiweek[[2]], 1)
-  expect_equal(head(df18)$salary_cumsum[[3]], 21246)
+  expect_equal(head(df18)$salary_cumsum[[3]], 37706)
 
   # group by Date - extract week (Starts from Mon)
   df19 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_isoweek` = "hired_date"),group_funs = c("isoweek"),salary_cumsum = cumsum(salary))
   expect_equal(head(df19)$hired_date_isoweek[[2]], 1)
-  expect_equal(head(df19)$salary_cumsum[[3]], 31304)
+  expect_equal(head(df19)$salary_cumsum[[3]], 48022)
 
   # group by Date - extract week of quarter
   df19 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week_of_quarter` = "hired_date"),group_funs = c("week_of_quarter"),salary_cumsum = cumsum(salary))
   expect_equal(head(df19)$hired_date_week_of_quarter[[2]], 1)
-  expect_equal(head(df19)$salary_cumsum[[3]], 15048)
+  expect_equal(head(df19)$salary_cumsum[[3]], 53824)
 
   # group by Date - extract week of Month
   df20 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week_of_month` = "hired_date"),group_funs = c("week_of_month"),salary_cumsum = cumsum(salary))
   expect_equal(head(df20)$hired_date_week_of_month[[2]], 1)
-  expect_equal(head(df20)$salary_cumsum[[3]], 15505)
+  expect_equal(head(df20)$salary_cumsum[[3]], 47529)
 
   # group by Date - extract day of year
   df21 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofyera` = "hired_date"),group_funs = c("dayofyear"),salary_cumsum = cumsum(salary))
@@ -1698,33 +1698,59 @@ test_that("mutate_group", {
   # group by Date - extract day of quarter
   df22 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofquarter` = "hired_date"),group_funs = c("dayofquarter"),salary_cumsum = cumsum(salary))
   expect_equal(head(df22)$hired_date_dayofquarter[[2]], 1)
-  expect_equal(head(df22)$salary_cumsum[[3]], 14385)
+  expect_equal(head(df22)$salary_cumsum[[3]], 49500)
 
   # group by Date - extract day of month
   df23 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_day` = "hired_date"),group_funs = c("day"),salary_cumsum = cumsum(salary))
   expect_equal(head(df23)$hired_date_day[[2]], 1)
-  expect_equal(head(df23)$salary_cumsum[[3]], 22548)
+  expect_equal(head(df23)$salary_cumsum[[3]], 45331)
 
   # group by Date - extract day of week
   df24 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofweek` = "hired_date"),group_funs = c("dayofweek"),salary_cumsum = cumsum(salary))
   expect_equal(head(df24)$hired_date_dayofweek[[2]], 1)
-  expect_equal(head(df24)$salary_cumsum[[3]], 8399)
+  expect_equal(head(df24)$salary_cumsum[[3]], 41541)
 
   # group by Date - extract week day
   df25 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wday` = "hired_date"),group_funs = c("wday"),salary_cumsum = cumsum(salary))
   expect_equal(as.character(head(df25)$hired_date_wday[[2]]), "Sun")
-  expect_equal(head(df25)$salary_cumsum[[3]], 8399)
+  expect_equal(head(df25)$salary_cumsum[[3]], 41541)
 
   # group by Date - extract week day
   df26 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wdaylong` = "hired_date"),group_funs = c("wdaylong"),salary_cumsum = cumsum(salary))
   expect_equal(as.character(head(df26)$hired_date_wdaylong[[2]]), "Sunday")
-  expect_equal(head(df26)$salary_cumsum[[3]], 8399)
+  expect_equal(head(df26)$salary_cumsum[[3]], 41541)
 
   # group by Date - extract weekend
   df27 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_weekend` = "hired_date"),group_funs = c("weekend"),salary_cumsum = cumsum(salary))
   expect_equal(as.character(head(df27)$hired_date_weekend[[2]]), "Weekday")
-  expect_equal(head(df27)$salary_cumsum[[3]], 13213)
+  expect_equal(head(df27)$salary_cumsum[[3]], 39727)
 
+  # group by Date - make sure sort is applied.
+  dateDF <- exploratory::read_delim_file(data_text = "date, qty, id
+2023/03/03, 2, 1
+2023/03/02, 7, 2
+2023/03/01, 4, 3
+2023/02/03, 5, 4
+2023/02/02, 2, 1
+2023/02/01, 3, 2
+2023/01/03, 4, 3
+2023/01/02, 1, 4
+2023/01/01, 1, 5
+", delim = NULL, quote = "\"" , col_names = TRUE , na = c('') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
+  df28 <- dateDF %>% mutate_group(group_cols = c(`date_day` = "date"),group_funs = c("day"),qty_cum_sum = cumsum(qty))
+  # here is the ersult and date is sorted.
+  # date_day date         qty    id qty_cum_sum
+  #<dbl> <date>     <dbl> <dbl>       <dbl>
+  # 1        1 2023-01-01     1     5           1
+  # 2        1 2023-02-01     3     2           4
+  # 3        1 2023-03-01     4     3           8
+  # 4        2 2023-01-02     1     4           1
+  # 5        2 2023-02-02     2     1           3
+  # 6        2 2023-03-02     7     2          10
+  # 7        3 2023-01-03     4     3           4
+  # 8        3 2023-02-03     5     4           9
+  # 9        3 2023-03-03     2     1          11
+  expect_equal(head(df28)$qty_cum_sum[[3]], 8)
 
 })
 
