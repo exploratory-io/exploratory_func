@@ -1718,6 +1718,16 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     }
     ret <- broom::tidy(shapiro.test(resid))
     ret$n = length(resid) # Add sample size info
+    # Example output:
+    # A tibble: 1 × 4
+    # statistic p.value method                          n
+    # <dbl>     <dbl>   <chr>                       <int>
+    # 0.933     0.0483  Shapiro-Wilk normality test    32
+    ret <- ret %>% dplyr::rename(any_of(c(`W Statistic`="statistic",
+                                          `P Value`="p.value",
+                                          `Method`="method",
+                                          `Number of Rows`="n")))
+
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
