@@ -1649,10 +1649,23 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     ret <- emmeans::emmeans(x, formula)
     ret <- graphics::pairs(ret)
     ret <- tibble::as.tibble(ret)
+    ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "c2_", ""))
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
     colnames(ret) <- orig_terms
+    # Example output:
+    # A tibble: 1 × 7
+    # contrast    `w t` estimate    SE    df t.ratio p.value
+    # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
+    # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
+    ret <- ret %>% dplyr::rename(any_of(c(Pair="contrast",
+                                          `Adjusted Difference`="estimate",
+                                          `Standard Error`="SE",
+                                          `Degree of Freedom`="df",
+                                          `t Value`="t.ratio",
+                                          `P Value`="p.value")))
+
     # The version that uses multcomp. It had an issue with column names with spaces.
     # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
     # ret <- broom::tidy(ret)
