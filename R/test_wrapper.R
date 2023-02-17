@@ -1635,6 +1635,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     # <fct> <dbl>  <dbl> <dbl> <dbl>    <dbl>    <dbl>
     # 0      3.22   20.1 0.833    29     18.4     21.8
     # 1      3.22   20.1 1.07     29     17.9     22.3
+    ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Mean`="emmean",
+                                          `Standard Error`="SE",
+                                          `Degree of Freedom`="df",
+                                          `Conf Low`="lower.CL",
+                                          `Conf High`="upper.CL",
+                                          `Mean`="mean")))
   }
   else if (type == "multcomp") {
     if ("error" %in% class(x)) {
