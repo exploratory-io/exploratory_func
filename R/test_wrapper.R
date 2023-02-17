@@ -1486,7 +1486,7 @@ glance.anova_exploratory <- function(x) {
 }
 
 #' @export
-tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test_center="median") {
   if (type == "model") {
     if ("error" %in% class(x)) {
       if (!is.null(x$n)) {
@@ -1665,7 +1665,13 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       return(ret)
     }
     # Levene's test of equality of error variances
-    ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]]))
+    if (levene_test_center == "mean") {
+      levene_test_center_fun <- mean
+    }
+    else {
+      levene_test_center_fun <- median
+    }
+    ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
   }
   else if (type == "shapiro") {
     if ("error" %in% class(x)) {
