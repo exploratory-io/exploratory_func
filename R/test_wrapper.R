@@ -1553,7 +1553,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                                             `Probability of Type 2 Error`="beta",
                                             `Number of Rows`="n")))
     }
-    else {
+    else { # Since we do not support power analysis for ANCOVA, this is only for ANOVA case.
       # If required power is specified in the arguments, estimate required sample size. 
       tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
         power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
