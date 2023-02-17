@@ -1502,8 +1502,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- broom:::tidy.aov(x)
     } else { # ANCOVA case
       ret <- broom::tidy(car::Anova(x, type="III"))
-      # Filtering out the intercept row to bring the row for the IV to the first row. TODO: Do we need to keep the info for intercept?
-      ret <- ret %>% filter(term != '(Intercept)')
     }
 
     # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
