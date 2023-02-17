@@ -1528,7 +1528,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
       ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
       # Map the variable names in the term column back to the original.
-      orig_term <- x$terms_mapping[ret$term]
+      terms_mapping <- x$terms_mapping
+      # Add mapping for interaction term
+      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], ":", terms_mapping["c3_"])))
+      orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
       if (is.null(x$covariates)) { # ANOVA case
