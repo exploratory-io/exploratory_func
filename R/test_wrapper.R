@@ -1689,6 +1689,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       resid <- x$residuals
     }
     ret <- broom::tidy(shapiro.test(resid))
+    ret$n = length(resid) # Add sample size info
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
