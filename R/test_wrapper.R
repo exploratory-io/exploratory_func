@@ -1694,6 +1694,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       levene_test_center_fun <- median
     }
     ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
+    # Example output:
+    # A tibble: 1 × 4
+    # statistic p.value    df df.residual
+    #  <dbl>   <dbl> <int>       <int>
+    # 0.0607   0.807     1          30
+    ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
+                                          `P Value`="p.value",
+                                          `Degree of Freedom`="df",
+                                          `Residual Degree of Freedom`="df.residual")))
   }
   else if (type == "shapiro") {
     if ("error" %in% class(x)) {
