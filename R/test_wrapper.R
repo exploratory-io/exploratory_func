@@ -1622,6 +1622,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     }
     ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
+    # Join regular mean. [[1]] is necessary to remove name from x$var2.
+    mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
+    ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
