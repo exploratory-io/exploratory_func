@@ -1524,7 +1524,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
       ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
-      ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
+      if (is.null(x$covariates)) { # Power analysis is only for ANOVA case
+        ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
+      }
       # Map the variable names in the term column back to the original.
       terms_mapping <- x$terms_mapping
       # Add mapping for interaction term
