@@ -1539,8 +1539,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
-      else {
-        ret <- ret %>% dplyr::rename(`Variable`="term") # ANCOVA case
+      else { # ANCOVA case
+        total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS should be calculated from type 1 SS.
+        ret <- ret %>% dplyr::add_row(term="Total", sumsq = total, df = sum(ret$df))
+        ret <- ret %>% dplyr::rename(`Variable`="term")
       }
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
                                             `P Value`="p.value",
