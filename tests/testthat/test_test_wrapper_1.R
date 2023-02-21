@@ -1,4 +1,5 @@
 context("tests for wrappers of tests")
+
 test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
@@ -7,7 +8,6 @@ test_df <- data.frame(
 test_df$list_c <- as.list(seq(20))
 
 test_df[["with space"]] <- seq(20)
-
 test_that("test t.test.aggregated with two.sided alternative (default)", {
   test_df <- data.frame(
     cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
@@ -603,6 +603,65 @@ test_that("test exp_ttest with group-level error (not eough data)", {
                c("group", "Number of Rows", "Number of Rows for a", "Number of Rows for b", "Note"))
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
+})
+
+test_that("test ANCOVA with exp_anova", {
+  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
+  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
+                                    covariate_funs=list("w t"="log", "q sec"="none"),
+                                    with_interaction = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
+  ret <- model_df %>% tidy_rowwise(model, type="levene")
+  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
+  ret <- model_df %>% tidy_rowwise(model, type="emmeans")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="anova")
+  ret <- model_df %>% tidy_rowwise(model, type="data")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
+
+  # Test broom output to detect changes at upgrade.
+  x <- model_df$model[[1]]
+  ret <- broom::tidy(car::Anova(x, type="III"))
+  expect_equal(colnames(ret),
+               c("term", "sumsq", "df", "statistic", "p.value"))
+  ret <- broom:::tidy.aov(x)
+  expect_equal(colnames(ret),
+               c("term", "df", "sumsq", "meansq", "statistic", "p.value"))
+  ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=median))
+  expect_equal(colnames(ret),
+               c("statistic", "p.value", "df", "df.residual"))
+  ret <- broom::tidy(shapiro.test(x$residuals))
+  expect_equal(colnames(ret),
+               c("statistic", "p.value", "method"))
+})
+
+test_that("test ANCOVA with exp_anova with some NAs in the data", {
+  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
+  mtcars2$`a m`[[1]] <- NA
+  mtcars2$`w t`[[2]] <- NA
+  mtcars2$`q sec`[[3]] <- NA
+  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
+                                    covariate_funs=list("w t"="log", "q sec"="none"),
+                                    with_interaction = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
+  # TODO: make them work.
+  # ret <- model_df %>% tidy_rowwise(model, type="levene")
+  # ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
+  ret <- model_df %>% tidy_rowwise(model, type="emmeans")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="anova")
+  ret <- model_df %>% tidy_rowwise(model, type="data")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_anova", {
