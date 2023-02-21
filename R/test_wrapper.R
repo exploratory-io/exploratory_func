@@ -1347,20 +1347,30 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     power <- 1.0 - beta
   }
   var1_col <- col_name(substitute(var1))
-  var2_col <- col_name(substitute(var2))
+  var2_ <- substitute(var2)
+  if (class(var2_) == "name") { # For backward compatibility with pre-6.13 when we only had one-way ANOVA.
+    var2_col <- col_name(var2_)
+  }
+  else {
+    var2_col <- var2
+  }
   grouped_cols <- grouped_by(df)
 
   if (!is.null(func2)) {
-    if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
-    }
-    else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
+    for (i in 1:length(func2)) {
+      if (lubridate::is.Date(df[[var2_col[i]]]) || lubridate::is.POSIXct(df[[var2_col[i]]])) {
+        df <- df %>% dplyr::mutate(!!rlang::sym(var2_col[i]) := extract_from_date(!!rlang::sym(var2_col[i]), type=!!func2[i]))
+      }
+      else if (is.numeric(df[[var2_col[i]]])) {
+        df <- df %>% dplyr::mutate(!!rlang::sym(var2_col[i]) := extract_from_numeric(!!rlang::sym(var2_col[i]), type=!!func2[i]))
+      }
     }
   }
   
-  if (n_distinct(df[[var2_col]]) < 2) {
-    stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+  for (i in 1:length(var2_col)) {
+    if (n_distinct(df[[var2_col[i]]]) < 2) {
+      stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+    }
   }
 
   # Apply preprocessing functions to the covariates.
@@ -1391,9 +1401,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         covariates <- name_map[covariates]
       }
       df <- clean_df
-
       if (is.null(covariates)) {
-        formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+        formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse="`+`"), '`'))
       }
       else {
         if (!with_interaction) {
@@ -1428,7 +1437,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         }
       }
       # It seems that the 2nd row of broom:::tidy.aov(x) is missed, if no group has more than 1 row. Check it here, rather than handling it later.
-      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(max_n=max(n),tot_n=sum(n))
+      count_df <- df %>% group_by(!!!rlang::syms(as.character(var2_col))) %>% summarize(n=n()) %>% ungroup() %>% summarize(max_n=max(n),tot_n=sum(n))
       if (count_df$max_n <= 1) {
         e <- simpleError("At least one group needs to have 2 or more rows.")
         class(e) <- c("anova_exploratory", class(e))
@@ -1436,8 +1445,10 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         return(e)
       }
       model <- aov(formula, data = df, ...)
-      # calculate Cohen's f from actual data
-      model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
+      # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
+      if (length(var2_col) == 1) {
+        model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
+      }
       if (is.null(f)) {
         model$cohens_f_to_detect <- model$cohens_f
       }
