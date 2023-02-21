@@ -625,6 +625,30 @@ test_that("test ANCOVA with exp_anova", {
                  "Minimum","Maximum"))
 })
 
+test_that("test ANCOVA with exp_anova with some NAs in the data", {
+  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
+  mtcars2$`a m`[[1]] <- NA
+  mtcars2$`w t`[[2]] <- NA
+  mtcars2$`q sec`[[3]] <- NA
+  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
+                                    covariate_funs=list("w t"="log", "q sec"="none"),
+                                    with_interaction = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
+  # TODO: make them work.
+  # ret <- model_df %>% tidy_rowwise(model, type="levene")
+  # ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
+  ret <- model_df %>% tidy_rowwise(model, type="emmeans")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="anova")
+  ret <- model_df %>% tidy_rowwise(model, type="data")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
+})
+
 test_that("test exp_anova", {
   model_df <- exp_anova(mtcars, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
