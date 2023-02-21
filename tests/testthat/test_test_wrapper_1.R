@@ -1,6 +1,5 @@
 context("tests for wrappers of tests")
 
-if(F){
 test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
@@ -605,29 +604,27 @@ test_that("test exp_ttest with group-level error (not eough data)", {
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })
-}
 
 test_that("test ANCOVA with exp_anova", {
   mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
   model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
-                                    covariate_funs=list("w t"="log", "q sec"="none"))
-  #ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="anova")
+                                    covariate_funs=list("w t"="log", "q sec"="none"),
+                                    with_interaction = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
+  ret <- model_df %>% tidy_rowwise(model, type="levene")
+  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
   ret <- model_df %>% tidy_rowwise(model, type="emmeans")
   ret <- model_df %>% tidy_rowwise(model, type="multcomp")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="anova")
   ret <- model_df %>% tidy_rowwise(model, type="data")
-  #model_df <- exp_anova(mtcars, mpg, gear)
-  #ret <- model_df %>% tidy_rowwise(model, type="model")
-  #ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  #expect_equal(colnames(ret),
-  #             c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
-  #               "Minimum","Maximum"))
-  #ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
 })
 
-if(F){
 test_that("test exp_anova", {
   model_df <- exp_anova(mtcars, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
@@ -734,4 +731,3 @@ test_that("test exp_normality with column with almost always same value", {
   expect_equal(colnames(model_summary),
                c("Column","W Statistic","P Value","Sample Size","Normal Distribution"))
 })
-}
