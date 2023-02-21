@@ -1642,7 +1642,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
                                           `Conf High`="upper.CL",
                                           `Mean`="mean")))
   }
-  else if (type == "multcomp") {
+  else if (type == "pairs") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
