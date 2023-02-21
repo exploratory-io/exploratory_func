@@ -623,6 +623,21 @@ test_that("test ANCOVA with exp_anova", {
   expect_equal(colnames(ret),
                c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
                  "Minimum","Maximum"))
+
+  # Test broom output to detect changes at upgrade.
+  x <- model_df$model[[1]]
+  ret <- broom::tidy(car::Anova(x, type="III"))
+  expect_equal(colnames(ret),
+               c("term", "sumsq", "df", "statistic", "p.value"))
+  ret <- broom:::tidy.aov(x)
+  expect_equal(colnames(ret),
+               c("term", "df", "sumsq", "meansq", "statistic", "p.value"))
+  ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=median))
+  expect_equal(colnames(ret),
+               c("statistic", "p.value", "df", "df.residual"))
+  ret <- broom::tidy(shapiro.test(x$residuals))
+  expect_equal(colnames(ret),
+               c("statistic", "p.value", "method"))
 })
 
 test_that("test ANCOVA with exp_anova with some NAs in the data", {
