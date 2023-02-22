@@ -1659,20 +1659,25 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
                                           `Conf High`="upper.CL",
                                           `Mean`="mean")))
   }
-  else if (type == "pairs") {
+  else if (type == "pairs") { # For ANCOVA or 2-way ANOVA
+    browser()
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
     }
-    if (!x$with_interaction) {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
-    } else {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+    if (!is.null(x$covariates)) { # ANCOVA case
+      if (!x$with_interaction) {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+      } else {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+      }
+    } else { # 2-way ANOVA case
+      formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
     ret <- emmeans::emmeans(x, formula)
     ret <- graphics::pairs(ret)
     ret <- tibble::as.tibble(ret)
-    ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "c2_", ""))
+    ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "(c2_|c3_)", ""))
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
