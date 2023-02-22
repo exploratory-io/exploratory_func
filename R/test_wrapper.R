@@ -1509,33 +1509,39 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       return(ret)
     }
     note <- NULL
-    if (is.null(x$covariates)) { # ANOVA case
+
+    one_way_anova <- is.null(x$covariates) && length(x$var2) == 1 # Power analysis is for one-way ANOVA case only.
+
+    if (one_way_anova) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
-    } else { # ANCOVA case
+    } else { # ANCOVA/2-way ANOVA case
       ret <- broom::tidy(car::Anova(x, type="III"))
     }
 
-    # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
-    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
-      dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
-    k <- data_summary$k
-    # Using minimum group sample size as the sample size for power calculation.
-    # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
-    min_n_rows <- data_summary$min_n_rows
-    tot_n_rows <- data_summary$tot_n_rows
+
+    if (one_way_anova) {
+      # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
+      data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+        dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
+        dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
+      k <- data_summary$k
+      # Using minimum group sample size as the sample size for power calculation.
+      # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
+      min_n_rows <- data_summary$min_n_rows
+      tot_n_rows <- data_summary$tot_n_rows
+    }
 
     if (is.null(x$power)) {
-      # If power is not specified in the arguments, estimate current power.
-      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
-        power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
-        power_val <- power_res$power
-      }, error = function(e) {
-        note <<- e$message
-        power_val <<- NA_real_
-      })
       ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
-      if (is.null(x$covariates)) { # Power analysis is only for ANOVA case
+      if (one_way_anova) { # Power analysis is only for ANOVA case
+        # If power is not specified in the arguments, estimate current power.
+        tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+          power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
+          power_val <- power_res$power
+        }, error = function(e) {
+          note <<- e$message
+          power_val <<- NA_real_
+        })
         ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
       }
       # Map the variable names in the term column back to the original.
@@ -1545,14 +1551,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
-      if (is.null(x$covariates)) { # ANOVA case
+      if (one_way_anova) { # One-way ANOVA case
         ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
         ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
         ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
-      else { # ANCOVA case
+      else { # ANCOVA/2-way ANOVA case
         total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS should be calculated from type 1 SS.
         ret <- ret %>% dplyr::add_row(term="Total", sumsq = total, df = sum(ret$df))
         ret <- ret %>% dplyr::rename(`Variable`="term")
@@ -1568,7 +1574,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
                                             `Probability of Type 2 Error`="beta",
                                             `Number of Rows`="n")))
     }
-    else { # Since we do not support power analysis for ANCOVA, this is only for ANOVA case.
+    else { # Since we do not support power analysis for ANCOVA or 2-way ANOVA, this is only for one-way ANOVA case.
       # If required power is specified in the arguments, estimate required sample size. 
       tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
         power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
