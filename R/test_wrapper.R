@@ -1763,7 +1763,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       return(ret)
     }
     conf_threshold = 1 - (1 - conf_level)/2
-    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+    ret <- x$data %>%
+      dplyr::group_by(!!!rlang::syms(as.character(x$var2))) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
@@ -1775,7 +1776,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
                        `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
-      dplyr::select(!!rlang::sym(x$var2),
+      dplyr::select(!!!rlang::syms(as.character(x$var2)),
                     `Number of Rows`,
                     Mean,
                     `Conf Low`,
