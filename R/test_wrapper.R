@@ -1512,7 +1512,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     note <- NULL
 
     one_way_anova <- is.null(x$covariates) && length(x$var2) == 1 # Power analysis is for one-way ANOVA case only.
-
     if (one_way_anova) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
     } else { # ANCOVA/2-way ANOVA case
@@ -1796,14 +1795,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       ret <- tibble::tibble()
       return(ret)
     }
-    if (is.null(x$covariates)) { # ANOVA case
-      ret0 <- broom:::tidy.aov(x)
-      ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
-    } else { # ANCOVA case
+    if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
       ret0 <- broom::tidy(car::Anova(x, type="III"))
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
       # df1 is from the categorical independent variable row, and df2 is from the residuals row.
-      ret0 <- ret0 %>% filter(term %in% c(x$var2,"Residuals"))
+      ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
+      ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+    } else { # one-way ANOVA case
+      ret0 <- broom:::tidy.aov(x)
       ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     }
     ret
