@@ -1791,7 +1791,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
     colnames(ret) <- orig_terms
   }
-  else if (type == "prob_dist") {
+  else if (type == "prob_dist") { # Note that 2-way ANOVA, with multiple P-values in the result, is not supported here.
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
