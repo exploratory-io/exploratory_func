@@ -1660,7 +1660,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
                                           `Mean`="mean")))
   }
   else if (type == "pairs") { # For ANCOVA or 2-way ANOVA
-    browser()
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
@@ -1715,7 +1714,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     else {
       levene_test_center_fun <- median
     }
-    ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
+
+    if (!is.null(x$covariates)) { # ANCOVA case
+      ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
+    }
+    else { # 2-way or 1-way ANOVA case
+      formula <- as.formula(paste0('`', x$var1, '`~`', paste(x$var2, collapse='`*`'), '`'))
+      ret <- broom::tidy(car::leveneTest(formula, data=x$data, center=levene_test_center_fun))
+    }
     # Example output:
     # A tibble: 1 × 4
     # statistic p.value    df df.residual
