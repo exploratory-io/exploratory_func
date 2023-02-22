@@ -1356,6 +1356,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   }
   grouped_cols <- grouped_by(df)
 
+  # Note that applying preprocessing function is taken care of by the analytics view framework now, and this code applying func2
+  # is not currently used.
   if (!is.null(func2)) {
     for (i in 1:length(func2)) {
       if (lubridate::is.Date(df[[var2_col[i]]]) || lubridate::is.POSIXct(df[[var2_col[i]]])) {
