@@ -1404,8 +1404,14 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       }
       df <- clean_df
       if (is.null(covariates)) { # 2-way/1-way ANOVA case
-        # TODO: With *, car::Anova(x, type="III") fails with "there are aliased coefficients in the model"
-        formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse="`+`"), '`'))
+        if (with_interaction) {
+          # TODO: With *, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
+          collapse_str <- "`*`"
+        }
+        else {
+          collapse_str <- "`+`"
+        }
+        formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
       }
       else { # ANCOVA case
         if (!with_interaction) {
