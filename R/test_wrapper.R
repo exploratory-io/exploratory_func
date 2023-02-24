@@ -1422,6 +1422,16 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         }
       }
 
+      # For 2-way ANOVA case. Prepare contrasts setting to match SPSS.
+      # http://www.statscanbefun.com/rblog/2015/8/27/ensuring-r-generates-the-same-anova-f-values-as-spss
+      if (is.null(covariates) && length(var2_col) > 1) {
+        contrasts_list <- as.list(rep("contr.helmert", length(var2_col)))
+        names(contrasts_list) <- var2_col
+      }
+      else {
+        contrasts_list <- list()
+      }
+
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
       if (nrow(df) == 0) {
         stop("There is no data left after removing NA.")
@@ -1453,7 +1463,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         e$n <- count_df$tot_n
         return(e)
       }
-      model <- aov(formula, data = df, ...)
+      model <- aov(formula, data = df, contrasts = contrasts_list, ...)
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
         model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
