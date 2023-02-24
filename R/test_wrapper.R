@@ -1522,7 +1522,7 @@ glance.anova_exploratory <- function(x) {
 }
 
 #' @export
-tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test_center="median") {
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, emmeans_adjust="none", levene_test_center="median") {
   if (type == "model") {
     if ("error" %in% class(x)) {
       if (!is.null(x$n)) {
@@ -1668,16 +1668,22 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       ret <- tibble::tibble()
       return(ret)
     }
-    if (!x$with_interaction) {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
-    } else {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+    if (!is.null(x$covariates)) { # ANCOVA case
+      if (!x$with_interaction) {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+      } else {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+      }
+    } else { # 2-way ANOVA case # TODO: Should this be + or *?
+      formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
-    ret <- emmeans::emmeans(x, formula)
+    ret <- emmeans::emmeans(x, formula, options=list(adjust=emmeans_adjust))
     ret <- tibble::as.tibble(ret)
-    # Join regular mean. [[1]] is necessary to remove name from x$var2.
-    mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
-    ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
+    # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
+    if (!is.null(x$covariates)) { # ANCOVA case
+      mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
+      ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
+    }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
@@ -1706,10 +1712,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       } else {
         formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
       }
-    } else { # 2-way ANOVA case
+    } else { # 2-way ANOVA case # TODO: Should this be + or *?
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
-    ret <- emmeans::emmeans(x, formula)
+    ret <- emmeans::emmeans(x, formula, options=list(adjust=emmeans_adjust))
     ret <- graphics::pairs(ret)
     ret <- tibble::as.tibble(ret)
     ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "(c2_|c3_)", ""))
