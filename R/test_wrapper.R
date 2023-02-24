@@ -1463,7 +1463,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         e$n <- count_df$tot_n
         return(e)
       }
-      model <- aov(formula, data = df, contrasts = contrasts_list, ...)
+      if (is.null(covariates) && length(var2_col) > 1) {
+        # For 2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary.
+        model <- lm(formula, data = df, contrasts = contrasts_list, ...)
+      }
+      else {
+        model <- aov(formula, data = df)
+      }
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
         model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
@@ -1577,14 +1583,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
       else { # ANCOVA/2-way ANOVA case
-        # total <- sum((x$data[[x$var1]]-mean(x$data[[x$var1]]))^2, na.rm=TRUE) # SS witout subtracting mean.
-        total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS can be calculated from summing up the type 1 SS.
+        total <- sum((x$data[[x$var1]]-mean(x$data[[x$var1]]))^2, na.rm=TRUE) # SS witout subtracting mean.
+        # total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS could be calculated from summing up the type 1 SS, but tidy.aov does not work on x which is generated with lm() rather than aov().
         total0 <- sum(x$data[[x$var1]]^2, na.rm=TRUE) # SS witout subtracting mean.
         total_df <- sum(ret$df)
         ret <- ret %>% dplyr::add_row(term="Total", sumsq = total0, df = total_df)
         ret <- ret %>% dplyr::add_row(term="Corrected Total", sumsq = total, df = total_df-1)
         model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
-        ret <- ret %>% dplyr::add_row(term="Corrected Model", sumsq = model_sumsq, .before = 1)
+        lm_summary <- broom:::glance.lm(x)
+        ret <- ret %>% dplyr::add_row(term="Corrected Model", sumsq = model_sumsq,
+                                      statistic = lm_summary$statistic,
+                                      p.value = lm_summary$p.value,
+                                      df = lm_summary$df, .before = 1)
         ret <- ret %>% dplyr::rename(`Variable`="term")
       }
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
