@@ -1583,6 +1583,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
         total_df <- sum(ret$df)
         ret <- ret %>% dplyr::add_row(term="Total", sumsq = total0, df = total_df)
         ret <- ret %>% dplyr::add_row(term="Corrected Total", sumsq = total, df = total_df-1)
+        model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
+        ret <- ret %>% dplyr::add_row(term="Corrected Model", sumsq = model_sumsq, .before = 1)
         ret <- ret %>% dplyr::rename(`Variable`="term")
       }
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
