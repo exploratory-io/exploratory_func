@@ -1522,7 +1522,7 @@ glance.anova_exploratory <- function(x) {
 }
 
 #' @export
-tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, emmeans_adjust="none", levene_test_center="median") {
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median") {
   if (type == "model") {
     if ("error" %in% class(x)) {
       if (!is.null(x$n)) {
@@ -1677,7 +1677,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, emmeans_adj
     } else { # 2-way ANOVA case # TODO: Should this be + or *?
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
-    ret <- emmeans::emmeans(x, formula, options=list(adjust=emmeans_adjust))
+    ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
     # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
     if (!is.null(x$covariates)) { # ANCOVA case
@@ -1715,8 +1715,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, emmeans_adj
     } else { # 2-way ANOVA case # TODO: Should this be + or *?
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
-    ret <- emmeans::emmeans(x, formula, options=list(adjust=emmeans_adjust))
-    ret <- graphics::pairs(ret)
+    browser()
+    ret <- emmeans::emmeans(x, formula)
+    ret <- graphics::pairs(ret, adjust=pairs_adjust)
     ret <- tibble::as.tibble(ret)
     ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "(c2_|c3_)", ""))
     # Map the column names back to the original.
