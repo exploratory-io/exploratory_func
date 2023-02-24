@@ -1577,8 +1577,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
       else { # ANCOVA/2-way ANOVA case
-        total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS should be calculated from type 1 SS.
-        ret <- ret %>% dplyr::add_row(term="Total", sumsq = total, df = sum(ret$df))
+        # total <- sum((x$data[[x$var1]]-mean(x$data[[x$var1]]))^2, na.rm=TRUE) # SS witout subtracting mean.
+        total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS can be calculated from summing up the type 1 SS.
+        total0 <- sum(x$data[[x$var1]]^2, na.rm=TRUE) # SS witout subtracting mean.
+        total_df <- sum(ret$df)
+        ret <- ret %>% dplyr::add_row(term="Total", sumsq = total0, df = total_df)
+        ret <- ret %>% dplyr::add_row(term="Corrected Total", sumsq = total, df = total_df-1)
         ret <- ret %>% dplyr::rename(`Variable`="term")
       }
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
