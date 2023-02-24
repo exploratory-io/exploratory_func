@@ -1422,9 +1422,9 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         }
       }
 
-      # For 2-way ANOVA case. Prepare contrasts setting to match SPSS.
+      # For ANCOVA/2-way ANOVA case. Prepare contrasts setting to match SPSS.
       # http://www.statscanbefun.com/rblog/2015/8/27/ensuring-r-generates-the-same-anova-f-values-as-spss
-      if (is.null(covariates) && length(var2_col) > 1) {
+      if (!is.null(covariates) || length(var2_col) > 1) {
         contrasts_list <- as.list(rep("contr.helmert", length(var2_col)))
         names(contrasts_list) <- var2_col
       }
@@ -1463,8 +1463,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         e$n <- count_df$tot_n
         return(e)
       }
-      if (is.null(covariates) && length(var2_col) > 1) {
-        # For 2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary.
+      if (!is.null(covariates) || length(var2_col) > 1) {
+        # For ANCOVA/2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary.
         model <- lm(formula, data = df, contrasts = contrasts_list, ...)
       }
       else {
