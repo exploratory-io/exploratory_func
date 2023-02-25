@@ -1464,8 +1464,21 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         return(e)
       }
       if (!is.null(covariates) || length(var2_col) > 1) {
-        # For ANCOVA/2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary.
+        # For ANCOVA/2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary later.
         model <- lm(formula, data = df, contrasts = contrasts_list, ...)
+        # Calculate type 3 some of square and attach to the model.
+        tryCatch({
+          ss3 <- broom::tidy(car::Anova(model, type="III"))
+        }, error = function(e) { # This can fail depending on the data.
+          # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
+          if (with_interaction && stringr::str_detect(e$message, "there are aliased coefficients in the model")) {
+            stop('EXP-ANA-9 :: [] :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
+          }
+          else {
+            stop(e)
+          }
+        })
+        model$ss3 <- ss3
       }
       else {
         model <- aov(formula, data = df)
@@ -1539,17 +1552,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     if (one_way_anova) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
     } else { # ANCOVA/2-way ANOVA case
-      tryCatch({
-        ret <- broom::tidy(car::Anova(x, type="III"))
-      }, error = function(e) { # This can fail depending on the data.
-        # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
-        if (x$with_interaction && stringr::str_detect(e$message, "there are aliased coefficients in the model")) {
-          stop('EXP-ANA-9 :: {} :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
-        }
-        else {
-          stop(e)
-        }
-      })
+      ret <- x$ss3
     }
     if (one_way_anova) {
       # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
@@ -1827,17 +1830,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
-      tryCatch({
-        ret0 <- broom::tidy(car::Anova(x, type="III"))
-      }, error = function(e) { # This can fail depending on the data.
-        # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
-        if (x$with_interaction && stringr::str_detect(e$message, "there are aliased coefficients in the model")) {
-          stop('EXP-ANA-9 :: {} :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
-        }
-        else {
-          stop(e)
-        }
-      })
+      ret0 <- x$ss3
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
       # df1 is from the categorical independent variable row, and df2 is from the residuals row.
       ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
