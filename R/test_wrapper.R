@@ -1539,10 +1539,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     if (one_way_anova) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
     } else { # ANCOVA/2-way ANOVA case
-      ret <- broom::tidy(car::Anova(x, type="III"))
+      tryCatch({
+        ret <- broom::tidy(car::Anova(x, type="III"))
+      }, error = function(e) { # This can fail depending on the data.
+        # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
+        if (x$with_interaction && stringr::str_detect(e$message, "there are aliased coefficients in the model")) {
+          stop('EXP-ANA-9 :: {} :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
+        }
+        else {
+          stop(e)
+        }
+      })
     }
-
-
     if (one_way_anova) {
       # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
       data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
@@ -1696,7 +1704,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 2-way ANOVA case # TODO: Should this be + or *?
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
-    browser()
     ret <- emmeans::emmeans(x, formula)
     ret <- graphics::pairs(ret, adjust=pairs_adjust)
     ret <- tibble::as.tibble(ret)
@@ -1820,7 +1827,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
-      ret0 <- broom::tidy(car::Anova(x, type="III"))
+      tryCatch({
+        ret0 <- broom::tidy(car::Anova(x, type="III"))
+      }, error = function(e) { # This can fail depending on the data.
+        # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
+        if (x$with_interaction && stringr::str_detect(e$message, "there are aliased coefficients in the model")) {
+          stop('EXP-ANA-9 :: {} :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
+        }
+        else {
+          stop(e)
+        }
+      })
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
       # df1 is from the categorical independent variable row, and df2 is from the residuals row.
       ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
