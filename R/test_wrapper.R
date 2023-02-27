@@ -1604,6 +1604,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                       statistic = lm_summary$statistic,
                                       p.value = lm_summary$p.value,
                                       df = lm_summary$df, .before = 1)
+        ret <- ret %>% dplyr::mutate(meansq = sumsq/df)
+        ret <- ret %>% dplyr::relocate(meansq, .after = df)
         ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
         ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
         ret <- ret %>% dplyr::mutate(term = if_else(term=="Residuals", "(Residuals)", term))
@@ -1613,10 +1615,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       }
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
                                             `P Value`="p.value",
-                                            `Degree of Freedom`="df",
                                             `Sum of Squares`="sumsq",
-                                            `SS Ratio`="ssr",
+                                            `Degree of Freedom`="df",
                                             `Mean Square`="meansq",
+                                            `SS Ratio`="ssr",
                                             `Effect Size (Cohen's f)`="f",
                                             `Power`="power",
                                             `Probability of Type 2 Error`="beta",
