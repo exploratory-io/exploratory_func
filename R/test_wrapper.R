@@ -1710,10 +1710,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 2-way ANOVA case # TODO: Should this be + or *?
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
-    ret <- emmeans::emmeans(x, formula)
-    ret <- graphics::pairs(ret, adjust=pairs_adjust)
-    ret <- tibble::as.tibble(ret)
+    emm_fit <- emmeans::emmeans(x, formula)
+    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust)
+    ret <- tibble::as.tibble(pw_comp)
     ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "(c2_|c3_)", ""))
+    # Get confidence interval.
+    emm_ci <- confint(pw_comp, level=0.95)
+    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+    ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
@@ -1724,6 +1728,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
     # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
     ret <- ret %>% dplyr::rename(any_of(c(Pair="contrast",
+                                          `Conf High`="conf.high",
+                                          `Conf Low`="conf.low",
                                           `Standard Error`="SE",
                                           `Degree of Freedom`="df",
                                           `t Value`="t.ratio",
