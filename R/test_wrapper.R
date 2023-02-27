@@ -1721,11 +1721,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
     # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
     ret <- ret %>% dplyr::rename(any_of(c(Pair="contrast",
-                                          `Adjusted Difference`="estimate",
                                           `Standard Error`="SE",
                                           `Degree of Freedom`="df",
                                           `t Value`="t.ratio",
                                           `P Value`="p.value")))
+    if (!is.null(x$covariates)) { # ANCOVA case
+      ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Difference`="estimate")))
+    } else { # 2-way ANOVA case. For 2-way ANOVA, there is no adjustment here.
+      ret <- ret %>% dplyr::rename(any_of(c(`Difference`="estimate")))
+    }
 
     # The version that uses multcomp. It had an issue with column names with spaces.
     # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
