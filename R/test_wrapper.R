@@ -1582,7 +1582,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       # Map the variable names in the term column back to the original.
       terms_mapping <- x$terms_mapping
       # Add mapping for interaction term
-      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], ":", terms_mapping["c3_"])))
+      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
