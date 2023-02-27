@@ -1598,14 +1598,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         # total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS could be calculated from summing up the type 1 SS, but tidy.aov does not work on x which is generated with lm() rather than aov().
         total0 <- sum(x$data[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
         total_df <- sum(ret$df)
-        ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
-        ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
-        model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
         lm_summary <- broom:::glance.lm(x)
+        model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
         ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
                                       statistic = lm_summary$statistic,
                                       p.value = lm_summary$p.value,
                                       df = lm_summary$df, .before = 1)
+        ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
+        ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
         ret <- ret %>% dplyr::mutate(term = if_else(term=="Residuals", "(Residuals)", term))
         ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
