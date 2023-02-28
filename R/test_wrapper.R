@@ -1382,7 +1382,6 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     covariates <- names(unlist(covariate_funs))
   }
 
-
   anova_each <- function(df) {
     tryCatch({
       # Keep only the relevant columns.

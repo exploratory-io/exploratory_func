@@ -620,7 +620,7 @@ test_that("test 2-way ANOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
-test_that("test 2-way ANOVA with exp_anova", {
+test_that("test 2-way ANOVA with exp_anova with repeat-by", {
   mtcars2 <- mtcars %>% mutate(`a m`=am, `ge ar`=gear, `w t`=wt, `q sec`=qsec) %>% group_by(vs)
   model_df <- mtcars2 %>% exp_anova(mpg, c("a m","ge ar"), func2=c("aschar","aschar"))
   # This case fails with multi-colinearity-related error.
