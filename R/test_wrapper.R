@@ -1450,9 +1450,11 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       if(length(grouped_cols) > 0) {
         # Check n_distinct again within group after handling outliers.
         # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
-        n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
-        if (n_distinct_res_each < 2) {
-          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+        for (i in 1:length(var2_col)) {
+          n_distinct_res_each <- n_distinct(df[[var2_col[i]]], na.rm=TRUE)
+          if (n_distinct_res_each < 2) {
+            stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+          }
         }
       }
       # It seems that the 2nd row of broom:::tidy.aov(x) is missed, if no group has more than 1 row. Check it here, rather than handling it later.

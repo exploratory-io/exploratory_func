@@ -620,6 +620,26 @@ test_that("test 2-way ANOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
+test_that("test 2-way ANOVA with exp_anova", {
+  mtcars2 <- mtcars %>% mutate(`a m`=am, `ge ar`=gear, `w t`=wt, `q sec`=qsec) %>% group_by(vs)
+  model_df <- mtcars2 %>% exp_anova(mpg, c("a m","ge ar"), func2=c("aschar","aschar"))
+  # This case fails with multi-colinearity-related error.
+  # model_df <- mtcars2 %>% exp_anova(mpg, c("carb","ge ar"), func2=c("aschar","aschar"), with_interaction = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(colnames(ret),
+    c("vs","Variable","Sum of Squares","SS Ratio","Degree of Freedom","Mean Square","F Value","P Value","Note"))
+  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
+  expect_equal(colnames(ret),
+    c("vs","Pair","Difference","Conf High","Conf Low","Standard Error","Degree of Freedom","t Value","P Value"))
+  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="levene")
+  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
+  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
+  ret <- model_df %>% tidy_rowwise(model, type="data")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+})
+
 test_that("test ANCOVA with exp_anova", {
   mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
   model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
