@@ -1509,9 +1509,11 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       model$with_interaction <- with_interaction
       model
     }, error = function(e){
-      if(length(grouped_cols) > 0) {
+      if(length(grouped_cols) > 0 && !str_detect(e$message, 'EXP-ANA')) {
         # In repeat-by case, we report group-specific error in the Summary table,
         # so that analysis on other groups can go on.
+        # Also, since translation mechanism for EXP-ANA-xxx message is not there on the route with Note column,
+        # fail over to just throwing error for those errors.
         class(e) <- c("anova_exploratory", class(e))
         e
       } else {
@@ -1537,7 +1539,7 @@ glance.anova_exploratory <- function(x) {
 }
 
 #' @export
-tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median") {
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1) {
   if (type == "model") {
     if ("error" %in% class(x)) {
       if (is.null(x$message) || x$message == "") {
@@ -1796,6 +1798,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     # Shapiro-Wilk test for residual normality
     if (length(x$residuals) > 5000) {
+      if (!is.null(shapiro_seed)) {
+        set.seed(shapiro_seed)
+      }
       resid <- sample(x$residuals, 5000)
     }
     else {
