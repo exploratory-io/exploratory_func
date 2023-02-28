@@ -1707,7 +1707,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       } else {
         formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
       }
-    } else { # 2-way ANOVA case # TODO: Should this be + or *?
+    } else { # 1-way/2-way ANOVA case # TODO: Should this be + or *?
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`+`'), '`'))
     }
     emm_fit <- emmeans::emmeans(x, formula)
