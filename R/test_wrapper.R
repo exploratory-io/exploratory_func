@@ -1538,11 +1538,19 @@ glance.anova_exploratory <- function(x) {
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median") {
   if (type == "model") {
     if ("error" %in% class(x)) {
-      if (!is.null(x$n)) {
-        ret <- tibble::tibble(`Number of Rows`=x$n, Note = x$message)
+      if (is.null(x$message) || x$message == "") {
+        # It seems there are some cases where x$message is an empty string. Get the error message with as.character().
+        message <- as.character(x)
       }
       else {
-        ret <- tibble::tibble(Note = x$message)
+        message <- x$message
+      }
+      # x$n can match something like x$nxyz. Check if it is numeric to make sure it is the number of rows we set.
+      if (!is.null(x$n) && is.numeric(x$n)) {
+        ret <- tibble::tibble(`Number of Rows`=x$n, Note = message)
+      }
+      else {
+        ret <- tibble::tibble(Note = message)
       }
       return(ret)
     }
