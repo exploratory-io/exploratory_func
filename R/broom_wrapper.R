@@ -60,7 +60,9 @@ tidy_rowwise <- function(df, model, ...) {
   }
   # Bring the Note column to the last. Without this, if a summary row with only the Note column happens to be the one from the first group,
   # it appears as the first column after the group column.
-  ret <- ret %>% dplyr::relocate(any_of(c("Note")), .after = last_col())
+  if (length(colnames(ret)) > 0) { # Do this only there actually are columns to avoid error.
+    ret <- ret %>% dplyr::relocate(any_of(c("Note")), .after = last_col())
+  }
   ret
 }
 
