@@ -1382,8 +1382,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     covariates <- names(unlist(covariate_funs))
   }
 
-  # For ANCOVA case, parepare common var2 order to display un-adjusted/adjusted means everywhere.
-  if (!is.null(covariates)) {
+  # For ANCOVA or one-way ANOVA, parepare common var2 order to display un-adjusted/adjusted means everywhere.
+  if (!is.null(covariates) || length(var2_col) == 1) {
     common_var2_order <- (df %>% ungroup() %>% group_by(!!rlang::sym(var2_col)) %>% summarize(mean=mean(!!rlang::sym(var1_col), na.rm=TRUE)) %>% arrange(desc(mean)))[[var2_col]]
   }
 
@@ -1504,6 +1504,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       model$var2 <- var2_col
       if (!is.null(covariates)) {
         model$covariates <- covariates
+      }
+      if (!is.null(covariates) || length(var2_col) == 1) {
         model$common_var2_order <- as.character(common_var2_order) # as.character is to strip names.
       }
       model$terms_mapping <- terms_mapping
@@ -1695,10 +1697,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
       mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
       ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
-      # Set the common order to display means and emmeans.
-      if (sort_factor_levels) {
-        ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
-      }
+    }
+    # Set the common order to display means and emmeans.
+    if (sort_factor_levels && !is.null(x$common_var2_order)) {
+      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
     }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
@@ -1884,7 +1886,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     ret <- x$data
-    if (!is.null(x$covariates) && sort_factor_levels) { # ANCOVA and for the Means error bar.
+    if (sort_factor_levels && !is.null(x$common_var2_order)) { # ANCOVA/one-way ANOVA and for the Means error bar.
       # Set the common order to display means and emmeans.
       ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
     }
