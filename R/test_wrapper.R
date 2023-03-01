@@ -1544,7 +1544,7 @@ glance.anova_exploratory <- function(x) {
 }
 
 #' @export
-tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1) {
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1, sort_factor_levels=FALSE) {
   if (type == "model") {
     if ("error" %in% class(x)) {
       if (is.null(x$message) || x$message == "") {
@@ -1696,7 +1696,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
       ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
       # Set the common order to display means and emmeans.
-      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
+      if (sort_factor_levels) {
+        ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
+      }
     }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
@@ -1882,7 +1884,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     ret <- x$data
-    if (!is.null(x$covariates)) { # ANCOVA case
+    if (!is.null(x$covariates) && sort_factor_levels) { # ANCOVA and for the Means error bar.
       # Set the common order to display means and emmeans.
       ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
     }
