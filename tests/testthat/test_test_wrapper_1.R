@@ -714,11 +714,16 @@ test_that("test ANCOVA with exp_anova with some NAs in the data", {
 })
 
 test_that("test exp_anova", {
-  model_df <- exp_anova(mtcars, mpg, am)
+  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
+  model_df <- exp_anova(mtcars2, mpg, `a m`)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(nrow(ret), 3) # Between Groups, Within Group, and Total.
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
+  ret <- model_df %>% tidy_rowwise(model, type="levene")
+  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
   model_df <- exp_anova(mtcars, mpg, gear)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
