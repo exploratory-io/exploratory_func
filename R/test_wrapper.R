@@ -1333,6 +1333,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
+#' @param var1 - The column for dependent variable
+#' @param var2 - The column for the categorical independent variable(s).
+#'               If it is a single column, it can be specified with unquoted column name.
+#'               If there are 2 columns (2-way ANOVA case), it is a character vector with 2 elements of character.
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
 exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
@@ -1347,20 +1351,32 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     power <- 1.0 - beta
   }
   var1_col <- col_name(substitute(var1))
-  var2_col <- col_name(substitute(var2))
+  var2_ <- substitute(var2)
+  if (class(var2_) == "name") { # For backward compatibility with pre-6.13 when we only had one-way ANOVA.
+    var2_col <- col_name(var2_)
+  }
+  else {
+    var2_col <- var2
+  }
   grouped_cols <- grouped_by(df)
 
+  # Note that applying preprocessing function is taken care of by the analytics view framework now, and this code applying func2
+  # is not currently used.
   if (!is.null(func2)) {
-    if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
-    }
-    else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
+    for (i in 1:length(func2)) {
+      if (lubridate::is.Date(df[[var2_col[i]]]) || lubridate::is.POSIXct(df[[var2_col[i]]])) {
+        df <- df %>% dplyr::mutate(!!rlang::sym(var2_col[i]) := extract_from_date(!!rlang::sym(var2_col[i]), type=!!func2[i]))
+      }
+      else if (is.numeric(df[[var2_col[i]]])) {
+        df <- df %>% dplyr::mutate(!!rlang::sym(var2_col[i]) := extract_from_numeric(!!rlang::sym(var2_col[i]), type=!!func2[i]))
+      }
     }
   }
   
-  if (n_distinct(df[[var2_col]]) < 2) {
-    stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+  for (i in 1:length(var2_col)) {
+    if (n_distinct(df[[var2_col[i]]]) < 2) {
+      stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+    }
   }
 
   # Apply preprocessing functions to the covariates.
@@ -1370,6 +1386,10 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     covariates <- names(unlist(covariate_funs))
   }
 
+  # For ANCOVA or one-way ANOVA, parepare common var2 order to display un-adjusted/adjusted means everywhere.
+  if (!is.null(covariates) || length(var2_col) == 1) {
+    common_var2_order <- (df %>% ungroup() %>% group_by(!!rlang::sym(var2_col)) %>% summarize(mean=mean(!!rlang::sym(var1_col), na.rm=TRUE)) %>% arrange(desc(mean)))[[var2_col]]
+  }
 
   anova_each <- function(df) {
     tryCatch({
@@ -1391,17 +1411,32 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         covariates <- name_map[covariates]
       }
       df <- clean_df
-
-      if (is.null(covariates)) {
-        formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+      if (is.null(covariates)) { # 2-way/1-way ANOVA case
+        if (with_interaction) {
+          collapse_str <- "`*`"
+        }
+        else {
+          collapse_str <- "`+`"
+        }
+        formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
       }
-      else {
+      else { # ANCOVA case
         if (!with_interaction) {
           formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', paste(covariates, collapse="`+`"), '`'))
         }
         else { # Calculating interaction only with the first covariate for simplicity for now.
           formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`*`', covariates[1], '`'))
         }
+      }
+
+      # For ANCOVA/2-way ANOVA case. Prepare contrasts setting to match SPSS.
+      # http://www.statscanbefun.com/rblog/2015/8/27/ensuring-r-generates-the-same-anova-f-values-as-spss
+      if (!is.null(covariates) || length(var2_col) > 1) {
+        contrasts_list <- as.list(rep("contr.helmert", length(var2_col)))
+        names(contrasts_list) <- var2_col
+      }
+      else {
+        contrasts_list <- list()
       }
 
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
@@ -1422,22 +1457,45 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       if(length(grouped_cols) > 0) {
         # Check n_distinct again within group after handling outliers.
         # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
-        n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
-        if (n_distinct_res_each < 2) {
-          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+        for (i in 1:length(var2_col)) {
+          n_distinct_res_each <- n_distinct(df[[var2_col[i]]], na.rm=TRUE)
+          if (n_distinct_res_each < 2) {
+            stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+          }
         }
       }
       # It seems that the 2nd row of broom:::tidy.aov(x) is missed, if no group has more than 1 row. Check it here, rather than handling it later.
-      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(max_n=max(n),tot_n=sum(n))
+      count_df <- df %>% group_by(!!!rlang::syms(as.character(var2_col))) %>% summarize(n=n()) %>% ungroup() %>% summarize(max_n=max(n),tot_n=sum(n))
       if (count_df$max_n <= 1) {
         e <- simpleError("At least one group needs to have 2 or more rows.")
         class(e) <- c("anova_exploratory", class(e))
         e$n <- count_df$tot_n
         return(e)
       }
-      model <- aov(formula, data = df, ...)
-      # calculate Cohen's f from actual data
-      model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
+      if (!is.null(covariates) || length(var2_col) > 1) {
+        # For ANCOVA/2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary later.
+        model <- lm(formula, data = df, contrasts = contrasts_list, ...)
+        # Calculate type 3 some of square and attach to the model.
+        tryCatch({
+          ss3 <- broom::tidy(car::Anova(model, type="III"))
+        }, error = function(e) { # This can fail depending on the data.
+          # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
+          if (with_interaction && stringr::str_detect(e$message, "there are aliased coefficients in the model")) {
+            stop('EXP-ANA-9 :: [] :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
+          }
+          else {
+            stop(e)
+          }
+        })
+        model$ss3 <- ss3
+      }
+      else {
+        model <- aov(formula, data = df)
+      }
+      # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
+      if (length(var2_col) == 1) {
+        model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
+      }
       if (is.null(f)) {
         model$cohens_f_to_detect <- model$cohens_f
       }
@@ -1450,6 +1508,9 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       if (!is.null(covariates)) {
         model$covariates <- covariates
       }
+      if (!is.null(covariates) || length(var2_col) == 1) {
+        model$common_var2_order <- as.character(common_var2_order) # as.character is to strip names.
+      }
       model$terms_mapping <- terms_mapping
       model$data <- df
       model$test_sig_level <- test_sig_level
@@ -1458,9 +1519,11 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       model$with_interaction <- with_interaction
       model
     }, error = function(e){
-      if(length(grouped_cols) > 0) {
+      if(length(grouped_cols) > 0 && !str_detect(e$message, 'EXP-ANA')) {
         # In repeat-by case, we report group-specific error in the Summary table,
         # so that analysis on other groups can go on.
+        # Also, since translation mechanism for EXP-ANA-xxx message is not there on the route with Note column,
+        # fail over to just throwing error for those errors.
         class(e) <- c("anova_exploratory", class(e))
         e
       } else {
@@ -1486,78 +1549,104 @@ glance.anova_exploratory <- function(x) {
 }
 
 #' @export
-tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test_center="median") {
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1, sort_factor_levels=FALSE) {
   if (type == "model") {
     if ("error" %in% class(x)) {
-      if (!is.null(x$n)) {
-        ret <- tibble::tibble(`Number of Rows`=x$n, Note = x$message)
+      if (is.null(x$message) || x$message == "") {
+        # It seems there are some cases where x$message is an empty string. Get the error message with as.character().
+        message <- as.character(x)
       }
       else {
-        ret <- tibble::tibble(Note = x$message)
+        message <- x$message
+      }
+      # x$n can match something like x$nxyz. Check if it is numeric to make sure it is the number of rows we set.
+      if (!is.null(x$n) && is.numeric(x$n)) {
+        ret <- tibble::tibble(`Number of Rows`=x$n, Note = message)
+      }
+      else {
+        ret <- tibble::tibble(Note = message)
       }
       return(ret)
     }
     note <- NULL
-    if (is.null(x$covariates)) { # ANOVA case
+
+    one_way_anova <- is.null(x$covariates) && length(x$var2) == 1 # Power analysis is for one-way ANOVA case only.
+    if (one_way_anova) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
-    } else { # ANCOVA case
-      ret <- broom::tidy(car::Anova(x, type="III"))
+    } else { # ANCOVA/2-way ANOVA case
+      ret <- x$ss3
+    }
+    if (one_way_anova) {
+      # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
+      data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+        dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
+        dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
+      k <- data_summary$k
+      # Using minimum group sample size as the sample size for power calculation.
+      # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
+      min_n_rows <- data_summary$min_n_rows
+      tot_n_rows <- data_summary$tot_n_rows
     }
 
-    # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
-    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
-      dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
-    k <- data_summary$k
-    # Using minimum group sample size as the sample size for power calculation.
-    # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
-    min_n_rows <- data_summary$min_n_rows
-    tot_n_rows <- data_summary$tot_n_rows
-
     if (is.null(x$power)) {
-      # If power is not specified in the arguments, estimate current power.
-      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
-        power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
-        power_val <- power_res$power
-      }, error = function(e) {
-        note <<- e$message
-        power_val <<- NA_real_
-      })
       ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
-      if (is.null(x$covariates)) { # Power analysis is only for ANOVA case
+      if (one_way_anova) { # Power analysis is only for ANOVA case
+        # If power is not specified in the arguments, estimate current power.
+        tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+          power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
+          power_val <- power_res$power
+        }, error = function(e) {
+          note <<- e$message
+          power_val <<- NA_real_
+        })
         ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
       }
       # Map the variable names in the term column back to the original.
       terms_mapping <- x$terms_mapping
       # Add mapping for interaction term
-      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], ":", terms_mapping["c3_"])))
+      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
-      if (is.null(x$covariates)) { # ANOVA case
+      if (one_way_anova) { # One-way ANOVA case
         ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
         ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
         ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
-      else { # ANCOVA case
-        total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS should be calculated from type 1 SS.
-        ret <- ret %>% dplyr::add_row(term="Total", sumsq = total, df = sum(ret$df))
+      else { # ANCOVA/2-way ANOVA case
+        total <- sum((x$data[[x$var1]]-mean(x$data[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
+        # total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS could be calculated from summing up the type 1 SS, but tidy.aov does not work on x which is generated with lm() rather than aov().
+        total0 <- sum(x$data[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
+        total_df <- sum(ret$df)
+        lm_summary <- broom:::glance.lm(x)
+        model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
+        ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
+                                      statistic = lm_summary$statistic,
+                                      p.value = lm_summary$p.value,
+                                      df = lm_summary$df, .before = 1)
+        ret <- ret %>% dplyr::mutate(meansq = sumsq/df)
+        ret <- ret %>% dplyr::relocate(meansq, .after = df)
+        ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
+        ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
+        ret <- ret %>% dplyr::mutate(term = if_else(term=="Residuals", "(Residuals)", term))
+        ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
+        ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
         ret <- ret %>% dplyr::rename(`Variable`="term")
       }
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
                                             `P Value`="p.value",
-                                            `Degree of Freedom`="df",
                                             `Sum of Squares`="sumsq",
-                                            `SS Ratio`="ssr",
+                                            `Degree of Freedom`="df",
                                             `Mean Square`="meansq",
+                                            `SS Ratio`="ssr",
                                             `Effect Size (Cohen's f)`="f",
                                             `Power`="power",
                                             `Probability of Type 2 Error`="beta",
                                             `Number of Rows`="n")))
     }
-    else { # Since we do not support power analysis for ANCOVA, this is only for ANOVA case.
+    else { # Since we do not support power analysis for ANCOVA or 2-way ANOVA, this is only for one-way ANOVA case.
       # If required power is specified in the arguments, estimate required sample size. 
       tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
         power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
@@ -1591,40 +1680,31 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
-  else if (type == "anova") {
-    if ("error" %in% class(x)) {
-      ret <- tibble::tibble()
-      return(ret)
-    }
-    # base-stats-based. This is type I.
-    # ret <- broom:::tidy.aov(x) # TODO: This is called for "model" type too. Might want to optimize.
-    ret <- broom::tidy(car::Anova(x, type="III"))
-    # Map the variable names in the term column back to the original.
-    orig_term <- x$terms_mapping[ret$term]
-    orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
-    ret$term <- orig_term
-
-    ret <- ret %>% dplyr::rename(`F Value`=statistic,
-                                 `P Value`=p.value,
-                                 `Degree of Freedom`=df,
-                                 `Sum of Squares`=sumsq,
-                                 `Variable`=term)
-  }
   else if (type == "emmeans") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
     }
-    if (!x$with_interaction) {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
-    } else {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+    if (!is.null(x$covariates)) { # ANCOVA case
+      if (!x$with_interaction) {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+      } else {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+      }
+    } else { # 2-way ANOVA case. The separator (*, :, or +) should not matter.
+      formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
     ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
-    # Join regular mean. [[1]] is necessary to remove name from x$var2.
-    mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
-    ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
+    if (!is.null(x$covariates)) { # ANCOVA case
+      # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
+      mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
+      ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
+    }
+    # Set the common order to display means and emmeans.
+    if (sort_factor_levels && !is.null(x$common_var2_order)) {
+      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
+    }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
@@ -1642,20 +1722,28 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
                                           `Conf High`="upper.CL",
                                           `Mean`="mean")))
   }
-  else if (type == "pairs") {
+  else if (type == "pairs") { # For ANCOVA or 2-way ANOVA
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
     }
-    if (!x$with_interaction) {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
-    } else {
-      formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+    if (!is.null(x$covariates)) { # ANCOVA case
+      if (!x$with_interaction) {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
+      } else {
+        formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+      }
+    } else { # 1-way/2-way ANOVA case. The separator (*, :, or +) should not matter.
+      formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
-    ret <- emmeans::emmeans(x, formula)
-    ret <- graphics::pairs(ret)
-    ret <- tibble::as.tibble(ret)
-    ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "c2_", ""))
+    emm_fit <- emmeans::emmeans(x, formula)
+    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust)
+    ret <- tibble::as.tibble(pw_comp)
+    ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "(c2_|c3_)", ""))
+    # Get confidence interval.
+    emm_ci <- confint(pw_comp, level=0.95)
+    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+    ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
@@ -1666,11 +1754,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
     # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
     ret <- ret %>% dplyr::rename(any_of(c(Pair="contrast",
-                                          `Adjusted Difference`="estimate",
+                                          `Conf High`="conf.high",
+                                          `Conf Low`="conf.low",
                                           `Standard Error`="SE",
                                           `Degree of Freedom`="df",
                                           `t Value`="t.ratio",
                                           `P Value`="p.value")))
+    if (!is.null(x$covariates)) { # ANCOVA case
+      ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Difference`="estimate")))
+    } else { # 2-way ANOVA case. For 2-way ANOVA, there is no adjustment here.
+      ret <- ret %>% dplyr::rename(any_of(c(`Difference`="estimate")))
+    }
 
     # The version that uses multcomp. It had an issue with column names with spaces.
     # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
@@ -1693,7 +1787,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     else {
       levene_test_center_fun <- median
     }
-    ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
+
+    if (!is.null(x$covariates)) { # ANCOVA case
+      ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
+    }
+    else { # 2-way or 1-way ANOVA case
+      formula <- as.formula(paste0('`', x$var1, '`~`', paste(x$var2, collapse='`*`'), '`'))
+      ret <- broom::tidy(car::leveneTest(formula, data=x$data, center=levene_test_center_fun))
+    }
     # Example output:
     # A tibble: 1 × 4
     # statistic p.value    df df.residual
@@ -1711,6 +1812,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
     }
     # Shapiro-Wilk test for residual normality
     if (length(x$residuals) > 5000) {
+      if (!is.null(shapiro_seed)) {
+        set.seed(shapiro_seed)
+      }
       resid <- sample(x$residuals, 5000)
     }
     else {
@@ -1735,7 +1839,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       return(ret)
     }
     conf_threshold = 1 - (1 - conf_level)/2
-    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+    ret <- x$data %>%
+      dplyr::group_by(!!!rlang::syms(as.character(x$var2))) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
@@ -1747,7 +1852,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
                        `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
-      dplyr::select(!!rlang::sym(x$var2),
+      dplyr::select(!!!rlang::syms(as.character(x$var2)),
                     `Number of Rows`,
                     Mean,
                     `Conf Low`,
@@ -1766,14 +1871,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       ret <- tibble::tibble()
       return(ret)
     }
-    if (is.null(x$covariates)) { # ANOVA case
-      ret0 <- broom:::tidy.aov(x)
-      ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
-    } else { # ANCOVA case
-      ret0 <- broom::tidy(car::Anova(x, type="III"))
+    if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
+      ret0 <- x$ss3
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
       # df1 is from the categorical independent variable row, and df2 is from the residuals row.
-      ret0 <- ret0 %>% filter(term %in% c(x$var2,"Residuals"))
+      ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
+      ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+    } else { # one-way ANOVA case
+      ret0 <- broom:::tidy.aov(x)
       ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     }
     ret
@@ -1784,6 +1889,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, levene_test
       return(ret)
     }
     ret <- x$data
+    if (sort_factor_levels && !is.null(x$common_var2_order)) { # ANCOVA/one-way ANOVA and for the Means error bar.
+      # Set the common order to display means and emmeans.
+      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
+    }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
