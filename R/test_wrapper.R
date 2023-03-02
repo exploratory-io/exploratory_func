@@ -1333,6 +1333,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
+#' @param var1 - The column for dependent variable
+#' @param var2 - The column for the categorical independent variable(s).
+#'               If it is a single column, it can be specified with unquoted column name.
+#'               If there are 2 columns (2-way ANOVA case), it is a character vector with 2 elements of character.
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
 exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
@@ -1409,7 +1413,6 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       df <- clean_df
       if (is.null(covariates)) { # 2-way/1-way ANOVA case
         if (with_interaction) {
-          # TODO: With *, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
           collapse_str <- "`*`"
         }
         else {
@@ -1863,7 +1866,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
     colnames(ret) <- orig_terms
   }
-  else if (type == "prob_dist") { # Note that 2-way ANOVA, with multiple P-values in the result, is not supported here.
+  else if (type == "prob_dist") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
