@@ -2153,11 +2153,13 @@ exp_chisq_power <- function(dummy, n=seq(10,100,by=10), effect_size=0.3, sig.lev
   df = (rows-1)*(cols-1) # Degree of freedom
 
   # Sample size vs power calculation
-  n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=0.3, sig.level=0.05)
+  n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=effect_size, sig.level=sig.level)
   n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
 
   # Required sample size calculation
-  required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=0.3, sig.level=0.05, power=power))$N
+  required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=effect_size, sig.level=sig.level, power=power))$N
 
-  list(n_to_power <- n_to_power, required_n=required_n)
+  density <- generate_chisq_density_data_for_power(df=df, w=effect_size, N=required_n)
+
+  list(n_to_power=n_to_power, required_n=required_n, density=density)
 }
