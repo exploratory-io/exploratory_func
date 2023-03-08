@@ -43,6 +43,17 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret
 }
 
+generate_chisq_density_data_for_power <- function(df, w, N) {
+  l <- df*3 # TODO: adjust it better.
+  x <- seq(from=0, to=l, by=l/1000 )
+
+  ret <- tibble::tibble(x=x,
+                        y1=dchisq(x, df=df),
+                        y2=dchisq(x, df=df, ncp=N*w^2)
+  )
+  ret
+}
+
 # Generates data for F distribution probability density with critical section and statistic
 # to depict a result of a F test like one-way ANOVA.
 generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
