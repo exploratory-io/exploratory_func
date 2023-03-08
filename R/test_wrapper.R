@@ -2134,3 +2134,19 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
     ret
   }
 }
+
+exp_chisq_power <- function(dummy, n=seq(10,100,by=10), effect_size=0.3, sig.level=0.05, power=0.95, rows=2, cols=2) {
+  # t-test
+  # n_to_power_res <- pwr::pwr.t.test(n=n, d=0.3, sig.level=0.05, type="two.sample")
+
+  df = (rows-1)*(cols-1) # Degree of freedom
+
+  # Sample size vs power calculation
+  n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=0.3, sig.level=0.05)
+  n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
+
+  # Required sample size calculation
+  required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=0.3, sig.level=0.05, power=power))$N
+
+  list(n_to_power <- n_to_power, required_n=required_n)
+}
