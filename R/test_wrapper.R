@@ -2150,16 +2150,40 @@ exp_chisq_power <- function(dummy, n=seq(10,100,by=10), effect_size=0.3, sig.lev
   # t-test
   # n_to_power_res <- pwr::pwr.t.test(n=n, d=0.3, sig.level=0.05, type="two.sample")
 
-  df = (rows-1)*(cols-1) # Degree of freedom
+  chisq_power_each <- function(dummy) {
+    df = (rows-1)*(cols-1) # Degree of freedom
 
-  # Sample size vs power calculation
-  n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=effect_size, sig.level=sig.level)
-  n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
+    # Sample size vs power calculation
+    n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=effect_size, sig.level=sig.level)
+    n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
 
-  # Required sample size calculation
-  required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=effect_size, sig.level=sig.level, power=power))$N
+    # Required sample size calculation
+    required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=effect_size, sig.level=sig.level, power=power))$N
 
-  density <- generate_chisq_density_data_for_power(df=df, w=effect_size, N=required_n)
+    density <- generate_chisq_density_data_for_power(df=df, w=effect_size, N=required_n)
 
-  list(n_to_power=n_to_power, required_n=required_n, density=density)
+    model <- list(n_to_power=n_to_power,
+                  df=df,
+                  w=effect_size,
+                  sig.level=sig.level,
+                  power=power,
+                  required_n=required_n,
+                  density=density)
+    class(model) <- c("chisq_power_exploratory")
+    model
+  }
+  do_on_each_group(df, chisq_power_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.chisq_power_exploratory <- function(x, type="summary") {
+  if (type == "summary") {
+    tibble::tibble(df=x$df, sig.level=x$sig.level, w=x$w, power=x$power, n=x$required_n)
+  }
+  else if (type == "n_to_power") {
+    x$n_to_power
+  }
+  else if (type == "density") {
+    x$density
+  }
 }
