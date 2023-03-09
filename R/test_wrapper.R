@@ -2146,7 +2146,9 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
   }
 }
 
-exp_chisq_power <- function(dummy, n=seq(10,100,by=10), effect_size=0.3, sig.level=0.05, power=0.95, rows=2, cols=2) {
+#' @export
+exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, power=0.95, n_start=10, n_end=100, n_step=10) {
+  n = seq(n_start, n_end, by=n_step)
   # t-test
   # n_to_power_res <- pwr::pwr.t.test(n=n, d=0.3, sig.level=0.05, type="two.sample")
 
@@ -2154,17 +2156,17 @@ exp_chisq_power <- function(dummy, n=seq(10,100,by=10), effect_size=0.3, sig.lev
     df = (rows-1)*(cols-1) # Degree of freedom
 
     # Sample size vs power calculation
-    n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=effect_size, sig.level=sig.level)
+    n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=w, sig.level=sig.level)
     n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
 
     # Required sample size calculation
-    required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=effect_size, sig.level=sig.level, power=power))$N
+    required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=w, sig.level=sig.level, power=power))$N
 
-    density <- generate_chisq_density_data_for_power(df=df, w=effect_size, N=required_n)
+    density <- generate_chisq_density_data_for_power(df=df, w=w, N=required_n)
 
     model <- list(n_to_power=n_to_power,
                   df=df,
-                  w=effect_size,
+                  w=w,
                   sig.level=sig.level,
                   power=power,
                   required_n=required_n,
@@ -2172,7 +2174,7 @@ exp_chisq_power <- function(dummy, n=seq(10,100,by=10), effect_size=0.3, sig.lev
     class(model) <- c("chisq_power_exploratory")
     model
   }
-  do_on_each_group(df, chisq_power_each, name = "model", with_unnest = FALSE)
+  do_on_each_group(dummy, chisq_power_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
