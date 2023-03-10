@@ -2206,8 +2206,9 @@ calculate_cohens_w <- function(chi_sq, N) {
 calculate_cohens_w_for_ab_test <- function(a_ratio, conversion_rate, diff) {
   expected <- matrix(c(a_ratio, 1-a_ratio)) %*% matrix(c(conversion_rate, 1-conversion_rate), nrow = 1)
   # Devide the diff into a_up and b_down, without changing the overall mean conversion rate.
-  a_up <- diff*(1-a_ratio)
-  b_down <- diff*a_ratio
+  a_up <- diff*(1-a_ratio)*a_ratio
+  # b_down <- diff*a_ratio*(1-a_ratio) # Actually this is same as a_up
+  b_down <- a_up
   # Calculate Cohen's w.
   res <- a_up^2/expected[1,1] + a_up^2/expected[1,2] + b_down^2/expected[2,1] + b_down^2/expected[2,2]
   res <- sqrt(res)
