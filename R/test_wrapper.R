@@ -53,6 +53,8 @@ generate_chisq_density_data_for_power <- function(df, w, N, crit) {
                         type="null"
   )
   ret <- ret %>% dplyr::mutate(critical=(x>=crit))
+  ret0 <- tibble::tibble(x=crit, y=dchisq(crit, df=df), type="null", statistic=TRUE)
+  ret <- ret %>% dplyr::bind_rows(ret0)
   ret2 <- tibble::tibble(x=x,
                         y=dchisq(x, df=df, ncp=N*w^2),
                         type="alternative"
