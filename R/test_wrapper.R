@@ -44,7 +44,8 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
 }
 
 generate_chisq_density_data_for_power <- function(df, w, N) {
-  l <- df*3 # TODO: adjust it better.
+  # Plot up to 95 percentile.
+  l <- qchisq(0.95, df=df, ncp=N*w^2)
   x <- seq(from=0, to=l, by=l/1000 )
 
   ret <- tibble::tibble(x=x,
