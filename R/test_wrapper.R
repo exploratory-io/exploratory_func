@@ -43,15 +43,23 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret
 }
 
-generate_chisq_density_data_for_power <- function(df, w, N) {
+generate_chisq_density_data_for_power <- function(df, w, N, crit) {
   # Plot up to 95 percentile.
   l <- qchisq(0.95, df=df, ncp=N*w^2)
   x <- seq(from=0, to=l, by=l/1000 )
 
   ret <- tibble::tibble(x=x,
-                        y1=dchisq(x, df=df),
-                        y2=dchisq(x, df=df, ncp=N*w^2)
+                        y=dchisq(x, df=df),
+                        type="null"
   )
+  ret <- ret %>% dplyr::mutate(critical=(x>=crit))
+  ret2 <- tibble::tibble(x=x,
+                        y=dchisq(x, df=df, ncp=N*w^2),
+                        type="alternative"
+  )
+  ret2 <- ret2 %>% dplyr::mutate(critical=(x<=crit))
+  ret <- ret %>% dplyr::bind_rows(ret2)
+  ret <- ret %>% dplyr::mutate(type=factor(type, levels=c("null", "alternative")))
   ret
 }
 
@@ -2164,7 +2172,8 @@ exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, beta=0
     # Required sample size calculation
     required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=w, sig.level=sig.level, power=power))$N
 
-    density <- generate_chisq_density_data_for_power(df=df, w=w, N=required_n)
+    crit <- qchisq(1-sig.level, df=df) # The chisq value that corresponds to the significance level.
+    density <- generate_chisq_density_data_for_power(df=df, w=w, N=required_n, crit)
 
     model <- list(n_to_power=n_to_power,
                   df=df,
