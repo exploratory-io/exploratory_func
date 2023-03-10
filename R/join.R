@@ -113,6 +113,20 @@ anti_join <- function(x, y, by = NULL, copy = FALSE, ignorecase = FALSE, ...) {
   }
 }
 
+#' @export
+#' Wrapper function for dplyr's cross_join to support case insensitive join.
+cross_join <- function(x, y, copy = FALSE, suffix = c(".x", ".y"), target_columns = NULL, exclude_target_columns = FALSE, ...) {
+  # Limit target columns to use for join when target_columns are set.
+  if (!is.null(target_columns)) {
+    if (exclude_target_columns) {
+      y <- y %>% dplyr::select(-dplyr::one_of(target_columns))
+    } else {
+      y <- y %>% dplyr::select(dplyr::one_of(target_columns))
+    }
+  }
+  dplyr::cross_join(x = x, y = y, copy = copy, suffix = suffix);
+}
+
 
 
 
