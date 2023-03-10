@@ -177,6 +177,36 @@ test_that("anti_join with case sensitive", {
   expect_equal(unlist(df12 %>% filter(lower_col == "d1a") %>% select(value_lower_col))[[1]], 4)
 })
 
+test_that("cross_join with selected column", {
+  source <- readr::read_csv('"ID","製品製品名"
+1,"机"
+2,"ライト"
+3,"椅子"')
+
+ target <- readr::read_csv('"ID","色","適用"
+1,"赤","明るめ"
+2,"青","暗め"
+3,"白","普通"')
+
+  df <- cross_join(source, target, target_columns = (c("適用")), exclude_target_columns=TRUE)
+  # > df
+  # A tibble: 9 × 5
+  # ID.x 製品製品名  ID.y 色
+  # <dbl> <chr>      <dbl> <chr>
+  # 1     1 机             1 赤
+  # 2     1 机             2 青
+  # 3     1 机             3 白
+  # 4     2 ライト         1 赤
+  # 5     2 ライト         2 青
+  # 6     2 ライト         3 白
+  # 7     3 椅子           1 赤
+  # 8     3 椅子           2 青
+  # 9     3 椅子           3 白
+  expect_equal(nrow(df), 9)
+  expect_equal(ncol(df), 4)
+
+})
+
 test_that("column suffix argument with case insensitive", {
   df13 <- mtcars %>% left_join(mtcars, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("1", "2"), ignorecase = TRUE)
   expect_equal("mpg1" %in% colnames(df13) , TRUE)

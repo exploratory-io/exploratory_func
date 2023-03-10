@@ -12,8 +12,11 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
       y[[tmp_by_y[[i]]]] <- tolower(y[[by$y[[i]]]])
       y[[by$y[[i]]]] <- NULL
     }
-
-    res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy)
+    if (exists("suffix")) {
+      res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy)
+    } else {
+      res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), copy = copy)
+    }
     res[tmp_by_x] <- list(NULL)
 
     res
