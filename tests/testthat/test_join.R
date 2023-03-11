@@ -204,6 +204,7 @@ test_that("cross_join with selected column", {
   # 9     3 椅子           3 白
   expect_equal(nrow(df), 9)
   expect_equal(ncol(df), 4)
+  expect_equal(stringr::str_detect(colnames(df), "適用"), c(FALSE, FALSE, FALSE, FALSE))
 
 })
 
