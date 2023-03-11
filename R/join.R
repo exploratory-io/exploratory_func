@@ -12,8 +12,11 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
       y[[tmp_by_y[[i]]]] <- tolower(y[[by$y[[i]]]])
       y[[by$y[[i]]]] <- NULL
     }
-
-    res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy)
+    if (exists("suffix")) {
+      res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy)
+    } else {
+      res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), copy = copy)
+    }
     res[tmp_by_x] <- list(NULL)
 
     res
@@ -111,6 +114,20 @@ anti_join <- function(x, y, by = NULL, copy = FALSE, ignorecase = FALSE, ...) {
   } else {
     dplyr::anti_join(x = x, y = y, by = by, copy = copy);
   }
+}
+
+#' @export
+#' Wrapper function for dplyr's cross_join to support case insensitive join.
+cross_join <- function(x, y, copy = FALSE, suffix = c(".x", ".y"), target_columns = NULL, exclude_target_columns = FALSE, ...) {
+  # Limit target columns to use for join when target_columns are set.
+  if (!is.null(target_columns)) {
+    if (exclude_target_columns) {
+      y <- y %>% dplyr::select(-dplyr::one_of(target_columns))
+    } else {
+      y <- y %>% dplyr::select(dplyr::one_of(target_columns))
+    }
+  }
+  dplyr::cross_join(x = x, y = y, copy = copy, suffix = suffix);
 }
 
 
