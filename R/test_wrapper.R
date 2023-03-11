@@ -45,23 +45,24 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
 
 generate_chisq_density_data_for_power <- function(df, w, N, crit) {
   # Plot up to 95 percentile.
-  l <- qchisq(0.95, df=df, ncp=N*w^2)
+  ncp <- N*w^2
+  l <- qchisq(0.95, df=df, ncp=ncp)
   x <- seq(from=0, to=l, by=l/1000 )
 
   ret <- tibble::tibble(x=x,
                         y=dchisq(x, df=df),
-                        type="null"
+                        type="Null"
   )
-  ret <- ret %>% dplyr::mutate(critical=(x>=crit))
-  ret0 <- tibble::tibble(x=crit, y=dchisq(crit, df=df), type="null", statistic=TRUE)
+  ret0 <- tibble::tibble(x=crit, y=dchisq(crit, df=df), type="Null", statistic=TRUE)
   ret <- ret %>% dplyr::bind_rows(ret0)
+  ret <- ret %>% dplyr::mutate(critical=(x>=crit), df=1, ncp=0)
   ret2 <- tibble::tibble(x=x,
                         y=dchisq(x, df=df, ncp=N*w^2),
-                        type="alternative"
+                        type="Alternative"
   )
-  ret2 <- ret2 %>% dplyr::mutate(critical=(x<=crit))
+  ret2 <- ret2 %>% dplyr::mutate(critical=(x<=crit), df=1, ncp=ncp)
   ret <- ret %>% dplyr::bind_rows(ret2)
-  ret <- ret %>% dplyr::mutate(type=factor(type, levels=c("null", "alternative")))
+  ret <- ret %>% dplyr::mutate(type=factor(type, levels=c("Null", "Alternative")))
   ret
 }
 
@@ -2201,12 +2202,18 @@ exp_chisq_power_for_ab_test <- function(dummy, a_ratio=0.5, conversion_rate=0.1,
 #' @export
 tidy.chisq_power_exploratory <- function(x, type="summary") {
   if (type == "summary") {
-    tibble::tibble(df=x$df, sig.level=x$sig.level, w=x$w, beta=x$beta, power=x$power, n=x$required_n)
+    ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, w=x$w, n=x$required_n)
+    ret <- ret %>% dplyr::rename(any_of(c(`Probability of Type 1 Error`="sig.level",
+                                          `Probability of Type 2 Error`="beta",
+                                          `Power`="power",
+                                          `Effect Size (Cohen's w)`="w",
+                                          `Required Sample Size`="n")))
   }
   else if (type == "n_to_power") {
-    x$n_to_power
+    ret <- x$n_to_power
   }
   else if (type == "density") {
-    x$density
+    ret <- x$density
   }
+  ret
 }
