@@ -812,7 +812,7 @@ align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
       # In case model does not know (Missing) level, do fct_other again. (Missing) will be absorbed in Other.
       ret <- forcats::fct_other(ret, keep=training_predictor_levels)
       # If "Other" is not included in the model levels, replace them with NA. They will be handled as NA rows.
-      if ("Other" %nin% training_predictor_levels) {
+      if ("Other" %nin% training_predictor_levels && "Other" %in% levels(ret)) {
         ret <- dplyr::na_if(ret, "Other")
       }
       if (is.factor(training_predictor)) { # Set the same levels as the training data including the level order.
