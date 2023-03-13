@@ -43,6 +43,36 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret
 }
 
+# Generates data for probability density chart for chi-square test.
+# df - Degree of freedom
+# w - Cohen's w
+# N - Sample size
+# crit - Critical chi-square value, for the vertical reference line.
+generate_chisq_density_data_for_power <- function(df, w, N, crit) {
+  # Plot up to 95 percentile.
+  ncp <- N*w^2
+  # In the chart data, cover 0 to 95 percentile of the non-centeral chi-square distribution.
+  l <- qchisq(0.95, df=df, ncp=ncp)
+  x <- seq(from=0, to=l, by=l/1000 )
+
+  ret <- tibble::tibble(x=x,
+                        y=dchisq(x, df=df),
+                        type="Null"
+  )
+  # Prepare and bind one-row data for the vertical reference line for the critical value.
+  ret0 <- tibble::tibble(x=crit, y=dchisq(crit, df=df), type="Null", statistic=TRUE)
+  ret <- ret %>% dplyr::bind_rows(ret0)
+  ret <- ret %>% dplyr::mutate(critical=(x>=crit), df=1, ncp=0)
+  ret2 <- tibble::tibble(x=x,
+                        y=dchisq(x, df=df, ncp=N*w^2),
+                        type="Alternative"
+  )
+  ret2 <- ret2 %>% dplyr::mutate(critical=(x<=crit), df=1, ncp=ncp)
+  ret <- ret %>% dplyr::bind_rows(ret2)
+  ret <- ret %>% dplyr::mutate(type=factor(type, levels=c("Null", "Alternative")))
+  ret
+}
+
 # Generates data for F distribution probability density with critical section and statistic
 # to depict a result of a F test like one-way ANOVA.
 generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
@@ -2133,4 +2163,64 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
     ret <- ret %>% dplyr::rename(`Column`=col, `W Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret
   }
+}
+
+#' dummy - Data frame. Since it is just ignored, it is named dummy here.
+#' @export
+exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, beta=0.2, n_start=10, n_end=100, n_step=10) {
+  power <- 1.0 - beta
+  n = seq(n_start, n_end, by=n_step)
+
+  chisq_power_each <- function(dummy) {
+    df = (rows-1)*(cols-1) # Degree of freedom
+
+    # Sample size vs power calculation
+    n_to_power_res <- pwr::pwr.chisq.test(df=df, N=n, w=w, sig.level=sig.level)
+    n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
+
+    # Required sample size calculation
+    required_n <- (pwr::pwr.chisq.test(df=df, N=NULL, w=w, sig.level=sig.level, power=power))$N
+
+    crit <- qchisq(1-sig.level, df=df) # The chisq value that corresponds to the significance level.
+    density <- generate_chisq_density_data_for_power(df=df, w=w, N=required_n, crit)
+
+    model <- list(n_to_power=n_to_power,
+                  df=df,
+                  w=w,
+                  sig.level=sig.level,
+                  beta=beta,
+                  power=power,
+                  required_n=required_n,
+                  density=density)
+    class(model) <- c("chisq_power_exploratory")
+    model
+  }
+  do_on_each_group(dummy, chisq_power_each, name = "model", with_unnest = FALSE)
+}
+
+#' Chi-Square test power analysis function specialized for AB test. Rows and cols are fixed to 2, and Cohen's w is calculated from the conversion rate difference to detect, etc.
+#' @export
+exp_chisq_power_for_ab_test <- function(dummy, a_ratio=0.5, conversion_rate=0.1, diff=0.01, sig.level=0.05, beta=0.2, n_start=10, n_end=50000, n_step=10) {
+  w <- calculate_cohens_w_for_ab_test(a_ratio, conversion_rate, diff)
+  res <- exp_chisq_power(dummy, rows=2, cols=2, w=w, sig.level=sig.level, beta=beta, n_start=n_start, n_end=n_end, n_step=n_step)
+  res
+}
+
+#' @export
+tidy.chisq_power_exploratory <- function(x, type="summary") {
+  if (type == "summary") {
+    ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, w=x$w, n=x$required_n)
+    ret <- ret %>% dplyr::rename(any_of(c(`Probability of Type 1 Error`="sig.level",
+                                          `Probability of Type 2 Error`="beta",
+                                          `Power`="power",
+                                          `Effect Size (Cohen's w)`="w",
+                                          `Required Sample Size`="n")))
+  }
+  else if (type == "n_to_power") {
+    ret <- x$n_to_power
+  }
+  else if (type == "density") {
+    ret <- x$density
+  }
+  ret
 }

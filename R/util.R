@@ -2199,6 +2199,22 @@ calculate_cohens_w <- function(chi_sq, N) {
   sqrt(chi_sq/N)
 }
 
+# Calculate Cohen's w from the following input for 2x2 AB test case.
+# - Ratio of sample size between A and B
+# - Expected overall conversion rate
+# - Conversion rate difference to detect. i.e. conversion(A) - conversion(B)
+calculate_cohens_w_for_ab_test <- function(a_ratio, conversion_rate, diff) {
+  expected <- matrix(c(a_ratio, 1-a_ratio)) %*% matrix(c(conversion_rate, 1-conversion_rate), nrow = 1)
+  # Divide the diff into a_up and b_down, without changing the overall mean conversion rate.
+  a_up <- diff*(1-a_ratio)*a_ratio
+  # b_down <- diff*a_ratio*(1-a_ratio) # Actually this is same as a_up
+  b_down <- a_up
+  # Calculate Cohen's w.
+  res <- a_up^2/expected[1,1] + a_up^2/expected[1,2] + b_down^2/expected[2,1] + b_down^2/expected[2,2]
+  res <- sqrt(res)
+  res
+}
+
 # References:
 # Cohen's f2 definition: https://en.wikipedia.org/wiki/Effect_size
 #'Calculate Cohen's f squared, which is an effect size of F-test for multiple regression.
