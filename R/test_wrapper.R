@@ -2170,8 +2170,6 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
 exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, beta=0.2, n_start=10, n_end=100, n_step=10) {
   power <- 1.0 - beta
   n = seq(n_start, n_end, by=n_step)
-  # t-test
-  # n_to_power_res <- pwr::pwr.t.test(n=n, d=0.3, sig.level=0.05, type="two.sample")
 
   chisq_power_each <- function(dummy) {
     df = (rows-1)*(cols-1) # Degree of freedom
