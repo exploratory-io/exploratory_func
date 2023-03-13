@@ -2193,7 +2193,7 @@ exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, beta=0
 }
 
 #' @export
-exp_chisq_power_for_ab_test <- function(dummy, a_ratio=0.5, conversion_rate=0.1, diff=0.01, sig.level=0.05, beta=0.2, n_start=10, n_end=100, n_step=10) {
+exp_chisq_power_for_ab_test <- function(dummy, a_ratio=0.5, conversion_rate=0.1, diff=0.01, sig.level=0.05, beta=0.2, n_start=10, n_end=50000, n_step=10) {
   w <- calculate_cohens_w_for_ab_test(a_ratio, conversion_rate, diff)
   res <- exp_chisq_power(dummy, rows=2, cols=2, w=w, sig.level=sig.level, beta=beta, n_start=n_start, n_end=n_end, n_step=n_step)
   res
