@@ -43,9 +43,15 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret
 }
 
+# Generates data for probability density chart for chi-square test.
+# df - Degree of freedom
+# w - Cohen's w
+# N - Sample size
+# crit - Critical chi-square value, for the vertical reference line.
 generate_chisq_density_data_for_power <- function(df, w, N, crit) {
   # Plot up to 95 percentile.
   ncp <- N*w^2
+  # In the chart data, cover 0 to 95 percentile of the non-centeral chi-square distribution.
   l <- qchisq(0.95, df=df, ncp=ncp)
   x <- seq(from=0, to=l, by=l/1000 )
 
@@ -53,6 +59,7 @@ generate_chisq_density_data_for_power <- function(df, w, N, crit) {
                         y=dchisq(x, df=df),
                         type="Null"
   )
+  # Prepare and bind one-row data for the vertical reference line for the critical value.
   ret0 <- tibble::tibble(x=crit, y=dchisq(crit, df=df), type="Null", statistic=TRUE)
   ret <- ret %>% dplyr::bind_rows(ret0)
   ret <- ret %>% dplyr::mutate(critical=(x>=crit), df=1, ncp=0)
@@ -2158,6 +2165,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
   }
 }
 
+#' dummy - Data frame. Since it is just ignored, it is named dummy here.
 #' @export
 exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, beta=0.2, n_start=10, n_end=100, n_step=10) {
   power <- 1.0 - beta
@@ -2192,6 +2200,7 @@ exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, beta=0
   do_on_each_group(dummy, chisq_power_each, name = "model", with_unnest = FALSE)
 }
 
+#' Chi-Square test power analysis function specialized for AB test. Rows and cols are fixed to 2, and Cohen's w is calculated from the conversion rate difference to detect, etc.
 #' @export
 exp_chisq_power_for_ab_test <- function(dummy, a_ratio=0.5, conversion_rate=0.1, diff=0.01, sig.level=0.05, beta=0.2, n_start=10, n_end=50000, n_step=10) {
   w <- calculate_cohens_w_for_ab_test(a_ratio, conversion_rate, diff)
