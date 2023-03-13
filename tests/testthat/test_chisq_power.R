@@ -9,6 +9,7 @@ test_that("chisq AB test power analysis", {
   expect_true(!is.null(model_df$model))
   res <- model_df %>% tidy_rowwise(model, type="summary")
   expect_equal(colnames(res), c("Probability of Type 1 Error","Probability of Type 2 Error","Power","Effect Size (Cohen's w)","Required Sample Size"))
+  expect_equal(res$`Required Sample Size`, 28255.9, tolerance=0.1)
   res <- model_df %>% tidy_rowwise(model, type="n_to_power")
   expect_equal(colnames(res), c("n","power"))
   res <- model_df %>% tidy_rowwise(model, type="density")
