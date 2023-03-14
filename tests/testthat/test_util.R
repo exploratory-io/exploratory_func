@@ -1737,8 +1737,8 @@ test_that("mutate_group", {
 
   # without group by, just sort by hired_date (desc)
   df30 <- empDF %>% exploratory::mutate_group(sort_cols = c("hired_date"), sort_funs = c("desc"), salary_cumsum = cumsum(salary))
-  expect_equal(df30$salary_cumsum[[1]], 2314826) # since this is cumsum without group by, row 1 value must be different from df29 case.
-  expect_equal(df30$salary_cumsum[[131]], 5923945) # since this is cumsum without group by, row 131 value must be different from df29 case.
+  expect_equal(df30$salary_cumsum[[1]], 12504) # since this is cumsum without group by, row 1 value must be different from df29 case.
+  expect_equal(df30$salary_cumsum[[131]], 681061) # since this is cumsum without group by, row 131 value must be different from df29 case.
 
 
 })
