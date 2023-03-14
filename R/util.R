@@ -2432,7 +2432,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
       # If sort_cols and associated categorizing functions are provided,
       # quote the columns/functions with rlang::quo so that dplyr can understand them.
       sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
-      .data %>% dplyr::mutate(.data = .data, ...) %>% dplyr::arrange(!!!sort_args)
+      .data %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(.data = .data, ...)
     } else {
       .data %>% dplyr::mutate(.data = .data, ...)
     }
@@ -3186,7 +3186,7 @@ likert_sigma <- function(x) {
   p0 <- lag(p1)
   p0[is.na(p0)] <- 0
   # Reference: https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
-  # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x), 
+  # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x),
   mapping <- (dnorm(qnorm(p0)) - dnorm(qnorm(p1)))/ratios
   res <- mapping[x0] # Note that factor levels of x0 rather than the face value of x is used for the mapping here.
   res
