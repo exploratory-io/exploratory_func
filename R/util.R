@@ -2422,11 +2422,18 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
 #' @param .data - data frame
 #' @param group_cols - Columns to group_by
 #' @param group_funs - Functions to apply to group_by columns
+#' @param sort_cols - Columns to sort
+#' @param sort_funs - Either desc or none and none means asc.
 #' @param ... - Name-value pairs of mutate functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
 #' @export
-mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, ...) {
+mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, sort_cols = NULL, sort_funs = NULL, ...) {
   ret <- if(length(group_cols) == 0) {
-    .data %>% dplyr::mutate(.data = .data, ...)
+    if (!is.null(sort_cols) && !is.null(sort_funs)) {
+      sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+      .data %>% dplyr::mutate(.data = .data, ...) %>% dplyr::arrange(!!!sort_args)
+    } else {
+      .data %>% dplyr::mutate(.data = .data, ...)
+    }
   } else {
     # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
     # when group_cols conflict with group columns in previous steps.
@@ -2444,14 +2451,30 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
         name_list <- group_cols
       }
       names(groupby_args) <- name_list
-      # make sure to sort result by group by columns
-      .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
-    } else {
-      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+      if (!is.null(sort_cols) && !is.null(sort_funs)) {
+        sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+        .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      } else {
         # make sure to sort result by group by columns
-        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+        .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      }
+    } else {
+      if(!is.null(group_cols)) { # In case only group_by columns are provided, group_by with the columns
+        if (!is.null(sort_cols) && !is.null(sort_funs)) {
+          sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+          # make sure to sort result by group by columns
+          .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+        } else {
+          # make sure to sort result by group by columns
+          .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+        }
       } else { # In case no group_by columns are provided,skip group_by
-        .data %>% dplyr::mutate(...)
+        if (!is.null(sort_cols) && !is.null(sort_funs)) {
+          sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+          .data %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...)
+        } else {
+          .data %>% dplyr::mutate(...)
+        }
       }
     }
   }
