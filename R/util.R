@@ -2429,7 +2429,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
 mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, sort_cols = NULL, sort_funs = NULL, ...) {
   ret <- if(length(group_cols) == 0) {
     if (!is.null(sort_cols) && !is.null(sort_funs)) {
-      # If sort_cols and associated categorizing functions are provided,
+      # If sort_cols and associated sort functions are provided,
       # quote the columns/functions with rlang::quo so that dplyr can understand them.
       sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
       .data %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(.data = .data, ...)
@@ -2443,7 +2443,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
     groupby_args <- list() # default empty list
     name_list <- list()
     name_index = 1
-    # If group_by columns and associated sort functions are provided,
+    # If group_by columns and associated categorizing functionts are provided,
     # quote the columns/functions with rlang::quo so that dplyr can understand them.
     if (!is.null(group_cols) && !is.null(group_funs)) {
       groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
