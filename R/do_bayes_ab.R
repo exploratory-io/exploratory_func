@@ -161,6 +161,17 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
   }
 }
 
+exp_bayes_ab_aggregated <- function(df, a_b_identifier, conversion_rate, count, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 1, ...){
+  a_b_identifier_col <- col_name(substitute(a_b_identifier))
+  conversion_rate_col <- col_name(substitute(conversion_rate))
+  count_col <- col_name(substitute(count))
+  df <- df %>% mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
+  df <- df %>% pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
+  df <- df %>% mutate(converted=as.logical(converted))
+  res <- exp_bayes_ab(df, converted, !!rlang::sym(a_b_identifier_col), count = n, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 1, ...)
+  res
+}
+
 #' Run bayesTest from bayesAB package
 #' @param df Data frame to run bayes ab test
 #' @param a_b_identifier A column with 2 unique values to distinguish groups
