@@ -382,14 +382,12 @@ test_that("test exp_chisq with numeric", {
   expect_equal(class(ret$gear), "numeric")
   expect_equal(class(ret$carb), "numeric")
 })
-
 test_that("test exp_chisq with integer", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=as.integer(gear), carb=as.integer(carb)), gear, carb) # integer type should be kept in the model
   ret <- model_df %>% tidy_rowwise(model, type="residuals")
   expect_equal(class(ret$gear), "integer")
   expect_equal(class(ret$carb), "integer")
 })
-
 test_that("test exp_chisq with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
   observed <- ret %>% tidy_rowwise(model, type="observed")
@@ -406,6 +404,20 @@ test_that("test exp_chisq with group_by with single class category in one of the
   summary <- ret %>% glance_rowwise(model)
   expect_equal(nrow(summary), 2) # summary for 2 groups, one of which is a row with Note, should be shown.
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
+})
+
+test_that("test exp_chisq_ab", {
+  df <- tibble::tibble(cat=c('A','B'), n=c(100,200), cr=c(0.22, 0.2))
+  ret <- df %>% exp_chisq_ab(cat, cr, n)
+
+  observed <- ret %>% tidy_rowwise(model, type="observed")
+  summary <- ret %>% glance_rowwise(model)
+  residuals <- ret %>% tidy_rowwise(model, type="residuals")
+  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
+                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  ))
+  expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
+  prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
 })
 
 test_that("test exp_ttest", {

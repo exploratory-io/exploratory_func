@@ -302,9 +302,9 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   #    https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
   #    https://aue.repo.nii.ac.jp/?action=repository_uri&item_id=785&file_id=15&file_no=1
   # 2. With Yates's correction residuals do not add up to chi-square value, which makes contributions not adding up to 100%.
-  var1_col <- col_name(substitute(var1))
-  var2_col <- col_name(substitute(var2))
-  value_col <- col_name(substitute(value))
+  var1_col <- tidyselect::vars_select(names(df), !! rlang::enquo(var1))
+  var2_col <- tidyselect::vars_select(names(df), !! rlang::enquo(var2))
+  value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
   grouped_cols <- grouped_by(df)
 
   if (!is.null(func1)) {
@@ -360,7 +360,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
       # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
       df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
-      if (is.null(value_col)) {
+      if (is.null(value_col) || length(value_col) == 0) { # It seems tht if value_col is not specified value_col can be named character(0), which can be detected by length(value_col)=0.
         df <- df %>% dplyr::summarize(.temp_value_col=n())
       }
       else {
@@ -419,6 +419,18 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     })
   }
   do_on_each_group(df, chisq.test_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+exp_chisq_ab <- function(df, a_b_identifier, conversion_rate, count, correct = FALSE, sig.level = 0.05) {
+  a_b_identifier_col <- col_name(substitute(a_b_identifier))
+  conversion_rate_col <- col_name(substitute(conversion_rate))
+  count_col <- col_name(substitute(count))
+  df <- df %>% mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
+  df <- df %>% pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
+  res <- exp_chisq(df, !!rlang::sym(a_b_identifier_col), converted, value = n, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE,
+                      test_sig_level = sig.level, sig.level = sig.level, w = NULL, power = NULL, beta = NULL)
+  res
 }
 
 #' @export
