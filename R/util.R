@@ -2422,11 +2422,20 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
 #' @param .data - data frame
 #' @param group_cols - Columns to group_by
 #' @param group_funs - Functions to apply to group_by columns
+#' @param sort_cols - Columns to sort
+#' @param sort_funs - Either desc or none and none means asc.
 #' @param ... - Name-value pairs of mutate functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
 #' @export
-mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, ...) {
+mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, sort_cols = NULL, sort_funs = NULL, ...) {
   ret <- if(length(group_cols) == 0) {
-    .data %>% dplyr::mutate(.data = .data, ...)
+    if (!is.null(sort_cols) && !is.null(sort_funs)) {
+      # If sort_cols and associated sort functions are provided,
+      # quote the columns/functions with rlang::quo so that dplyr can understand them.
+      sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+      .data %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(.data = .data, ...)
+    } else {
+      .data %>% dplyr::mutate(.data = .data, ...)
+    }
   } else {
     # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
     # when group_cols conflict with group columns in previous steps.
@@ -2436,7 +2445,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
     name_index = 1
     # If group_by columns and associated categorizing functionts are provided,
     # quote the columns/functions with rlang::quo so that dplyr can understand them.
-    if (!is.null(group_cols) && !is.null(group_funs)) {
+    if (!is.null(group_funs)) {
       groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
       # Set names of group_by columns in the output.
       name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
@@ -2444,14 +2453,25 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
         name_list <- group_cols
       }
       names(groupby_args) <- name_list
-      # make sure to sort result by group by columns
-      .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      # If sort_cols and associated sort functions are provided,
+      # quote the columns/functions with rlang::quo so that dplyr can understand them.
+      if (!is.null(sort_cols) && !is.null(sort_funs)) {
+        sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+        .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      } else {
+        # make sure to sort result by group by columns
+        .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      }
     } else {
-      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+      # If sort_cols and associated sort functions are provided,
+      # quote the columns/functions with rlang::quo so that dplyr can understand them.
+      if (!is.null(sort_cols) && !is.null(sort_funs)) {
+        sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+        # make sure to sort result by group by columns
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      } else {
         # make sure to sort result by group by columns
         .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
-      } else { # In case no group_by columns are provided,skip group_by
-        .data %>% dplyr::mutate(...)
       }
     }
   }
@@ -3155,7 +3175,7 @@ likert_sigma <- function(x) {
   p0 <- lag(p1)
   p0[is.na(p0)] <- 0
   # Reference: https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
-  # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x), 
+  # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x),
   mapping <- (dnorm(qnorm(p0)) - dnorm(qnorm(p1)))/ratios
   res <- mapping[x0] # Note that factor levels of x0 rather than the face value of x is used for the mapping here.
   res

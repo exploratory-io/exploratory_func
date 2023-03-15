@@ -1725,6 +1725,21 @@ test_that("mutate_group", {
   expect_equal(as.character(head(df27)$hired_date_weekend[[2]]), "Weekday")
   expect_equal(head(df27)$salary_cumsum[[3]], 13213)
 
+  # group by job and sort by hired_date (asc)
+  df28 <- empDF %>% exploratory::mutate_group(group_cols = c("job"), group_funs = c("none"), sort_cols = c("hired_date"), sort_funs = c("none"), salary_cumsum = cumsum(salary))
+  expect_equal(df28$salary_cumsum[[1]], 10312) # since this is cumsum, row 1 is the first value for the group "health care"
+  expect_equal(df28$salary_cumsum[[131]], 986268) # since this is cumsum, row 131 is the total value for the group "health care"
+
+  # group by job and sort by hired_date (desc)
+  df29 <- empDF %>% exploratory::mutate_group(group_cols = c("job"), group_funs = c("none"), sort_cols = c("hired_date"), sort_funs = c("desc"), salary_cumsum = cumsum(salary))
+  expect_equal(df29$salary_cumsum[[1]], 5538) # since this is cumsum, row 1 is the first value for the group "health care" and this must be different from df28 case.
+  expect_equal(df29$salary_cumsum[[131]], 986268) # since this is cumsum, row 131 is the max value for the group "health care" and this must be same as df28 case.
+
+  # without group by, just sort by hired_date (desc)
+  df30 <- empDF %>% exploratory::mutate_group(sort_cols = c("hired_date"), sort_funs = c("desc"), salary_cumsum = cumsum(salary))
+  expect_equal(df30$salary_cumsum[[1]], 12504) # since this is cumsum without group by, row 1 value must be different from df29 case.
+  expect_equal(df30$salary_cumsum[[131]], 681061) # since this is cumsum without group by, row 131 value must be different from df29 case.
+
 
 })
 
