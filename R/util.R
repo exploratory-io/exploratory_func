@@ -2445,7 +2445,7 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
     name_index = 1
     # If group_by columns and associated categorizing functionts are provided,
     # quote the columns/functions with rlang::quo so that dplyr can understand them.
-    if (!is.null(group_cols) && !is.null(group_funs)) {
+    if (!is.null(group_funs)) {
       groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
       # Set names of group_by columns in the output.
       name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
@@ -2463,26 +2463,15 @@ mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_fun
         .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
       }
     } else {
-      if(!is.null(group_cols)) { # In case only group_by columns are provided, group_by with the columns
-        # If sort_cols and associated sort functions are provided,
-        # quote the columns/functions with rlang::quo so that dplyr can understand them.
-        if (!is.null(sort_cols) && !is.null(sort_funs)) {
-          sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
-          # make sure to sort result by group by columns
-          .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
-        } else {
-          # make sure to sort result by group by columns
-          .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
-        }
-      } else { # In case no group_by columns are provided,skip group_by
-        # If sort_cols and associated sort functions are provided,
-        # quote the columns/functions with rlang::quo so that dplyr can understand them.
-        if (!is.null(sort_cols) && !is.null(sort_funs)) {
-          sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
-          .data %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...)
-        } else {
-          .data %>% dplyr::mutate(...)
-        }
+      # If sort_cols and associated sort functions are provided,
+      # quote the columns/functions with rlang::quo so that dplyr can understand them.
+      if (!is.null(sort_cols) && !is.null(sort_funs)) {
+        sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+        # make sure to sort result by group by columns
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      } else {
+        # make sure to sort result by group by columns
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
       }
     }
   }
