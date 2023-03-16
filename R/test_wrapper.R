@@ -422,7 +422,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 }
 
 #' @export
-exp_chisq_ab <- function(df, a_b_identifier, conversion_rate, count, correct = FALSE, sig.level = 0.05) {
+exp_chisq_ab_aggregated <- function(df, a_b_identifier, conversion_rate, count, correct = FALSE, sig.level = 0.05) {
   a_b_identifier_col <- col_name(substitute(a_b_identifier))
   conversion_rate_col <- col_name(substitute(conversion_rate))
   count_col <- col_name(substitute(count))

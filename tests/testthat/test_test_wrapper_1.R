@@ -406,9 +406,9 @@ test_that("test exp_chisq with group_by with single class category in one of the
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
 })
 
-test_that("test exp_chisq_ab", {
+test_that("test exp_chisq_ab_aggregated", {
   df <- tibble::tibble(cat=c('A','B'), n=c(100,200), cr=c(0.22, 0.2))
-  ret <- df %>% exp_chisq_ab(cat, cr, n)
+  ret <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
 
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
