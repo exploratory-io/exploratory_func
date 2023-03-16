@@ -453,6 +453,10 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       conversion_rate_pct = seq(0, 1, 0.001) * 100,
       probability_density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
     )
+  } else if (type == "observed") {
+    df <- bind_rows(tibble(ab_identifier='A', converted=x$inputs$A_data$A), tibble(ab_identifier='B', converted=x$inputs$B_data$B))
+    df <- df %>% dplyr::mutate(converted = as.logical(converted), observed = 1)
+    df
   } else {
     stop(paste0(type, " is not defined as type"))
   }
