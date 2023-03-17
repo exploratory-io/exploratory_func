@@ -165,9 +165,9 @@ exp_bayes_ab_aggregated <- function(df, a_b_identifier, conversion_rate, count, 
   a_b_identifier_col <- col_name(substitute(a_b_identifier))
   conversion_rate_col <- col_name(substitute(conversion_rate))
   count_col <- col_name(substitute(count))
-  df <- df %>% mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
-  df <- df %>% pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
-  df <- df %>% mutate(converted=as.logical(converted))
+  df <- df %>% dplyr::mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% dplyr::select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
+  df <- df %>% tidyr::pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
+  df <- df %>% dplyr::mutate(converted=as.logical(converted))
   res <- exp_bayes_ab(df, converted, !!rlang::sym(a_b_identifier_col), count = n, prior_mean = prior_mean, prior_sd = prior_sd, type = "model", revert_ab = revert_ab, seed = seed, ...)
   res
 }

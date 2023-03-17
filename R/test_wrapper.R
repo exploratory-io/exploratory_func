@@ -426,8 +426,8 @@ exp_chisq_ab_aggregated <- function(df, a_b_identifier, conversion_rate, count, 
   a_b_identifier_col <- col_name(substitute(a_b_identifier))
   conversion_rate_col <- col_name(substitute(conversion_rate))
   count_col <- col_name(substitute(count))
-  df <- df %>% mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
-  df <- df %>% pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
+  df <- df %>% dplyr::mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% dplyr::select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
+  df <- df %>% tidyr::pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
   res <- exp_chisq(df, !!rlang::sym(a_b_identifier_col), converted, value = n, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE,
                       test_sig_level = sig.level, sig.level = sig.level, w = NULL, power = NULL, beta = NULL)
   res
