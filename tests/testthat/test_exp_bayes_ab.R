@@ -112,9 +112,8 @@ test_that("test exp_bayes_ab_aggregated with multiple rows per group", {
   expect_equal(colnames(res),c("ab_identifier","converted","observed"))
 })
 
-test_that("test exp_bayes_ab_aggregated with multiple rows per group", {
+test_that("test exp_bayes_ab_aggregated with more than 2 groups", {
   df <- tibble::tibble(cat=c('A','B','C'), n=c(100,200,300), cr=c(0.22, 0.2, 0.2))
-  # revert A/B - character case
   expect_error({
     model_df <- df %>% exp_bayes_ab_aggregated(cat, cr, n, prior_mean=0.1, prior_sd=0.01, seed=0)
   }, "A/B must be 2 unique identifiers")
