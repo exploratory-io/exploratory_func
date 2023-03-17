@@ -440,15 +440,15 @@ test_that("test exp_chisq_ab_aggregated with more than 2 groups", {
   # Here we test the case where there are more than 2 groups.
   # It's not the most common use we expect, but this should also work as 2xN chi-square test.
   df <- tibble::tibble(cat=c('A','B','C'), n=c(100,200,300), cr=c(0.22, 0.2, 0.2))
-    model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
-  summary <- ret %>% glance_rowwise(model)
+  model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
+  summary <- model_df %>% glance_rowwise(model)
   expect_equal(summary$`Number of Rows`,600) # Number of rows should be added up.
   expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
                     "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
-  residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
+  residuals <- model_df %>% tidy_rowwise(model, type="residuals")
+  prob_dist <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
 
 test_that("test exp_ttest", {
