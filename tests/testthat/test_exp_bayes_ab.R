@@ -86,11 +86,10 @@ test_that("test exp_bayes_ab test with summary output", {
 })
 
 test_that("test exp_bayes_ab_aggregated", {
-  set.seed(0)
   df <- tibble::tibble(cat=c('A','B'), n=c(100,200), cr=c(0.22, 0.2))
 
   # revert A/B - character case
-  model_df <- df %>% exp_bayes_ab_aggregated(cat, cr, n, prior_mean=0.1, prior_sd=0.01)
+  model_df <- df %>% exp_bayes_ab_aggregated(cat, cr, n, prior_mean=0.1, prior_sd=0.01, seed=0)
   res <- model_df %>% tidy_rowwise(model, type = "summary", pretty.name = TRUE)
   res <- model_df %>% tidy_rowwise(model, type = "improvement")
   res <- model_df %>% tidy_rowwise(model, type = "posteriors")
