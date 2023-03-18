@@ -161,6 +161,8 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
   }
 }
 
+#' Runs Bayes A/B test with already aggregated data with conversion rates and sample sizes.
+#' Wrapper around exp_bayes_ab.
 exp_bayes_ab_aggregated <- function(df, a_b_identifier, conversion_rate, count, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 1, ...){
   a_b_identifier_col <- col_name(substitute(a_b_identifier))
   conversion_rate_col <- col_name(substitute(conversion_rate))
