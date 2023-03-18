@@ -161,6 +161,21 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
   }
 }
 
+#' Runs Bayes A/B test with already aggregated data with conversion rates and sample sizes.
+#' Wrapper around exp_bayes_ab.
+exp_bayes_ab_aggregated <- function(df, a_b_identifier, conversion_rate, count, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 1, ...){
+  a_b_identifier_col <- col_name(substitute(a_b_identifier))
+  conversion_rate_col <- col_name(substitute(conversion_rate))
+  count_col <- col_name(substitute(count))
+  # Keep only necessary columns before pivot_longer to avoid unnecessary copies.
+  df <- df %>% dplyr::select(!!rlang::sym(a_b_identifier_col), !!rlang::sym(conversion_rate_col), !!rlang::sym(count_col))
+  df <- df %>% dplyr::mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% dplyr::select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
+  df <- df %>% tidyr::pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
+  df <- df %>% dplyr::mutate(converted=as.logical(converted))
+  res <- exp_bayes_ab(df, converted, !!rlang::sym(a_b_identifier_col), count = n, prior_mean = prior_mean, prior_sd = prior_sd, type = "model", revert_ab = revert_ab, seed = seed, ...)
+  res
+}
+
 #' Run bayesTest from bayesAB package
 #' @param df Data frame to run bayes ab test
 #' @param a_b_identifier A column with 2 unique values to distinguish groups
@@ -442,6 +457,10 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       conversion_rate_pct = seq(0, 1, 0.001) * 100,
       probability_density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
     )
+  } else if (type == "observed") {
+    df <- bind_rows(tibble(ab_identifier='A', converted=x$inputs$A_data$A), tibble(ab_identifier='B', converted=x$inputs$B_data$B))
+    df <- df %>% dplyr::mutate(converted = as.logical(converted), observed = 1)
+    df
   } else {
     stop(paste0(type, " is not defined as type"))
   }
