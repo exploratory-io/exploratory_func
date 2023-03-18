@@ -360,7 +360,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
       # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
       df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
-      if (is.null(value_col) || length(value_col) == 0) { # It seems tht if value_col is not specified value_col can be named character(0), which can be detected by length(value_col)=0.
+      if (is.null(value_col) || length(value_col) == 0) { # It seems that if value_col is not specified value_col can be named character(0), which can be detected by length(value_col)=0.
         df <- df %>% dplyr::summarize(.temp_value_col=n())
       }
       else {
