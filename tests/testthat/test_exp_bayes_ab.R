@@ -122,7 +122,6 @@ test_that("test exp_bayes_ab_aggregated with more than 2 groups", {
 })
 
 test_that("test exp_bayes_ab_aggregated with only group A", {
-  # It's not the most common use we expect, but this still also work.
   df <- tibble::tibble(cat=c('A'), n=c(100), cr=c(0.22))
   expect_error({
     model_df <- df %>% exp_bayes_ab_aggregated(cat, cr, n, prior_mean=0.1, prior_sd=0.01, seed=0)

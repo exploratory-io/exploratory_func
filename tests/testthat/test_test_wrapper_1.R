@@ -451,6 +451,13 @@ test_that("test exp_chisq_ab_aggregated with more than 2 groups", {
   prob_dist <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
 
+test_that("test exp_chisq_ab_aggregated with only group A", {
+  df <- tibble::tibble(cat=c('A'), n=c(100), cr=c(0.22))
+  expect_error({
+    model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
+  }, "The explanatory variable needs to have 2 or more unique values.")
+})
+
 test_that("test exp_ttest", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
