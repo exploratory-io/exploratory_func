@@ -89,6 +89,7 @@ test_that("test exp_bayes_ab_aggregated", {
   # revert A/B - character case
   model_df <- df %>% exp_bayes_ab_aggregated(cat, cr, n, prior_mean=0.1, prior_sd=0.01, seed=0)
   res <- model_df %>% tidy_rowwise(model, type = "summary", pretty.name = TRUE)
+  expect_equal(res$`Chance of Being Better`, c(0.330, 0.670), tolerance=0.005)
   res <- model_df %>% tidy_rowwise(model, type = "improvement")
   res <- model_df %>% tidy_rowwise(model, type = "posteriors")
   res <- model_df %>% tidy_rowwise(model, type = "prior")
@@ -103,6 +104,7 @@ test_that("test exp_bayes_ab_aggregated with multiple rows per group", {
   # revert A/B - character case
   model_df <- df %>% exp_bayes_ab_aggregated(cat, cr, n, prior_mean=0.1, prior_sd=0.01, seed=0)
   res <- model_df %>% tidy_rowwise(model, type = "summary", pretty.name = TRUE)
+  expect_equal(res$`Chance of Being Better`, c(0.254, 0.746), tolerance=0.005)
   expect_equal(res$`Number of Rows`,c(200,400)) # Number of rows should be added up.
   expect_equal(res$`Conversion Rate`,c(0.22,0.2)) # Ratios should be weight-averaged.
   res <- model_df %>% tidy_rowwise(model, type = "improvement")
