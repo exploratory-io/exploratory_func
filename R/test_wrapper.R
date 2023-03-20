@@ -2181,7 +2181,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
 
 #' dummy - Data frame. Since it is just ignored, it is named dummy here.
 #' @export
-exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.3, sig.level=0.05, beta=0.2, n_start=10, n_end=100, n_step=10) {
+exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.1, sig.level=0.05, beta=0.2, n_start=10, n_end=1000, n_step=10) {
   power <- 1.0 - beta
   n = seq(n_start, n_end, by=n_step)
 
@@ -2223,11 +2223,12 @@ exp_chisq_power_for_ab_test <- function(dummy, a_ratio=0.5, conversion_rate=0.1,
 #' @export
 tidy.chisq_power_exploratory <- function(x, type="summary") {
   if (type == "summary") {
-    ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, w=x$w, n=x$required_n)
+    ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, w=x$w, df=x$df, n=x$required_n)
     ret <- ret %>% dplyr::rename(any_of(c(`Probability of Type 1 Error`="sig.level",
                                           `Probability of Type 2 Error`="beta",
                                           `Power`="power",
                                           `Effect Size (Cohen's w)`="w",
+                                          `Degree of Freedom`="df",
                                           `Required Sample Size`="n")))
   }
   else if (type == "n_to_power") {
