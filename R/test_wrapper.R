@@ -26,6 +26,39 @@ generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "
   ret
 }
 
+generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 0.05, alternative = "two.sided") {
+  ncp <- d * (1/sqrt(1/n1 + 1/n2))
+  l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
+
+  x <- seq(from=-l,to=l,by=l/500 )
+  ret <- tibble::tibble(x=x, y=dt(x, df=df), type="Null")
+
+  if (alternative == "two.sided") {
+    tt <- qt(1-sig_level/2, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), type="Alternative")
+    ret2 <- ret2 %>% mutate(critical=(x<=tt))
+  }
+  else if (alternative == "greater") {
+    tt <- qt(1-sig_level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt))
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), type="Alternative")
+    ret2 <- ret2 %>% mutate(critical=(x<=tt))
+  }
+  else { # alternative == "less"
+    tt <- qt(sig_level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x<=tt))
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=-ncp), type="Alternative")
+    ret2 <- ret2 %>% mutate(critical=(x>=tt))
+  }
+  ret <- ret %>% mutate(df=df)
+
+  ret3 <- tibble::tibble(x=t, y=dt(x, df=df), type="Null", statistic=TRUE)
+  ret <- bind_rows(ret, ret2, ret3)
+  ret <- ret %>% dplyr::mutate(type=factor(type, levels=c("Null", "Alternative")))
+  ret
+}
+
 # Generates data for chi-square distribution probability density with critical section and statistic
 # to depict a result of a chi-square test.
 generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
