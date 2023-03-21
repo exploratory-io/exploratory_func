@@ -2281,7 +2281,7 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
   n1 = a_ratio*n
   n2 = (1-a_ratio)*n
 
-  chisq_power_each <- function(dummy) {
+  ttest_power_each <- function(dummy) {
     # Sample size vs power calculation
     n_to_power_res <- pwr::pwr.t2n.test(n1=n1, n2=n2, d=d, sig.level=sig.level, alternative = alternative)
     n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
@@ -2289,19 +2289,20 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
     # Required sample size calculation
     required_n <- (pwr::pwr.t2nr.test(r=a_ratio, d=d, sig.level=sig.level, power=power, alternative = alternative))$n
 
-    crit <- qchisq(1-sig.level, df=df) # The chisq value that corresponds to the significance level.
-    density <- generate_chisq_density_data_for_power(df=df, w=w, N=required_n, crit)
+    df <- required_n - 2 # Assuming Student's independent samples t-test sinde Welch's requires standard deviations as extra inputs.
+    crit <- qt(1-sig.level, df=df) # The t statistic that corresponds to the significance level. TODO: handle different alternative values.
+    density <- generate_ttest_density_data_for_power(d=d, n1=n1, n2=n2, t=crit, df=df, sig_level = sig.level, alternative = alternative)
 
     model <- list(n_to_power=n_to_power,
                   df=df,
-                  w=w,
+                  d=d,
                   sig.level=sig.level,
                   beta=beta,
                   power=power,
                   required_n=required_n,
                   density=density)
-    class(model) <- c("chisq_power_exploratory")
+    class(model) <- c("ttest_power_exploratory")
     model
   }
-  do_on_each_group(dummy, chisq_power_each, name = "model", with_unnest = FALSE)
+  do_on_each_group(dummy, ttest_power_each, name = "model", with_unnest = FALSE)
 }
