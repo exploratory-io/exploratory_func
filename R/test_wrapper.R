@@ -31,24 +31,24 @@ generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 
   l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
 
   x <- seq(from=-l,to=l,by=l/500 )
-  ret <- tibble::tibble(x=x, y=dt(x, df=df), type="Null")
+  ret <- tibble::tibble(x=x, y=dt(x, df=df), ncp=0, type="Null")
 
   if (alternative == "two.sided") {
     tt <- qt(1-sig_level/2, df=df) # Threshold t for critical section.
     ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
-    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), type="Alternative")
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), ncp=ncp, type="Alternative")
     ret2 <- ret2 %>% mutate(critical=(x<=tt))
   }
   else if (alternative == "greater") {
     tt <- qt(1-sig_level, df=df) # Threshold t for critical section.
     ret <- ret %>% mutate(critical=(x>=tt))
-    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), type="Alternative")
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), ncp=ncp,type="Alternative")
     ret2 <- ret2 %>% mutate(critical=(x<=tt))
   }
   else { # alternative == "less"
     tt <- qt(sig_level, df=df) # Threshold t for critical section.
     ret <- ret %>% mutate(critical=(x<=tt))
-    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=-ncp), type="Alternative")
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=-ncp), ncp=-ncp, type="Alternative")
     ret2 <- ret2 %>% mutate(critical=(x>=tt))
   }
   ret <- ret %>% mutate(df=df)
@@ -2291,6 +2291,8 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
 
     df <- required_n - 2 # Assuming Student's independent samples t-test sinde Welch's requires standard deviations as extra inputs.
     crit <- qt(1-sig.level, df=df) # The t statistic that corresponds to the significance level. TODO: handle different alternative values.
+    n1 = a_ratio*required_n
+    n2 = (1-a_ratio)*required_n
     density <- generate_ttest_density_data_for_power(d=d, n1=n1, n2=n2, t=crit, df=df, sig_level = sig.level, alternative = alternative)
 
     model <- list(n_to_power=n_to_power,
@@ -2305,4 +2307,24 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
     model
   }
   do_on_each_group(dummy, ttest_power_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.ttest_power_exploratory <- function(x, type="summary") {
+  if (type == "summary") {
+    ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, d=x$d, df=x$df, n=x$required_n)
+    ret <- ret %>% dplyr::rename(any_of(c(`Probability of Type 1 Error`="sig.level",
+                                          `Probability of Type 2 Error`="beta",
+                                          `Power`="power",
+                                          `Effect Size (Cohen's d)`="d",
+                                          `Degree of Freedom`="df",
+                                          `Required Sample Size`="n")))
+  }
+  else if (type == "n_to_power") {
+    ret <- x$n_to_power
+  }
+  else if (type == "density") {
+    ret <- x$density
+  }
+  ret
 }
