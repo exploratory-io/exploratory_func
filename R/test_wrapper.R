@@ -2239,3 +2239,36 @@ tidy.chisq_power_exploratory <- function(x, type="summary") {
   }
   ret
 }
+
+#' dummy - Data frame. Since it is just ignored, it is named dummy here.
+#' @export
+exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2, alternative="two.sided", n_start=10, n_end=1000, n_step=10) {
+  power <- 1.0 - beta
+  n = seq(n_start, n_end, by=n_step)
+  n1 = a_ratio*n
+  n2 = (1-a_ratio)*n
+
+  chisq_power_each <- function(dummy) {
+    # Sample size vs power calculation
+    n_to_power_res <- pwr::pwr.t2n.test(n1=n1, n2=n2, d=d, sig.level=sig.level, alternative = alternative)
+    n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
+
+    # Required sample size calculation
+    required_n <- (pwr::pwr.t2nr.test(r=a_ratio, d=d, sig.level=sig.level, power=power, alternative = alternative))$n
+
+    crit <- qchisq(1-sig.level, df=df) # The chisq value that corresponds to the significance level.
+    density <- generate_chisq_density_data_for_power(df=df, w=w, N=required_n, crit)
+
+    model <- list(n_to_power=n_to_power,
+                  df=df,
+                  w=w,
+                  sig.level=sig.level,
+                  beta=beta,
+                  power=power,
+                  required_n=required_n,
+                  density=density)
+    class(model) <- c("chisq_power_exploratory")
+    model
+  }
+  do_on_each_group(dummy, chisq_power_each, name = "model", with_unnest = FALSE)
+}
