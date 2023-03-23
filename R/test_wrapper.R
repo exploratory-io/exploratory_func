@@ -26,8 +26,13 @@ generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "
   ret
 }
 
-generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 0.05, alternative = "two.sided") {
-  ncp <- d * (1/sqrt(1/n1 + 1/n2))
+generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 0.05, alternative = "two.sided", paired = TRUE) {
+  if (!paired) {
+    ncp <- d * (1/sqrt(1/n1 + 1/n2))
+  }
+  else {
+    ncp <- d * sqrt(n1) # Paired case. Assuming n1 == n2.
+  }
   l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
 
   x <- seq(from=-l,to=l,by=l/500 )
@@ -2300,6 +2305,7 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
     # Required sample size calculation
     if (!paired) {
       required_n <- (pwr::pwr.t2nr.test(r=a_ratio, d=d_signed, sig.level=sig.level, power=power, alternative = alternative))$n
+    }
     else {
       required_n <- (pwr::pwr.t.test(d=d_signed, sig.level=sig.level, power=power, type="paired", alternative = alternative))$n
     }
@@ -2307,8 +2313,9 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
 
     if (!paired) {
       df <- required_n - 2 # Assuming Student's independent samples t-test sinde Welch's requires standard deviations as extra inputs.
+    }
     else {
-      df <- n - 1
+      df <- required_n - 1
     }
     if (alternative == "greater") {
       crit <- qt(1-sig.level, df=df) # The t statistic that corresponds to the significance level.
@@ -2320,9 +2327,15 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
       crit <- qt(1-sig.level/2, df=df)
     }
 
-    n1 = a_ratio*required_n
-    n2 = (1-a_ratio)*required_n
-    density <- generate_ttest_density_data_for_power(d=d, n1=n1, n2=n2, t=crit, df=df, sig_level = sig.level, alternative = alternative)
+    if (!paired) {
+      n1 = a_ratio*required_n
+      n2 = (1-a_ratio)*required_n
+    }
+    else {
+      n1 = required_n
+      n2 = required_n
+    }
+    density <- generate_ttest_density_data_for_power(d=d, n1=n1, n2=n2, t=crit, df=df, sig_level = sig.level, alternative = alternative, paired = paired)
 
     model <- list(n_to_power=n_to_power,
                   df=df,
