@@ -2275,22 +2275,51 @@ tidy.chisq_power_exploratory <- function(x, type="summary") {
 
 #' dummy - Data frame. Since it is just ignored, it is named dummy here.
 #' @export
-exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2, alternative="two.sided", n_start=10, n_end=1000, n_step=10) {
+exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2, alternative="two.sided", paired=FALSE, n_start=10, n_end=1000, n_step=10) {
   power <- 1.0 - beta
   n = seq(n_start, n_end, by=n_step)
   n1 = a_ratio*n
   n2 = (1-a_ratio)*n
+  if (alternative == "less") {
+    d_signed <- -d
+  }
+  else {
+    d_signed <- d
+  }
 
   ttest_power_each <- function(dummy) {
     # Sample size vs power calculation
-    n_to_power_res <- pwr::pwr.t2n.test(n1=n1, n2=n2, d=d, sig.level=sig.level, alternative = alternative)
+    if (!paired) {
+      n_to_power_res <- pwr::pwr.t2n.test(n1=n1, n2=n2, d=d_signed, sig.level=sig.level, alternative = alternative)
+    }
+    else {
+      n_to_power_res <- pwr::pwr.t.test(n=n, d=d_signed, sig.level=sig.level, type="paired", alternative = alternative)
+    }
     n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
 
     # Required sample size calculation
-    required_n <- (pwr::pwr.t2nr.test(r=a_ratio, d=d, sig.level=sig.level, power=power, alternative = alternative))$n
+    if (!paired) {
+      required_n <- (pwr::pwr.t2nr.test(r=a_ratio, d=d_signed, sig.level=sig.level, power=power, alternative = alternative))$n
+    else {
+      required_n <- (pwr::pwr.t.test(d=d_signed, sig.level=sig.level, power=power, type="paired", alternative = alternative))$n
+    }
 
-    df <- required_n - 2 # Assuming Student's independent samples t-test sinde Welch's requires standard deviations as extra inputs.
-    crit <- qt(1-sig.level, df=df) # The t statistic that corresponds to the significance level. TODO: handle different alternative values.
+
+    if (!paired) {
+      df <- required_n - 2 # Assuming Student's independent samples t-test sinde Welch's requires standard deviations as extra inputs.
+    else {
+      df <- n - 1
+    }
+    if (alternative == "greater") {
+      crit <- qt(1-sig.level, df=df) # The t statistic that corresponds to the significance level.
+    }
+    else if (alternative == "less") {
+      crit <- qt(sig.level, df=df)
+    }
+    else { # "two.sided" case
+      crit <- qt(1-sig.level/2, df=df)
+    }
+
     n1 = a_ratio*required_n
     n2 = (1-a_ratio)*required_n
     density <- generate_ttest_density_data_for_power(d=d, n1=n1, n2=n2, t=crit, df=df, sig_level = sig.level, alternative = alternative)
