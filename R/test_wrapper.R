@@ -33,9 +33,17 @@ generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 
   else {
     ncp <- d * sqrt(n1) # Paired case. Assuming n1 == n2.
   }
-  l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
 
-  x <- seq(from=-l,to=l,by=l/500 )
+  # Cover 3.5 sd of the both distributions.
+  if (alternative == "less") {
+    start <- -ncp-3.5
+    end <- 3.5
+  }
+  else {
+    start <- -3.5
+    end <- ncp+3.5
+  }
+  x <- seq(from=start,to=end,by=(end-start)/500 )
   ret <- tibble::tibble(x=x, y=dt(x, df=df), ncp=0, type="Null")
 
   if (alternative == "two.sided") {
