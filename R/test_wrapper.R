@@ -2290,6 +2290,9 @@ tidy.chisq_power_exploratory <- function(x, type="summary") {
 #' @export
 exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2, alternative="two.sided", paired=FALSE, n_start=10, n_end=1000, n_step=10) {
   power <- 1.0 - beta
+  # Adjust n_start and n_end so that they are not too small. The smaller of s_start*a_ratio and n_start*(1-a_ratio) should be greater than 2.
+  n_start <- max(n_start, 2/min(a_ratio,1-a_ratio))
+  n_end <- max(n_end, n_start)
   n = seq(n_start, n_end, by=n_step)
   n1 = a_ratio*n
   n2 = (1-a_ratio)*n
