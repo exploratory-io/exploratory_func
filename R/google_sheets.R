@@ -6,7 +6,7 @@
 #' @param filepath path of source CSV file that you want to upload to Google Sheet
 #' @param title name of the new sheet on Google Sheets.
 #' @param overwrite flag to control if you want to overwrite existing sheet
-uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
+uploadGoogleSheet <- function(filepath, title, overwrite = FALSE, sheetName= NULL){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   # the first argument of getGoogleTokenForSheet is no longer used but pass empty string to make it work.
@@ -14,6 +14,10 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
   sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
+  if (!is.null(sheetName)) {
+    googlesheets4::sheet_rename(sheet, sheet = NULL, sheetName)
+  }
+  sheet
 }
 
 #' API to update existing Google Sheet with the local CSV file.
