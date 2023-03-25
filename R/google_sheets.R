@@ -14,7 +14,7 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE, sheetName= NUL
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
   sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
-  if (!is.null(sheetName)) { # if sheet name is specified, rename the tab with the sheet name after uploading the file.
+  if (!is.null(sheetName)) { # if sheet name is specified, rename the tab (sheet) with the sheet name after uploading the file.
     googlesheets4::sheet_rename(sheet, sheet = NULL, sheetName)
   }
   sheet
