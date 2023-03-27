@@ -26,6 +26,7 @@ generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "
   ret
 }
 
+# Generates data for t distribution probability density to depict the power analysis.
 generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 0.05, alternative = "two.sided", paired = TRUE) {
   if (!paired) {
     ncp <- d * (1/sqrt(1/n1 + 1/n2))
