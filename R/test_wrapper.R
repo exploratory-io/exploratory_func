@@ -26,6 +26,53 @@ generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "
   ret
 }
 
+# Generates data for t distribution probability density to depict the power analysis.
+generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 0.05, alternative = "two.sided", paired = TRUE) {
+  if (!paired) {
+    ncp <- d * (1/sqrt(1/n1 + 1/n2))
+  }
+  else {
+    ncp <- d * sqrt(n1) # Paired case. Assuming n1 == n2.
+  }
+
+  # Cover 3.5 sd of the both distributions.
+  if (alternative == "less") {
+    start <- -ncp-3.5
+    end <- 3.5
+  }
+  else {
+    start <- -3.5
+    end <- ncp+3.5
+  }
+  x <- seq(from=start,to=end,by=(end-start)/500 )
+  ret <- tibble::tibble(x=x, y=dt(x, df=df), ncp=0, type="Null")
+
+  if (alternative == "two.sided") {
+    tt <- qt(1-sig_level/2, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), ncp=ncp, type="Alternative")
+    ret2 <- ret2 %>% mutate(critical=(x<=tt))
+  }
+  else if (alternative == "greater") {
+    tt <- qt(1-sig_level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt))
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=ncp), ncp=ncp,type="Alternative")
+    ret2 <- ret2 %>% mutate(critical=(x<=tt))
+  }
+  else { # alternative == "less"
+    tt <- qt(sig_level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x<=tt))
+    ret2 <- tibble::tibble(x=x, y=dt(x, df=df, ncp=-ncp), ncp=-ncp, type="Alternative")
+    ret2 <- ret2 %>% mutate(critical=(x>=tt))
+  }
+  ret <- ret %>% mutate(df=df)
+
+  ret3 <- tibble::tibble(x=t, y=dt(x, df=df), type="Null", statistic=TRUE)
+  ret <- bind_rows(ret, ret2, ret3)
+  ret <- ret %>% dplyr::mutate(type=factor(type, levels=c("Null", "Alternative")))
+  ret
+}
+
 # Generates data for chi-square distribution probability density with critical section and statistic
 # to depict a result of a chi-square test.
 generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
@@ -2228,6 +2275,102 @@ tidy.chisq_power_exploratory <- function(x, type="summary") {
                                           `Probability of Type 2 Error`="beta",
                                           `Power`="power",
                                           `Effect Size (Cohen's w)`="w",
+                                          `Degree of Freedom`="df",
+                                          `Required Sample Size`="n")))
+  }
+  else if (type == "n_to_power") {
+    ret <- x$n_to_power
+  }
+  else if (type == "density") {
+    ret <- x$density
+  }
+  ret
+}
+
+#' dummy - Data frame. Since it is just ignored, it is named dummy here.
+#' @export
+exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2, alternative="two.sided", paired=FALSE, n_start=10, n_end=1000, n_step=10) {
+  power <- 1.0 - beta
+  # Adjust n_start and n_end so that they are not too small. The smaller of s_start*a_ratio and n_start*(1-a_ratio) should be greater than 2.
+  n_start <- max(n_start, 2/min(a_ratio,1-a_ratio))
+  n_end <- max(n_end, n_start)
+  n = seq(n_start, n_end, by=n_step)
+  n1 = a_ratio*n
+  n2 = (1-a_ratio)*n
+  if (alternative == "less") {
+    d_signed <- -d
+  }
+  else {
+    d_signed <- d
+  }
+
+  ttest_power_each <- function(dummy) {
+    # Sample size vs power calculation
+    if (!paired) {
+      n_to_power_res <- pwr::pwr.t2n.test(n1=n1, n2=n2, d=d_signed, sig.level=sig.level, alternative = alternative)
+    }
+    else {
+      n_to_power_res <- pwr::pwr.t.test(n=n, d=d_signed, sig.level=sig.level, type="paired", alternative = alternative)
+    }
+    n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
+
+    # Required sample size calculation
+    if (!paired) {
+      required_n <- (pwr::pwr.t2nr.test(r=a_ratio, d=d_signed, sig.level=sig.level, power=power, alternative = alternative))$n
+    }
+    else {
+      required_n <- (pwr::pwr.t.test(d=d_signed, sig.level=sig.level, power=power, type="paired", alternative = alternative))$n
+    }
+
+
+    if (!paired) {
+      df <- required_n - 2 # Assuming Student's independent samples t-test sinde Welch's requires standard deviations as extra inputs.
+    }
+    else {
+      df <- required_n - 1
+    }
+    if (alternative == "greater") {
+      crit <- qt(1-sig.level, df=df) # The t statistic that corresponds to the significance level.
+    }
+    else if (alternative == "less") {
+      crit <- qt(sig.level, df=df)
+    }
+    else { # "two.sided" case
+      crit <- qt(1-sig.level/2, df=df)
+    }
+
+    if (!paired) {
+      n1 = a_ratio*required_n
+      n2 = (1-a_ratio)*required_n
+    }
+    else {
+      n1 = required_n
+      n2 = required_n
+    }
+    density <- generate_ttest_density_data_for_power(d=d, n1=n1, n2=n2, t=crit, df=df, sig_level = sig.level, alternative = alternative, paired = paired)
+
+    model <- list(n_to_power=n_to_power,
+                  df=df,
+                  d=d,
+                  sig.level=sig.level,
+                  beta=beta,
+                  power=power,
+                  required_n=required_n,
+                  density=density)
+    class(model) <- c("ttest_power_exploratory")
+    model
+  }
+  do_on_each_group(dummy, ttest_power_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.ttest_power_exploratory <- function(x, type="summary") {
+  if (type == "summary") {
+    ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, d=x$d, df=x$df, n=x$required_n)
+    ret <- ret %>% dplyr::rename(any_of(c(`Probability of Type 1 Error`="sig.level",
+                                          `Probability of Type 2 Error`="beta",
+                                          `Power`="power",
+                                          `Effect Size (Cohen's d)`="d",
                                           `Degree of Freedom`="df",
                                           `Required Sample Size`="n")))
   }
