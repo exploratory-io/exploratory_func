@@ -2521,6 +2521,8 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
     sum(x[condition], na.rm = na.rm) / sum(x, na.rm = na.rm)
   } else if (aggregateFunc == "count_ratio") {
     sum(condition, na.rm = na.rm) / length(condition)
+  } else if (aggregateFunc == "count_pct") {
+    100 * sum(condition, na.rm = na.rm) / length(condition)
   } else if (aggregateFunc == "mean_ratio" || aggregateFunc == "average_ratio") {
     mean(x[condition], na.rm = na.rm) / mean(x, na.rm = na.rm)
   } else if (aggregateFunc == "median_ratio") {
@@ -2551,6 +2553,11 @@ count_if <- function(x, ..., na.rm = TRUE) {
 #' export
 count_if_ratio <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "count_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+count_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "count_pct", ..., na.rm = na.rm)
 }
 
 #' export
