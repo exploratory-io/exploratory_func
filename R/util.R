@@ -2519,21 +2519,34 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
     n_distinct(x[condition], na.rm = na.rm)
   } else if (aggregateFunc == "sum_ratio") {
     sum(x[condition], na.rm = na.rm) / sum(x, na.rm = na.rm)
+  } else if (aggregateFunc == "sum_pct") {
+    100 * sum(x[condition], na.rm = na.rm) / sum(x, na.rm = na.rm)
   } else if (aggregateFunc == "count_ratio") {
     sum(condition, na.rm = na.rm) / length(condition)
   } else if (aggregateFunc == "count_pct") {
     100 * sum(condition, na.rm = na.rm) / length(condition)
   } else if (aggregateFunc == "mean_ratio" || aggregateFunc == "average_ratio") {
     mean(x[condition], na.rm = na.rm) / mean(x, na.rm = na.rm)
+  } else if (aggregateFunc == "mean_pct" || aggregateFunc == "average_pct") {
+    100 * mean(x[condition], na.rm = na.rm) / mean(x, na.rm = na.rm)
   } else if (aggregateFunc == "median_ratio") {
     median(x[condition], na.rm = na.rm) / median(x, na.rm = na.rm)
+  } else if (aggregateFunc == "median_pct") {
+    100 * median(x[condition], na.rm = na.rm) / median(x, na.rm = na.rm)
   } else if (aggregateFunc == "min_ratio") {
     min(x[condition], na.rm = na.rm) / min(x, na.rm = na.rm)
+  } else if (aggregateFunc == "min_pct") {
+    100 * min(x[condition], na.rm = na.rm) / min(x, na.rm = na.rm)
   } else if (aggregateFunc == "max_ratio") {
     max(x[condition], na.rm = na.rm) / max(x, na.rm = na.rm)
+  } else if (aggregateFunc == "max_pct") {
+    100 * max(x[condition], na.rm = na.rm) / max(x, na.rm = na.rm)
   } else if (aggregateFunc == "n_distinct_ratio" || aggregateFunc == "count_unique_ratio") {
     n_distinct(x[condition], na.rm = na.rm) / n_distinct(x, na.rm = na.rm)
+  } else if (aggregateFunc == "n_distinct_pct" || aggregateFunc == "count_unique_pct") {
+    100 * n_distinct(x[condition], na.rm = na.rm) / n_distinct(x, na.rm = na.rm)
   }
+
 }
 
 #' export
@@ -2541,8 +2554,14 @@ sum_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "sum", ..., na.rm = na.rm)
 }
 
+#' export
 sum_if_ratio <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "sum_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+sum_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "sum_pct", ..., na.rm = na.rm)
 }
 
 #' export
@@ -2571,6 +2590,11 @@ average_if_ratio <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
+average_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "average_pct", ..., na.rm = na.rm)
+}
+
+#' export
 mean_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "mean", ..., na.rm = na.rm)
 }
@@ -2578,6 +2602,11 @@ mean_if <- function(x, ..., na.rm = TRUE) {
 #' export
 mean_if_ratio <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "mean_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+mean_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "mean_pct", ..., na.rm = na.rm)
 }
 
 #' export
@@ -2591,6 +2620,11 @@ median_if_ratio <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
+median_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "median_pct", ..., na.rm = na.rm)
+}
+
+#' export
 min_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "min", ..., na.rm = na.rm)
 }
@@ -2598,6 +2632,11 @@ min_if <- function(x, ..., na.rm = TRUE) {
 #' export
 min_if_ratio <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "min_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+min_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "min_pct", ..., na.rm = na.rm)
 }
 
 #' export
@@ -2611,6 +2650,11 @@ max_if_ratio <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
+max_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "max_pct", ..., na.rm = na.rm)
+}
+
+#' export
 count_unique_if <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "n_distinct", ..., na.rm = na.rm)
 }
@@ -2618,6 +2662,11 @@ count_unique_if <- function(x, ..., na.rm = TRUE) {
 #' export
 count_unique_if_ratio <- function(x, ..., na.rm = TRUE) {
   aggregate_if(x, "n_distinct_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+count_unique_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "n_distinct_pct", ..., na.rm = na.rm)
 }
 
 #' Alias for n()
