@@ -6,7 +6,7 @@ exp_sem <- function(df, model_desc, seed = 1) {
   }
 
   each_func <- function(df) {
-    fit <- sem(model_desc, data = df)
+    fit <- lavaan::sem(model_desc, data = df)
     model<-list(model=fit)
     class(model) <- c("sem_exploratory", "list")
     model
@@ -20,7 +20,6 @@ exp_sem <- function(df, model_desc, seed = 1) {
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
 tidy.sem_exploratory <- function(x, type="summary") {
-  browser()
   if (type == "summary") {
     res <- broom::glance(x$model)
   }
