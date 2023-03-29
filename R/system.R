@@ -2044,7 +2044,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
-    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
+    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access" || type == "oracle") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       reset <- NULL
       resultSet <- DBI::dbSendQuery(conn, query)
@@ -2082,7 +2082,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
+  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access" || type == "oracle") {
     DBI::dbClearResult(resultSet)
   }
   if (type == "access") { # clear access connection so that lock file is removed.
