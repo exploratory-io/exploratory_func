@@ -1579,6 +1579,81 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
       connection_pool[[key]] <- conn
     }
+  }  else if (type == "oracle") {
+    # If the platform is Linux, set the below predefined driver installed on Collaboration Server
+    # so that this data source can be scheduled.
+    if (Sys.info()["sysname"] == "Linux") {
+      driver <-  "";
+    }
+    if (!requireNamespace("DBI")) {
+      stop("package DBI must be installed.")
+    }
+    if (!requireNamespace("odbc")) {
+      stop("package odbc must be installed.")
+    }
+    if (timezone == "") {
+      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
+    }
+
+    key <- paste("oracle", host, port,databaseName, username, timezone, additionalParams, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)) {
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+
+      loc <- Sys.getlocale(category = "LC_CTYPE")
+      # loc looks like "Japanese_Japan.932", so split it with dot ".".
+      encoding <- stringr::str_split(loc, pattern = "\\.")
+      # For Snowflake, map catalog argument to "WAREHOUSE".
+      connectionString <- stringr::str_c(
+        "Driver={", driver, "};FWC=T;DBQ=", host, ":", port, "/", databaseName,
+        ";UID=", username, ";PWD=", password
+      );
+      if (additionalParams != "") {
+        connectionString <- stringr::str_c(connectionString, ";", additionalParams);
+      }
+
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               encoding = encoding[[1]][[2]],
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
+      } else { # Without encoding
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
+      }
+      connection_pool[[key]] <- conn
+    }
   }
   conn
 }
