@@ -1626,7 +1626,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       loc <- Sys.getlocale(category = "LC_CTYPE")
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
-      # For Snowflake, map catalog argument to "WAREHOUSE".
+      # For Oracle, set FWC (Force SQL_WCHAR Support) to workaround ORA-01406 error.
       connectionString <- stringr::str_c(
         "Driver={", driver, "};FWC=T;DBQ=", host, ":", port, "/", databaseName,
         ";UID=", username, ";PWD=", password
