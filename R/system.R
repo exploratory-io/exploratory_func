@@ -1751,6 +1751,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
     key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, sep = ":")
+  } else if (type %in% c("oracle")) {
+    key <- paste("oracle", host, port, databaseName, username, timezone, sep = ":")
   }
   rm(list = key, envir = connection_pool) # Even if there is no matching key, this is harmless.
 }
