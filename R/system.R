@@ -1583,7 +1583,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
     # so that this data source can be scheduled.
     if (Sys.info()["sysname"] == "Linux") {
-      driver <-  "";
+      driver <- Sys.getenv("ORACLE_ODBC_DRIVER_FILE")
+      if (driver == "") { # if environment variable is not set, fallback to default one.
+        driver <-  "/lib/oracle/19.18/client64/lib/libsqora.so.19.1";
+      }
     }
     if (!requireNamespace("DBI")) {
       stop("package DBI must be installed.")
