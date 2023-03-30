@@ -730,7 +730,7 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
     loc <- Sys.getlocale(category = "LC_CTYPE")
     # loc looks like "Japanese_Japan.932", so split it with dot ".".
     encoding <- stringr::str_split(loc, pattern = "\\.")
-    if (length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+    if (length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
       connectionString <- stringr::str_c(connectionString, ";encoding=", encoding[[1]][[2]])
     }
   }
@@ -778,7 +778,7 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
     # For Windows, set encoding to make sure non-ascii data is handled properly.
     # ref: https://github.com/r-dbi/odbc/issues/153
-    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
       # For the legacy mode where we use non-UTF8 Windows encoding.
       # Encoding and Timezone need to be passed as explicit arguments.
       conn <- DBI::dbConnect(odbc::odbc(),
@@ -1200,7 +1200,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
         }
@@ -1263,7 +1263,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           # The "additionalParams" is passed as 'a=1,b=2,c=3'. Replace"," with ";" so that connection string becomes a=1;b=2;c=3
           connectionString <- stringr::str_c(connectionString,stringr::str_replace(additionalParams, ",", ";"));
         }
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           if (timezone != "") {
             conn <- DBI::dbConnect(odbc::odbc(),
@@ -1290,7 +1290,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                  bigint = "numeric")
         }
       } else if (!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'conn_str_text')) { # For manually entered connection string case.
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           if (timezone != "") { # both encoding and timezone.
             conn <- DBI::dbConnect(odbc::odbc(),
@@ -1390,7 +1390,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
         }
@@ -1478,7 +1478,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
         # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
         conn <- DBI::dbConnect(odbc::odbc(),
                               .connection_string = connectionString,
@@ -1560,7 +1560,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
         conn <- DBI::dbConnect(odbc::odbc(),
                                .connection_string = connectionString,
@@ -1635,7 +1635,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
         # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
         conn <- DBI::dbConnect(odbc::odbc(),
                                .connection_string = connectionString,
