@@ -730,7 +730,7 @@ createAmazonAthenaConnectionString <- function(driver = "", region = "", authent
     loc <- Sys.getlocale(category = "LC_CTYPE")
     # loc looks like "Japanese_Japan.932", so split it with dot ".".
     encoding <- stringr::str_split(loc, pattern = "\\.")
-    if (length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+    if (length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
       connectionString <- stringr::str_c(connectionString, ";encoding=", encoding[[1]][[2]])
     }
   }
@@ -778,7 +778,7 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
     # For Windows, set encoding to make sure non-ascii data is handled properly.
     # ref: https://github.com/r-dbi/odbc/issues/153
-    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
       # For the legacy mode where we use non-UTF8 Windows encoding.
       # Encoding and Timezone need to be passed as explicit arguments.
       conn <- DBI::dbConnect(odbc::odbc(),
@@ -1200,7 +1200,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
         }
@@ -1263,7 +1263,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           # The "additionalParams" is passed as 'a=1,b=2,c=3'. Replace"," with ";" so that connection string becomes a=1;b=2;c=3
           connectionString <- stringr::str_c(connectionString,stringr::str_replace(additionalParams, ",", ";"));
         }
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           if (timezone != "") {
             conn <- DBI::dbConnect(odbc::odbc(),
@@ -1290,7 +1290,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                  bigint = "numeric")
         }
       } else if (!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'conn_str_text')) { # For manually entered connection string case.
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           if (timezone != "") { # both encoding and timezone.
             conn <- DBI::dbConnect(odbc::odbc(),
@@ -1390,7 +1390,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
-        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
           connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
         }
@@ -1478,7 +1478,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
         # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
         conn <- DBI::dbConnect(odbc::odbc(),
                               .connection_string = connectionString,
@@ -1560,8 +1560,86 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
 
-      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && encoding[[1]][[2]] != "utf8") {
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               encoding = encoding[[1]][[2]],
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
+      } else { # Without encoding
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               .connection_string = connectionString,
+                               timezone = timezone,
+                               timezone_out = timezone,
+                               bigint = "numeric"
+        )
+      }
+      connection_pool[[key]] <- conn
+    }
+  }  else if (type == "oracle") {
+    # If the platform is Linux, set the below predefined driver installed on Collaboration Server
+    # so that this data source can be scheduled.
+    if (Sys.info()["sysname"] == "Linux") {
+      driver <- Sys.getenv("ORACLE_ODBC_DRIVER_FILE")
+      if (driver == "") { # if environment variable is not set, fallback to default one.
+        driver <-  "/lib/oracle/19.18/client64/lib/libsqora.so.19.1";
+      }
+    }
+    if (!requireNamespace("DBI")) {
+      stop("package DBI must be installed.")
+    }
+    if (!requireNamespace("odbc")) {
+      stop("package odbc must be installed.")
+    }
+    if (timezone == "") {
+      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
+    }
+
+    key <- paste("oracle", host, port,databaseName, username, timezone, additionalParams, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)) {
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+
+      loc <- Sys.getlocale(category = "LC_CTYPE")
+      # loc looks like "Japanese_Japan.932", so split it with dot ".".
+      encoding <- stringr::str_split(loc, pattern = "\\.")
+      # For Oracle, set FWC (Force SQL_WCHAR Support) to workaround ORA-01406 error.
+      connectionString <- stringr::str_c(
+        "Driver={", driver, "};FWC=T;DBQ=", host, ":", port, "/", databaseName,
+        ";UID=", username, ";PWD=", password
+      );
+      if (additionalParams != "") {
+        connectionString <- stringr::str_c(connectionString, ";", additionalParams);
+      }
+
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
+        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
         conn <- DBI::dbConnect(odbc::odbc(),
                                .connection_string = connectionString,
                                encoding = encoding[[1]][[2]],
@@ -1676,6 +1754,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
     key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, sep = ":")
+  } else if (type %in% c("oracle")) {
+    key <- paste("oracle", host, port, databaseName, username, timezone, sep = ":")
   }
   rm(list = key, envir = connection_pool) # Even if there is no matching key, this is harmless.
 }
@@ -1967,7 +2047,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
-    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
+    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access" || type == "oracle") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       reset <- NULL
       resultSet <- DBI::dbSendQuery(conn, query)
@@ -2005,7 +2085,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access") {
+  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake" || type == "teradata" || type == "access" || type == "oracle") {
     DBI::dbClearResult(resultSet)
   }
   if (type == "access") { # clear access connection so that lock file is removed.
