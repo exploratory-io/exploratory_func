@@ -2099,6 +2099,7 @@ recode_factor <- function(x, ..., .default = NULL, .missing = NULL, .ordered = T
   if (Sys.info()['sysname'] == 'Windows' &&
       ((is.character(x) && is.character(ret) &&
         all(Encoding(x) == 'UTF-8') && # Do it only when all values were originally UTF-8, and some turned into 'unknown'.
+        !all(Encoding(ret) == 'UTF-8') && # If all the return values are UTF-8, ignore it.
         all(Encoding(ret) %in% c('UTF-8', 'unknown'))) ||
        (!is.character(x) || is.character(ret)))) { # If original is non-character column like numeric, the resulting column's encoding seems to become 'unknown' too.
     ret <- tryCatch({
