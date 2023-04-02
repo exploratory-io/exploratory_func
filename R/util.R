@@ -2089,6 +2089,28 @@ recode <- function(x, ...) {
   ret
 }
 
+#'Wrapper function for dplyr::recode_factor to workaround encoding info getting lost.
+#'@export
+recode_factor <- function(x, ..., .default = NULL, .missing = NULL, .ordered = TRUE) {
+  ret <- dplyr::recode_factor(x, ..., .default = .default, .missing = .missing, .ordered = .ordered)
+  # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
+  # Such values are displayed fine on the spot, but later if bind_row is applied,
+  # they get garbled. Working it around by converting to UTF-8.
+  if (Sys.info()['sysname'] == 'Windows' &&
+      ((is.character(x) && is.character(ret) &&
+        all(Encoding(x) == 'UTF-8') && # Do it only when all values were originally UTF-8, and some turned into 'unknown'.
+        !all(Encoding(ret) == 'UTF-8') && # If all the return values are UTF-8, ignore it.
+        all(Encoding(ret) %in% c('UTF-8', 'unknown'))) ||
+       (!is.character(x) || is.character(ret)))) { # If original is non-character column like numeric, the resulting column's encoding seems to become 'unknown' too.
+    ret <- tryCatch({
+      enc2utf8(ret)
+    }, error = function(e) { # In case of error, just use the original.
+      ret
+    })
+  }
+  ret
+}
+
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
 #'@export
 case_when <- function(x, ...) {
