@@ -2089,26 +2089,67 @@ recode <- function(x, ...) {
   ret
 }
 
-#'Wrapper function for dplyr::recode_factor to workaround encoding info getting lost.
+# Get the unique values. Used for recode_factor.
+get_unique_values<-function (x, limit) {
+  if (is.factor(x)) {
+    # Do not sort to keep the level order.
+    return (utils::head(levels(x), limit))
+  } else {
+    return (sort(utils::head(unique(x), limit)))
+  }
+}
+
+#'Wrapper function for dplyr::recode_factor to workaround encoding info getting lost and to handle levels.
 #'@export
-recode_factor <- function(x, ..., .default = NULL, .missing = NULL, .ordered = TRUE) {
-  ret <- dplyr::recode_factor(x, ..., .default = .default, .missing = .missing, .ordered = .ordered)
+recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missing = NULL, .ordered = TRUE) {
+  current_levels = NULL;
+  num_of_unique_value = NULL;
+  # if input is factor, remember original levels and number of unique values.
+  if (is.factor(x)) {
+    current_levels <- levels(x)
+    num_of_unique_value <- length(current_levels)
+  } else { # if input is not factor, get unique values sorted by count and remember it as current level.
+    current_levels <- get_unique_values(x, length(x))
+    num_of_unique_value <- length(current_levels)
+  }
+  replacements <- dplyr:::dplyr_quosures(...)
+  argumentLength = length(replacements)
+  # check if all the unique values are recoded
+  if (argumentLength == num_of_unique_value) { # if all the values are recoded, just call recode_factor so that level is automatically adjusted.
+      ret <- dplyr::recode_factor(x, ..., .default = .default, .missing = .missing, .ordered = .ordered)
+  } else { # if not all the unique values are recoded, need to adjust ordering manually.
+    if (!is.factor(x)) { # check if input is factor.
+      if (!is.character(x)) {
+        x <- as.character(x) # to make forcats::fct_relevel works, convert it to character.
+      }
+      # make sure to apply current_levels before doing recode, so that current levels is honored.
+      x <- forcats::fct_relevel(x, current_levels)
+    }
+    # pass current_levels to .default argument to keep the levels in the input.
+    ret <- dplyr::recode(x, ..., .default = current_levels, .missing = .missing)
+  }
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
   # they get garbled. Working it around by converting to UTF-8.
+  is_input_character_or_factor = is.character(x) || is.factor(x)
+  is_output_character_or_factor = is.character(ret) || is.factor(ret)
   if (Sys.info()['sysname'] == 'Windows' &&
-      ((is.character(x) && is.character(ret) &&
+      ((is_input_character_or_factor && is_output_character_or_factor &&
         all(Encoding(x) == 'UTF-8') && # Do it only when all values were originally UTF-8, and some turned into 'unknown'.
         !all(Encoding(ret) == 'UTF-8') && # If all the return values are UTF-8, ignore it.
         all(Encoding(ret) %in% c('UTF-8', 'unknown'))) ||
-       (!is.character(x) || is.character(ret)))) { # If original is non-character column like numeric, the resulting column's encoding seems to become 'unknown' too.
+       (!is_input_character_or_factor || is_output_character_or_factor))) { # If original is non-character column like numeric, the resulting column's encoding seems to become 'unknown' too.
     ret <- tryCatch({
       enc2utf8(ret)
     }, error = function(e) { # In case of error, just use the original.
       ret
     })
   }
-  ret
+  if (reverse_order) { # if need to reverse the order, call forcats::fct_rev
+    forcats::fct_rev(ret)
+  } else{
+    ret
+  }
 }
 
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.

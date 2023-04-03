@@ -1783,6 +1783,22 @@ test_that("mutate_group", {
 
 })
 
+test_that("recode_factor", {
+  empDF <- exploratory::read_parquet_file("https://www.dropbox.com/s/n0jkv4wu9dpb4se/Employee_Data_win_calc.parquet?dl=1")
+  # partial recode and reverse order
+  result <- empDF %>% mutate(job = exploratory::recode_factor(job, "リサーチサイエンティスト" = "A", "リサーチディレクター" = "B", "人事" = "C", reverse_order = TRUE))
+  expect_equal(levels(result$job), c("製造ディレクター", "営業担当", "営業幹部", "C", "B", "A", "ラボ技術者", "マネージャー", "ヘルスケア担当"))
+  # partial recode and keep order
+  result2 <- empDF %>% mutate(job = exploratory::recode_factor(job, "リサーチサイエンティスト" = "A", "リサーチディレクター" = "B", "人事" = "C"))
+  expect_equal(levels(result2$job), c("ヘルスケア担当", "マネージャー", "ラボ技術者", "A", "B", "C", "営業幹部", "営業担当","製造ディレクター"))
+  # full recode and reverse order
+  result3 <- empDF %>% mutate(job_level = exploratory::recode_factor(job_level, `1` = "A", `2` = "B", `3` = "C", `4` = "D", `5` = "E", reverse_order = TRUE))
+  expect_equal(levels(result3$job_level), c("E", "D", "C", "B", "A"))
+  # full recode and keep order
+  result4 <- empDF %>% mutate(job_level = exploratory::recode_factor(job_level, `1` = "A", `2` = "B", `3` = "C", `4` = "D", `5` = "E"))
+  expect_equal(levels(result4$job_level), c("A", "B", "C", "D", "E"))
+})
+
 test_that("separate_japanese_address", {
   #  Address 1. Tokyo-To Shinjuku-ku Hyakunin-cho 1-2
   #  Address 2. Tokyo-To Shibuya-ku Shoto 2-3
