@@ -633,6 +633,8 @@ build_lm.fast <- function(df,
                     ...,
                     target_fun = NULL,
                     predictor_funs = NULL,
+                    weight = NULL,
+                    weight_fun = NULL,
                     model_type = "lm",
                     family = NULL,
                     link = NULL,
@@ -678,6 +680,16 @@ build_lm.fast <- function(df,
     selected_cols <- orig_selected_cols
   }
 
+  weight_col <- tidyselect::vars_select(names(df), !! rlang::enquo(weight))
+  if (is.null(weight_col) || length(weight_col) == 0) { # It seems that if weight_col is not specified weight_col can be named character(0), which can be detected by length(weight_col)=0.
+    weight_col <- NULL
+  }
+  if (!is.null(weight_col) && !is.null(weight_fun)) {
+    weight_funs <- list(weight_fun)
+    names(weight_funs) <- weight_col
+    df <- df %>% mutate_predictors(weight_col, weight_funs)
+  }
+
   grouped_cols <- grouped_by(df)
 
   if (!is.null(variable_metric)  && variable_metric == "ame") { # Special argument for integration with Analytics View.
@@ -718,12 +730,12 @@ build_lm.fast <- function(df,
 
   # drop unrelated columns so that SMOTE later does not have to deal with them.
   # select_ was not able to handle space in target_col. let's do it in base R way.
-  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col, weight_col), drop=FALSE]
 
-  # remove grouped col or target col
+  # Remove grouped col or target col. Weight col is not removed because it can be one of the predictors.
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
 
-  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
+  if (any(c(target_col, selected_cols, weight_col) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
   }
 
@@ -787,6 +799,12 @@ build_lm.fast <- function(df,
   colnames(clean_df) <- name_map
 
   clean_target_col <- name_map[target_col]
+  if (!is.null(weight_col)) {
+    clean_weight_col <- name_map[weight_col]
+  }
+  else {
+    clean_weight_col <- NULL
+  }
   clean_cols <- name_map[selected_cols]
 
   each_func <- function(df) {
@@ -982,8 +1000,12 @@ build_lm.fast <- function(df,
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
         }
-
-        model <- stats::lm(fml, data = df) 
+        if (is.null(clean_weight_col)) {
+          model <- stats::lm(fml, data = df)
+        }
+        else {
+          model <- stats::lm(fml, data = df, weights=df[[clean_weight_col]]) 
+        }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
           if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
             model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
