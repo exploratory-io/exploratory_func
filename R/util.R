@@ -2089,7 +2089,7 @@ recode <- function(x, type_convert = FALSE, ...) {
   if (type_convert && is.character(ret)) {
     # try to guess the data type for recoded value.
     tryCatch({
-      ret <- readr::type_convert(data.frame(x = ret))$x
+      ret <- readr::type_convert(tibble::tibble(x = ret))$x
     })
   }
   ret
