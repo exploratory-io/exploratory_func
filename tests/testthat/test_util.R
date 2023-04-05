@@ -1783,7 +1783,8 @@ test_that("mutate_group", {
 
 })
 
-test_that("recode_factor", {
+
+test_that("recode and recode_factor", {
   empDF <- exploratory::read_parquet_file("https://www.dropbox.com/s/n0jkv4wu9dpb4se/Employee_Data_win_calc.parquet?dl=1")
   # partial recode and reverse order
   result <- empDF %>% mutate(job = exploratory::recode_factor(job, "リサーチサイエンティスト" = "A", "リサーチディレクター" = "B", "人事" = "C", reverse_order = TRUE))
@@ -1797,6 +1798,12 @@ test_that("recode_factor", {
   # full recode and keep order
   result4 <- empDF %>% mutate(job_level = exploratory::recode_factor(job_level, `1` = "A", `2` = "B", `3` = "C", `4` = "D", `5` = "E"))
   expect_equal(levels(result4$job_level), c("A", "B", "C", "D", "E"))
+  # type covert is set as TRUE so the result should be numeric 1,2,3 instead of character "1","2","3".
+  result5 <- empDF %>% mutate(business_travel = exploratory::recode(business_travel, "たまに" = "1", "なし" = "2", "頻繁" = "3", type_convert = TRUE))
+  expect_equal(exploratory:::get_unique_values(result5$business_travel, 100), c(1,2,3))
+  # type covert is set as TRUE so the result should be Date 2023-01-01,2023-01-02,2023-01-03 instead of character "2023-01-01","2023-01-02", "2023-01-03".
+  result6 <- empDF %>% mutate(business_travel = exploratory::recode(business_travel, "たまに" = "2023-01-01", "なし" = "2023-01-02", "頻繁" = "2023-01-03", type_convert = TRUE))
+  expect_equal(exploratory:::get_unique_values(result6$business_travel, 100), c(lubridate::ymd("2023-01-01"),lubridate::ymd("2023-01-02"),lubridate::ymd("2023-01-03")))
 })
 
 test_that("separate_japanese_address", {
