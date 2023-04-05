@@ -2137,14 +2137,12 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
   # they get garbled. Working it around by converting to UTF-8.
-  is_input_character_or_factor = is.character(x) || is.factor(x)
-  is_output_character_or_factor = is.character(ret) || is.factor(ret)
   if (Sys.info()['sysname'] == 'Windows' &&
-      ((is_input_character_or_factor && is_output_character_or_factor &&
+      ((is.character(x) && is.character(ret) &&
         all(Encoding(x) == 'UTF-8') && # Do it only when all values were originally UTF-8, and some turned into 'unknown'.
         !all(Encoding(ret) == 'UTF-8') && # If all the return values are UTF-8, ignore it.
         all(Encoding(ret) %in% c('UTF-8', 'unknown'))) ||
-       (!is_input_character_or_factor || is_output_character_or_factor))) { # If original is non-character column like numeric, the resulting column's encoding seems to become 'unknown' too.
+       (!is.character(x) || is.character(ret)))) { # If original is non-character column like numeric, the resulting column's encoding seems to become 'unknown' too.
     ret <- tryCatch({
       enc2utf8(ret)
     }, error = function(e) { # In case of error, just use the original.
