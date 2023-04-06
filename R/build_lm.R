@@ -915,7 +915,12 @@ build_lm.fast <- function(df,
         # When link is not specified, use default link function for each family,
         # except for the case where family is negativebinomial, which we should use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
-          model <- stats::glm(fml, data = df, family = family) 
+          if (is.null(clean_weight_col)) {
+            model <- stats::glm(fml, data = df, family = family) 
+          }
+          else {
+            model <- stats::glm(fml, data = df, family = family, weights=df[[clean_weight_col]])
+          }
         }
         else {
           if (family == "gaussian") {
@@ -967,12 +972,22 @@ build_lm.fast <- function(df,
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
             # link "link" not available for poisson family; available links are 'log', 'identity', 'sqrt'
             # Therefore, we used eval to pass the string (log etc.) specified in the argument to link as it is.
-            model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+            if (is.null(clean_weight_col)) {
+              model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+            }
+            else {
+              model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ", weights=df[[clean_weight_col]])")))
+            }
 
             # A model by MASS::glm.nb has not a formula attribute.
             model$formula <- fml
           } else {
-            model <- stats::glm(fml, data = df, family = family_arg)
+            if (is.null(clean_weight_col)) {
+              model <- stats::glm(fml, data = df, family = family_arg) 
+            }
+            else {
+              model <- stats::glm(fml, data = df, family = family_arg, weights=df[[clean_weight_col]])
+            }
           }
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
