@@ -912,7 +912,8 @@ build_lm.fast <- function(df,
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
         }
 
-        # when family is negativebinomial, use MASS::glm.nb
+        # When link is not specified, use default link function for each family,
+        # except for the case where family is negativebinomial, which we should use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
           model <- stats::glm(fml, data = df, family = family) 
         }
