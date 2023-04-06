@@ -689,6 +689,13 @@ build_lm.fast <- function(df,
     names(weight_funs) <- weight_col
     df <- df %>% mutate_predictors(weight_col, weight_funs)
   }
+  if (!is.null(weight_col) && min(df[[weight_col]], na.rm=TRUE) < 0) {
+    stop("EXP-ANA-10 :: [] :: Weight column must be non-negative.")
+  }
+  if (!is.null(weight_col)) {
+    # Fill NA weight with 1.
+    df <- df %>% dplyr::mutate(!!rlang::sym(weight_col) := ifelse(is.na(!!rlang::sym(weight_col)), 1, !!rlang::sym(weight_col)))
+  }
 
   grouped_cols <- grouped_by(df)
 
