@@ -37,7 +37,6 @@ test_that("binary prediction with character target column", {
 
   expect_true(nrow(ret) > 0)
 })
-
 test_that("binary prediction with factor target column", {
   test_data <- tibble::tibble(
       `CANCELLED X` = factor(c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"), levels=c("A","N","Y","B")),
@@ -715,6 +714,48 @@ test_that("Group Logistic Regression with test_rate", {
   ret <- group_data %>%
            build_lm.fast(`CANCELLED X`,
                         `ARR_TIME`,
+                        model_type = "glm",
+                        family = "binomial",
+                        link = "logit",
+                        test_rate = 0.1)
+  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
+  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
+  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
+  training_nrows <- group_nrows - test_nrows
+
+  suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=group_data)
+    pred_training <- prediction(ret, data = "training")
+    pred_test <- prediction(ret, data = "test")
+    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
+                 training_nrows)
+    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
+                 test_nrows)
+
+    # Since broom 0.7.0, I sometimes see "residuals" missing here, but not consistently. Will keep watching.
+    expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
+                       "cooks_distance", "predicted_response", "predicted_label")
+    expect_true(all(expected_cols %in% colnames(pred_training)))
+
+    expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response", "predicted_label")
+    expect_true(all(expected_cols %in% colnames(pred_test)))
+
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+   })
+})
+
+test_that("Group Logistic Regression with test_rate with weight", {
+  group_data <- test_data %>% group_by(klass)
+  ret <- group_data %>%
+           build_lm.fast(`CANCELLED X`,
+                        `ARR_TIME`,
+                        weight=`DISTANCE`,
                         model_type = "glm",
                         family = "binomial",
                         link = "logit",
