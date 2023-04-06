@@ -689,8 +689,9 @@ build_lm.fast <- function(df,
     names(weight_funs) <- weight_col
     df <- df %>% mutate_predictors(weight_col, weight_funs)
   }
-  if (!is.null(weight_col) && min(df[[weight_col]], na.rm=TRUE) < 0) {
-    stop("EXP-ANA-10 :: [] :: Weight column must be non-negative.")
+  if (!is.null(weight_col) && min(df[[weight_col]], na.rm=TRUE) <= 0) {
+    # We enforce strict positive values because with weights including 0, the model throws error at prediction.
+    stop("EXP-ANA-10 :: [] :: Weight column must be positive.")
   }
   if (!is.null(weight_col)) {
     # Fill NA weight with 1.
