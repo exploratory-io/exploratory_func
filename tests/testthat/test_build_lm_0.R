@@ -401,7 +401,7 @@ test_that("test GLM (Negative Binomial) with group columns with weight", {
   test_data <- dplyr::bind_rows(test_data, test_data)
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
   set.seed(0);
-  test_data <- test_data %>% mutate(Weight=runif(n()))
+  test_data <- test_data %>% mutate(Weight=0.3*sin(1:n())+1)
 
   ret <- test_data %>% dplyr::group_by(CARRIER) %>%
            build_lm.fast(`CANCELLED X`,
@@ -412,6 +412,8 @@ test_that("test GLM (Negative Binomial) with group columns with weight", {
                          family = "negativebinomial")
   expect_equal(length(ret[["CARRIER"]]), 8)
   model_ret <- ret %>% glance_rowwise(model)
+  # Check the numbers so that we can detect any change in broom or stats in the future.
+  expect_equal((ret %>% tidy_rowwise(model))$estimate, c(-174.5406548, 0.1474161), tolerance=1e-4)
   expect_equal(colnames(model_ret), # Position of Note columns is adjusted on Exploratory-side
                c("CARRIER", "Note", "null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance", "df.residual",

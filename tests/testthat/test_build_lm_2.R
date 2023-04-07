@@ -73,9 +73,11 @@ test_that("build_lm.fast (linear regression) evaluate training and test with per
 
 test_that("build_lm.fast (linear regression) evaluate training and test with permutation importance with weight", {
   set.seed(0)
-  model_df <- flight %>% mutate(Weight=runif(n())) %>%
+  model_df <- flight %>% mutate(Weight=0.3*sin(1:n())+1) %>%
                 build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1, weight=Weight)
 
+  # Check the numbers so that we can detect any change in broom or stats in the future.
+  expect_equal((model_df %>% tidy_rowwise(model))$estimate[1:3], c(-4.5642712, 1.8621591, 0.5881287), tolerance=1e-4)
   ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
