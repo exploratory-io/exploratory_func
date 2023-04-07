@@ -21,7 +21,6 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
-
 test_that("build_lm.fast (linear regression) evaluate training and test with FIRM importance", {
   model_df <- flight %>%
                 build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1, importance_measure="firm")
@@ -51,6 +50,34 @@ test_that("build_lm.fast (linear regression) evaluate training and test with per
   model_df <- flight %>%
                 build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1)
 
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1475) # Not very stable for some reason. Will revisit.
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3444) # Not very stable for some reason. Will revisit.
+  ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
+  # Check order of variable importance result.
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
+  # unname() is necessary for the result to be equal to the expectation.
+  expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+
+  # Test univariate case handling
+  model_df <- flight %>%
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, test_rate = 0.3, seed=1)
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
+  expect_equal(nrow(ret), 0)
+})
+
+test_that("build_lm.fast (linear regression) evaluate training and test with permutation importance with weight", {
+  set.seed(0)
+  model_df <- flight %>% mutate(Weight=0.3*sin(1:n())+1) %>%
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1, weight=Weight)
+
+  # Check the numbers so that we can detect any change in broom or stats in the future.
+  expect_equal((model_df %>% tidy_rowwise(model))$estimate[1:3], c(-4.5642712, 1.8621591, 0.5881287), tolerance=1e-4)
   ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)

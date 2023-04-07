@@ -633,6 +633,8 @@ build_lm.fast <- function(df,
                     ...,
                     target_fun = NULL,
                     predictor_funs = NULL,
+                    weight = NULL,
+                    weight_fun = NULL,
                     model_type = "lm",
                     family = NULL,
                     link = NULL,
@@ -678,6 +680,24 @@ build_lm.fast <- function(df,
     selected_cols <- orig_selected_cols
   }
 
+  weight_col <- tidyselect::vars_select(names(df), !! rlang::enquo(weight))
+  if (is.null(weight_col) || length(weight_col) == 0) { # It seems that if weight_col is not specified weight_col can be named character(0), which can be detected by length(weight_col)=0.
+    weight_col <- NULL
+  }
+  if (!is.null(weight_col) && !is.null(weight_fun)) {
+    weight_funs <- list(weight_fun)
+    names(weight_funs) <- weight_col
+    df <- df %>% mutate_predictors(weight_col, weight_funs)
+  }
+  if (!is.null(weight_col) && min(df[[weight_col]], na.rm=TRUE) <= 0) {
+    # We enforce strict positive values because with weights including 0, the model throws error at prediction.
+    stop("EXP-ANA-10 :: [] :: Weight column must be positive.")
+  }
+  if (!is.null(weight_col)) {
+    # Fill NA weight with 1.
+    df <- df %>% dplyr::mutate(!!rlang::sym(weight_col) := ifelse(is.na(!!rlang::sym(weight_col)), 1, !!rlang::sym(weight_col)))
+  }
+
   grouped_cols <- grouped_by(df)
 
   if (!is.null(variable_metric)  && variable_metric == "ame") { # Special argument for integration with Analytics View.
@@ -718,12 +738,12 @@ build_lm.fast <- function(df,
 
   # drop unrelated columns so that SMOTE later does not have to deal with them.
   # select_ was not able to handle space in target_col. let's do it in base R way.
-  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col, weight_col), drop=FALSE]
 
-  # remove grouped col or target col
+  # Remove grouped col or target col. Weight col is not removed because it can be one of the predictors.
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
 
-  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
+  if (any(c(target_col, selected_cols, weight_col) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
   }
 
@@ -787,6 +807,12 @@ build_lm.fast <- function(df,
   colnames(clean_df) <- name_map
 
   clean_target_col <- name_map[target_col]
+  if (!is.null(weight_col)) {
+    clean_weight_col <- name_map[weight_col]
+  }
+  else {
+    clean_weight_col <- NULL
+  }
   clean_cols <- name_map[selected_cols]
 
   each_func <- function(df) {
@@ -865,6 +891,7 @@ build_lm.fast <- function(df,
             # close distribution to the original data.
             df_before_smote <- df
           }
+          # Note: If there is weight column, we synthesize weight column as well.
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
           for(col in names(df)){
@@ -894,9 +921,15 @@ build_lm.fast <- function(df,
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
         }
 
-        # when family is negativebinomial, use MASS::glm.nb
+        # When link is not specified, use default link function for each family,
+        # except for the case where family is negativebinomial, which we should use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
-          model <- stats::glm(fml, data = df, family = family) 
+          if (is.null(clean_weight_col)) {
+            model <- stats::glm(fml, data = df, family = family) 
+          }
+          else {
+            model <- stats::glm(fml, data = df, family = family, weights=df[[clean_weight_col]])
+          }
         }
         else {
           if (family == "gaussian") {
@@ -948,12 +981,22 @@ build_lm.fast <- function(df,
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
             # link "link" not available for poisson family; available links are 'log', 'identity', 'sqrt'
             # Therefore, we used eval to pass the string (log etc.) specified in the argument to link as it is.
-            model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+            if (is.null(clean_weight_col)) {
+              model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+            }
+            else {
+              model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ", weights=df[[clean_weight_col]])")))
+            }
 
             # A model by MASS::glm.nb has not a formula attribute.
             model$formula <- fml
           } else {
-            model <- stats::glm(fml, data = df, family = family_arg)
+            if (is.null(clean_weight_col)) {
+              model <- stats::glm(fml, data = df, family = family_arg) 
+            }
+            else {
+              model <- stats::glm(fml, data = df, family = family_arg, weights=df[[clean_weight_col]])
+            }
           }
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
@@ -982,8 +1025,12 @@ build_lm.fast <- function(df,
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
         }
-
-        model <- stats::lm(fml, data = df) 
+        if (is.null(clean_weight_col)) {
+          model <- stats::lm(fml, data = df)
+        }
+        else {
+          model <- stats::lm(fml, data = df, weights=df[[clean_weight_col]]) 
+        }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
           if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
             model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
