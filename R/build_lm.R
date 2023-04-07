@@ -891,6 +891,7 @@ build_lm.fast <- function(df,
             # close distribution to the original data.
             df_before_smote <- df
           }
+          # Note: If there is weight column, we synthesize weight column as well.
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
           for(col in names(df)){
