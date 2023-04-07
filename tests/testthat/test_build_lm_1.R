@@ -107,7 +107,6 @@ test_data <- tibble::tibble(
 test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
 
 test_data$klass <- c(rep("A", 10), rep("B", 10))
-
 test_that("add_prediction with linear regression", {
   model_df <- test_data %>% build_lm.fast(`DISTANCE`,
                                      `ARR_TIME`,
@@ -752,14 +751,16 @@ test_that("Group Logistic Regression with test_rate", {
 
 test_that("Group Logistic Regression with test_rate with weight", {
   group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
+  ret <- group_data %>% mutate(Weight=sin(1:n())+1) %>%
            build_lm.fast(`CANCELLED X`,
                         `ARR_TIME`,
-                        weight=`DISTANCE`,
+                        weight=`Weight`,
                         model_type = "glm",
                         family = "binomial",
                         link = "logit",
                         test_rate = 0.1)
+  # Check the numbers so that we can detect any change in broom or stats in the future.
+  expect_equal((ret %>% tidy_rowwise(model))$estimate, c(-24.840867308, 0.001245984, -1.104902459, -0.002945304), tolerance = 0.001)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
