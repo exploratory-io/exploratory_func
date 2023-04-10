@@ -1994,7 +1994,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
 
 #' Kruskal-Wallis wrapper for Analytics View
 #' @export
-exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
+exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -2034,6 +2034,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
       model$var2 <- var2_col
       model$data <- df
       model$epsilon_squared <- epsilon_squared
+      model$test_sig_level <- test_sig_level
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -2095,6 +2096,10 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "prob_dist") {
+    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
+    ret
   }
   else { # type == "data"
     if ("error" %in% class(x)) {
