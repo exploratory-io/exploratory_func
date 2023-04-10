@@ -1236,6 +1236,50 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+# Mean of the reference normal distribution (non-exact cases) for Wilcoxon test.
+wilcox_norm_dist_mean <- function(alternative, paired, statistic, n1, n2) {
+  if (!paired) {
+    if (alternative == "two.sided") {
+      if (statistic - n1*n2/2 >= 0) {
+        correction <- 0.5
+      }
+      else {
+        correction <- -0.5
+      }
+    }
+    else if (alternative == "greater") {
+      correction <- 0.5
+    }
+    else if (alternative == "less") {
+      correction <- -0.5
+    }
+    else {
+      stop("Invalid alternative value.")
+    }
+    return(correction + n1*n2/2) 
+  }
+  else {
+    if (alternative == "two.sided") {
+      if (statistic - n1*(n1 + 1)/4 >= 0) {
+        correction <- 0.5
+      }
+      else {
+        correction <- -0.5
+      }
+    }
+    else if (alternative == "greater") {
+      correction <- 0.5
+    }
+    else if (alternative == "less") {
+      correction <- -0.5
+    }
+    else {
+      stop("Invalid alternative value.")
+    }
+    return(correction + n1*(n1 + 1)/4) 
+  }
+}
+
 #' Wrapper for Wilcoxon rank sum test and signed-rank test for Analytics View
 #' @export
 #' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
