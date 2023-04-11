@@ -138,17 +138,18 @@ generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
 }
 
 generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternative = "two.sided") {
-  l <- max(5, abs(z)*1.1) # limit of x for the data we generate here.
+  r <- max(5*sigma, abs(z-mu)*1.1) # radius of x for the data we generate here.
 
-  x <- seq(from=-l,to=l,by=l/500 )
+  x <- seq(from=mu-r,to=mu+r,by=r/250)
   ret <- tibble::tibble(x=x, y=dnorm(x, mean=mu, sd=sigma))
 
-  ret2 <- tibble::tibble(x=z, y=dnorm(x, mean=mu, sd=sigma), statistic=TRUE)
+  ret2 <- tibble::tibble(x=z, y=dnorm(z, mean=mu, sd=sigma), statistic=TRUE)
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
-    tz <- qnorm(1-sig_level/2, mean=mu, sd=sigma) # Threshold z for critical section.
-    ret <- ret %>% mutate(critical=(x>=tz|x<=-tz))
+    tz_greater <- qnorm(1-sig_level/2, mean=mu, sd=sigma) # Threshold z for critical section.
+    tz_less <- qnorm(sig_level/2, mean=mu, sd=sigma) # Threshold z for critical section.
+    ret <- ret %>% mutate(critical=(x>=tz_greater|x<=tz_less))
   }
   else if (alternative == "greater") {
     tz <- qnorm(1-sig_level, mean=mu, sd=sigma) # Threshold z for critical section.
@@ -161,6 +162,69 @@ generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternati
   ret <- ret %>% mutate(mean=mu, sd=sigma)
   ret
 }
+
+generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alternative = "two.sided") {
+  from <- min(stat, qwilcox(sig_level/2, m=n1, n=n2)) # Start of the x axis range.
+  to <- max(stat, qwilcox(1-sig_level/2, m=n1, n=n2)) # End of the x axis range.
+  # Give some space around the data range.
+  l <- to - from
+  from <- from - l/10
+  to <- to + l/10
+  x <- seq(from=from,to=to,by=(to-from)/500 )
+
+  ret <- tibble::tibble(x=x, y=dwilcox(x, m=n1, n=n2))
+
+  ret2 <- tibble::tibble(x=stat, y=dwilcox(stat, m=n1, n=n2), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  if (alternative == "two.sided") {
+    tx_greater <- qwilcox(1-sig_level/2, m=n1, n=n2) # Threshold x for critical section.
+    tx_less <- qwilcox(sig_level/2, m=n1, n=n2) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx_greater|x<=tx_less))
+  }
+  else if (alternative == "greater") {
+    tx <- qwilcox(1-sig_level, m=n1, n=n2) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx))
+  }
+  else { # alternative == "less"
+    tx <- qwilcox(sig_level, m=n1, n=n2) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x<=tx))
+  }
+  ret <- ret %>% mutate(n1=n1, n2=n2)
+  ret
+}
+
+generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternative = "two.sided") {
+  from <- min(stat, qsignrank(sig_level/2, n=n)) # Start of the x axis range.
+  to <- max(stat, qsignrank(1-sig_level/2, n=n)) # End of the x axis range.
+  # Give some space around the data range.
+  l <- to - from
+  from <- from - l/10
+  to <- to + l/10
+  x <- seq(from=from,to=to,by=(to-from)/500 )
+  
+  ret <- tibble::tibble(x=x, y=dsignrank(x, n=n))
+
+  ret2 <- tibble::tibble(x=stat, y=dsignrank(stat, n=n), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  if (alternative == "two.sided") {
+    tx_greater <- qsignrank(1-sig_level/2, n=n) # Threshold x for critical section.
+    tx_less <- qsignrank(sig_level/2, n=n) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx_greater|x<=tx_less))
+  }
+  else if (alternative == "greater") {
+    tx <- qsignrank(1-sig_level, n=n) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx))
+  }
+  else { # alternative == "less"
+    tx <- qsignrank(sig_level, n=n) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x<=tx))
+  }
+  ret <- ret %>% mutate(n=n)
+  ret
+}
+
 
 #' wrapper for t.test, which compares means
 #' @export
