@@ -1280,6 +1280,16 @@ wilcox_norm_dist_mean <- function(alternative, paired, statistic, n1, n2) {
   }
 }
 
+# Standard deviation of the reference normal distribution (non-exact cases) for Wilcoxon test.
+wilcox_norm_dist_sd <- function(alternative, paired, statistic, n1, n2, tie_counts) {
+  if (!paired) {
+    sqrt(n1*n2/12*(n1 + n2 + 1 - sum(tie_counts^3 - tie_counts)/((n1 + n2)*(n1 + n2 -1))))
+  }
+  else {
+    sqrt(n1*(n1 + 1)*(2*n1 + 1)/6 - sum(tie_counts^3 - tie_counts)/12)/2
+  }
+}
+
 #' Wrapper for Wilcoxon rank sum test and signed-rank test for Analytics View
 #' @export
 #' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
