@@ -164,8 +164,8 @@ generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternati
 }
 
 generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alternative = "two.sided") {
-  from <- min(stat, qwilcox(sig_level/2, m=n1, n=n2)) # Start of the x axis range.
-  to <- max(stat, qwilcox(1-sig_level/2, m=n1, n=n2)) # End of the x axis range.
+  from <- min(stat, qwilcox(sig_level/4, m=n1, n=n2)) # Start of the x axis range.
+  to <- max(stat, qwilcox(1-sig_level/4, m=n1, n=n2)) # End of the x axis range.
   # Give some space around the data range.
   l <- to - from
   from <- from - l/10
@@ -195,8 +195,8 @@ generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alterna
 }
 
 generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternative = "two.sided") {
-  from <- min(stat, qsignrank(sig_level/2, n=n)) # Start of the x axis range.
-  to <- max(stat, qsignrank(1-sig_level/2, n=n)) # End of the x axis range.
+  from <- min(stat, qsignrank(sig_level/4, n=n)) # Start of the x axis range.
+  to <- max(stat, qsignrank(1-sig_level/4, n=n)) # End of the x axis range.
   # Give some space around the data range.
   l <- to - from
   from <- from - l/10
