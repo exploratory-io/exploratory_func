@@ -1319,7 +1319,7 @@ wilcox_norm_dist_sd <- function(alternative, paired, statistic, n1, n2, tie_coun
 #' @export
 #' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
 #' @param conf.level - Level of confidence for confidence interval. Passed to wilcox.test as part of ...
-exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
+exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, paired = FALSE, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -1382,10 +1382,15 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
         df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(forcats::fct_infreq(as.factor(!!rlang::sym(var2_col)))))
       }
       base.level <- levels(df_test[[var2_col]])[2]
-      model <- wilcox.test(formula, data = df_test, ...)
+      model <- wilcox.test(formula, data = df_test, paired = paired, ...)
+      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% dplyr::summarize(n=n())
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
+      model$paired <- paired
+      model$n1 <- count_df$n[1]
+      model$n2 <- count_df$n[2]
+      model$test_sig_level <- test_sig_level
       model$base.level <- base.level
       model$data <- df
       model
@@ -1490,6 +1495,17 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "prob_dist") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    mu <- wilcox_norm_dist_mean(x$alternative, x$paired, x$statistic, x$n1, x$n2)
+    tie_counts <- table(x$data[[x$var1]])
+    sigma <- wilcox_norm_dist_sd(x$alternative, x$paired, x$statistic, x$n1, x$n2, tie_counts)
+    ret <- generate_norm_density_data(x$statistic, mu, sigma, sig_level=x$test_sig_level, alternative=x$alternative)
+    ret
   }
   else { # type == "data"
     if ("error" %in% class(x)) {
