@@ -137,6 +137,31 @@ generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
   ret
 }
 
+generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternative = "two.sided") {
+  l <- max(5, abs(z)*1.1) # limit of x for the data we generate here.
+
+  x <- seq(from=-l,to=l,by=l/500 )
+  ret <- tibble::tibble(x=x, y=dnorm(x, mean=mu, sd=sigma))
+
+  ret2 <- tibble::tibble(x=z, y=dnorm(x, mean=mu, sd=sigma), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  if (alternative == "two.sided") {
+    tz <- qnorm(1-sig_level/2, mean=mu, sd=sigma) # Threshold z for critical section.
+    ret <- ret %>% mutate(critical=(x>=tz|x<=-tz))
+  }
+  else if (alternative == "greater") {
+    tz <- qnorm(1-sig_level, mean=mu, sd=sigma) # Threshold z for critical section.
+    ret <- ret %>% mutate(critical=(x>=tz))
+  }
+  else { # alternative == "less"
+    tz <- qnorm(sig_level, mean=mu, sd=sigma) # Threshold z for critical section.
+    ret <- ret %>% mutate(critical=(x<=tz))
+  }
+  ret <- ret %>% mutate(mean=mu, sd=sigma)
+  ret
+}
+
 #' wrapper for t.test, which compares means
 #' @export
 do_t.test <- function(df, value, key=NULL, ...){
