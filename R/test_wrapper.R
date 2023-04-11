@@ -174,7 +174,8 @@ generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alterna
 
   ret <- tibble::tibble(x=x, y=dwilcox(x, m=n1, n=n2))
 
-  ret2 <- tibble::tibble(x=stat, y=dwilcox(stat, m=n1, n=n2), statistic=TRUE)
+  # We need to take the mean of the density at the two closest integer values since non-integer density values are zero.
+  ret2 <- tibble::tibble(x=stat, y=mean(dwilcox(c(floor(stat), ceiling(stat)), m=n1, n=n2)), statistic=TRUE)
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
@@ -205,7 +206,8 @@ generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternativ
   
   ret <- tibble::tibble(x=x, y=dsignrank(x, n=n))
 
-  ret2 <- tibble::tibble(x=stat, y=dsignrank(stat, n=n), statistic=TRUE)
+  # We need to take the mean of the density at the two closest integer values since non-integer density values are zero.
+  ret2 <- tibble::tibble(x=stat, y=mean(dsignrank(c(floor(stat), ceiling(stat)), n=n)), statistic=TRUE)
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
