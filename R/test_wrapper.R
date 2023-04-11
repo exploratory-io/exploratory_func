@@ -170,7 +170,7 @@ generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alterna
   l <- to - from
   from <- from - l/10
   to <- to + l/10
-  x <- seq(from=from,to=to,by=(to-from)/500 )
+  x <- seq(from=floor(from),to=ceiling(to)) # x has to be integer.
 
   ret <- tibble::tibble(x=x, y=dwilcox(x, m=n1, n=n2))
 
@@ -201,7 +201,7 @@ generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternativ
   l <- to - from
   from <- from - l/10
   to <- to + l/10
-  x <- seq(from=from,to=to,by=(to-from)/500 )
+  x <- seq(from=floor(from),to=ceiling(to)) # x has to be integer.
   
   ret <- tibble::tibble(x=x, y=dsignrank(x, n=n))
 
@@ -1565,10 +1565,20 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- tibble::tibble()
       return(ret)
     }
-    mu <- wilcox_norm_dist_mean(x$alternative, x$paired, x$statistic, x$n1, x$n2)
     tie_counts <- table(x$data[[x$var1]])
-    sigma <- wilcox_norm_dist_sd(x$alternative, x$paired, x$statistic, x$n1, x$n2, tie_counts)
-    ret <- generate_norm_density_data(x$statistic, mu, sigma, sig_level=x$test_sig_level, alternative=x$alternative)
+    if (x$n1 < 50 && x$n2 < 50 && max(tie_counts) <= 1) { # Use exact method as wilcox.test does.
+      if (x$paired) {
+        ret <- generate_signrank_density_data(x$statistic, x$n1, sig_level=x$test_sig_level, alternative=x$alternative)
+      }
+      else {
+        ret <- generate_wilcox_density_data(x$statistic, x$n1, x$n2, sig_level=x$test_sig_level, alternative=x$alternative)
+      }
+    }
+    else {
+      mu <- wilcox_norm_dist_mean(x$alternative, x$paired, x$statistic, x$n1, x$n2)
+      sigma <- wilcox_norm_dist_sd(x$alternative, x$paired, x$statistic, x$n1, x$n2, tie_counts)
+      ret <- generate_norm_density_data(x$statistic, mu, sigma, sig_level=x$test_sig_level, alternative=x$alternative)
+    }
     ret
   }
   else { # type == "data"
