@@ -224,6 +224,11 @@ generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternativ
     ret <- ret %>% mutate(critical=(x<=tx))
   }
   ret <- ret %>% mutate(n=n)
+
+  # Smooth it out for visualization with LOESS. (dsignrank is not smooth unlike dwilcox.)
+  span_value <- 0.5  # Larger span values result in more smoothing
+  loess_model <- loess(y ~ x, data = ret, span = span_value)
+  ret$y <- predict(loess_model)
   ret
 }
 
