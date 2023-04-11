@@ -1506,10 +1506,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
     # Switch the name of statistic based on the type of performed test.
     if (stringr::str_detect(ret$method[[1]], "signed rank")) {
-      ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
+      ret <- ret %>% dplyr::rename(`W Value`=statistic)
     }
     else if (stringr::str_detect(ret$method[[1]], "rank sum")) { # Intentionally matching with just "rank sum" to match "Wilcoxon rank sum exact test" too.
-      ret <- ret %>% dplyr::rename(`U Statistic`=statistic)
+      ret <- ret %>% dplyr::rename(`U Value`=statistic)
     }
 
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
@@ -2237,7 +2237,7 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- broom:::tidy.htest(x)
     ret <- ret %>% dplyr::select(statistic, p.value) # Removed method since it is always "Kruskal-Wallis rank sum test" here.
     ret <- ret %>% dplyr::mutate(epsilon_squared=!!x$epsilon_squared, n=!!tot_n_rows)
-    ret <- ret %>% dplyr::rename(`H Statistic` = statistic,
+    ret <- ret %>% dplyr::rename(`H Value` = statistic,
                                  `P Value`=p.value,
                                  `Effect Size (Epsilon Squared)`=epsilon_squared,
                                  `Number of Rows`=n)
