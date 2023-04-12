@@ -681,7 +681,7 @@ test_that("test 2-way ANOVA with exp_anova with repeat-by", {
     c("vs","Variable","Sum of Squares","SS Ratio","Degree of Freedom","Mean Square","F Value","P Value","Note"))
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
   expect_equal(colnames(ret),
-    c("vs","Pair","Difference","Conf High","Conf Low","Standard Error","Degree of Freedom","t Value","P Value"))
+    c("vs","Pair","Difference","Conf High","Conf Low","Standard Error","Degree of Freedom","t Value","P Value", "Method"))
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   ret <- model_df %>% tidy_rowwise(model, type="levene")
