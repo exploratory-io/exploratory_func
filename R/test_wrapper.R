@@ -2169,8 +2169,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
 }
 
 #' Kruskal-Wallis wrapper for Analytics View
+#' @param test_sig_level - Significance level for the t-test ifself.
 #' @export
-exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, ...) {
+exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pairs_adjust = "none", ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -2203,7 +2204,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, ...
         }
       }
       model <- kruskal.test(formula, data = df, ...)
-      model$dunn.test <- dunn.test::dunn.test(df[[var1_col]],df[[var2_col]])
+      model$dunn.test <- dunn.test::dunn.test(df[[var1_col]],df[[var2_col]], method=pairs_adjust, alpha=test_sig_level)
       N <- nrow(df)
       epsilon_squared <- calculate_epsilon_squared(model, N)
       class(model) <- c("kruskal_exploratory", class(model))
