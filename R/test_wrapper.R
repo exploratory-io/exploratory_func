@@ -2170,7 +2170,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     ret <- x$data
     if (sort_factor_levels && !is.null(x$common_var2_order)) { # ANCOVA/one-way ANOVA and for the Means error bar.
       # Set the common order to display means and emmeans.
-      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
+      # as.character() is needed to avoid error when the var2 column is logical.
+      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(as.character(!!rlang::sym(x$var2[[1]])), x$common_var2_order))
     }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]

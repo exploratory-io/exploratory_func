@@ -7,6 +7,7 @@ test_df <- data.frame(
 test_df$list_c <- as.list(seq(20))
 
 test_df[["with space"]] <- seq(20)
+
 test_that("test t.test.aggregated with two.sided alternative (default)", {
   test_df <- data.frame(
     cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
@@ -774,6 +775,7 @@ test_that("test exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="levene")
   ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
+  res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
   model_df <- exp_anova(mtcars, mpg, gear)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
@@ -781,6 +783,12 @@ test_that("test exp_anova", {
                c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
                  "Minimum","Maximum"))
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+})
+
+test_that("test exp_anova with logical group column", {
+  mtcars2 <- mtcars %>% mutate(`a m`=as.logical(am), `w t`=wt, `q sec`=qsec)
+  model_df <- exp_anova(mtcars2, mpg, `a m`)
+  res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
 })
 
 test_that("test exp_anova with group-level error (lack of unique values)", {
