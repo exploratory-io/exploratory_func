@@ -2041,6 +2041,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # term  contrast null.value estimate std.error statistic adj.p.value
     # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
     # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
+
+    method <- switch(pairs_adjust,
+      "none" = "Pairwise T-Test with No Adjustment",
+      "tukey" = "Tukey's HSD Test",
+      "bonferroni" = "Pairwise T-Test with Bonferroni Correction",
+      "sheffe" = "Sheffe's Method",
+      "sidak" = "Pairwise T-Test with Sidak Correction",
+      "dunnett" = "Dunnett's Test",
+      "holm" = "Pairwise T-Test with Holm Correction",
+      "hochberg" = "Pairwise T-Test with Hochberg Correction"
+    )
+    ret <- ret %>% dplyr::mutate(`Method`=!!method)
   }
   else if (type == "levene") {
     if ("error" %in% class(x)) {
