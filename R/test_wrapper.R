@@ -2203,6 +2203,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, ...
         }
       }
       model <- kruskal.test(formula, data = df, ...)
+      model$dunn.test <- dunn.test::dunn.test(df[[var1_col]],df[[var2_col]])
       N <- nrow(df)
       epsilon_squared <- calculate_epsilon_squared(model, N)
       class(model) <- c("kruskal_exploratory", class(model))
@@ -2245,6 +2246,15 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
+  }
+  if (type == "dunn_test") {
+    ret <- tibble::as_tibble(x$dunn.test)
+    ret <- ret %>% dplyr::select(-chi2)
+    ret <- ret %>% dplyr::relocate(comparisons, .before = Z)
+    ret <- ret %>% dplyr::rename(`Z Value` = Z,
+                                 `P Value`=P,
+                                 `Adjusted P Value`=P.adjusted,
+                                 `Pair`=comparisons)
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
