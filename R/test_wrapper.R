@@ -2205,6 +2205,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pai
       }
       model <- kruskal.test(formula, data = df, ...)
       model$dunn.test <- dunn.test::dunn.test(df[[var1_col]],df[[var2_col]], method=pairs_adjust, alpha=test_sig_level)
+      model$pairs_adjust <- pairs_adjust
       N <- nrow(df)
       epsilon_squared <- calculate_epsilon_squared(model, N)
       class(model) <- c("kruskal_exploratory", class(model))
@@ -2255,7 +2256,14 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- ret %>% dplyr::rename(`Z Value`=Z,
                                  `P Value`=P.adjusted,
                                  `Pair`=comparisons)
-    ret <- ret %>% dplyr::mutate(`Method`="Dunn's Test")
+    method <- switch(x$pairs_adjust,
+      "none" = "Dunn's Test with No Adjustment",
+      "bonferroni" = "Dunn's Test with Bonferroni Correction",
+      "sidak" = "Dunn's Test with Sidak Correction",
+      "holm" = "Dunn's Test with Holm Correction",
+      "hochberg" = "Dunn's Test with Hochberg Correction"
+    )
+    ret <- ret %>% dplyr::mutate(`Method`=!!method)
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
