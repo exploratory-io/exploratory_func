@@ -3,6 +3,7 @@ context("tests for wrappers of Kraskal-Wallis tests")
 
 test_that("test exp_kruskal", {
   model_df <- exp_kruskal(mtcars, mpg, gear)
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")

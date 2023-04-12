@@ -2248,7 +2248,7 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
-  if (type == "dunn_test") {
+  if (type == "pairs") {
     ret <- tibble::as_tibble(x$dunn.test)
     ret <- ret %>% dplyr::select(-chi2)
     ret <- ret %>% dplyr::relocate(comparisons, .before = Z)
