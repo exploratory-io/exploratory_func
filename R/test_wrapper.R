@@ -2250,12 +2250,12 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
   }
   if (type == "pairs") {
     ret <- tibble::as_tibble(x$dunn.test)
-    ret <- ret %>% dplyr::select(-chi2)
+    ret <- ret %>% dplyr::select(-chi2, -P)
     ret <- ret %>% dplyr::relocate(comparisons, .before = Z)
-    ret <- ret %>% dplyr::rename(`Z Value` = Z,
-                                 `P Value`=P,
-                                 `Adjusted P Value`=P.adjusted,
+    ret <- ret %>% dplyr::rename(`Z Value`=Z,
+                                 `P Value`=P.adjusted,
                                  `Pair`=comparisons)
+    ret <- ret %>% dplyr::mutate(`Method`="Dunn's Test")
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
