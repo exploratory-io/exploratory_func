@@ -40,6 +40,7 @@ test_that("exp_anova with groups with only single category", {
 test_that("exp_wilcox with groups with only single category", {
   flight_by_carrier <- flight %>% dplyr::group_by(`CAR RIER`)
   model_df <- flight_by_carrier %>% filter(!is.na(`is UA or AA`)) %>% exp_wilcox(`ARR DELAY`, `is UA or AA`)
+  res <- model_df %>% tidy_rowwise(model, type="prob_dist")
   res <- model_df %>% tidy_rowwise(model, type="model")
   res <- model_df %>% tidy_rowwise(model, type="data")
   res <- model_df %>% tidy_rowwise(model, type="data_summary", conf_level=0.95)

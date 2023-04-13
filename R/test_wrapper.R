@@ -137,6 +137,105 @@ generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
   ret
 }
 
+# Generated data of a normal distribution with critical section and statistic for visualization.
+# We currently use it for non-exact Wilcoxon test.
+generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternative = "two.sided") {
+  r <- max(5*sigma, abs(z-mu)*1.1) # radius of x for the data we generate here.
+
+  x <- seq(from=mu-r,to=mu+r,by=r/250)
+  ret <- tibble::tibble(x=x, y=dnorm(x, mean=mu, sd=sigma))
+
+  ret2 <- tibble::tibble(x=z, y=dnorm(z, mean=mu, sd=sigma), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  if (alternative == "two.sided") {
+    tz_greater <- qnorm(1-sig_level/2, mean=mu, sd=sigma) # Threshold z for critical section.
+    tz_less <- qnorm(sig_level/2, mean=mu, sd=sigma) # Threshold z for critical section.
+    ret <- ret %>% mutate(critical=(x>=tz_greater|x<=tz_less))
+  }
+  else if (alternative == "greater") {
+    tz <- qnorm(1-sig_level, mean=mu, sd=sigma) # Threshold z for critical section.
+    ret <- ret %>% mutate(critical=(x>=tz))
+  }
+  else { # alternative == "less"
+    tz <- qnorm(sig_level, mean=mu, sd=sigma) # Threshold z for critical section.
+    ret <- ret %>% mutate(critical=(x<=tz))
+  }
+  ret <- ret %>% mutate(mean=mu, sd=sigma)
+  ret
+}
+
+# Generates data for probability density chart for exact Wilcoxon test.
+generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alternative = "two.sided") {
+  from <- min(stat, qwilcox(sig_level/4, m=n1, n=n2)) # Start of the x axis range.
+  to <- max(stat, qwilcox(1-sig_level/4, m=n1, n=n2)) # End of the x axis range.
+  # Give some space around the data range.
+  l <- to - from
+  from <- from - l/10
+  to <- to + l/10
+  x <- seq(from=floor(from),to=ceiling(to)) # x has to be integer.
+
+  ret <- tibble::tibble(x=x, y=dwilcox(x, m=n1, n=n2))
+
+  # We need to take the mean of the density at the two closest integer values since non-integer density values are zero.
+  ret2 <- tibble::tibble(x=stat, y=mean(dwilcox(c(floor(stat), ceiling(stat)), m=n1, n=n2)), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  if (alternative == "two.sided") {
+    tx_greater <- qwilcox(1-sig_level/2, m=n1, n=n2) # Threshold x for critical section.
+    tx_less <- qwilcox(sig_level/2, m=n1, n=n2) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx_greater|x<=tx_less))
+  }
+  else if (alternative == "greater") {
+    tx <- qwilcox(1-sig_level, m=n1, n=n2) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx))
+  }
+  else { # alternative == "less"
+    tx <- qwilcox(sig_level, m=n1, n=n2) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x<=tx))
+  }
+  ret <- ret %>% mutate(n1=n1, n2=n2)
+  ret
+}
+
+# Generates data for probability density chart for exact sign rank test.
+generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternative = "two.sided") {
+  from <- min(stat, qsignrank(sig_level/4, n=n)) # Start of the x axis range.
+  to <- max(stat, qsignrank(1-sig_level/4, n=n)) # End of the x axis range.
+  # Give some space around the data range.
+  l <- to - from
+  from <- from - l/10
+  to <- to + l/10
+  x <- seq(from=floor(from),to=ceiling(to)) # x has to be integer.
+  
+  ret <- tibble::tibble(x=x, y=dsignrank(x, n=n))
+
+  # We need to take the mean of the density at the two closest integer values since non-integer density values are zero.
+  ret2 <- tibble::tibble(x=stat, y=mean(dsignrank(c(floor(stat), ceiling(stat)), n=n)), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  if (alternative == "two.sided") {
+    tx_greater <- qsignrank(1-sig_level/2, n=n) # Threshold x for critical section.
+    tx_less <- qsignrank(sig_level/2, n=n) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx_greater|x<=tx_less))
+  }
+  else if (alternative == "greater") {
+    tx <- qsignrank(1-sig_level, n=n) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x>=tx))
+  }
+  else { # alternative == "less"
+    tx <- qsignrank(sig_level, n=n) # Threshold x for critical section.
+    ret <- ret %>% mutate(critical=(x<=tx))
+  }
+  ret <- ret %>% mutate(n=n)
+
+  # Smooth it out for visualization with LOESS. (dsignrank is not smooth unlike dwilcox.)
+  span_value <- 0.5  # Larger span values result in more smoothing
+  loess_model <- loess(y ~ x, data = ret, span = span_value)
+  ret$y <- predict(loess_model)
+  ret
+}
+
 #' wrapper for t.test, which compares means
 #' @export
 do_t.test <- function(df, value, key=NULL, ...){
@@ -1236,11 +1335,65 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+# Mean of the reference normal distribution (non-exact cases) for Wilcoxon test.
+wilcox_norm_dist_mean <- function(alternative, paired, statistic, n1, n2) {
+  if (!paired) {
+    if (alternative == "two.sided") {
+      if (statistic - n1*n2/2 >= 0) {
+        correction <- 0.5
+      }
+      else {
+        correction <- -0.5
+      }
+    }
+    else if (alternative == "greater") {
+      correction <- 0.5
+    }
+    else if (alternative == "less") {
+      correction <- -0.5
+    }
+    else {
+      stop("Invalid alternative value.")
+    }
+    return(correction + n1*n2/2) 
+  }
+  else {
+    if (alternative == "two.sided") {
+      if (statistic - n1*(n1 + 1)/4 >= 0) {
+        correction <- 0.5
+      }
+      else {
+        correction <- -0.5
+      }
+    }
+    else if (alternative == "greater") {
+      correction <- 0.5
+    }
+    else if (alternative == "less") {
+      correction <- -0.5
+    }
+    else {
+      stop("Invalid alternative value.")
+    }
+    return(correction + n1*(n1 + 1)/4) 
+  }
+}
+
+# Standard deviation of the reference normal distribution (non-exact cases) for Wilcoxon test.
+wilcox_norm_dist_sd <- function(alternative, paired, statistic, n1, n2, tie_counts) {
+  if (!paired) {
+    sqrt(n1*n2/12*(n1 + n2 + 1 - sum(tie_counts^3 - tie_counts)/((n1 + n2)*(n1 + n2 -1))))
+  }
+  else {
+    sqrt(n1*(n1 + 1)*(2*n1 + 1)/6 - sum(tie_counts^3 - tie_counts)/12)/2
+  }
+}
+
 #' Wrapper for Wilcoxon rank sum test and signed-rank test for Analytics View
 #' @export
 #' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
 #' @param conf.level - Level of confidence for confidence interval. Passed to wilcox.test as part of ...
-exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
+exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, paired = FALSE, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -1303,10 +1456,15 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
         df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(forcats::fct_infreq(as.factor(!!rlang::sym(var2_col)))))
       }
       base.level <- levels(df_test[[var2_col]])[2]
-      model <- wilcox.test(formula, data = df_test, ...)
+      model <- wilcox.test(formula, data = df_test, paired = paired, ...)
+      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% dplyr::summarize(n=n())
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
+      model$paired <- paired
+      model$n1 <- count_df$n[1]
+      model$n2 <- count_df$n[2]
+      model$test_sig_level <- test_sig_level
       model$base.level <- base.level
       model$data <- df
       model
@@ -1351,10 +1509,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
     # Switch the name of statistic based on the type of performed test.
     if (stringr::str_detect(ret$method[[1]], "signed rank")) {
-      ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
+      ret <- ret %>% dplyr::rename(`W Value`=statistic)
     }
     else if (stringr::str_detect(ret$method[[1]], "rank sum")) { # Intentionally matching with just "rank sum" to match "Wilcoxon rank sum exact test" too.
-      ret <- ret %>% dplyr::rename(`U Statistic`=statistic)
+      ret <- ret %>% dplyr::rename(`U Value`=statistic)
     }
 
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
@@ -1411,6 +1569,27 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "prob_dist") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    tie_counts <- table(x$data[[x$var1]])
+    if (x$n1 < 50 && x$n2 < 50 && max(tie_counts) <= 1) { # Use exact method as wilcox.test does.
+      if (x$paired) {
+        ret <- generate_signrank_density_data(x$statistic, x$n1, sig_level=x$test_sig_level, alternative=x$alternative)
+      }
+      else {
+        ret <- generate_wilcox_density_data(x$statistic, x$n1, x$n2, sig_level=x$test_sig_level, alternative=x$alternative)
+      }
+    }
+    else {
+      mu <- wilcox_norm_dist_mean(x$alternative, x$paired, x$statistic, x$n1, x$n2)
+      sigma <- wilcox_norm_dist_sd(x$alternative, x$paired, x$statistic, x$n1, x$n2, tie_counts)
+      ret <- generate_norm_density_data(x$statistic, mu, sigma, sig_level=x$test_sig_level, alternative=x$alternative)
+    }
+    ret
   }
   else { # type == "data"
     if ("error" %in% class(x)) {
@@ -1794,7 +1973,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     # Set the common order to display means and emmeans.
     if (sort_factor_levels && !is.null(x$common_var2_order)) {
-      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
+      # as.character() is needed to avoid error when the var2 column is logical.
+      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(as.character(!!rlang::sym(x$var2[[1]])), x$common_var2_order))
     }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
@@ -1865,6 +2045,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # term  contrast null.value estimate std.error statistic adj.p.value
     # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
     # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
+
+    method <- switch(pairs_adjust,
+      "none" = "Pairwise T-Test with No Adjustment",
+      "tukey" = "Tukey's HSD Test",
+      "bonferroni" = "Pairwise T-Test with Bonferroni Correction",
+      "sheffe" = "Sheffe's Method",
+      "sidak" = "Pairwise T-Test with Sidak Correction",
+      "dunnett" = "Dunnett's Test",
+      "holm" = "Pairwise T-Test with Holm Correction",
+      "hochberg" = "Pairwise T-Test with Hochberg Correction"
+    )
+    ret <- ret %>% dplyr::mutate(`Method`=!!method)
   }
   else if (type == "levene") {
     if ("error" %in% class(x)) {
@@ -1982,7 +2174,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     ret <- x$data
     if (sort_factor_levels && !is.null(x$common_var2_order)) { # ANCOVA/one-way ANOVA and for the Means error bar.
       # Set the common order to display means and emmeans.
-      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(!!rlang::sym(x$var2[[1]]), x$common_var2_order))
+      # as.character() is needed to avoid error when the var2 column is logical.
+      ret <- ret %>% dplyr::mutate(!!rlang::sym(x$var2[[1]]):=forcats::fct_relevel(as.character(!!rlang::sym(x$var2[[1]])), x$common_var2_order))
     }
     # Map the column names back to the original.
     orig_terms <- x$terms_mapping[colnames(ret)]
@@ -1993,8 +2186,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
 }
 
 #' Kruskal-Wallis wrapper for Analytics View
+#' @param test_sig_level - Significance level for the t-test ifself.
 #' @export
-exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
+exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pairs_adjust = "none", ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -2027,6 +2221,8 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
         }
       }
       model <- kruskal.test(formula, data = df, ...)
+      model$dunn.test <- dunn.test::dunn.test(df[[var1_col]],df[[var2_col]], method=pairs_adjust, alpha=test_sig_level)
+      model$pairs_adjust <- pairs_adjust
       N <- nrow(df)
       epsilon_squared <- calculate_epsilon_squared(model, N)
       class(model) <- c("kruskal_exploratory", class(model))
@@ -2034,6 +2230,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
       model$var2 <- var2_col
       model$data <- df
       model$epsilon_squared <- epsilon_squared
+      model$test_sig_level <- test_sig_level
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -2059,14 +2256,31 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     note <- NULL
     ret <- broom:::tidy.htest(x)
     ret <- ret %>% dplyr::select(statistic, p.value) # Removed method since it is always "Kruskal-Wallis rank sum test" here.
-    ret <- ret %>% dplyr::mutate(epsilon_squared=!!x$epsilon_squared, n=!!tot_n_rows)
-    ret <- ret %>% dplyr::rename(`H Statistic` = statistic,
+    ret <- ret %>% dplyr::mutate(df=!!x$parameter, epsilon_squared=!!x$epsilon_squared, n=!!tot_n_rows)
+    ret <- ret %>% dplyr::rename(`H Value` = statistic,
                                  `P Value`=p.value,
+                                 `Degree of Freedom`=df,
                                  `Effect Size (Epsilon Squared)`=epsilon_squared,
                                  `Number of Rows`=n)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
+  }
+  if (type == "pairs") {
+    ret <- tibble::as_tibble(x$dunn.test)
+    ret <- ret %>% dplyr::select(-chi2, -P)
+    ret <- ret %>% dplyr::relocate(comparisons, .before = Z)
+    ret <- ret %>% dplyr::rename(`Z Value`=Z,
+                                 `P Value`=P.adjusted,
+                                 `Pair`=comparisons)
+    method <- switch(x$pairs_adjust,
+      "none" = "Dunn's Test with No Adjustment",
+      "bonferroni" = "Dunn's Test with Bonferroni Correction",
+      "sidak" = "Dunn's Test with Sidak Correction",
+      "holm" = "Dunn's Test with Holm Correction",
+      "hochberg" = "Dunn's Test with Hochberg Correction"
+    )
+    ret <- ret %>% dplyr::mutate(`Method`=!!method)
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     if ("error" %in% class(x)) {
@@ -2095,6 +2309,10 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "prob_dist") {
+    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
+    ret
   }
   else { # type == "data"
     if ("error" %in% class(x)) {
