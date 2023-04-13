@@ -137,6 +137,8 @@ generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
   ret
 }
 
+# Generated data of a normal distribution with critical section and statistic for visualization.
+# We currently use it for non-exact Wilcoxon test.
 generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternative = "two.sided") {
   r <- max(5*sigma, abs(z-mu)*1.1) # radius of x for the data we generate here.
 
@@ -163,6 +165,7 @@ generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternati
   ret
 }
 
+# Generates data for probability density chart for exact Wilcoxon test.
 generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alternative = "two.sided") {
   from <- min(stat, qwilcox(sig_level/4, m=n1, n=n2)) # Start of the x axis range.
   to <- max(stat, qwilcox(1-sig_level/4, m=n1, n=n2)) # End of the x axis range.
@@ -195,6 +198,7 @@ generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alterna
   ret
 }
 
+# Generates data for probability density chart for exact sign rank test.
 generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternative = "two.sided") {
   from <- min(stat, qsignrank(sig_level/4, n=n)) # Start of the x axis range.
   to <- max(stat, qsignrank(1-sig_level/4, n=n)) # End of the x axis range.
@@ -231,7 +235,6 @@ generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternativ
   ret$y <- predict(loess_model)
   ret
 }
-
 
 #' wrapper for t.test, which compares means
 #' @export
