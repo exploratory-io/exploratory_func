@@ -1,4 +1,4 @@
-exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, seed = 1) {
+exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 2, seed = 1) {
   if (!requireNamespace("FactoMineR", quietly = TRUE)) {
     install.packages("FactoMineR")
   }
@@ -54,7 +54,7 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, seed 
     }
 
     cleaned_df <- cleaned_df %>% mutate_all(as.factor)
-    fit <- FactoMineR::MCA(cleaned_df, graph = FALSE)
+    fit <- FactoMineR::MCA(cleaned_df, ncp = ncp, graph = FALSE)
     fit$df <- df
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
@@ -74,6 +74,11 @@ tidy.mca_exploratory <- function(x, type="categories") {
   else if (type == "variables") {
     res <- tibble::rownames_to_column(as.data.frame(x$var$eta2), var="variable_name")
     res <- res %>% select(variable_name, `Dim 1`, `Dim 2`)
+    res
+  }
+  else if (type == "ind") {
+    res <- tibble::rownames_to_column(as.data.frame(x$ind$coord), var="label")
+    res <- res %>% select(label, `Dim 1`, `Dim 2`)
     res
   }
 }
