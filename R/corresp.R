@@ -52,6 +52,8 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
         return(NULL)
       }
     }
+    var_names_map <- colnames(cleaned_df)
+    names(var_names_map) <- paste0("V", 1:length(var_names_map))
 
     # Prefix the category values with the column index to make sure they are unique across columns, to avoid unwanted name prefixing by MCA
     for (i in 1:length(cleaned_df)) {
@@ -60,6 +62,7 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
     cleaned_df <- cleaned_df %>% mutate_all(as.factor)
     fit <- FactoMineR::MCA(cleaned_df, ncp = ncp, graph = FALSE)
     fit$df <- df
+    fit$var_names_map <- var_names_map
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
     class(fit) <- c("mca_exploratory", class(fit))
@@ -74,6 +77,7 @@ tidy.mca_exploratory <- function(x, type="categories") {
     res <- tibble::rownames_to_column(as.data.frame(x$var$coord), var="category")
     res <- res %>% dplyr::select(category, `Dim 1`, `Dim 2`)
     res <- res %>% tidyr::separate(col = category, into = c("variable", "category"), sep = ":")
+    res <- res %>% dplyr::mutate(variable = x$var_names_map[variable])
     res
   }
   else if (type == "variables") {
