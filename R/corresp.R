@@ -9,10 +9,6 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, seed 
   grouped_cols <- grouped_by(df)
   selected_cols <- setdiff(selected_cols, grouped_cols)
 
-  if (any(stringr::str_detect(all_cols, "^Dim[0-9]+$"))) {
-    stop("Columns with names such as Dim1, Dim2, ... cannot be in the input data frame. Please rename them.")
-  }
-
   if (any(selected_cols %in% grouped_cols)) {
     stop("Repeat-By column cannot be used as a variable column.")
   }
@@ -67,4 +63,12 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, seed 
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
+tidy.mca_exploratory <- function(x, type="categories") {
+  if (type == "categories") {
+    res <- tibble::rownames_to_column(as.data.frame(x$var$coord), var="category_name")
+    res <- res %>% select(category_name, `Dim 1`, `Dim 2`)
+    res
+  }
 }
