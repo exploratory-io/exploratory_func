@@ -71,18 +71,19 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
 
 tidy.mca_exploratory <- function(x, type="categories") {
   if (type == "categories") {
-    res <- tibble::rownames_to_column(as.data.frame(x$var$coord), var="category_name")
-    res <- res %>% select(category_name, `Dim 1`, `Dim 2`)
+    res <- tibble::rownames_to_column(as.data.frame(x$var$coord), var="category")
+    res <- res %>% dplyr::select(category, `Dim 1`, `Dim 2`)
+    res <- res %>% tidyr::separate(col = category, into = c("variable", "category"), sep = ":")
     res
   }
   else if (type == "variables") {
     res <- tibble::rownames_to_column(as.data.frame(x$var$eta2), var="variable_name")
-    res <- res %>% select(variable_name, `Dim 1`, `Dim 2`)
+    res <- res %>% dplyr::select(variable_name, `Dim 1`, `Dim 2`)
     res
   }
   else if (type == "ind") {
     res <- tibble::rownames_to_column(as.data.frame(x$ind$coord), var="label")
-    res <- res %>% select(label, `Dim 1`, `Dim 2`)
+    res <- res %>% dplyr::select(label, `Dim 1`, `Dim 2`)
     res
   }
 }
