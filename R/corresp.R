@@ -71,4 +71,9 @@ tidy.mca_exploratory <- function(x, type="categories") {
     res <- res %>% select(category_name, `Dim 1`, `Dim 2`)
     res
   }
+  else if (type == "variables") {
+    res <- tibble::rownames_to_column(as.data.frame(x$var$eta2), var="variable_name")
+    res <- res %>% select(variable_name, `Dim 1`, `Dim 2`)
+    res
+  }
 }
