@@ -95,6 +95,11 @@ tidy.mca_exploratory <- function(x, type="categories") {
     res <- res %>% dplyr::select(variable, `Dim 1`, `Dim 2`)
     res
   }
+  else if (type == "variance") {
+    res <- as.data.frame(x$eig) %>% dplyr::mutate(dim=1:n())
+    # Omit the tail demensions with almost 0 variances.
+    res <- res %>% dplyr::filter(`percentage of variance` > 1e-15)
+  }
   else if (type == "data") {
     res <- as.data.frame(x$ind$coord)
     res <- x$df %>% bind_cols(res)
