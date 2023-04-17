@@ -61,7 +61,11 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
         cleaned_df[i] <- as.factor(paste0("V",i,":",cleaned_df[[i]]))
       }
     }
-    fit <- FactoMineR::MCA(cleaned_df, ncp = ncp, graph = FALSE, quanti.sup=NULL)
+    quanti_sup_idx <- which(colnames(cleaned_df) %in% quanti_sup_cols)
+    if (length(quanti_sup_idx) == 0) {
+      quanti_sup_idx <- NULL
+    }
+    fit <- FactoMineR::MCA(cleaned_df, ncp = ncp, graph = FALSE, quanti.sup=quanti_sup_idx)
     fit$df <- df
     fit$var_names_map <- var_names_map
     fit$grouped_cols <- grouped_cols
