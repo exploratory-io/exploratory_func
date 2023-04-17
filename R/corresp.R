@@ -45,7 +45,7 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
     } else {
       min_ncol <- 2
     }
-    if (length(colnames(cleaned_df)) < min_ncol) {
+    if (sum(selected_cols %in% colnames(cleaned_df)) < min_ncol) {
       if (length(grouped_cols) < 1) {
         stop("There are not enough columns after removing the columns with only NA or a single value.")
       } else {
@@ -57,9 +57,10 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
 
     # Prefix the category values with the column index to make sure they are unique across columns, to avoid unwanted name prefixing by MCA
     for (i in 1:length(cleaned_df)) {
-      cleaned_df[i] <- paste0("V",i,":",cleaned_df[[i]])
+      if (colnames(cleaned_df)[i] %in% selected_cols) {
+        cleaned_df[i] <- as.factor(paste0("V",i,":",cleaned_df[[i]]))
+      }
     }
-    cleaned_df <- cleaned_df %>% mutate_all(as.factor)
     fit <- FactoMineR::MCA(cleaned_df, ncp = ncp, graph = FALSE, quanti.sup=NULL)
     fit$df <- df
     fit$var_names_map <- var_names_map
