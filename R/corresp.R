@@ -81,13 +81,13 @@ tidy.mca_exploratory <- function(x, type="categories") {
     res
   }
   else if (type == "variables") {
-    res <- tibble::rownames_to_column(as.data.frame(x$var$eta2), var="variable_name")
-    res <- res %>% dplyr::select(variable_name, `Dim 1`, `Dim 2`)
+    res <- tibble::rownames_to_column(as.data.frame(x$var$eta2), var="variable")
+    res <- res %>% dplyr::select(variable, `Dim 1`, `Dim 2`)
     res
   }
-  else if (type == "ind") {
-    res <- tibble::rownames_to_column(as.data.frame(x$ind$coord), var="label")
-    res <- res %>% dplyr::select(label, `Dim 1`, `Dim 2`)
+  else if (type == "data") {
+    res <- as.data.frame(x$ind$coord)
+    res <- x$df %>% bind_cols(res)
     res
   }
 }
