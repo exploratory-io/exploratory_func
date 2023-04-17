@@ -1,4 +1,4 @@
-exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 2, seed = 1) {
+exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 2, quanti_sup_cols = NULL, seed = 1) {
   if (!requireNamespace("FactoMineR", quietly = TRUE)) {
     install.packages("FactoMineR")
   }
@@ -8,6 +8,7 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_cols <- grouped_by(df)
   selected_cols <- setdiff(selected_cols, grouped_cols)
+  quanti_sup_cols <- setdiff(quanti_sup_cols, grouped_cols)
 
   if (any(selected_cols %in% grouped_cols)) {
     stop("Repeat-By column cannot be used as a variable column.")
@@ -31,10 +32,9 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
       df <- df %>% sample_rows(max_nrow)
     }
 
-    cleaned_df <- df[, colnames(df) %in% selected_cols, drop = FALSE]
+    cleaned_df <- df[, colnames(df) %in% c(selected_cols, quanti_sup_cols), drop = FALSE]
 
-    cols_copy <- colnames(cleaned_df)
-    for (col in cols_copy) {
+    for (col in selected_cols) {
       unique_val <- unique(cleaned_df[[col]])
       if (length(unique_val) == 1) {
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
@@ -60,7 +60,7 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
       cleaned_df[i] <- paste0("V",i,":",cleaned_df[[i]])
     }
     cleaned_df <- cleaned_df %>% mutate_all(as.factor)
-    fit <- FactoMineR::MCA(cleaned_df, ncp = ncp, graph = FALSE)
+    fit <- FactoMineR::MCA(cleaned_df, ncp = ncp, graph = FALSE, quanti.sup=NULL)
     fit$df <- df
     fit$var_names_map <- var_names_map
     fit$grouped_cols <- grouped_cols
