@@ -102,6 +102,7 @@ tidy.mca_exploratory <- function(x, type="categories") {
     res <- res %>% dplyr::mutate(variable = x$var_names_map[variable])
     res <- res %>% tidyr::unite(Category, variable, category, sep=" - ")
     res <- res %>% tidyr::pivot_longer(cols=starts_with("Dim "), names_to="Dimension", values_to="Value")
+    res <- res %>% dplyr::mutate(Dimension = stringr::str_replace(Dimension, "Dim ", "Dimension "))
     res
   }
   else if (type == "variance") {
