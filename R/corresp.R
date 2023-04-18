@@ -83,16 +83,19 @@ tidy.mca_exploratory <- function(x, type="categories") {
     res <- res %>% dplyr::select(category, `Dim 1`, `Dim 2`)
     res <- res %>% tidyr::separate(col = category, into = c("variable", "category"), sep = ":")
     res <- res %>% dplyr::mutate(variable = x$var_names_map[variable])
+    res <- res %>% dplyr::rename_with(~gsub("Dim ", "Dimension ", .), starts_with("Dim "))
     res
   }
   else if (type == "variables") {
     res <- tibble::rownames_to_column(as.data.frame(x$var$eta2), var="variable")
     res <- res %>% dplyr::select(variable, `Dim 1`, `Dim 2`)
+    res <- res %>% dplyr::rename_with(~gsub("Dim ", "Dimension ", .), starts_with("Dim "))
     res
   }
   else if (type == "quanti_sup") {
     res <- tibble::rownames_to_column(as.data.frame(x$quanti.sup$coord), var="variable")
     res <- res %>% dplyr::select(variable, `Dim 1`, `Dim 2`)
+    res <- res %>% dplyr::rename_with(~gsub("Dim ", "Dimension ", .), starts_with("Dim "))
     res
   }
   else if (type == "contrib") {
@@ -113,6 +116,7 @@ tidy.mca_exploratory <- function(x, type="categories") {
   else if (type == "data") {
     res <- as.data.frame(x$ind$coord)
     res <- x$df %>% bind_cols(res)
+    res <- res %>% dplyr::rename_with(~gsub("Dim ", "Dimension ", .), starts_with("Dim "))
     res
   }
 }
