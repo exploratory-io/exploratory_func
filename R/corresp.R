@@ -1,4 +1,4 @@
-exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 2, quanti_sups = NULL, seed = 1) {
+exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 5, quanti_sups = NULL, seed = 1) {
   if (!requireNamespace("FactoMineR", quietly = TRUE)) {
     install.packages("FactoMineR")
   }
