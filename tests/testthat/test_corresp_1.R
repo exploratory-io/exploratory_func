@@ -1,0 +1,10 @@
+context("test correspondence analysis")
+test_that("test exp_mca", {
+  model_df <- mtcars %>% exp_mca(vs,am,gear,carb, ncp=30, quanti_sups=c("mpg","disp","hp","drat","wt","qsec"))
+  res <- model_df %>% tidy_rowwise(model, type="contrib")
+  res <- model_df %>% tidy_rowwise(model, type="variance")
+  res <- model_df %>% tidy_rowwise(model, type="quanti_sup")
+  res <- model_df %>% tidy_rowwise(model, type="data")
+  res <- model_df %>% tidy_rowwise(model, type="categories")
+  res <- model_df %>% tidy_rowwise(model, type="variables")
+})
