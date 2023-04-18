@@ -95,6 +95,15 @@ tidy.mca_exploratory <- function(x, type="categories") {
     res <- res %>% dplyr::select(variable, `Dim 1`, `Dim 2`)
     res
   }
+  else if (type == "contrib") {
+    res <- tibble::rownames_to_column(as.data.frame(x$var$contrib), var="category")
+    res <- res %>% dplyr::select(category, starts_with("Dim "))
+    res <- res %>% tidyr::separate(col = category, into = c("variable", "category"), sep = ":")
+    res <- res %>% dplyr::mutate(variable = x$var_names_map[variable])
+    res <- res %>% tidyr::unite(Category, variable, category, sep=" - ")
+    res <- res %>% tidyr::pivot_longer(cols=starts_with("Dim "), names_to="Dimension", values_to="Value")
+    res
+  }
   else if (type == "variance") {
     res <- as.data.frame(x$eig) %>% dplyr::mutate(dim=1:n())
     # Omit the tail demensions with almost 0 variances.
