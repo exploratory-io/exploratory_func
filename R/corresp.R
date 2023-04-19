@@ -1,9 +1,4 @@
 exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 5, quanti_sups = NULL, seed = 1) {
-  if (!requireNamespace("FactoMineR", quietly = TRUE)) {
-    install.packages("FactoMineR")
-  }
-  library(FactoMineR)
-
   all_cols <- colnames(df)
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_cols <- grouped_by(df)
