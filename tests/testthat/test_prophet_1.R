@@ -15,10 +15,14 @@ test_that("do_prophet with aggregation", {
 
   # test for test mode.
   raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211
-  ret <- raw_data %>%
-    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
+  model_df <- raw_data %>%
+    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE, output="model")
+  ret <- model_df %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  # test for glance.
+  ret <- model_df %>% glance_rowwise(model)
+  expect_true(all(c("RMSE","MAE","MAPE","R Squared") %in% names(ret)))
 
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
@@ -130,7 +134,7 @@ test_that("do_prophet with short data (test for coef)", {
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2010-01-23")) 
   # test for glance.
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("RMSE","MAE","MAPE") %in% names(ret)))
+  expect_true(all(c("RMSE","MAE","MAPE","R Squared") %in% names(ret)))
 })
 
 test_that("do_prophet with quarterly and monthly seasonality", {
