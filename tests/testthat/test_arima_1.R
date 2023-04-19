@@ -8,7 +8,8 @@ test_that("exp_arima with aggregation", {
   model_df <- raw_data %>%
     exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", seasonal=F, test_mode=T) # With seasonal=T, the data would be too short.
   ret <- model_df %>% glance_with_ts_metric()
-  model_df %>% glance_rowwise(model)
+  expect_true(all(c("RMSE","MAE","MAPE","R Squared") %in% names(ret)))
+  ret <- model_df %>% glance_rowwise(model)
   ret <- raw_data %>%
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "day", seasonal=FALSE)
   ret <- raw_data %>%
