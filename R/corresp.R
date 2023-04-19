@@ -1,3 +1,5 @@
+#' Function for Correspondence Analysis Analytics View
+#' @export
 exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 5, quanti_sups = NULL, seed = 1) {
   all_cols <- colnames(df)
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -72,6 +74,8 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
+#' Extracts results from correspondence analysis result object in a dataframe column.
+#' @export
 tidy.mca_exploratory <- function(x, type="categories") {
   if (type == "categories") {
     res <- tibble::rownames_to_column(as.data.frame(x$var$coord), var="category")
