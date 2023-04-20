@@ -273,8 +273,8 @@ test_that("exp_rpart evaluate training and test with impurity importance - logic
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("exp_rpart(character(A,B)) evaluate training and test", { # This should be treated as multi-class
-  data <- flight %>% dplyr::mutate(is_delayed = if_else(as.logical(`is delayed`), "A", "B"))
+test_that("exp_rpart(factor(A,B)) evaluate training and test", { # This should be treated as multi-class
+  data <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A", "B"), ordered=TRUE))
   model_df <- data %>% exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
 
   ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
@@ -295,9 +295,12 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   expect_gt(nrow(train_ret), 3300)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
-  expect_equal(nrow(ret), 2) # 2 for train and test
+  expect_equal(nrow(ret), 2) # 2 for train/test
   ret <- model_df %>% rf_evaluation_training_and_test(type="evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 2 for train and test times A/B.
+  expect_equal(nrow(ret), 4) # 4 for train/test times A/B.
+  ret <- model_df %>% rf_evaluation_training_and_test(type='conf_mat')
+  expect_equal(nrow(ret), 8) # 8 for train/test times A/B (actual) times A/B (predicted).
+  expect_equal(colnames(ret), c("actual_value", "predicted_value", "count", "is_test_data"))
 
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = if_else(as.logical(`is delayed`), "A", "B")) %>%
