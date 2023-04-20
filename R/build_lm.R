@@ -571,7 +571,10 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       df[[col]] <- as.numeric(df[[col]])
     }
   }
-
+  # If target is factor, turn it into unordered factor if it is not already.
+  if (is.factor(df[[target_col]])) {
+    df[[target_col]] <- factor(df[[target_col]], ordered=FALSE)
+  }
   # remove columns with only one unique value
   cols_copy <- c_cols
   for (col in cols_copy) {
