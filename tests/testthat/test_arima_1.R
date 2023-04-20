@@ -8,7 +8,8 @@ test_that("exp_arima with aggregation", {
   model_df <- raw_data %>%
     exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", seasonal=F, test_mode=T) # With seasonal=T, the data would be too short.
   ret <- model_df %>% glance_with_ts_metric()
-  model_df %>% glance_rowwise(model)
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)","R Squared") %in% names(ret)))
+  ret <- model_df %>% glance_rowwise(model)
   ret <- raw_data %>%
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "day", seasonal=FALSE)
   ret <- raw_data %>%
@@ -130,7 +131,7 @@ test_that("exp_arima with short data", {
   expect_equal(last(model_df$data[[1]]$`time stamp`), as.Date("2010-01-23")) 
   # test for glance.
   ret <- model_df %>% glance_with_ts_metric()
-  expect_true(all(c("RMSE","MAE","MAPE") %in% names(ret)))
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)") %in% names(ret)))
   expect_true(!is.na(model_df$data[[1]]$forecasted_value[[length(model_df$data[[1]]$forecasted_value)]]))
 })
 
@@ -330,7 +331,7 @@ test_that("exp_arima grouped case", {
     exp_arima(timestamp, count, 10)
   ret <- model_df %>% glance_with_ts_metric()
   # P, D, Q, and Frequency used to be in the output column too with fable 0.2.1, but with fable 0.3.0, it started picking up a model without seasonality for some reason.
-  expect_true(all(c("group", "RMSE", "MAE", "MAPE", ".model", "AIC", "BIC", "AICc",
+  expect_true(all(c("group", "RMSE", "MAE", "MAPE (Ratio)", ".model", "AIC", "BIC", "AICc",
                     "p", "d", "q", "Ljung-Box Test Statistic",
                     "Ljung-Box Test P Value", "Number of Rows") %in% colnames(ret)))
 })
