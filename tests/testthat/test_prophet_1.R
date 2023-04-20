@@ -22,7 +22,7 @@ test_that("do_prophet with aggregation", {
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
   # test for glance.
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("RMSE","MAE","MAPE","R Squared") %in% names(ret)))
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)","R Squared") %in% names(ret)))
 
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
@@ -134,7 +134,7 @@ test_that("do_prophet with short data (test for coef)", {
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2010-01-23")) 
   # test for glance.
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("RMSE","MAE","MAPE","R Squared") %in% names(ret)))
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)","R Squared") %in% names(ret)))
 })
 
 test_that("do_prophet with quarterly and monthly seasonality", {

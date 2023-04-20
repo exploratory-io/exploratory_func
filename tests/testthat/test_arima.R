@@ -31,5 +31,6 @@ test_that("exp_arima with aggregation", {
   expect_true(!is.null(model_df$model))
   # test for glance.
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("RMSE","MAE","MAPE","R Squared") %in% names(ret)))
+  ret <- model_df %>% glance_with_ts_metric()
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)","R Squared") %in% names(ret)))
 })
