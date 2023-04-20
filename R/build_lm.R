@@ -486,7 +486,6 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
                                                     predictor_n = 12, # so that at least months can fit in it.
                                                     name_map = NULL, 
                                                     other_level = "Other") {
-                                                    browser()
   c_cols <- predictor_cols
   for(col in predictor_cols){
     if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
