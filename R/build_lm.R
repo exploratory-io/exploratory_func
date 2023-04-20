@@ -486,6 +486,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
                                                     predictor_n = 12, # so that at least months can fit in it.
                                                     name_map = NULL, 
                                                     other_level = "Other") {
+                                                    browser()
   c_cols <- predictor_cols
   for(col in predictor_cols){
     if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
@@ -571,7 +572,10 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       df[[col]] <- as.numeric(df[[col]])
     }
   }
-
+  # If target is factor, turn it into unordered factor if it is not already.
+  if (is.factor(df[[target_col]])) {
+    df[[target_col]] <- factor(df[[target_col]], ordered=FALSE)
+  }
   # remove columns with only one unique value
   cols_copy <- c_cols
   for (col in cols_copy) {
