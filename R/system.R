@@ -1426,7 +1426,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
     # so that this data soure can be scheduled.
     if(Sys.info()["sysname"]=="Linux"){
-      driver <-  "ODBC Driver 18 for SQL Server";
+      driver <- Sys.getenv("MS_SQL_SERVER_DRIVER_FILE")
+      if (driver == "") { # if environment variable is not set, fallback to default one.
+        driver <-  "ODBC Driver 18 for SQL Server";
+      }
     }
     # mssqlserver uses odbc package instead of RODBC for two reasons:
     # 1) The "ODBC Driver 17 for SQL Server" driver does not work on Mac with RODBC.
