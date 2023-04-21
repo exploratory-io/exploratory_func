@@ -1668,7 +1668,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
 
       if (with_repeated_measures) {
         # For repeated measures ANOVA, add a column for the subject ID.
-        df <- df %>% group_by(!!!rlang::syms(var2_col)) %>% mutate(subject_id = row_number())
+        df <- df %>% group_by(!!!rlang::syms(var2_col)) %>% mutate(subject_id = row_number()) %>% ungroup()
       }
 
       # Replace column names with names like c1_, c2_...
