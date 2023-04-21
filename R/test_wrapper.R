@@ -2208,6 +2208,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     ret <- x$dataframe
+    if (x$with_repeated_measures) {
+      # Remove the subject_id column.
+      ret <- ret %>% dplyr::select(-subject_id)
+    }
     if (sort_factor_levels && !is.null(x$common_var2_order)) { # ANCOVA/one-way ANOVA and for the Means error bar.
       # Set the common order to display means and emmeans.
       # as.character() is needed to avoid error when the var2 column is logical.
