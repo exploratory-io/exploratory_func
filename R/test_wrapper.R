@@ -2187,7 +2187,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- tibble::tibble()
       return(ret)
     }
-    if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
+    if (x$with_repeated_measures) { # Repeated measures ANOVA case - x is afex_aov class.
+      ret <- generate_ftest_density_data(x$anova_table$F, df1=x$anova_table$`num Df`, df2=x$anova_table$`den Df`, sig_level=x$test_sig_level)
+    } else if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
       ret0 <- x$ss3
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
       # df1 is from the categorical independent variable row, and df2 is from the residuals row.
