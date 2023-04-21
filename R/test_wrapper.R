@@ -1994,6 +1994,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
+    # emmeans seems to work even with afex_aov objects, as well as car::Anova objects or aov objects.
     ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
     if (!is.null(x$covariates)) { # ANCOVA case
