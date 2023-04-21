@@ -1804,6 +1804,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       model$sig.level <- sig.level
       model$power <- power
       model$with_interaction <- with_interaction
+      model$with_repeated_measures <- with_repeated_measures 
       model
     }, error = function(e){
       if(length(grouped_cols) > 0 && !str_detect(e$message, 'EXP-ANA')) {
@@ -1857,13 +1858,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     note <- NULL
 
-    one_way_anova <- is.null(x$covariates) && length(x$var2) == 1 # Power analysis is for one-way ANOVA case only.
-    if (one_way_anova) { # one-way ANOVA case
+    # Power analysis is for one-way ANOVA case only.
+    one_way_anova_without_repeated_measures <- is.null(x$covariates) && (length(x$var2) == 1) && !x$with_repeated_measures
+    if (one_way_anova_without_repeated_measures) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
+    } else if (x$with_repeated_measures) {
+      lm_copy <- x$lm
+      class(lm_copy) <- "aov"
+      ret <- broom:::tidy.aov(lm_copy)
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
-    if (one_way_anova) {
+    if (one_way_anova_without_repeated_measures) {
       # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
       data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
         dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
@@ -1877,7 +1883,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
 
     if (is.null(x$power)) {
       ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
-      if (one_way_anova) { # Power analysis is only for ANOVA case
+      if (one_way_anova_without_repeated_measures) { # Power analysis is only for ANOVA case
         # If power is not specified in the arguments, estimate current power.
         tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
           power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
@@ -1895,7 +1901,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
-      if (one_way_anova) { # One-way ANOVA case
+      if (one_way_anova_without_repeated_measures) { # One-way ANOVA case
         ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
         ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
@@ -1907,7 +1913,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         # total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS could be calculated from summing up the type 1 SS, but tidy.aov does not work on x which is generated with lm() rather than aov().
         total0 <- sum(x$data[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
         total_df <- sum(ret$df)
-        lm_summary <- broom:::glance.lm(x)
+        if (x$with_repeated_measures) {
+          lm_copy <- x$lm
+          class(lm_copy) <- "lm"
+          lm_summary <- broom:::glance.lm(lm_copy)
+        }
+        else {
+          lm_summary <- broom:::glance.lm(x)
+        }
         model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
         ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
                                       statistic = lm_summary$statistic,
