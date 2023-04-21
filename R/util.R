@@ -2075,8 +2075,10 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
-recode <- function(x, type_convert = FALSE, ...) {
-  ret <- dplyr::recode(x, ...)
+recode <- function(x, ..., type_convert = FALSE) {
+  # Recreate the dynamic dots for recoding "." characters.
+  map <- list(...)
+  ret <- dplyr::recode(x, !!!map)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
   # they get garbled. Working it around by converting to UTF-8.
