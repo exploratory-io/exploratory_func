@@ -1612,7 +1612,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
-                      with_interaction = FALSE,
+                      with_interaction = FALSE, with_repeated_measures = FALSE,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
@@ -1688,7 +1688,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         else {
           collapse_str <- "`+`"
         }
-        formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
+        if (with_repeated_measures) {
+          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject / (', paste(var2_col, collapse=collapse_str), '))'))
+        }
+        else {
+          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
+        }
       }
       else { # ANCOVA case
         if (!with_interaction) {
@@ -1760,7 +1765,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$ss3 <- ss3
       }
       else {
-        model <- aov(formula, data = df)
+        if (with_repeated_measures) {
+          model <- afex::aov_car(formula, data = df)
+        }
+        else {
+          model <- aov(formula, data = df)
+        }
       }
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
