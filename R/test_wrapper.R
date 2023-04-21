@@ -1666,11 +1666,6 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       # Keep only the relevant columns.
       df <- df %>% dplyr::select(c(var1_col, var2_col, covariates))
 
-      if (with_repeated_measures) {
-        # For repeated measures ANOVA, add a column for the subject ID.
-        df <- df %>% group_by(!!!rlang::syms(var2_col)) %>% mutate(subject_id = row_number()) %>% ungroup()
-      }
-
       # Replace column names with names like c1_, c2_...
       clean_df <- df
       names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
@@ -1682,10 +1677,17 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       names(terms_mapping) <- name_map
       var1_col <- name_map[var1_col]
       var2_col <- name_map[var2_col]
+      names(var2_col) <- NULL
       if (!is.null(covariates)) {
         covariates <- name_map[covariates]
       }
       df <- clean_df
+      if (with_repeated_measures) {
+        # For repeated measures ANOVA, add a column for the subject ID.
+        # This have to be done after the column name mapping so that subject_id is not mapped.
+        df <- df %>% group_by(!!!rlang::syms(var2_col)) %>% mutate(subject_id = row_number()) %>% ungroup()
+      }
+
       if (is.null(covariates)) { # 2-way/1-way ANOVA case
         if (with_interaction) {
           collapse_str <- "`*`"
@@ -1771,7 +1773,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       }
       else {
         if (with_repeated_measures) {
-          model <- afex::aov_car(formula, data = df)
+          model <- afex::aov_car(formula, data = df, type = "III")
         }
         else {
           model <- aov(formula, data = df)
