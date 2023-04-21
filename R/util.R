@@ -2075,7 +2075,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
-recode <- function(x, ..., type_convert = FALSE) {
+recode <- function(x, type_convert = FALSE, ...) {
   # Recreate the dynamic dots for recoding "." characters.
   map <- list(...)
   ret <- dplyr::recode(x, !!!map)
