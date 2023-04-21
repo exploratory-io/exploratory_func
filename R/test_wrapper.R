@@ -1666,6 +1666,11 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       # Keep only the relevant columns.
       df <- df %>% dplyr::select(c(var1_col, var2_col, covariates))
 
+      if (with_repeated_measures) {
+        # For repeated measures ANOVA, add a column for the subject ID.
+        df <- df %>% group_by(!!!rlang::syms(var2_col)) %>% mutate(subject_id = row_number())
+      }
+
       # Replace column names with names like c1_, c2_...
       clean_df <- df
       names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
@@ -1689,7 +1694,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
           collapse_str <- "`+`"
         }
         if (with_repeated_measures) {
-          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject / (', paste(var2_col, collapse=collapse_str), '))'))
+          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject_id / (', paste(var2_col, collapse=collapse_str), '))'))
         }
         else {
           formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
