@@ -1799,7 +1799,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$common_var2_order <- as.character(common_var2_order) # as.character is to strip names.
       }
       model$terms_mapping <- terms_mapping
-      model$data <- df
+      model$dataframe <- df # model$data is used in afex_aov class. Using model$dataframe to avoid conflict.
       model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
       model$power <- power
@@ -1871,7 +1871,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     if (one_way_anova_without_repeated_measures) {
       # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
-      data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      data_summary <- x$dataframe %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
         dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
         dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
       k <- data_summary$k
@@ -1909,9 +1909,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
       else { # ANCOVA/2-way ANOVA case
-        total <- sum((x$data[[x$var1]]-mean(x$data[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
+        total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
         # total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS could be calculated from summing up the type 1 SS, but tidy.aov does not work on x which is generated with lm() rather than aov().
-        total0 <- sum(x$data[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
+        total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
         total_df <- sum(ret$df)
         if (x$with_repeated_measures) {
           lm_copy <- x$lm
@@ -1998,7 +1998,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     ret <- tibble::as.tibble(ret)
     if (!is.null(x$covariates)) { # ANCOVA case
       # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
-      mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
+      mean_df <- x$dataframe %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
       ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
     }
     # Set the common order to display means and emmeans.
@@ -2102,11 +2102,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
 
     if (!is.null(x$covariates)) { # ANCOVA case
-      ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
+      ret <- broom::tidy(car::leveneTest(x$residuals, x$dataframe[[x$var2]], center=levene_test_center_fun))
     }
     else { # 2-way or 1-way ANOVA case
       formula <- as.formula(paste0('`', x$var1, '`~`', paste(x$var2, collapse='`*`'), '`'))
-      ret <- broom::tidy(car::leveneTest(formula, data=x$data, center=levene_test_center_fun))
+      ret <- broom::tidy(car::leveneTest(formula, data=x$dataframe, center=levene_test_center_fun))
     }
     # Example output:
     # A tibble: 1 × 4
@@ -2124,14 +2124,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     # Shapiro-Wilk test for residual normality
-    if (length(x$residuals) > 5000) {
+    if (x$with_repeated_measures) {
+      resid <- residuals(x)
+    }
+    else { # TODO: residuals(x) might work here too. Verify.
+      resid <- x$residuals
+    }
+    if (length(resid) > 5000) {
       if (!is.null(shapiro_seed)) {
         set.seed(shapiro_seed)
       }
-      resid <- sample(x$residuals, 5000)
-    }
-    else {
-      resid <- x$residuals
+      resid <- sample(resid, 5000)
     }
     ret <- broom::tidy(shapiro.test(resid))
     ret$n = length(resid) # Add sample size info
@@ -2152,7 +2155,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     conf_threshold = 1 - (1 - conf_level)/2
-    ret <- x$data %>%
+    ret <- x$dataframe %>%
       dplyr::group_by(!!!rlang::syms(as.character(x$var2))) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
@@ -2201,7 +2204,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- tibble::tibble()
       return(ret)
     }
-    ret <- x$data
+    ret <- x$dataframe
     if (sort_factor_levels && !is.null(x$common_var2_order)) { # ANCOVA/one-way ANOVA and for the Means error bar.
       # Set the common order to display means and emmeans.
       # as.character() is needed to avoid error when the var2 column is logical.
