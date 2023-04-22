@@ -1805,11 +1805,12 @@ test_that("recode and recode_factor", {
   result6 <- empDF %>% mutate(business_travel = exploratory::recode(business_travel, "たまに" = "2023-01-01", "なし" = "2023-01-02", "頻繁" = "2023-01-03", type_convert = TRUE))
   expect_equal(exploratory:::get_unique_values(result6$business_travel, 100), c(lubridate::ymd("2023-01-01"),lubridate::ymd("2023-01-02"),lubridate::ymd("2023-01-03")))
   # Test recoding "." to something else. 
+    # Test recoding "." to something else. 
   test.df <- tibble(text=c("a", "b", ".", "."), value=1:4)
-  test.df.result <- test.df %>% dplyr::mutate(text= recode(text, `.` = "abc", a="xyz"))
+  test.df.result <- test.df %>% dplyr::mutate(text = recode(text, `.` = "abc", a="xyz"))
   expect_equal(test.df.result$text, c("xyz", "b", "abc", "abc"))
-  test.df.result <- test.df %>% dplyr::mutate(text= recode_factor(text, `.` = "abc", a="xyz"))
-  expect_equal(test.df.result$text, c("xyz", "b", "abc", "abc"))
+  test.df.result <- test.df %>% dplyr::mutate(text = recode_factor(text, `.` = "abc", a="xyz"))
+  expect_equal(levels(test.df.result$text), c("abc", "xyz", "b"))
 })
 
 test_that("separate_japanese_address", {

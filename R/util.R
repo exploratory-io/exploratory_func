@@ -2130,7 +2130,6 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
 
   # Recreate the dynamic dots for recoding a single dot (".") problem.
   map <- list(...)
-  ret <- dplyr::recode(x, !!!map)
   # check if all the unique values are recoded
   if (argumentLength == num_of_unique_value) { # if all the values are recoded, just call recode_factor so that level is automatically adjusted.
       ret <- dplyr::recode_factor(x, !!!map, .default = .default, .missing = .missing, .ordered = .ordered)
