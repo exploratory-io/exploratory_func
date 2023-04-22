@@ -1808,6 +1808,8 @@ test_that("recode and recode_factor", {
   test.df <- tibble(text=c("a", "b", ".", "."), value=1:4)
   test.df.result <- test.df %>% dplyr::mutate(text= recode(text, `.` = "abc", a="xyz"))
   expect_equal(test.df.result$text, c("xyz", "b", "abc", "abc"))
+  test.df.result <- test.df %>% dplyr::mutate(text= recode_factor(text, `.` = "abc", a="xyz"))
+  expect_equal(test.df.result$text, c("xyz", "b", "abc", "abc"))
 })
 
 test_that("separate_japanese_address", {

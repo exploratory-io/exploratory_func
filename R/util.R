@@ -2127,9 +2127,13 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
   }
   replacements <- dplyr:::dplyr_quosures(...)
   argumentLength = length(replacements)
+
+  # Recreate the dynamic dots for recoding a single dot (".") problem.
+  map <- list(...)
+  ret <- dplyr::recode(x, !!!map)
   # check if all the unique values are recoded
   if (argumentLength == num_of_unique_value) { # if all the values are recoded, just call recode_factor so that level is automatically adjusted.
-      ret <- dplyr::recode_factor(x, ..., .default = .default, .missing = .missing, .ordered = .ordered)
+      ret <- dplyr::recode_factor(x, !!!map, .default = .default, .missing = .missing, .ordered = .ordered)
   } else { # if not all the unique values are recoded, need to adjust ordering manually.
     if (!is.factor(x)) { # check if input is factor.
       if (!is.character(x)) {
@@ -2139,7 +2143,7 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
       x <- forcats::fct_relevel(x, current_levels)
     }
     # pass current_levels to .default argument to keep the levels in the input.
-    ret <- dplyr::recode(x, ..., .default = current_levels, .missing = .missing)
+    ret <- dplyr::recode(x, !!!map, .default = current_levels, .missing = .missing)
   }
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
