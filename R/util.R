@@ -2076,7 +2076,9 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
 recode <- function(x, type_convert = FALSE, ...) {
-  ret <- dplyr::recode(x, ...)
+  # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
+  map <- list(...)
+  ret <- dplyr::recode(x, !!!map)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
   # they get garbled. Working it around by converting to UTF-8.
@@ -2125,9 +2127,12 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
   }
   replacements <- dplyr:::dplyr_quosures(...)
   argumentLength = length(replacements)
+
+  # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
+  map <- list(...)
   # check if all the unique values are recoded
   if (argumentLength == num_of_unique_value) { # if all the values are recoded, just call recode_factor so that level is automatically adjusted.
-      ret <- dplyr::recode_factor(x, ..., .default = .default, .missing = .missing, .ordered = .ordered)
+      ret <- dplyr::recode_factor(x, !!!map, .default = .default, .missing = .missing, .ordered = .ordered)
   } else { # if not all the unique values are recoded, need to adjust ordering manually.
     if (!is.factor(x)) { # check if input is factor.
       if (!is.character(x)) {
@@ -2137,7 +2142,7 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
       x <- forcats::fct_relevel(x, current_levels)
     }
     # pass current_levels to .default argument to keep the levels in the input.
-    ret <- dplyr::recode(x, ..., .default = current_levels, .missing = .missing)
+    ret <- dplyr::recode(x, !!!map, .default = current_levels, .missing = .missing)
   }
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
