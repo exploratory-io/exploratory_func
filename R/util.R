@@ -2076,7 +2076,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
 recode <- function(x, type_convert = FALSE, ...) {
-  # Recreate the dynamic dots for recoding a single dot (".") problem.
+  # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
   map <- list(...)
   ret <- dplyr::recode(x, !!!map)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
@@ -2128,7 +2128,7 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
   replacements <- dplyr:::dplyr_quosures(...)
   argumentLength = length(replacements)
 
-  # Recreate the dynamic dots for recoding a single dot (".") problem.
+  # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
   map <- list(...)
   # check if all the unique values are recoded
   if (argumentLength == num_of_unique_value) { # if all the values are recoded, just call recode_factor so that level is automatically adjusted.
