@@ -1868,6 +1868,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       colnames(x_matrix) <- colnames(x_summary$univariate.tests)
       ret <- as.data.frame(x_matrix)
       ret$terms <- rownames(x_summary$univariate.tests)
+      # Add info on p-value adjustment for departure from sphericity.
+      ret2 <- as.data.frame(x_summary$pval.adjustments)
+      ret2$terms <- rownames(ret2)
+      ret <- ret %>% dplyr::left_join(ret2, by="terms")
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
