@@ -1862,13 +1862,16 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     one_way_anova_without_repeated_measures <- is.null(x$covariates) && (length(x$var2) == 1) && !x$with_repeated_measures
     if (one_way_anova_without_repeated_measures) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
-    } else if (x$with_repeated_measures) {
-      lm_copy <- x$lm
-      class(lm_copy) <- "aov"
-      ret <- broom:::tidy.aov(lm_copy)
+    } else if (x$with_repeated_measures) { # For repeated measures ANOVA, we need to extract results from Anova.mlm object from car package.
+      x_summary <- summary(x$Anova)
+      x_matrix <- matrix(as.numeric(x_summary$univariate.tests), ncol=ncol(x_summary$univariate.tests))
+      colnames(x_matrix) <- colnames(x_summary$univariate.tests)
+      ret <- as.data.frame(x_matrix)
+      ret$terms <- rownames(x_summary$univariate.tests)
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
+
     if (one_way_anova_without_repeated_measures) {
       # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
       data_summary <- x$dataframe %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
@@ -1881,7 +1884,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       tot_n_rows <- data_summary$tot_n_rows
     }
 
-    if (is.null(x$power)) {
+    if (x$with_repeated_measures) {
+      # TODO: Formatting for repeated measures case, which uses Anova.mlm object from car package.
+      ret
+    }
+    else if (is.null(x$power)) {
       ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
       if (one_way_anova_without_repeated_measures) { # Power analysis is only for ANOVA case
         # If power is not specified in the arguments, estimate current power.
