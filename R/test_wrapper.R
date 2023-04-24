@@ -2029,6 +2029,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     orig_term <- terms_mapping[ret$term]
     orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
     ret$term <- orig_term
+    ret <- ret %>% dplyr::relocate(term, method, .before = 1)
+    ret <- ret %>% dplyr::rename(`Variable`="term", `Method`="method", `Test Statistic`="test.stat", `Approximate F Value`="approx.F", `Numerator Degrees of Freedom`="num.Df", `Denominator Degrees of Freedom`="den.Df", `P Value`="p.value")
   }
   else if (type == "sphericity") {
     summary_x <- summary(x$Anova)
