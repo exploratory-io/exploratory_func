@@ -2017,6 +2017,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         ret <- dplyr::bind_rows(ret, var_mvt_res_df)
       }
     }
+    ret <- ret %>% mutate(p.value=pf(approx.F, num.Df, den.Df, lower.tail = FALSE))
   }
   else if (type == "sphericity") {
     summary_x <- summary(x$Anova)
