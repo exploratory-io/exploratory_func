@@ -2006,15 +2006,19 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     for (var_name in names(mvt)) {
       var_mvt <- mvt[[var_name]]
       eigs <- Re(eigen(qr.coef(qr(var_mvt$SSPE), var_mvt$SSPH), symmetric = FALSE)$values)
-      var_mvt_res <- car:::Pillai(eigs, var_mvt$df, var_mvt$df.residual)
-      names(var_mvt_res) <- c("test stat", "approx F", "num Df", "den Df")
-      var_mvt_res_df <- as.data.frame(as.list(var_mvt_res))
-      var_mvt_res_df <- var_mvt_res_df %>% dplyr::mutate(term=var_name)
-      if (is.null(ret)) {
-        ret <- var_mvt_res_df
-      }
-      else {
-        ret <- dplyr::bind_rows(ret, var_mvt_res_df)
+      car_ns <- getNamespace("car")
+      # Iterate over results from different test methods.
+      for (func_name in c("Pillai", "Wilks", "HL", "Roy")) {
+        var_mvt_res <- get(func_name, envir=car_ns)(eigs, var_mvt$df, var_mvt$df.residual)
+        names(var_mvt_res) <- c("test stat", "approx F", "num Df", "den Df")
+        var_mvt_res_df <- as.data.frame(as.list(var_mvt_res))
+        var_mvt_res_df <- var_mvt_res_df %>% dplyr::mutate(term=var_name, method=func_name)
+        if (is.null(ret)) {
+          ret <- var_mvt_res_df
+        }
+        else {
+          ret <- dplyr::bind_rows(ret, var_mvt_res_df)
+        }
       }
     }
     ret <- ret %>% mutate(p.value=pf(approx.F, num.Df, den.Df, lower.tail = FALSE))
