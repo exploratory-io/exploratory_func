@@ -2061,7 +2061,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     ret$term <- orig_term
     # Relocate term column to the first column.
     ret <- ret %>% dplyr::relocate(term, .before = 1)
-    ret <- ret %>% dplyr::rename(`Variable`="term")
+    ret <- ret %>% dplyr::rename(`Variable`="term", `W Value`="Test statistic", `P Value`="p-value")
+    ret <- ret %>% dplyr::mutate(`Method`="Mauchly's Sphericity Test")
   }
   else if (type == "emmeans") {
     if ("error" %in% class(x)) {
