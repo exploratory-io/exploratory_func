@@ -2001,7 +2001,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
   }
   else if (type == "multivariate") {
-    browser()
+    mvt <- summary(x$Anova)$multivariate.tests
+    var_mvt <- mvt$c2_ # TODO: Support other variables too.
+    eigs <- Re(eigen(qr.coef(qr(var_mvt$SSPE), var_mvt$SSPH), symmetric = FALSE)$values)
+    var_mvt_res <- car:::Pillai(eigs, var_mvt$df, var_mvt$df.residual)
+    names(var_mvt_res) <- c("test stat", "approx F", "num Df", "den Df")
+    ret <- as.data.frame(as.list(var_mvt_res))
   }
   else if (type == "sphericity") {
     summary_x <- summary(x$Anova)
