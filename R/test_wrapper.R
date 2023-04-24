@@ -2000,6 +2000,26 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
+  else if (type == "multivariate") {
+    browser()
+  }
+  else if (type == "sphericity") {
+    summary_x <- summary(x$Anova)
+    s_matrix <- as.matrix(summary_x$sphericity.tests)
+    class(s_matrix) <- "matrix" # Necessary to make it work with as.data.frame.
+    ret <- as.data.frame(s_matrix)
+    ret ["term"] <- rownames(ret)
+    # Map the variable names in the term column back to the original.
+    terms_mapping <- x$terms_mapping
+    # Add mapping for interaction term
+    terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
+    orig_term <- terms_mapping[ret$term]
+    orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
+    ret$term <- orig_term
+    # Relocate term column to the first column.
+    ret <- ret %>% dplyr::relocate(term, .before = 1)
+    ret <- ret %>% dplyr::rename(`Variable`="term")
+  }
   else if (type == "emmeans") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
