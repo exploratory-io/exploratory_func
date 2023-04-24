@@ -1871,7 +1871,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       # Add info on p-value adjustment for departure from sphericity.
       ret2 <- as.data.frame(x_summary$pval.adjustments)
       ret2$term <- rownames(ret2)
-      ret <- ret %>% dplyr::left_join(ret2, by="term")
+      ret <- ret %>% dplyr::rename(p.value='Pr(>F)')
+      ret_err <- ret %>% dplyr::select(term, `Sum Sq`="Error SS")
+      ret <- ret %>% select(-`Error SS`)
+      ret_gg <- ret2 %>% dplyr::select(term, eps="GG eps", p.value="Pr(>F[GG])") %>% dplyr::mutate(correction="Greenhouse-Geisser")
+      ret_hf <- ret2 %>% dplyr::select(term, eps="HF eps", p.value="Pr(>F[HF])") %>% dplyr::mutate(correction="Huynh-Feldt")
+      ret <- dplyr::bind_rows(ret, ret_gg, ret_hf)
+      ret <- ret %>% dplyr::mutate(`Type of Variance`="Between Subjects")
+      ret_err <- ret_err %>% dplyr::mutate(`Type of Variance`="Within Subjects")
+      ret <- dplyr::bind_rows(ret, ret_err)
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
@@ -1897,8 +1905,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
       # Relocate term column to the first column.
-      ret <- ret %>% dplyr::relocate(term, .before = 1)
-      ret <- ret %>% dplyr::rename(`Variable`="term")
+      ret <- ret %>% dplyr::relocate(`Type of Variance`, term, correction, .before = 1)
+      ret <- ret %>% dplyr::relocate(eps, .before = `p.value`)
+      ret <- ret %>% dplyr::rename(`Variable`="term", `Correction`="correction", `P Value`="p.value",
+                                   `Epsilon`="eps",
+                                   `Sum of Squares`="Sum Sq",
+                                   `Numerator Degree of Freedom` = "num Df",
+                                   `Denominator Degree of Freedom` = "den Df"
+      )
       ret
     }
     else if (is.null(x$power)) {
@@ -2030,7 +2044,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
     ret$term <- orig_term
     ret <- ret %>% dplyr::relocate(term, method, .before = 1)
-    ret <- ret %>% dplyr::rename(`Variable`="term", `Method`="method", `Test Statistic`="test.stat", `Approximate F Value`="approx.F", `Numerator Degrees of Freedom`="num.Df", `Denominator Degrees of Freedom`="den.Df", `P Value`="p.value")
+    ret <- ret %>% dplyr::rename(`Variable`="term", `Method`="method", `Test Statistic`="test.stat", `Approximate F Value`="approx.F", `Numerator Degree of Freedom`="num.Df", `Denominator Degree of Freedom`="den.Df", `P Value`="p.value")
   }
   else if (type == "sphericity") {
     summary_x <- summary(x$Anova)
