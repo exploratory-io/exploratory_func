@@ -1867,11 +1867,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       x_matrix <- matrix(as.numeric(x_summary$univariate.tests), ncol=ncol(x_summary$univariate.tests))
       colnames(x_matrix) <- colnames(x_summary$univariate.tests)
       ret <- as.data.frame(x_matrix)
-      ret$terms <- rownames(x_summary$univariate.tests)
+      ret$term <- rownames(x_summary$univariate.tests)
       # Add info on p-value adjustment for departure from sphericity.
       ret2 <- as.data.frame(x_summary$pval.adjustments)
-      ret2$terms <- rownames(ret2)
-      ret <- ret %>% dplyr::left_join(ret2, by="terms")
+      ret2$term <- rownames(ret2)
+      ret <- ret %>% dplyr::left_join(ret2, by="term")
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
@@ -1889,7 +1889,16 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
 
     if (x$with_repeated_measures) {
-      # TODO: Formatting for repeated measures case, which uses Anova.mlm object from car package.
+      # Map the variable names in the term column back to the original.
+      terms_mapping <- x$terms_mapping
+      # Add mapping for interaction term
+      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
+      orig_term <- terms_mapping[ret$term]
+      orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
+      ret$term <- orig_term
+      # Relocate term column to the first column.
+      ret <- ret %>% dplyr::relocate(term, .before = 1)
+      ret <- ret %>% dplyr::rename(`Variable`="term")
       ret
     }
     else if (is.null(x$power)) {
