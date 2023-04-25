@@ -1696,7 +1696,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
           collapse_str <- "`+`"
         }
         if (with_repeated_measures) {
-          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject_id / (', paste(var2_col, collapse=collapse_str), '))'))
+          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject_id / (`', paste(var2_col, collapse=collapse_str), '`))'))
         }
         else {
           formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
@@ -1754,7 +1754,10 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         e$n <- count_df$tot_n
         return(e)
       }
-      if (!is.null(covariates) || length(var2_col) > 1) {
+      if (with_repeated_measures) {
+        model <- afex::aov_car(formula, data = df, type = "III")
+      }
+      else if (!is.null(covariates) || length(var2_col) > 1) {
         # For ANCOVA/2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary later.
         model <- lm(formula, data = df, contrasts = contrasts_list, ...)
         # Calculate type 3 some of square and attach to the model.
@@ -1772,12 +1775,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$ss3 <- ss3
       }
       else {
-        if (with_repeated_measures) {
-          model <- afex::aov_car(formula, data = df, type = "III")
-        }
-        else {
-          model <- aov(formula, data = df)
-        }
+        model <- aov(formula, data = df)
       }
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
