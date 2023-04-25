@@ -2122,6 +2122,9 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
     current_levels <- levels(x)
     num_of_unique_value <- length(current_levels)
   } else { # if input is not factor, get unique values sorted by count and remember it as current level.
+    if (!is.character(x)) {
+      x <- as.character(x) # to make forcats::fct_relevel works, convert it to character.
+    }
     current_levels <- get_unique_values(x, length(x))
     num_of_unique_value <- length(current_levels)
   }
@@ -2135,9 +2138,6 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
       ret <- dplyr::recode_factor(x, !!!map, .default = .default, .missing = .missing, .ordered = .ordered)
   } else { # if not all the unique values are recoded, need to adjust ordering manually.
     if (!is.factor(x)) { # check if input is factor.
-      if (!is.character(x)) {
-        x <- as.character(x) # to make forcats::fct_relevel works, convert it to character.
-      }
       # make sure to apply current_levels before doing recode, so that current levels is honored.
       x <- forcats::fct_relevel(x, current_levels)
     }
