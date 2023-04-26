@@ -1947,14 +1947,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         # total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS could be calculated from summing up the type 1 SS, but tidy.aov does not work on x which is generated with lm() rather than aov().
         total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
         total_df <- sum(ret$df)
-        if (x$with_repeated_measures) {
-          lm_copy <- x$lm
-          class(lm_copy) <- "lm"
-          lm_summary <- broom:::glance.lm(lm_copy)
-        }
-        else {
-          lm_summary <- broom:::glance.lm(x)
-        }
+        lm_summary <- broom:::glance.lm(x)
         model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
         ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
                                       statistic = lm_summary$statistic,
