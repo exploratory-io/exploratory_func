@@ -1684,8 +1684,9 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       df <- clean_df
       if (with_repeated_measures) {
         # For repeated measures ANOVA, add a column for the subject ID.
+        # This is a mixed-design repeated-measures model. Treat only the 2nd variable as a repeated measure.
         # This have to be done after the column name mapping so that subject_id is not mapped.
-        df <- df %>% group_by(!!!rlang::syms(var2_col)) %>% mutate(subject_id = row_number()) %>% ungroup()
+        df <- df %>% group_by(!!rlang::sym(var2_col[2])) %>% mutate(subject_id = row_number()) %>% ungroup()
       }
 
       if (is.null(covariates)) { # 2-way/1-way ANOVA case
@@ -1696,7 +1697,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
           collapse_str <- "`+`"
         }
         if (with_repeated_measures) {
-          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject_id / (`', paste(var2_col, collapse=collapse_str), '`))'))
+          # Mixed-design repeated-measures model. Treat only the 2nd variable as a repeated measure.
+          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject_id / (`', var2_col[2], '`))'))
         }
         else {
           formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
