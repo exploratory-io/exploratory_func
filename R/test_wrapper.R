@@ -1885,14 +1885,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       # Rename to make Total/Corrected Total row addition code consistent with other cases.
       ret <- ret %>% dplyr::rename(sumsq=`Sum Sq`)
 
-      # Add Total/Corrected Total rows.
-      total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
-      total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
-      total_df <- sum(ret$df, na.rm=TRUE)
-      ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
-      ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
-      ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
-
       if (any(!is.na(ret_gg$eps))) ret <- dplyr::bind_rows(ret, ret_gg)
       if (any(!is.na(ret_hf$eps))) ret <- dplyr::bind_rows(ret, ret_hf)
     } else { # ANCOVA/2-way ANOVA case
@@ -1923,11 +1915,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
 
       # Relocate term column to the first column.
       ret <- ret %>% dplyr::relocate(`Type of Variance`, term, .before = 1)
-      ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
       ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
       ret <- ret %>% dplyr::rename(`Variable`="term", `P Value`="p.value",
                                    `Sum of Squares`="sumsq",
-                                   `SS Ratio`="ssr",
                                    `DF` = "df"
       )
       if (!is.null(ret$correction)) {
