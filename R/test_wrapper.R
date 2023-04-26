@@ -1870,8 +1870,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret2 <- as.data.frame(x_summary$pval.adjustments)
       ret2$term <- rownames(ret2)
       ret <- ret %>% dplyr::rename(p.value='Pr(>F)')
-      ret_err <- ret %>% dplyr::select(term, `Sum Sq`="Error SS")
-      ret <- ret %>% select(-`Error SS`)
+      ret_err <- ret %>% dplyr::select(term, `Sum Sq`="Error SS", df="den Df")
+      ret <- ret %>% select(-`Error SS`, -`den Df`, df="num Df")
       ret_gg <- ret2 %>% dplyr::select(term, eps="GG eps", p.value="Pr(>F[GG])") %>% dplyr::mutate(correction="Greenhouse-Geisser")
       ret_hf <- ret2 %>% dplyr::select(term, eps="HF eps", p.value="Pr(>F[HF])") %>% dplyr::mutate(correction="Huynh-Feldt")
       ret <- dplyr::bind_rows(ret, ret_gg, ret_hf)
@@ -1902,14 +1902,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
+      ret <- ret %>% mutate(`Mean Square`=`Sum Sq`/df)
       # Relocate term column to the first column.
       ret <- ret %>% dplyr::relocate(`Type of Variance`, term, correction, .before = 1)
       ret <- ret %>% dplyr::relocate(eps, .before = `p.value`)
+      ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
       ret <- ret %>% dplyr::rename(`Variable`="term", `Correction`="correction", `P Value`="p.value",
                                    `Epsilon`="eps",
                                    `Sum of Squares`="Sum Sq",
-                                   `Numerator Degree of Freedom` = "num Df",
-                                   `Denominator Degree of Freedom` = "den Df"
+                                   `Degree of Freedom` = "df"
       )
       ret
     }
