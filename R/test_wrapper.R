@@ -1875,12 +1875,23 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% select(-`Error SS`, -`den Df`, df="num Df")
       ret_gg <- ret2 %>% dplyr::select(term, eps="GG eps", p.value="Pr(>F[GG])") %>% dplyr::mutate(correction="Greenhouse-Geisser")
       ret_hf <- ret2 %>% dplyr::select(term, eps="HF eps", p.value="Pr(>F[HF])") %>% dplyr::mutate(correction="Huynh-Feldt")
-      ret <- dplyr::bind_rows(ret, ret_gg, ret_hf)
+      ret_gg <- ret_gg %>% dplyr::mutate(`Type of Variance`="Between Subjects")
+      ret_hf <- ret_hf %>% dplyr::mutate(`Type of Variance`="Between Subjects")
       ret <- ret %>% dplyr::mutate(`Type of Variance`="Between Subjects")
       ret_err <- ret_err %>% dplyr::mutate(`Type of Variance`="Within Subjects")
       ret <- dplyr::bind_rows(ret, ret_err)
       # Rename to make Total/Corrected Total row addition code consistent with other cases.
       ret <- ret %>% dplyr::rename(sumsq=`Sum Sq`)
+
+      # Add Total/Corrected Total rows.
+      total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
+      total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
+      total_df <- sum(ret$df, na.rm=TRUE)
+      ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
+      ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
+      ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
+
+      ret <- dplyr::bind_rows(ret, ret_gg, ret_hf)
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
@@ -1907,15 +1918,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret$term <- orig_term
       ret <- ret %>% mutate(`Mean Square`=sumsq/df)
 
-      total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
-      total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
-      total_df <- sum(ret$df, na.rm=TRUE)
-      ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
-      ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
-      ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
-
       # Relocate term column to the first column.
-      ret <- ret %>% dplyr::relocate(`Type of Variance`, term, correction, .before = 1)
+      ret <- ret %>% dplyr::relocate(correction, `Type of Variance`, term, .before = 1)
       ret <- ret %>% dplyr::relocate(eps, .before = `p.value`)
       ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
       ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
