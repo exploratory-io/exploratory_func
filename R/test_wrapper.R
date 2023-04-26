@@ -1879,6 +1879,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::mutate(`Type of Variance`="Between Subjects")
       ret_err <- ret_err %>% dplyr::mutate(`Type of Variance`="Within Subjects")
       ret <- dplyr::bind_rows(ret, ret_err)
+      # Rename to make Total/Corrected Total row addition code consistent with other cases.
+      ret <- ret %>% dplyr::rename(sumsq=`Sum Sq`)
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
@@ -1903,16 +1905,27 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
-      ret <- ret %>% mutate(`Mean Square`=`Sum Sq`/df)
+      ret <- ret %>% mutate(`Mean Square`=sumsq/df)
+
+      total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
+      total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
+      total_df <- sum(ret$df, na.rm=TRUE)
+      ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
+      ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
+      ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
+
       # Relocate term column to the first column.
       ret <- ret %>% dplyr::relocate(`Type of Variance`, term, correction, .before = 1)
       ret <- ret %>% dplyr::relocate(eps, .before = `p.value`)
+      ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
       ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
       ret <- ret %>% dplyr::rename(`Variable`="term", `Correction`="correction", `P Value`="p.value",
                                    `Epsilon`="eps",
-                                   `Sum of Squares`="Sum Sq",
-                                   `Degree of Freedom` = "df"
+                                   `Sum of Squares`="sumsq",
+                                   `SS Ratio`="ssr",
+                                   `DF` = "df"
       )
+
       ret
     }
     else if (is.null(x$power)) {
