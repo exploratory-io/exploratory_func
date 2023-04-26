@@ -1891,7 +1891,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
       ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
 
-      ret <- dplyr::bind_rows(ret, ret_gg, ret_hf)
+      if (any(!is.na(ret_gg$eps))) ret <- dplyr::bind_rows(ret, ret_gg)
+      if (any(!is.na(ret_hf$eps))) ret <- dplyr::bind_rows(ret, ret_hf)
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
@@ -1919,17 +1920,21 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% mutate(`Mean Square`=sumsq/df)
 
       # Relocate term column to the first column.
-      ret <- ret %>% dplyr::relocate(correction, `Type of Variance`, term, .before = 1)
-      ret <- ret %>% dplyr::relocate(eps, .before = `p.value`)
+      ret <- ret %>% dplyr::relocate(`Type of Variance`, term, .before = 1)
       ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
       ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
-      ret <- ret %>% dplyr::rename(`Variable`="term", `Correction`="correction", `P Value`="p.value",
-                                   `Epsilon`="eps",
+      ret <- ret %>% dplyr::rename(`Variable`="term", `P Value`="p.value",
                                    `Sum of Squares`="sumsq",
                                    `SS Ratio`="ssr",
                                    `DF` = "df"
       )
-
+      if (!is.null(ret$correction)) {
+        ret <- ret %>% dplyr::relocate(eps, .before = `P Value`)
+        ret <- ret %>% dplyr::relocate(correction, .before = 1)
+        ret <- ret %>% dplyr::rename(`Correction`="correction",
+                                     `Epsilon`="eps"
+        )
+      }
       ret
     }
     else if (is.null(x$power)) {
