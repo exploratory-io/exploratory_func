@@ -72,32 +72,33 @@ tokenize_with_postprocess <- function(text,
                                       hiragana_word_length_to_remove = 2,
                                       compound_tokens = NULL
                                       ) {
-  if (tokenize_tweets) {
-    tryCatch({
-      tokenized <- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
-                                               strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
-    }, error = function(e) {
+  # comment out the "tokenize_tweets" handling for now since it's no longer available with tokenizers package.
+  #if (tokenize_tweets) {
+  #  tryCatch({
+  #    tokenized <- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
+  #                                             strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+  #  }, error = function(e) {
       # tokenize_tweets can throw error about invalid UTF-8 characters.
       # Try to recover from it by fixing the input with stri_enc_toutf8.
-      if (stringr::str_detect(e$message, "invalid UTF-8 byte sequence detected")) {
+  #    if (stringr::str_detect(e$message, "invalid UTF-8 byte sequence detected")) {
         # validate=TRUE replaces invalid characters with replacement character.
         # Since text is fed to guess_lang_for_stopwords() later, use <<- rather than <- here.
-        text <<- stringi::stri_enc_toutf8(text, validate = TRUE)
-        tokenized <<- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
-                                                  strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
-      }
-      else {
-        stop(e)
-      }
-    })
-  }
-  else {
+  #      text <<- stringi::stri_enc_toutf8(text, validate = TRUE)
+  #      tokenized <<- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
+  #                                                strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+  #    }
+  #    else {
+  #      stop(e)
+  #    }
+  #  })
+  #}
+  #else {
     if (remove_url) { # For tokenizers::tokenize_words, we remove urls ourselves beforehand.
       text <- str_remove_url(text)
     }
     tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL,
                                             strip_punct = remove_punct, simplify = FALSE)
-  }
+  #}
   names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
   tokens <- quanteda::tokens(tokenized)
   # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
