@@ -208,11 +208,10 @@ test_that("do_tokenize_icu with summary_level = all", {
 test_that("do_tokenize with URLs and twitter social tags", {
   test_df <- data.frame(
     input = c("@ExploratoryData and #rstats see: https://cran.r-project.org \uff10\uff11\uff12")) # With test to strip full-width number.
-  # comment out tokenize_tweets test for now since it's removed from tokenizer package.
-  #result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE, remove_url = FALSE, remove_twitter = FALSE)
-  #expect_equal(result$token, c("@ExploratoryData", "and", "#rstats", "see", "https://cran.r-project.org"))
-  #result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE)
-  #expect_equal(result$token, c("and", "see"))
+  result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE, remove_url = FALSE, remove_twitter = FALSE)
+  expect_equal(result$token, c( "exploratorydata", "and", "rstats", "see", "https", "cran.r", "project.org"))
+  result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE)
+  expect_equal(result$token, c("exploratorydata", "and", "rstats","see"))
   result <- test_df %>% do_tokenize(input) # By default, tokenize_words rather than tokenize_tweets is used for speed.
   expect_equal(result$token, c("exploratorydata", "and", "rstats", "see"))
 })
