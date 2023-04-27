@@ -1904,6 +1904,21 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
 
     if (x$with_repeated_measures) {
+      # Map ANOVA table rows to SPSS style with the following rules.
+      # Within Subjects,c2_:c3_ => remove
+      # Within Subjects,c3_ => remove
+      ret <- ret %>% filter(!(`Type of Variance`=="Within Subjects" & term=="c2_:c3_" | `Type of Variance`=="Within Subjects" & term=="c2_"))
+      # Within Subjects,c3_ => Within Subjects,Error(c3_)
+      ret <- ret %>% mutate(term=ifelse(`Type of Variance`=="Within Subjects"&term=="_c3","Error(_c3)",term))
+      # Within Subjects,(Intercept) => Between Subjects,(Error)
+      ret <- ret %>% mutate(term = ifelse(`Type of Variance` == "Within Subjects" & term == "(Intercept)", "(Error)", term), `Type of Variance` = ifelse(`Type of Variance` == "Within Subjects" & term == "(Error)", "Between Subjects", `Type of Variance`))
+      # Between Subjects,_c3 => Within Subjects,_c3
+      ret <- ret %>% mutate(`Type of Variance` = ifelse(`Type of Variance` == "Between Subjects" & term == "c3_", "Within Subjects", `Type of Variance`))
+      # Between Subjects,c2_:c3_ => Within Subjects,c2_:c3_
+      ret <- ret %>% mutate(`Type of Variance` = ifelse(`Type of Variance` == "Between Subjects" & term == "c2_:c3_", "Within Subjects", `Type of Variance`))
+      # Sort by the type of variance and the order of appearance of the terms.
+      ret <- ret %>% arrange(`Type of Variance`, match(term, unique(term)))
+
       # Map the variable names in the term column back to the original.
       terms_mapping <- x$terms_mapping
       # Add mapping for interaction term
