@@ -1838,7 +1838,7 @@ glance.anova_exploratory <- function(x) {
 
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1, sort_factor_levels=FALSE) {
-  if (type == "model") {
+  if (type %in% c("model", "between", "within")) {
     if ("error" %in% class(x)) {
       if (is.null(x$message) || x$message == "") {
         # It seems there are some cases where x$message is an empty string. Get the error message with as.character().
@@ -1954,6 +1954,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                    `Sum of Squares`="sumsq",
                                    `DF` = "df"
       )
+      if (type == "between") {
+        ret <- ret %>% dplyr::filter(`Type of Variance` == "Between Subjects") %>% dplyr::select(-`Type of Variance`)
+      }
+      else if (type == "within") {
+        ret <- ret %>% dplyr::filter(`Type of Variance` == "Within Subjects") %>% dplyr::select(-`Type of Variance`)
+      }
       ret
     }
     else if (is.null(x$power)) {
