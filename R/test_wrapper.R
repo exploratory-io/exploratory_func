@@ -1625,13 +1625,13 @@ gather_repeated_measures <- function(df, column_list) {
   return(df_transformed)
 }
 
-get_gather_repeated_measures_colnames <- function(input_list) {
-  if (length(input_list) > 1) {
-    cols_to_keep <- input_list[[1]]
-    new_col_name <- names(input_list[2])
+get_gather_repeated_measures_colnames <- function(column_list) {
+  if (length(column_list) > 1) {
+    cols_to_keep <- column_list[[1]]
+    new_col_name <- names(column_list[2])
   } else {
     cols_to_keep <- NULL
-    new_col_name <- names(input_list[1])
+    new_col_name <- names(column_list[1])
   }
   
   resulting_colnames <- c(cols_to_keep, new_col_name)
