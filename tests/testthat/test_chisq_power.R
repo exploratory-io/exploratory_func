@@ -1,11 +1,11 @@
 context("test chisq power analysis")
 test_that("chisq AB test effect size calculation", {
-  res <- calculate_cohens_w_for_ab_test(0.5, 0.3, 0.02)
+  res <- exploratory:::calculate_cohens_w_for_ab_test(0.5, 0.3, 0.02)
   expect_equal(res, 0.02182179, tolerance=0.0001)
 })
 
 test_that("chisq AB test power analysis", {
-  model_df <- airquality %>% exp_chisq_power_for_ab_test(a_ratio=0.5, conversion_rate=0.1, diff=0.01, sig.level = 0.05, beta = 0.2)
+  model_df <- airquality %>% exploratory:::exp_chisq_power_for_ab_test(a_ratio=0.5, conversion_rate=0.1, diff=0.01, sig.level = 0.05, beta = 0.2)
   expect_true(!is.null(model_df$model))
   res <- model_df %>% tidy_rowwise(model, type="summary")
   # For the UI, "Degree of Freedom" will be stripped out since it is always 1, but at the R level, we output it.
