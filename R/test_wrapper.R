@@ -1604,7 +1604,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
 # Function to perform the transformation
 # column_list: e.g. list("col1", new_col=c("col2", "col3", "col4"))
-gather_repeated_measures <- function(df, column_list) {
+gather_repeated_measures <- function(df, column_list, value_col_name) {
   new_col_name <- names(column_list)[1]
   cols_to_gather <- column_list[[1]]
   
@@ -1619,7 +1619,7 @@ gather_repeated_measures <- function(df, column_list) {
     pivot_longer(
       cols = all_of(cols_to_gather),
       names_to = new_col_name,
-      values_to = "Value" 
+      values_to = value_col_name
     )
   
   return(df_transformed)
@@ -1674,9 +1674,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   }
   # If var2_col is a list, convert it to a character vector.
   if (is.list(var2_col)) {
-    df <- gather_repeated_measures(df, var2_col)
+    df <- gather_repeated_measures(df, var2_col, var1_col)
     var2_col <- get_gather_repeated_measures_colnames(var2_col)
-    var1_col <- "Value" # TODO: Make it adjustable.
   }
 
   grouped_cols <- grouped_by(df)
