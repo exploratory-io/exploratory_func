@@ -1601,6 +1601,44 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+
+# Function to perform the transformation
+# column_list: e.g. list("col1", new_col=c("col2", "col3", "col4"))
+gather_repeated_measures <- function(df, column_list) {
+  new_col_name <- names(column_list)[1]
+  cols_to_gather <- column_list[[1]]
+  
+  if (length(column_list) > 1) {
+    cols_to_keep <- column_list[[1]]
+    cols_to_gather <- column_list[[2]]
+    new_col_name <- names(column_list[2])
+  }
+  
+  df_transformed <- df %>%
+    select(if (length(column_list) > 1) all_of(cols_to_keep), all_of(cols_to_gather)) %>%
+    pivot_longer(
+      cols = all_of(cols_to_gather),
+      names_to = new_col_name,
+      values_to = "Value" 
+    )
+  
+  return(df_transformed)
+}
+
+get_gather_repeated_measures_colnames <- function(input_list) {
+  if (length(input_list) > 1) {
+    cols_to_keep <- input_list[[1]]
+    new_col_name <- names(input_list[2])
+  } else {
+    cols_to_keep <- NULL
+    new_col_name <- names(input_list[1])
+  }
+  
+  resulting_colnames <- c(cols_to_keep, new_col_name)
+  return(resulting_colnames)
+}
+
+
 #' ANOVA wrapper for Analytics View
 #' @export
 #' @param var1 - The column for dependent variable
@@ -1630,8 +1668,11 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   }
   # If var2_col is a list, convert it to a character vector.
   if (is.list(var2_col)) {
-    var2_col <- as.character(var2_col)
+    df <- gather_repeated_measures(df, var2_col)
+    var2_col <- get_gather_repeated_measures_colnames(var2_col)
+    var1_col <- "Value" # TODO: Make it adjustable.
   }
+
   grouped_cols <- grouped_by(df)
 
   # Note that applying preprocessing function is taken care of by the analytics view framework now, and this code applying func2
