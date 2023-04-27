@@ -1628,6 +1628,10 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   else {
     var2_col <- var2
   }
+  # If var2_col is a list, convert it to a character vector.
+  if (is.list(var2_col)) {
+    var2_col <- as.character(var2_col)
+  }
   grouped_cols <- grouped_by(df)
 
   # Note that applying preprocessing function is taken care of by the analytics view framework now, and this code applying func2
