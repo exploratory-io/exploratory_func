@@ -1916,17 +1916,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       # Relocate term column to the first column.
       ret <- ret %>% dplyr::relocate(`Type of Variance`, term, .before = 1)
       ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
-      ret <- ret %>% dplyr::rename(`Variable`="term", `P Value`="p.value",
-                                   `Sum of Squares`="sumsq",
-                                   `DF` = "df"
-      )
       if (!is.null(ret$correction)) {
-        ret <- ret %>% dplyr::relocate(eps, .before = `P Value`)
-        ret <- ret %>% dplyr::relocate(correction, .before = 1)
+        ret <- ret %>% dplyr::relocate(eps, .before = p.value)
+        ret <- ret %>% dplyr::relocate(correction, .after = term)
         ret <- ret %>% dplyr::rename(`Correction`="correction",
                                      `Epsilon`="eps"
         )
       }
+      ret <- ret %>% dplyr::rename(`Variable`="term", `P Value`="p.value",
+                                   `Sum of Squares`="sumsq",
+                                   `DF` = "df"
+      )
       ret
     }
     else if (is.null(x$power)) {
