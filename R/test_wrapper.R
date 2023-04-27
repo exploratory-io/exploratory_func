@@ -1658,7 +1658,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   if (is.null(power) && !is.null(beta)) {
     power <- 1.0 - beta
   }
-  var1_col <- col_name(substitute(var1))
+  var1_ <- substitute(var1)
+  if (class(var1_) == "name") { # To be able to handle wide-data too, we need to handle both unquoted existing column name, and quoted new column name.
+    var1_col <- col_name(var1_)
+  }
+  else {
+    var1_col <- var1
+  }
   var2_ <- substitute(var2)
   if (class(var2_) == "name") { # For backward compatibility with pre-6.13 when we only had one-way ANOVA.
     var2_col <- col_name(var2_)
