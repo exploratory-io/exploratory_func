@@ -1909,10 +1909,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       # Within Subjects,c3_ => remove
       ret <- ret %>% filter(!(`Type of Variance`=="Within Subjects" & term=="c2_:c3_" | `Type of Variance`=="Within Subjects" & term=="c2_"))
       # Within Subjects,c3_ => Within Subjects,Error(c3_)
-      ret <- ret %>% mutate(term=ifelse(`Type of Variance`=="Within Subjects"&term=="_c3","Error(_c3)",term))
+      ret <- ret %>% mutate(term=ifelse(`Type of Variance`=="Within Subjects"&term=="c3_","Error(c3_)",term))
       # Within Subjects,(Intercept) => Between Subjects,(Error)
       ret <- ret %>% mutate(term = ifelse(`Type of Variance` == "Within Subjects" & term == "(Intercept)", "(Error)", term), `Type of Variance` = ifelse(`Type of Variance` == "Within Subjects" & term == "(Error)", "Between Subjects", `Type of Variance`))
-      # Between Subjects,_c3 => Within Subjects,_c3
+      # Between Subjects,c3_ => Within Subjects,c3_
       ret <- ret %>% mutate(`Type of Variance` = ifelse(`Type of Variance` == "Between Subjects" & term == "c3_", "Within Subjects", `Type of Variance`))
       # Between Subjects,c2_:c3_ => Within Subjects,c2_:c3_
       ret <- ret %>% mutate(`Type of Variance` = ifelse(`Type of Variance` == "Between Subjects" & term == "c2_:c3_", "Within Subjects", `Type of Variance`))
@@ -1923,6 +1923,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       terms_mapping <- x$terms_mapping
       # Add mapping for interaction term
       terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
+      terms_mapping <- c(terms_mapping,c(`Error(c3_)`=paste0("Error(", terms_mapping["c3_"], ")")))
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
