@@ -1960,6 +1960,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       else if (type == "within") {
         ret <- ret %>% dplyr::filter(`Type of Variance` == "Within Subjects") %>% dplyr::select(-`Type of Variance`)
       }
+      # Because of the filtering above, it is possible that the Correction/Epsilon column is all NA. If so, remove it.
+      if (!is.null(ret$Correction) && all(is.na(ret$Correction))) {
+        ret <- ret %>% dplyr::select(-`Correction`, -`Epsilon`)
+      }
       ret
     }
     else if (is.null(x$power)) {
