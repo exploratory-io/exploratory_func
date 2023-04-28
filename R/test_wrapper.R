@@ -1922,6 +1922,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret2 <- as.data.frame(x_summary$pval.adjustments)
       ret2$term <- rownames(ret2)
       ret <- ret %>% dplyr::rename(p.value='Pr(>F)')
+      total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
+      ret <- ret %>% dplyr::mutate(`Eta Squared`=`Sum Sq`/!!total)
       ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=`Sum Sq`/(`Sum Sq`+`Error SS`))
       ret_err <- ret %>% dplyr::select(term, `Sum Sq`="Error SS", df="den Df")
       ret <- ret %>% select(-`Error SS`, -`den Df`, df="num Df")
