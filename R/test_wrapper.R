@@ -1925,6 +1925,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
       ret <- ret %>% dplyr::mutate(`Eta Squared`=`Sum Sq`/!!total)
       ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=`Sum Sq`/(`Sum Sq`+`Error SS`))
+      # Remove pointless negative eta squared.
+      ret <- ret %>% dplyr::mutate(`f Squared`=ifelse(`Eta Squared`<1, `Eta Squared`/(1-`Eta Squared`), NA_real_))
       ret_err <- ret %>% dplyr::select(term, `Sum Sq`="Error SS", df="den Df")
       ret <- ret %>% select(-`Error SS`, -`den Df`, df="num Df")
       ret_gg <- ret2 %>% dplyr::select(term, eps="GG eps", p.value="Pr(>F[GG])") %>% dplyr::mutate(correction="Greenhouse-Geisser")
@@ -2004,7 +2006,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       }
       ret <- ret %>% dplyr::rename(`Variable`="term", `P Value`="p.value",
                                    `Sum of Squares`="sumsq",
-                                   `DF` = "df"
+                                   `DF` = "df",
+                                   `F Value` = "F value"
       )
       if (type == "between") {
         ret <- ret %>% dplyr::filter(`Type of Variance` == "Between Subjects") %>% dplyr::select(-`Type of Variance`)
