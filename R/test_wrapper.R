@@ -2055,13 +2055,27 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
         total_df <- sum(ret$df)
         lm_summary <- broom:::glance.lm(x)
-        model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
+        error_sumsq <- (ret %>% filter(term=="Residuals"))$sumsq
+        model_sumsq <- total - error_sumsq
         ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
                                       statistic = lm_summary$statistic,
                                       p.value = lm_summary$p.value,
                                       df = lm_summary$df, .before = 1)
         ret <- ret %>% dplyr::mutate(meansq = sumsq/df)
+        error_meansq <- (ret %>% filter(term=="Residuals"))$meansq
         ret <- ret %>% dplyr::relocate(meansq, .after = df)
+
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=sumsq/!!total)
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=sumsq/(sumsq+error_sumsq))
+        # Remove pointless negative eta squared.
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(`Eta Squared`<1, sqrt(`Eta Squared`/(1-`Eta Squared`)), NA_real_))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=(sumsq-df*error_meansq)/(total+error_meansq))
+        # Set NA to the above effect sizes if the term is "Residuals" or "(Corrected Model)".
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Partial Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Cohen's F`))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Omega Squared`))
+
         ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
         ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
         ret <- ret %>% dplyr::mutate(term = if_else(term=="Residuals", "(Residuals)", term))
