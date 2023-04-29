@@ -2250,7 +2250,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
     emm_fit <- emmeans::emmeans(x, formula)
-    if (length(levels(emm_fit)) >=2) {
+    if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) {
       c2_levels <- levels(emm_fit)$c2_
       c3_levels <- levels(emm_fit)$c3_
       levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
@@ -2273,6 +2273,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
       ret <- tibble::as.tibble(pw_comp)
       ret <- ret %>% separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
+      if (length(levels(emm_fit)) >=2) { # This means ANCOVA case. Strip the covariate value after the independent variable. e.g. "2 1.97101449275362"
+        ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
+        ret <- ret %>% mutate(var2=stringr::str_remove(var2, " .*"))
+      }
       ret <- ret %>% mutate(var1=c2_levels[as.integer(var1)])
       ret <- ret %>% mutate(var2=c2_levels[as.integer(var2)])
       ret <- ret %>% arrange(var1, var2)
