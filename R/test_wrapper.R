@@ -2260,10 +2260,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
       ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
       ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
-      ret <- ret %>% mutate(pair1_1=c2_levels[as.integer(pair1_1)])
-      ret <- ret %>% mutate(pair1_2=c3_levels[as.integer(pair1_2)])
-      ret <- ret %>% mutate(pair2_1=c2_levels[as.integer(pair2_1)])
-      ret <- ret %>% mutate(pair2_2=c3_levels[as.integer(pair2_2)])
+      # Trying to honor the order of the original factor levels. WIP.
+      ret <- ret %>% mutate(pair1_1=factor(c2_levels[as.integer(pair1_1)], levels=c2_levels))
+      ret <- ret %>% mutate(pair1_2=factor(c3_levels[as.integer(pair1_2)], levels=c3_levels))
+      ret <- ret %>% mutate(pair2_1=factor(c2_levels[as.integer(pair2_1)], levels=c2_levels))
+      ret <- ret %>% mutate(pair2_2=factor(c3_levels[as.integer(pair2_2)], levels=c3_levels))
       ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
     }
     else {
