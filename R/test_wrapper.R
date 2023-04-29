@@ -2249,7 +2249,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 1-way/2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
-    browser()
     emm_fit <- emmeans::emmeans(x, formula)
     if (length(levels(emm_fit)) >=2) {
       c2_levels <- levels(emm_fit)$c2_
@@ -2268,8 +2267,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
     }
     else {
+      c2_levels <- levels(emm_fit)$c2_
+      levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
       pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
       ret <- tibble::as.tibble(pw_comp)
+      ret <- ret %>% separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
+      ret <- ret %>% mutate(var1=c2_levels[as.integer(var1)])
+      ret <- ret %>% mutate(var2=c2_levels[as.integer(var2)])
+      ret <- ret %>% arrange(var1, var2)
     }
     # Get confidence interval.
     emm_ci <- confint(pw_comp, level=0.95)
@@ -2289,6 +2294,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                           `Pair 1 Var 2`="pair1_2",
                                           `Pair 2 Var 1`="pair2_1",
                                           `Pair 2 Var 2`="pair2_2",
+                                          `Var 1`="var1",
+                                          `Var 2`="var2",
                                           `Conf High`="conf.high",
                                           `Conf Low`="conf.low",
                                           `Standard Error`="SE",
