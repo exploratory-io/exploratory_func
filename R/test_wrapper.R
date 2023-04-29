@@ -2249,20 +2249,28 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 1-way/2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
+    browser()
     emm_fit <- emmeans::emmeans(x, formula)
-    c2_levels <- levels(emm_fit)$c2_
-    c3_levels <- levels(emm_fit)$c3_
-    levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
-    levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
-    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
-    ret <- tibble::as.tibble(pw_comp)
-    ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
-    ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
-    ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
-    ret <- ret %>% mutate(pair1_1=c2_levels[as.integer(pair1_1)])
-    ret <- ret %>% mutate(pair1_2=c3_levels[as.integer(pair1_2)])
-    ret <- ret %>% mutate(pair2_1=c2_levels[as.integer(pair2_1)])
-    ret <- ret %>% mutate(pair2_2=c3_levels[as.integer(pair2_2)])
+    if (length(levels(emm_fit)) >=2) {
+      c2_levels <- levels(emm_fit)$c2_
+      c3_levels <- levels(emm_fit)$c3_
+      levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+      levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
+      pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
+      ret <- tibble::as.tibble(pw_comp)
+      ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
+      ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
+      ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
+      ret <- ret %>% mutate(pair1_1=c2_levels[as.integer(pair1_1)])
+      ret <- ret %>% mutate(pair1_2=c3_levels[as.integer(pair1_2)])
+      ret <- ret %>% mutate(pair2_1=c2_levels[as.integer(pair2_1)])
+      ret <- ret %>% mutate(pair2_2=c3_levels[as.integer(pair2_2)])
+      ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
+    }
+    else {
+      pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
+      ret <- tibble::as.tibble(pw_comp)
+    }
     # Get confidence interval.
     emm_ci <- confint(pw_comp, level=0.95)
     ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
@@ -2271,7 +2279,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
     colnames(ret) <- orig_terms
-    ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
     # Example output:
     # A tibble: 1 × 7
     # contrast    `w t` estimate    SE    df t.ratio p.value
