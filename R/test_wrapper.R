@@ -2250,9 +2250,19 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
     emm_fit <- emmeans::emmeans(x, formula)
-    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust)
+    c2_levels <- levels(emm_fit)$c2_
+    c3_levels <- levels(emm_fit)$c3_
+    levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+    levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
+    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
-    ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "(c2_|c3_)", ""))
+    ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
+    ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
+    ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
+    ret <- ret %>% mutate(pair1_1=c2_levels[as.integer(pair1_1)])
+    ret <- ret %>% mutate(pair1_2=c3_levels[as.integer(pair1_2)])
+    ret <- ret %>% mutate(pair2_1=c2_levels[as.integer(pair2_1)])
+    ret <- ret %>% mutate(pair2_2=c3_levels[as.integer(pair2_2)])
     # Get confidence interval.
     emm_ci <- confint(pw_comp, level=0.95)
     ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
@@ -2261,12 +2271,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     orig_terms <- x$terms_mapping[colnames(ret)]
     orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
     colnames(ret) <- orig_terms
+    ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
     # Example output:
     # A tibble: 1 × 7
     # contrast    `w t` estimate    SE    df t.ratio p.value
     # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
     # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
-    ret <- ret %>% dplyr::rename(any_of(c(Pair="contrast",
+    ret <- ret %>% dplyr::rename(any_of(c(
+                                          `Pair 1 Var 1`="pair1_1",
+                                          `Pair 1 Var 2`="pair1_2",
+                                          `Pair 2 Var 1`="pair2_1",
+                                          `Pair 2 Var 2`="pair2_2",
                                           `Conf High`="conf.high",
                                           `Conf Low`="conf.low",
                                           `Standard Error`="SE",
