@@ -1945,7 +1945,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
-
     if (one_way_anova_without_repeated_measures) {
       # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
       data_summary <- x$dataframe %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
@@ -2033,7 +2032,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
           note <<- e$message
           power_val <<- NA_real_
         })
-        ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
+        ret <- ret %>% dplyr::mutate(power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
       }
       # Map the variable names in the term column back to the original.
       terms_mapping <- x$terms_mapping
@@ -2043,8 +2042,22 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
       if (one_way_anova_without_repeated_measures) { # One-way ANOVA case
-        ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
-        ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
+        total <- sum(ret$sumsq)
+        total_df <- sum(ret$df)
+        error_sumsq <- (ret %>% filter(term=="Residuals"))$sumsq
+        error_meansq <- (ret %>% filter(term=="Residuals"))$meansq
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=sumsq/!!total)
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=sumsq/(sumsq+error_sumsq))
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(`Eta Squared`<1, sqrt(`Eta Squared`/(1-`Eta Squared`)), NA_real_))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=(sumsq-df*error_meansq)/(total+error_meansq))
+        # Set NA to the above effect sizes if the term is "Residuals" or "(Corrected Model)".
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=ifelse(term %in% c("Residuals"), NA_real_, `Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=ifelse(term %in% c("Residuals"), NA_real_, `Partial Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(term %in% c("Residuals"), NA_real_, `Cohen's F`))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=ifelse(term %in% c("Residuals"), NA_real_, `Omega Squared`))
+
+        ret <- ret %>% dplyr::add_row(sumsq = total, df = total_df)
+        ret <- ret %>% dplyr::mutate(ssr = sumsq/total)
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
         ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
