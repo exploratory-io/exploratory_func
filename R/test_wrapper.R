@@ -1886,6 +1886,94 @@ glance.anova_exploratory <- function(x) {
   ret
 }
 
+get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
+  emm_fit <- emmeans::emmeans(x, formula)
+  if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) {
+    c2_levels <- levels(emm_fit)$c2_
+    c3_levels <- levels(emm_fit)$c3_
+    levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+    levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
+    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
+    ret <- tibble::as.tibble(pw_comp)
+    ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
+    ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
+    ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
+    # Trying to honor the order of the original factor levels. WIP.
+    ret <- ret %>% mutate(pair1_1=factor(c2_levels[as.integer(pair1_1)], levels=c2_levels))
+    ret <- ret %>% mutate(pair1_2=factor(c3_levels[as.integer(pair1_2)], levels=c3_levels))
+    ret <- ret %>% mutate(pair2_1=factor(c2_levels[as.integer(pair2_1)], levels=c2_levels))
+    ret <- ret %>% mutate(pair2_2=factor(c3_levels[as.integer(pair2_2)], levels=c3_levels))
+    ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
+  }
+  else {
+    c2_levels <- levels(emm_fit)$c2_
+    levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
+    ret <- tibble::as.tibble(pw_comp)
+    ret <- ret %>% separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
+    if (length(levels(emm_fit)) >=2) { # This means ANCOVA case. Strip the covariate value after the independent variable. e.g. "2 1.97101449275362"
+      ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
+      ret <- ret %>% mutate(var2=stringr::str_remove(var2, " .*"))
+    }
+    ret <- ret %>% mutate(var1=c2_levels[as.integer(var1)])
+    ret <- ret %>% mutate(var2=c2_levels[as.integer(var2)])
+    ret <- ret %>% arrange(var1, var2)
+  }
+  # Get confidence interval.
+  emm_ci <- confint(pw_comp, level=0.95)
+  ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+  ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
+  # Map the column names back to the original.
+  orig_terms <- x$terms_mapping[colnames(ret)]
+  orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
+  colnames(ret) <- orig_terms
+  # Example output:
+  # A tibble: 1 × 7
+  # contrast    `w t` estimate    SE    df t.ratio p.value
+  # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
+  # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
+  ret <- ret %>% dplyr::rename(any_of(c(
+                                        `Pair 1 Var 1`="pair1_1",
+                                        `Pair 1 Var 2`="pair1_2",
+                                        `Pair 2 Var 1`="pair2_1",
+                                        `Pair 2 Var 2`="pair2_2",
+                                        `Var 1`="var1",
+                                        `Var 2`="var2",
+                                        `Conf High`="conf.high",
+                                        `Conf Low`="conf.low",
+                                        `Standard Error`="SE",
+                                        `Degree of Freedom`="df",
+                                        `t Value`="t.ratio",
+                                        `P Value`="p.value")))
+  if (!is.null(x$covariates)) { # ANCOVA case
+    ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Difference`="estimate")))
+  } else { # 2-way ANOVA case. For 2-way ANOVA, there is no adjustment here.
+    ret <- ret %>% dplyr::rename(any_of(c(`Difference`="estimate")))
+  }
+
+  # The version that uses multcomp. It had an issue with column names with spaces.
+  # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
+  # ret <- broom::tidy(ret)
+  # Output example:
+  # A tibble: 1 × 7
+  # term  contrast null.value estimate std.error statistic adj.p.value
+  # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
+  # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
+
+  method <- switch(pairs_adjust,
+    "none" = "Pairwise T-Test with No Adjustment",
+    "tukey" = "Tukey's HSD Test",
+    "bonferroni" = "Pairwise T-Test with Bonferroni Correction",
+    "sheffe" = "Sheffe's Method",
+    "sidak" = "Pairwise T-Test with Sidak Correction",
+    "dunnett" = "Dunnett's Test",
+    "holm" = "Pairwise T-Test with Holm Correction",
+    "hochberg" = "Pairwise T-Test with Hochberg Correction"
+  )
+  ret <- ret %>% dplyr::mutate(`Method`=!!method)
+  ret
+}
+
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1, sort_factor_levels=FALSE) {
   if (type %in% c("model", "between", "within")) {
@@ -2249,90 +2337,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 1-way/2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
-    emm_fit <- emmeans::emmeans(x, formula)
-    if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) {
-      c2_levels <- levels(emm_fit)$c2_
-      c3_levels <- levels(emm_fit)$c3_
-      levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
-      levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
-      pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
-      ret <- tibble::as.tibble(pw_comp)
-      ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
-      ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
-      ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
-      # Trying to honor the order of the original factor levels. WIP.
-      ret <- ret %>% mutate(pair1_1=factor(c2_levels[as.integer(pair1_1)], levels=c2_levels))
-      ret <- ret %>% mutate(pair1_2=factor(c3_levels[as.integer(pair1_2)], levels=c3_levels))
-      ret <- ret %>% mutate(pair2_1=factor(c2_levels[as.integer(pair2_1)], levels=c2_levels))
-      ret <- ret %>% mutate(pair2_2=factor(c3_levels[as.integer(pair2_2)], levels=c3_levels))
-      ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
-    }
-    else {
-      c2_levels <- levels(emm_fit)$c2_
-      levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
-      pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
-      ret <- tibble::as.tibble(pw_comp)
-      ret <- ret %>% separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
-      if (length(levels(emm_fit)) >=2) { # This means ANCOVA case. Strip the covariate value after the independent variable. e.g. "2 1.97101449275362"
-        ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
-        ret <- ret %>% mutate(var2=stringr::str_remove(var2, " .*"))
-      }
-      ret <- ret %>% mutate(var1=c2_levels[as.integer(var1)])
-      ret <- ret %>% mutate(var2=c2_levels[as.integer(var2)])
-      ret <- ret %>% arrange(var1, var2)
-    }
-    # Get confidence interval.
-    emm_ci <- confint(pw_comp, level=0.95)
-    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
-    ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
-    # Map the column names back to the original.
-    orig_terms <- x$terms_mapping[colnames(ret)]
-    orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
-    colnames(ret) <- orig_terms
-    # Example output:
-    # A tibble: 1 × 7
-    # contrast    `w t` estimate    SE    df t.ratio p.value
-    # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
-    # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
-    ret <- ret %>% dplyr::rename(any_of(c(
-                                          `Pair 1 Var 1`="pair1_1",
-                                          `Pair 1 Var 2`="pair1_2",
-                                          `Pair 2 Var 1`="pair2_1",
-                                          `Pair 2 Var 2`="pair2_2",
-                                          `Var 1`="var1",
-                                          `Var 2`="var2",
-                                          `Conf High`="conf.high",
-                                          `Conf Low`="conf.low",
-                                          `Standard Error`="SE",
-                                          `Degree of Freedom`="df",
-                                          `t Value`="t.ratio",
-                                          `P Value`="p.value")))
-    if (!is.null(x$covariates)) { # ANCOVA case
-      ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Difference`="estimate")))
-    } else { # 2-way ANOVA case. For 2-way ANOVA, there is no adjustment here.
-      ret <- ret %>% dplyr::rename(any_of(c(`Difference`="estimate")))
-    }
-
-    # The version that uses multcomp. It had an issue with column names with spaces.
-    # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
-    # ret <- broom::tidy(ret)
-    # Output example:
-    # A tibble: 1 × 7
-    # term  contrast null.value estimate std.error statistic adj.p.value
-    # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
-    # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
-
-    method <- switch(pairs_adjust,
-      "none" = "Pairwise T-Test with No Adjustment",
-      "tukey" = "Tukey's HSD Test",
-      "bonferroni" = "Pairwise T-Test with Bonferroni Correction",
-      "sheffe" = "Sheffe's Method",
-      "sidak" = "Pairwise T-Test with Sidak Correction",
-      "dunnett" = "Dunnett's Test",
-      "holm" = "Pairwise T-Test with Holm Correction",
-      "hochberg" = "Pairwise T-Test with Hochberg Correction"
-    )
-    ret <- ret %>% dplyr::mutate(`Method`=!!method)
+    ret <- get_pairwise_contrast_df(x, formula, pairs_adjust)
   }
   else if (type == "levene") {
     if ("error" %in% class(x)) {
