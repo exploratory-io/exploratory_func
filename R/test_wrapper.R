@@ -2391,10 +2391,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                           `DF`="df",
                                           `Residual DF`="df.residual")))
     if (levene_test_center == "mean") {
-      ret <- ret %>% dplyr::mutate(`Method`="Levene's test")
+      ret <- ret %>% dplyr::mutate(`Method`="Levene's Test")
     }
     else { # Levene's test with median as the center is called Brown-Forsythe test. https://search.r-project.org/CRAN/refmans/misty/html/test.levene.html
-      ret <- ret %>% dplyr::mutate(`Method`="Brown-Forsythe test")
+      ret <- ret %>% dplyr::mutate(`Method`="Brown-Forsythe Test")
     }
   }
   else if (type == "shapiro") {
@@ -2426,6 +2426,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                           `P Value`="p.value",
                                           `Method`="method",
                                           `Number of Rows`="n")))
+    ret <- ret %>% dplyr::mutate(`Method`="Shapiro-Wilk Normality Test") # Just making it in Title Case.
 
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
