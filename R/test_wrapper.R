@@ -1948,7 +1948,7 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
                                         `Conf High`="conf.high",
                                         `Conf Low`="conf.low",
                                         `Standard Error`="SE",
-                                        `Degree of Freedom`="df",
+                                        `DF`="df",
                                         `t Value`="t.ratio",
                                         `P Value`="p.value")))
   if (!is.null(x$covariates)) { # ANCOVA case
@@ -2193,7 +2193,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
                                             `P Value`="p.value",
                                             `Sum of Squares`="sumsq",
-                                            `Degree of Freedom`="df",
+                                            `DF`="df",
                                             `Mean Square`="meansq",
                                             `SS Ratio`="ssr",
                                             `Effect Size (Cohen's f)`="f",
@@ -2220,7 +2220,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::rename(`Type of Variance`=term,
                                    `F Value`=statistic,
                                    `P Value`=p.value,
-                                   `Degree of Freedom`=df,
+                                   `DF`=df,
                                    `Sum of Squares`=sumsq,
                                    `SS Ratio`=ssr,
                                    `Mean Square`=meansq,
@@ -2265,7 +2265,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
     ret$term <- orig_term
     ret <- ret %>% dplyr::relocate(term, method, .before = 1)
-    ret <- ret %>% dplyr::rename(`Variable`="term", `Method`="method", `Test Statistic`="test.stat", `Approximate F Value`="approx.F", `Hypothesis Degree of Freedom`="num.Df", `Error Degree of Freedom`="den.Df", `P Value`="p.value")
+    ret <- ret %>% dplyr::rename(`Variable`="term", `Method`="method", `Test Statistic`="test.stat", `Approximate F Value`="approx.F", `Hypothesis DF`="num.Df", `Error DF`="den.Df", `P Value`="p.value")
   }
   else if (type == "sphericity") {
     summary_x <- summary(x$Anova)
@@ -2324,7 +2324,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # 1      3.22   20.1 1.07     29     17.9     22.3
     ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Mean`="emmean",
                                           `Standard Error`="SE",
-                                          `Degree of Freedom`="df",
+                                          `DF`="df",
                                           `Conf Low`="lower.CL",
                                           `Conf High`="upper.CL",
                                           `Mean`="mean")))
@@ -2384,8 +2384,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # 0.0607   0.807     1          30
     ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
                                           `P Value`="p.value",
-                                          `Degree of Freedom`="df",
-                                          `Residual Degree of Freedom`="df.residual")))
+                                          `DF`="df",
+                                          `Residual DF`="df.residual")))
   }
   else if (type == "shapiro") {
     if ("error" %in% class(x)) {
