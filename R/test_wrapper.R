@@ -2323,7 +2323,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                           `Conf High`="upper.CL",
                                           `Mean`="mean")))
   }
-  else if (type == "pairs") { # For ANCOVA or 2-way ANOVA
+  else if (type == "pairs") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
