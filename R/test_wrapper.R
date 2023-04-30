@@ -2390,6 +2390,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                           `P Value`="p.value",
                                           `DF`="df",
                                           `Residual DF`="df.residual")))
+    if (levene_test_center == "mean") {
+      ret <- ret %>% dplyr::mutate(`Method`="Levene's test")
+    }
+    else { # Levene's test with median as the center is called Brown-Forsythe test. https://search.r-project.org/CRAN/refmans/misty/html/test.levene.html
+      ret <- ret %>% dplyr::mutate(`Method`="Brown-Forsythe test")
+    }
   }
   else if (type == "shapiro") {
     if ("error" %in% class(x)) {
