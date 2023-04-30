@@ -1886,6 +1886,7 @@ glance.anova_exploratory <- function(x) {
   ret
 }
 
+# Returns a data frame for pairwise contrast. This is a common utility function for "pairs" and "pairs_per_variable" type of the tidier.
 get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
   emm_fit <- emmeans::emmeans(x, formula)
   if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) {
