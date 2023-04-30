@@ -1905,9 +1905,15 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     ret <- ret %>% mutate(pair2_2=factor(c3_levels[as.integer(pair2_2)], levels=c3_levels))
     ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
   }
-  else {
-    c2_levels <- levels(emm_fit)$c2_
-    levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+  else { # Only 1 variable. Either c2_ or c3_.
+    if (!is.null(levels(emm_fit)$c2_)) {# c2_ case
+      var_levels <- levels(emm_fit)$c2_
+      levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+    }
+    else { # c3_ case
+      var_levels <- levels(emm_fit)$c3_
+      levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
+    }
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
     ret <- ret %>% separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
@@ -1915,8 +1921,8 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
       ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
       ret <- ret %>% mutate(var2=stringr::str_remove(var2, " .*"))
     }
-    ret <- ret %>% mutate(var1=c2_levels[as.integer(var1)])
-    ret <- ret %>% mutate(var2=c2_levels[as.integer(var2)])
+    ret <- ret %>% mutate(var1=var_levels[as.integer(var1)])
+    ret <- ret %>% mutate(var2=var_levels[as.integer(var2)])
     ret <- ret %>% arrange(var1, var2)
   }
   # Get confidence interval.
@@ -2338,6 +2344,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
     ret <- get_pairwise_contrast_df(x, formula, pairs_adjust)
+  }
+  else if (type == "pairs_per_variable") { # For only 2-way ANOVA
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    formula1 <- as.formula(paste0('~`', x$var2[1], '`'))
+    formula2 <- as.formula(paste0('~`', x$var2[2], '`'))
+    browser()
+    ret <- get_pairwise_contrast_df(x, formula1, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[1]]) %>% dplyr::select(`Variable`, everything())
+    ret2 <- get_pairwise_contrast_df(x, formula2, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[2]]) %>% dplyr::select(`Variable`, everything())
+    ret <- ret %>% dplyr::bind_rows(ret2)
   }
   else if (type == "levene") {
     if ("error" %in% class(x)) {
