@@ -2087,11 +2087,13 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
-      ret <- ret %>% mutate(`Mean Square`=sumsq/df)
+      ret <- ret %>% dplyr::mutate(`Mean Square`=sumsq/df)
+      ret <- ret %>% dplyr::mutate(ssr=sumsq/!!total)
 
       # Relocate term column to the first column.
       ret <- ret %>% dplyr::relocate(`Type of Variance`, term, .before = 1)
       ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
+      ret <- ret %>% dplyr::relocate(ssr, .after=sumsq)
       if (!is.null(ret$correction)) {
         ret <- ret %>% dplyr::relocate(eps, .before = p.value)
         ret <- ret %>% dplyr::relocate(correction, .after = term)
@@ -2101,6 +2103,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       }
       ret <- ret %>% dplyr::rename(`Variable`="term", `P Value`="p.value",
                                    `Sum of Squares`="sumsq",
+                                   `SS Ratio`="ssr",
                                    `DF` = "df",
                                    `F Value` = "F value"
       )
