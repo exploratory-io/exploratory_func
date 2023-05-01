@@ -310,7 +310,7 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
   }
   df <- as.data.frame(mat) %>%
     tibble::rownames_to_column(".Var2.temp") %>% # The column name .Var2.temp is to avoid name conflict as much as possible.
-    tidyr::pivot_longer(-.Var2.temp, "Var1","value", values_drop_na = na.rm) %>%
+    tidyr::pivot_longer(-.Var2.temp, names_to="Var1", values_to="value", values_drop_na = na.rm) %>%
     dplyr::rename(Var2 = .Var2.temp)
 
   if(zero.rm){
@@ -2076,7 +2076,9 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
 recode <- function(x, type_convert = FALSE, ...) {
-  ret <- dplyr::recode(x, ...)
+  # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
+  map <- list(...)
+  ret <- dplyr::recode(x, !!!map)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
   # they get garbled. Working it around by converting to UTF-8.
@@ -2120,24 +2122,27 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
     current_levels <- levels(x)
     num_of_unique_value <- length(current_levels)
   } else { # if input is not factor, get unique values sorted by count and remember it as current level.
+    if (!is.character(x)) {
+      x <- as.character(x) # to make forcats::fct_relevel works, convert it to character.
+    }
     current_levels <- get_unique_values(x, length(x))
     num_of_unique_value <- length(current_levels)
   }
   replacements <- dplyr:::dplyr_quosures(...)
   argumentLength = length(replacements)
+
+  # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
+  map <- list(...)
   # check if all the unique values are recoded
   if (argumentLength == num_of_unique_value) { # if all the values are recoded, just call recode_factor so that level is automatically adjusted.
-      ret <- dplyr::recode_factor(x, ..., .default = .default, .missing = .missing, .ordered = .ordered)
+      ret <- dplyr::recode_factor(x, !!!map, .default = .default, .missing = .missing, .ordered = .ordered)
   } else { # if not all the unique values are recoded, need to adjust ordering manually.
     if (!is.factor(x)) { # check if input is factor.
-      if (!is.character(x)) {
-        x <- as.character(x) # to make forcats::fct_relevel works, convert it to character.
-      }
       # make sure to apply current_levels before doing recode, so that current levels is honored.
       x <- forcats::fct_relevel(x, current_levels)
     }
     # pass current_levels to .default argument to keep the levels in the input.
-    ret <- dplyr::recode(x, ..., .default = current_levels, .missing = .missing)
+    ret <- dplyr::recode(x, !!!map, .default = current_levels, .missing = .missing)
   }
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,

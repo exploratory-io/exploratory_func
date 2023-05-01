@@ -2633,6 +2633,10 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else if (type == "prob_dist") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
     ret
   }

@@ -1804,6 +1804,16 @@ test_that("recode and recode_factor", {
   # type covert is set as TRUE so the result should be Date 2023-01-01,2023-01-02,2023-01-03 instead of character "2023-01-01","2023-01-02", "2023-01-03".
   result6 <- empDF %>% mutate(business_travel = exploratory::recode(business_travel, "たまに" = "2023-01-01", "なし" = "2023-01-02", "頻繁" = "2023-01-03", type_convert = TRUE))
   expect_equal(exploratory:::get_unique_values(result6$business_travel, 100), c(lubridate::ymd("2023-01-01"),lubridate::ymd("2023-01-02"),lubridate::ymd("2023-01-03")))
+  result7 <- empDF %>% mutate(job_level = exploratory::recode_factor(job_level, `1` = "10", `4` = "40"))
+  expect_equal(levels(result7$job_level), c("10", "2", "3", "40", "5"))
+
+  # Test recoding "." to something else.
+    # Test recoding "." to something else.
+  test.df <- tibble(text=c("a", "b", ".", "."), value=1:4)
+  test.df.result <- test.df %>% dplyr::mutate(text = exploratory::recode(text, `.` = "abc", a="xyz"))
+  expect_equal(test.df.result$text, c("xyz", "b", "abc", "abc"))
+  test.df.result <- test.df %>% dplyr::mutate(text = exploratory::recode_factor(text, `.` = "abc", a="xyz"))
+  expect_equal(levels(test.df.result$text), c("abc", "xyz", "b"))
 })
 
 test_that("separate_japanese_address", {
