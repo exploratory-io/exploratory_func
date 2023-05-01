@@ -2,6 +2,7 @@ df <- afex::obk.long %>% pivot_wider(names_from="hour",values_from = "value")
 # 2-way mixed repeated-measures ANOVA case
 model_df <- df %>% exp_anova("value", list("treatment", Measurements=c("1","2","3","4","5")), with_repeated_measures = TRUE)
 res <- model_df %>% tidy_rowwise(model, type="between")
+expect_equal(res$`F Value`, c(409.021729, 5.578327, NA), tolerance=1e-4)
 expect_equal(colnames(res),c("Variable","Sum of Squares","SS Ratio","DF","Mean Square","F Value","P Value","Eta Squared","Partial Eta Squared","Cohen's F","Omega Squared"))
 res <- model_df %>% tidy_rowwise(model, type="within")
 expect_equal(colnames(res),c("Variable","Correction","Sum of Squares","SS Ratio","DF","Mean Square","F Value","Epsilon","P Value","Eta Squared","Partial Eta Squared","Cohen's F","Omega Squared"))
