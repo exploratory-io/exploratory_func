@@ -2357,7 +2357,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     formula1 <- as.formula(paste0('~`', x$var2[1], '`'))
     formula2 <- as.formula(paste0('~`', x$var2[2], '`'))
-    browser()
     ret <- get_pairwise_contrast_df(x, formula1, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[1]]) %>% dplyr::select(`Variable`, everything())
     ret2 <- get_pairwise_contrast_df(x, formula2, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[2]]) %>% dplyr::select(`Variable`, everything())
     ret <- ret %>% dplyr::bind_rows(ret2)
@@ -2424,7 +2423,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # statistic p.value method                          n
     # <dbl>     <dbl>   <chr>                       <int>
     # 0.933     0.0483  Shapiro-Wilk normality test    32
-    ret <- ret %>% dplyr::rename(any_of(c(`W Statistic`="statistic",
+    ret <- ret %>% dplyr::rename(any_of(c(`W Value`="statistic",
                                           `P Value`="p.value",
                                           `Method`="method",
                                           `Number of Rows`="n")))
