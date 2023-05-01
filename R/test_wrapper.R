@@ -2407,10 +2407,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     # Shapiro-Wilk test for residual normality
-    if (x$with_repeated_measures) {
+    if (x$with_repeated_measures) { # For afex::aov_car return, x$residuals is not available.
       resid <- residuals(x)
     }
-    else { # TODO: residuals(x) might work here too. Verify.
+    else {
       resid <- x$residuals
     }
     if (length(resid) > 5000) {
