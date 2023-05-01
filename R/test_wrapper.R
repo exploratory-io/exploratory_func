@@ -1614,6 +1614,9 @@ gather_repeated_measures <- function(df, column_list, value_col_name) {
     new_col_name <- names(column_list[2])
   }
   
+  # filter out rows that have NA in the columns to gather
+  df <- df %>% filter(across(all_of(cols_to_gather), ~ !is.na(.)))
+
   df_transformed <- df %>%
     select(if (length(column_list) > 1) all_of(cols_to_keep), all_of(cols_to_gather)) %>%
     pivot_longer(
