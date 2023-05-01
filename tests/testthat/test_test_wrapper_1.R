@@ -678,10 +678,11 @@ test_that("test 2-way ANOVA with exp_anova with repeat-by", {
   # model_df <- mtcars2 %>% exp_anova(mpg, c("carb","ge ar"), func2=c("aschar","aschar"), with_interaction = TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret),
-    c("vs","Variable","Sum of Squares","SS Ratio","Degree of Freedom","Mean Square","F Value","P Value","Note"))
+    c("vs","Variable","Sum of Squares","SS Ratio","DF","Mean Square","F Value","P Value","Eta Squared","Partial Eta Squared","Cohen's F","Omega Squared","Note"))
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
   expect_equal(colnames(ret),
-    c("vs","Pair","Difference","Conf High","Conf Low","Standard Error","Degree of Freedom","t Value","P Value", "Method"))
+    c("vs","Pair 1 Var 1","Pair 1 Var 2","Pair 2 Var 1","Pair 2 Var 2","Difference",
+      "Conf High","Conf Low","Standard Error","DF","t Value","P Value","Method"))
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   ret <- model_df %>% tidy_rowwise(model, type="levene")
@@ -707,7 +708,7 @@ test_that("test ANCOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+               c("a m","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 
   # Test broom output to detect changes at upgrade.
@@ -739,7 +740,7 @@ test_that("test ANCOVA with exp_anova with logical group variable", {
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+               c("a m","Number of Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 
   # Test broom output to detect changes at upgrade.
@@ -792,7 +793,7 @@ test_that("test ANCOVA with exp_anova with some NAs in the data", {
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("a m","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+               c("a m","Number of Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -812,7 +813,7 @@ test_that("test exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+               c("gear","Number of Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
@@ -851,7 +852,7 @@ test_that("test exp_anova with outlier filter", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+               c("gear","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -863,7 +864,7 @@ test_that("test exp_anova with required power", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+               c("gear","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -871,7 +872,7 @@ test_that("test exp_anova with grouping functions", {
   model_df <- exp_anova(mtcars, mpg, disp, func2="asintby10")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("disp","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+               c("disp","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -882,7 +883,7 @@ test_that("test exp_anova with group_by", {
   model_df <- mtcars %>% group_by(vs) %>% exp_anova(mpg, gear)
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("vs","gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean",
+               c("vs","gear","Number of Rows","Mean","Std Error","Conf Low","Conf High",
                  "Std Deviation","Minimum","Maximum"))
 })
 
