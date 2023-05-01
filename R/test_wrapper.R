@@ -1734,9 +1734,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       df <- clean_df
       if (with_repeated_measures) {
         # For repeated measures ANOVA, add a column for the subject ID.
-        # If 2-say, this is a mixed-design repeated-measures model. Treat only the 2nd variable as a repeated measure.
+        # If 2-way, this is a mixed-design repeated-measures model. Treat only the 2nd variable as a repeated measure.
         # This have to be done after the column name mapping so that subject_id is not mapped.
         df <- df %>% group_by(!!rlang::sym(var2_col[length(var2_col)])) %>% mutate(subject_id = row_number()) %>% ungroup()
+      }
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
+      if (nrow(df) == 0) {
+        stop("There is no data left after removing NA.")
       }
 
       if (is.null(covariates)) { # 2-way/1-way ANOVA case
@@ -1773,10 +1777,6 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         contrasts_list <- list()
       }
 
-      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
-      if (nrow(df) == 0) {
-        stop("There is no data left after removing NA.")
-      }
       if (!is.null(outlier_filter_type)) { #TODO: duplicated code with exp_ttest.
         is_outlier <- function(x) {
           res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("Lower", "Upper")
