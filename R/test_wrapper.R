@@ -1901,10 +1901,9 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
-    ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
-    ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
-    ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
-    # Trying to honor the order of the original factor levels, but just setting level extracted from emm_fit does not seem enough. TODO
+    ret <- ret %>% tidyr::separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
+    ret <- ret %>% tidyr::separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
+    ret <- ret %>% tidyr::separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
     ret <- ret %>% mutate(pair1_1=factor(c2_levels[as.integer(pair1_1)], levels=c2_levels))
     ret <- ret %>% mutate(pair1_2=factor(c3_levels[as.integer(pair1_2)], levels=c3_levels))
     ret <- ret %>% mutate(pair2_1=factor(c2_levels[as.integer(pair2_1)], levels=c2_levels))
@@ -1922,7 +1921,7 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     }
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
-    ret <- ret %>% separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
+    ret <- ret %>% tidyr::separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
     if (length(levels(emm_fit)) >=2) { # This means ANCOVA case. Strip the covariate value after the independent variable. e.g. "2 1.97101449275362"
       ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
       ret <- ret %>% mutate(var2=stringr::str_remove(var2, " .*"))
