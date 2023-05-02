@@ -1618,8 +1618,8 @@ gather_repeated_measures <- function(df, column_list, value_col_name) {
   df <- df %>% filter(across(all_of(cols_to_gather), ~ !is.na(.)))
 
   df_transformed <- df %>%
-    select(if (length(column_list) > 1) all_of(cols_to_keep), all_of(cols_to_gather)) %>%
-    pivot_longer(
+    dplyr::select(if (length(column_list) > 1) all_of(cols_to_keep), all_of(cols_to_gather)) %>%
+    tidyr::pivot_longer(
       cols = all_of(cols_to_gather),
       names_to = new_col_name,
       values_to = value_col_name
