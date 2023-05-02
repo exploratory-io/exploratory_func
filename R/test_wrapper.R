@@ -1628,11 +1628,12 @@ gather_repeated_measures <- function(df, column_list, value_col_name) {
   return(df_transformed)
 }
 
+# Returns the column names in the long-format data returned by gather_repeated_measures is applied.
 get_gather_repeated_measures_colnames <- function(column_list) {
-  if (length(column_list) > 1) {
+  if (length(column_list) > 1) { # This means 2-way repeated-measures ANOVA.
     cols_to_keep <- column_list[[1]]
     new_col_name <- names(column_list[2])
-  } else {
+  } else { # This means 1-way repeated-measures ANOVA.
     cols_to_keep <- NULL
     new_col_name <- names(column_list[1])
   }
@@ -1892,9 +1893,10 @@ glance.anova_exploratory <- function(x) {
 # Returns a data frame for pairwise contrast. This is a common utility function for "pairs" and "pairs_per_variable" type of the tidier.
 get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
   emm_fit <- emmeans::emmeans(x, formula)
-  if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) {
+  if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) { # 2-way ANOVA (repeated measures or regular)
     c2_levels <- levels(emm_fit)$c2_
     c3_levels <- levels(emm_fit)$c3_
+    # Map the levels to numbers, so that we can stably parse the output contrast column.
     levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
     levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
