@@ -1904,7 +1904,6 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     ret <- ret %>% tidyr::separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
     ret <- ret %>% tidyr::separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
     ret <- ret %>% tidyr::separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
-    # Trying to honor the order of the original factor levels, but just setting level extracted from emm_fit does not seem enough. TODO
     ret <- ret %>% mutate(pair1_1=factor(c2_levels[as.integer(pair1_1)], levels=c2_levels))
     ret <- ret %>% mutate(pair1_2=factor(c3_levels[as.integer(pair1_2)], levels=c3_levels))
     ret <- ret %>% mutate(pair2_1=factor(c2_levels[as.integer(pair2_1)], levels=c2_levels))
