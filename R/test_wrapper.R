@@ -1601,6 +1601,48 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+
+# Function to perform the transformation
+# column_list: e.g. list("col1", new_col=c("col2", "col3", "col4"))
+gather_repeated_measures <- function(df, column_list, value_col_name) {
+  new_col_name <- names(column_list)[1]
+  cols_to_gather <- column_list[[1]]
+  
+  if (length(column_list) > 1) {
+    cols_to_keep <- column_list[[1]]
+    cols_to_gather <- column_list[[2]]
+    new_col_name <- names(column_list[2])
+  }
+  
+  # filter out rows that have NA in the columns to gather
+  df <- df %>% filter(across(all_of(cols_to_gather), ~ !is.na(.)))
+
+  df_transformed <- df %>%
+    select(if (length(column_list) > 1) all_of(cols_to_keep), all_of(cols_to_gather)) %>%
+    pivot_longer(
+      cols = all_of(cols_to_gather),
+      names_to = new_col_name,
+      values_to = value_col_name
+    )
+  
+  return(df_transformed)
+}
+
+# Returns the column names in the long-format data returned by gather_repeated_measures is applied.
+get_gather_repeated_measures_colnames <- function(column_list) {
+  if (length(column_list) > 1) { # This means 2-way repeated-measures ANOVA.
+    cols_to_keep <- column_list[[1]]
+    new_col_name <- names(column_list[2])
+  } else { # This means 1-way repeated-measures ANOVA.
+    cols_to_keep <- NULL
+    new_col_name <- names(column_list[1])
+  }
+  
+  resulting_colnames <- c(cols_to_keep, new_col_name)
+  return(resulting_colnames)
+}
+
+
 #' ANOVA wrapper for Analytics View
 #' @export
 #' @param var1 - The column for dependent variable
@@ -1612,7 +1654,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
-                      with_interaction = FALSE,
+                      with_interaction = FALSE, with_repeated_measures = FALSE,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
@@ -1620,7 +1662,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   if (is.null(power) && !is.null(beta)) {
     power <- 1.0 - beta
   }
-  var1_col <- col_name(substitute(var1))
+  var1_ <- substitute(var1)
+  if (class(var1_) == "name") { # To be able to handle wide-data too, we need to handle both unquoted existing column name, and quoted new column name.
+    var1_col <- col_name(var1_)
+  }
+  else {
+    var1_col <- var1
+  }
   var2_ <- substitute(var2)
   if (class(var2_) == "name") { # For backward compatibility with pre-6.13 when we only had one-way ANOVA.
     var2_col <- col_name(var2_)
@@ -1628,6 +1676,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   else {
     var2_col <- var2
   }
+  # If var2_col is a list, convert it to a character vector.
+  if (is.list(var2_col)) {
+    df <- gather_repeated_measures(df, var2_col, var1_col)
+    var2_col <- get_gather_repeated_measures_colnames(var2_col)
+  }
+
   grouped_cols <- grouped_by(df)
 
   # Note that applying preprocessing function is taken care of by the analytics view framework now, and this code applying func2
@@ -1677,10 +1731,22 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       names(terms_mapping) <- name_map
       var1_col <- name_map[var1_col]
       var2_col <- name_map[var2_col]
+      names(var2_col) <- NULL
       if (!is.null(covariates)) {
         covariates <- name_map[covariates]
       }
       df <- clean_df
+      if (with_repeated_measures) {
+        # For repeated measures ANOVA, add a column for the subject ID.
+        # If 2-way, this is a mixed-design repeated-measures model. Treat only the 2nd variable as a repeated measure.
+        # This have to be done after the column name mapping so that subject_id is not mapped.
+        df <- df %>% group_by(!!rlang::sym(var2_col[length(var2_col)])) %>% mutate(subject_id = row_number()) %>% ungroup()
+      }
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
+      if (nrow(df) == 0) {
+        stop("There is no data left after removing NA.")
+      }
+
       if (is.null(covariates)) { # 2-way/1-way ANOVA case
         if (with_interaction) {
           collapse_str <- "`*`"
@@ -1688,7 +1754,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         else {
           collapse_str <- "`+`"
         }
-        formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
+        if (with_repeated_measures) {
+          # If 2-way, mixed-design repeated-measures model. Treat only the 2nd variable as a repeated measure.
+          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '` + Error(subject_id / (`', var2_col[length(var2_col)], '`))'))
+        }
+        else {
+          formula <- as.formula(paste0('`', var1_col, '`~`', paste(var2_col, collapse=collapse_str), '`'))
+        }
       }
       else { # ANCOVA case
         if (!with_interaction) {
@@ -1709,10 +1781,6 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         contrasts_list <- list()
       }
 
-      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
-      if (nrow(df) == 0) {
-        stop("There is no data left after removing NA.")
-      }
       if (!is.null(outlier_filter_type)) { #TODO: duplicated code with exp_ttest.
         is_outlier <- function(x) {
           res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("Lower", "Upper")
@@ -1742,7 +1810,10 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         e$n <- count_df$tot_n
         return(e)
       }
-      if (!is.null(covariates) || length(var2_col) > 1) {
+      if (with_repeated_measures) {
+        model <- afex::aov_car(formula, data = df, type = "III")
+      }
+      else if (!is.null(covariates) || length(var2_col) > 1) {
         # For ANCOVA/2-way ANOVA, use lm() rather than aov(), since we need F statistic and P value as a lm in our summary later.
         model <- lm(formula, data = df, contrasts = contrasts_list, ...)
         # Calculate type 3 some of square and attach to the model.
@@ -1782,11 +1853,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$common_var2_order <- as.character(common_var2_order) # as.character is to strip names.
       }
       model$terms_mapping <- terms_mapping
-      model$data <- df
+      model$dataframe <- df # model$data is used in afex_aov class. Using model$dataframe to avoid conflict.
       model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
       model$power <- power
       model$with_interaction <- with_interaction
+      model$with_repeated_measures <- with_repeated_measures 
       model
     }, error = function(e){
       if(length(grouped_cols) > 0 && !str_detect(e$message, 'EXP-ANA')) {
@@ -1818,9 +1890,105 @@ glance.anova_exploratory <- function(x) {
   ret
 }
 
+# Returns a data frame for pairwise contrast. This is a common utility function for "pairs" and "pairs_per_variable" type of the tidier.
+get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
+  emm_fit <- emmeans::emmeans(x, formula)
+  if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) { # 2-way ANOVA (repeated measures or regular)
+    c2_levels <- levels(emm_fit)$c2_
+    c3_levels <- levels(emm_fit)$c3_
+    # Map the levels to numbers, so that we can stably parse the output contrast column.
+    levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+    levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
+    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
+    ret <- tibble::as.tibble(pw_comp)
+    ret <- ret %>% separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
+    ret <- ret %>% separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
+    ret <- ret %>% separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
+    # Trying to honor the order of the original factor levels, but just setting level extracted from emm_fit does not seem enough. TODO
+    ret <- ret %>% mutate(pair1_1=factor(c2_levels[as.integer(pair1_1)], levels=c2_levels))
+    ret <- ret %>% mutate(pair1_2=factor(c3_levels[as.integer(pair1_2)], levels=c3_levels))
+    ret <- ret %>% mutate(pair2_1=factor(c2_levels[as.integer(pair2_1)], levels=c2_levels))
+    ret <- ret %>% mutate(pair2_2=factor(c3_levels[as.integer(pair2_2)], levels=c3_levels))
+    ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
+  }
+  else { # Only 1 variable. Either c2_ or c3_.
+    if (!is.null(levels(emm_fit)$c2_)) {# c2_ case
+      var_levels <- levels(emm_fit)$c2_
+      levels(emm_fit)$c2_ <- 1:length(levels(emm_fit)$c2_)
+    }
+    else { # c3_ case
+      var_levels <- levels(emm_fit)$c3_
+      levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
+    }
+    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
+    ret <- tibble::as.tibble(pw_comp)
+    ret <- ret %>% separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
+    if (length(levels(emm_fit)) >=2) { # This means ANCOVA case. Strip the covariate value after the independent variable. e.g. "2 1.97101449275362"
+      ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
+      ret <- ret %>% mutate(var2=stringr::str_remove(var2, " .*"))
+    }
+    ret <- ret %>% mutate(var1=var_levels[as.integer(var1)])
+    ret <- ret %>% mutate(var2=var_levels[as.integer(var2)])
+    ret <- ret %>% arrange(var1, var2)
+  }
+  # Get confidence interval.
+  emm_ci <- confint(pw_comp, level=0.95)
+  ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+  ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
+  # Map the column names back to the original.
+  orig_terms <- x$terms_mapping[colnames(ret)]
+  orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
+  colnames(ret) <- orig_terms
+  # Example output:
+  # A tibble: 1 × 7
+  # contrast    `w t` estimate    SE    df t.ratio p.value
+  # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
+  # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
+  ret <- ret %>% dplyr::rename(any_of(c(
+                                        `Pair 1 Var 1`="pair1_1",
+                                        `Pair 1 Var 2`="pair1_2",
+                                        `Pair 2 Var 1`="pair2_1",
+                                        `Pair 2 Var 2`="pair2_2",
+                                        `Var 1`="var1",
+                                        `Var 2`="var2",
+                                        `Conf High`="conf.high",
+                                        `Conf Low`="conf.low",
+                                        `Standard Error`="SE",
+                                        `DF`="df",
+                                        `t Value`="t.ratio",
+                                        `P Value`="p.value")))
+  if (!is.null(x$covariates)) { # ANCOVA case
+    ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Difference`="estimate")))
+  } else { # 2-way ANOVA case. For 2-way ANOVA, there is no adjustment here.
+    ret <- ret %>% dplyr::rename(any_of(c(`Difference`="estimate")))
+  }
+
+  # The version that uses multcomp. It had an issue with column names with spaces.
+  # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
+  # ret <- broom::tidy(ret)
+  # Output example:
+  # A tibble: 1 × 7
+  # term  contrast null.value estimate std.error statistic adj.p.value
+  # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
+  # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
+
+  method <- switch(pairs_adjust,
+    "none" = "Pairwise T-Test with No Adjustment",
+    "tukey" = "Tukey's HSD Test",
+    "bonferroni" = "Pairwise T-Test with Bonferroni Correction",
+    "sheffe" = "Sheffe's Method",
+    "sidak" = "Pairwise T-Test with Sidak Correction",
+    "dunnett" = "Dunnett's Test",
+    "holm" = "Pairwise T-Test with Holm Correction",
+    "hochberg" = "Pairwise T-Test with Hochberg Correction"
+  )
+  ret <- ret %>% dplyr::mutate(`Method`=!!method)
+  ret
+}
+
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1, sort_factor_levels=FALSE) {
-  if (type == "model") {
+  if (type %in% c("model", "between", "within")) {
     if ("error" %in% class(x)) {
       if (is.null(x$message) || x$message == "") {
         # It seems there are some cases where x$message is an empty string. Get the error message with as.character().
@@ -1840,15 +2008,46 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     note <- NULL
 
-    one_way_anova <- is.null(x$covariates) && length(x$var2) == 1 # Power analysis is for one-way ANOVA case only.
-    if (one_way_anova) { # one-way ANOVA case
+    # Power analysis is for one-way ANOVA case only.
+    one_way_anova_without_repeated_measures <- is.null(x$covariates) && (length(x$var2) == 1) && !x$with_repeated_measures
+    if (one_way_anova_without_repeated_measures) { # one-way ANOVA case
       ret <- broom:::tidy.aov(x)
+    } else if (x$with_repeated_measures) { # For repeated measures ANOVA, we need to extract results from Anova.mlm object from car package.
+      x_summary <- summary(x$Anova)
+      x_matrix <- matrix(as.numeric(x_summary$univariate.tests), ncol=ncol(x_summary$univariate.tests))
+      colnames(x_matrix) <- colnames(x_summary$univariate.tests)
+      ret <- as.data.frame(x_matrix)
+      ret$term <- rownames(x_summary$univariate.tests)
+      # Add info on p-value adjustment for departure from sphericity.
+      ret2 <- as.data.frame(x_summary$pval.adjustments)
+      ret2$term <- rownames(ret2)
+      ret <- ret %>% dplyr::rename(p.value='Pr(>F)')
+      total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
+      ret <- ret %>% dplyr::mutate(`Eta Squared`=`Sum Sq`/!!total)
+      ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=`Sum Sq`/(`Sum Sq`+`Error SS`))
+      # Remove pointless negative eta squared.
+      ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(`Eta Squared`<1, sqrt(`Eta Squared`/(1-`Eta Squared`)), NA_real_))
+      ret <- ret %>% dplyr::mutate(`Omega Squared`=(`Sum Sq`-`num Df`*(`Error SS`/`den Df`))/(total+(`Error SS`/`den Df`)))
+      ret_err <- ret %>% dplyr::select(term, `Sum Sq`="Error SS", df="den Df")
+      ret <- ret %>% select(-`Error SS`, -`den Df`, df="num Df")
+      ret_gg <- ret2 %>% dplyr::select(term, eps="GG eps", p.value="Pr(>F[GG])") %>% dplyr::mutate(correction="Greenhouse-Geisser")
+      ret_hf <- ret2 %>% dplyr::select(term, eps="HF eps", p.value="Pr(>F[HF])") %>% dplyr::mutate(correction="Huynh-Feldt")
+      ret_gg <- ret_gg %>% dplyr::mutate(`Type of Variance`="Between Subjects")
+      ret_hf <- ret_hf %>% dplyr::mutate(`Type of Variance`="Between Subjects")
+      ret <- ret %>% dplyr::mutate(`Type of Variance`="Between Subjects")
+      ret_err <- ret_err %>% dplyr::mutate(`Type of Variance`="Within Subjects")
+      ret <- dplyr::bind_rows(ret, ret_err)
+      # Rename to make Total/Corrected Total row addition code consistent with other cases.
+      ret <- ret %>% dplyr::rename(sumsq=`Sum Sq`)
+
+      if (any(!is.na(ret_gg$eps))) ret <- dplyr::bind_rows(ret, ret_gg)
+      if (any(!is.na(ret_hf$eps))) ret <- dplyr::bind_rows(ret, ret_hf)
     } else { # ANCOVA/2-way ANOVA case
       ret <- x$ss3
     }
-    if (one_way_anova) {
+    if (one_way_anova_without_repeated_measures) {
       # Get number of groups (k) , and the minimum sample size among those groups (min_n_rows).
-      data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      data_summary <- x$dataframe %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
         dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
         dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
       k <- data_summary$k
@@ -1858,9 +2057,76 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       tot_n_rows <- data_summary$tot_n_rows
     }
 
-    if (is.null(x$power)) {
+    if (x$with_repeated_measures) {
+      # Map ANOVA table rows to SPSS style with the following rules.
+      if (length(x$var2) == 1) { # one-way case
+        # Within Subjects,c2_ => Within Subjects,Error(c2_)
+        ret <- ret %>% mutate(term=ifelse(`Type of Variance`=="Within Subjects"&term=="c2_","Error(c2_)",term))
+        # Within Subjects,(Intercept) => Between Subjects,(Error)
+        ret <- ret %>% mutate(term = ifelse(`Type of Variance` == "Within Subjects" & term == "(Intercept)", "(Error)", term), `Type of Variance` = ifelse(`Type of Variance` == "Within Subjects" & term == "(Error)", "Between Subjects", `Type of Variance`))
+        # Between Subjects,c2_ => Within Subjects,c2_
+        ret <- ret %>% mutate(`Type of Variance` = ifelse(`Type of Variance` == "Between Subjects" & term == "c2_", "Within Subjects", `Type of Variance`))
+      }
+      else { # 2-way case
+        # Within Subjects,c2_:c3_ => remove
+        # Within Subjects,c3_ => remove
+        ret <- ret %>% filter(!(`Type of Variance`=="Within Subjects" & term=="c2_:c3_" | `Type of Variance`=="Within Subjects" & term=="c2_"))
+        # Within Subjects,c3_ => Within Subjects,Error(c3_)
+        ret <- ret %>% mutate(term=ifelse(`Type of Variance`=="Within Subjects"&term=="c3_","Error(c3_)",term))
+        # Within Subjects,(Intercept) => Between Subjects,(Error)
+        ret <- ret %>% mutate(term = ifelse(`Type of Variance` == "Within Subjects" & term == "(Intercept)", "(Error)", term), `Type of Variance` = ifelse(`Type of Variance` == "Within Subjects" & term == "(Error)", "Between Subjects", `Type of Variance`))
+        # Between Subjects,c3_ => Within Subjects,c3_
+        ret <- ret %>% mutate(`Type of Variance` = ifelse(`Type of Variance` == "Between Subjects" & term == "c3_", "Within Subjects", `Type of Variance`))
+        # Between Subjects,c2_:c3_ => Within Subjects,c2_:c3_
+        ret <- ret %>% mutate(`Type of Variance` = ifelse(`Type of Variance` == "Between Subjects" & term == "c2_:c3_", "Within Subjects", `Type of Variance`))
+      }
+      # Sort by the type of variance and the order of appearance of the terms.
+      ret <- ret %>% arrange(`Type of Variance`, match(term, unique(term)))
+
+      # Map the variable names in the term column back to the original.
+      terms_mapping <- x$terms_mapping
+      # Add mapping for interaction term and error term.
+      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
+      terms_mapping <- c(terms_mapping,c(`Error(c3_)`=paste0("Error(", terms_mapping["c3_"], ")")))
+      terms_mapping <- c(terms_mapping,c(`Error(c2_)`=paste0("Error(", terms_mapping["c2_"], ")")))
+      orig_term <- terms_mapping[ret$term]
+      orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
+      ret$term <- orig_term
+      ret <- ret %>% dplyr::mutate(`Mean Square`=sumsq/df)
+      ret <- ret %>% dplyr::mutate(ssr=sumsq/!!total)
+
+      # Relocate term column to the first column.
+      ret <- ret %>% dplyr::relocate(`Type of Variance`, term, .before = 1)
+      ret <- ret %>% dplyr::relocate(`Mean Square`, .after=df)
+      ret <- ret %>% dplyr::relocate(ssr, .after=sumsq)
+      if (!is.null(ret$correction)) {
+        ret <- ret %>% dplyr::relocate(eps, .before = p.value)
+        ret <- ret %>% dplyr::relocate(correction, .after = term)
+        ret <- ret %>% dplyr::rename(`Correction`="correction",
+                                     `Epsilon`="eps"
+        )
+      }
+      ret <- ret %>% dplyr::rename(`Variable`="term", `P Value`="p.value",
+                                   `Sum of Squares`="sumsq",
+                                   `SS Ratio`="ssr",
+                                   `DF` = "df",
+                                   `F Value` = "F value"
+      )
+      if (type == "between") {
+        ret <- ret %>% dplyr::filter(`Type of Variance` == "Between Subjects") %>% dplyr::select(-`Type of Variance`)
+      }
+      else if (type == "within") {
+        ret <- ret %>% dplyr::filter(`Type of Variance` == "Within Subjects") %>% dplyr::select(-`Type of Variance`)
+      }
+      # Because of the filtering above, it is possible that the Correction/Epsilon column is all NA. If so, remove it.
+      if (!is.null(ret$Correction) && all(is.na(ret$Correction))) {
+        ret <- ret %>% dplyr::select(-`Correction`, -`Epsilon`)
+      }
+      ret
+    }
+    else if (is.null(x$power)) {
       ret <- ret %>% dplyr::select(any_of(c("term", "sumsq", "df", "meansq", "statistic", "p.value")))
-      if (one_way_anova) { # Power analysis is only for ANOVA case
+      if (one_way_anova_without_repeated_measures) { # Power analysis is only for ANOVA case
         # If power is not specified in the arguments, estimate current power.
         tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
           power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
@@ -1869,7 +2135,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
           note <<- e$message
           power_val <<- NA_real_
         })
-        ret <- ret %>% dplyr::mutate(f=c(!!(x$cohens_f), rep(NA, n()-1)), power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
+        ret <- ret %>% dplyr::mutate(power=c(!!power_val, rep(NA, n()-1)), beta=c(1.0-!!power_val, rep(NA, n()-1)), n=c(!!tot_n_rows, rep(NA, n()-1)))
       }
       # Map the variable names in the term column back to the original.
       terms_mapping <- x$terms_mapping
@@ -1878,26 +2144,54 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
-      if (one_way_anova) { # One-way ANOVA case
-        ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
-        ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
+      if (one_way_anova_without_repeated_measures) { # One-way ANOVA case
+        total <- sum(ret$sumsq)
+        total_df <- sum(ret$df)
+        error_sumsq <- (ret %>% filter(term=="Residuals"))$sumsq
+        error_meansq <- (ret %>% filter(term=="Residuals"))$meansq
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=sumsq/!!total)
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=sumsq/(sumsq+error_sumsq))
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(`Eta Squared`<1, sqrt(`Eta Squared`/(1-`Eta Squared`)), NA_real_))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=(sumsq-df*error_meansq)/(total+error_meansq))
+        # Set NA to the above effect sizes if the term is "Residuals" or "(Corrected Model)".
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=ifelse(term %in% c("Residuals"), NA_real_, `Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=ifelse(term %in% c("Residuals"), NA_real_, `Partial Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(term %in% c("Residuals"), NA_real_, `Cohen's F`))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=ifelse(term %in% c("Residuals"), NA_real_, `Omega Squared`))
+
+        ret <- ret %>% dplyr::add_row(sumsq = total, df = total_df)
+        ret <- ret %>% dplyr::mutate(ssr = sumsq/total)
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
         ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
       else { # ANCOVA/2-way ANOVA case
-        total <- sum((x$data[[x$var1]]-mean(x$data[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
+        total <- sum((x$dataframe[[x$var1]]-mean(x$dataframe[[x$var1]]))^2, na.rm=TRUE) # SS with subtracting mean.
         # total <- sum((broom:::tidy.aov(x))$sumsq) # Total SS could be calculated from summing up the type 1 SS, but tidy.aov does not work on x which is generated with lm() rather than aov().
-        total0 <- sum(x$data[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
+        total0 <- sum(x$dataframe[[x$var1]]^2, na.rm=TRUE) # SS without subtracting mean.
         total_df <- sum(ret$df)
         lm_summary <- broom:::glance.lm(x)
-        model_sumsq <- total - (ret %>% filter(term=="Residuals"))$sumsq
+        error_sumsq <- (ret %>% filter(term=="Residuals"))$sumsq
+        model_sumsq <- total - error_sumsq
         ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
                                       statistic = lm_summary$statistic,
                                       p.value = lm_summary$p.value,
                                       df = lm_summary$df, .before = 1)
         ret <- ret %>% dplyr::mutate(meansq = sumsq/df)
+        error_meansq <- (ret %>% filter(term=="Residuals"))$meansq
         ret <- ret %>% dplyr::relocate(meansq, .after = df)
+
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=sumsq/!!total)
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=sumsq/(sumsq+error_sumsq))
+        # Remove pointless negative eta squared.
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(`Eta Squared`<1, sqrt(`Eta Squared`/(1-`Eta Squared`)), NA_real_))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=(sumsq-df*error_meansq)/(total+error_meansq))
+        # Set NA to the above effect sizes if the term is "Residuals" or "(Corrected Model)".
+        ret <- ret %>% dplyr::mutate(`Eta Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Partial Eta Squared`))
+        ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Cohen's F`))
+        ret <- ret %>% dplyr::mutate(`Omega Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Omega Squared`))
+
         ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
         ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
         ret <- ret %>% dplyr::mutate(term = if_else(term=="Residuals", "(Residuals)", term))
@@ -1908,7 +2202,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
                                             `P Value`="p.value",
                                             `Sum of Squares`="sumsq",
-                                            `Degree of Freedom`="df",
+                                            `DF`="df",
                                             `Mean Square`="meansq",
                                             `SS Ratio`="ssr",
                                             `Effect Size (Cohen's f)`="f",
@@ -1935,7 +2229,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::rename(`Type of Variance`=term,
                                    `F Value`=statistic,
                                    `P Value`=p.value,
-                                   `Degree of Freedom`=df,
+                                   `DF`=df,
                                    `Sum of Squares`=sumsq,
                                    `SS Ratio`=ssr,
                                    `Mean Square`=meansq,
@@ -1949,6 +2243,57 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
+  }
+  else if (type == "multivariate") {
+    mvt <- summary(x$Anova)$multivariate.tests
+    ret <- NULL
+    for (var_name in names(mvt)) {
+      var_mvt <- mvt[[var_name]]
+      eigs <- Re(eigen(qr.coef(qr(var_mvt$SSPE), var_mvt$SSPH), symmetric = FALSE)$values)
+      car_ns <- getNamespace("car")
+      # Iterate over results from different test methods.
+      for (func_name in c("Pillai", "Wilks", "HL", "Roy")) {
+        var_mvt_res <- get(func_name, envir=car_ns)(eigs, var_mvt$df, var_mvt$df.residual)
+        names(var_mvt_res) <- c("test stat", "approx F", "num Df", "den Df")
+        var_mvt_res_df <- as.data.frame(as.list(var_mvt_res))
+        var_mvt_res_df <- var_mvt_res_df %>% dplyr::mutate(term=var_name, method=func_name)
+        if (is.null(ret)) {
+          ret <- var_mvt_res_df
+        }
+        else {
+          ret <- dplyr::bind_rows(ret, var_mvt_res_df)
+        }
+      }
+    }
+    ret <- ret %>% mutate(p.value=pf(approx.F, num.Df, den.Df, lower.tail = FALSE))
+    # Map the variable names in the term column back to the original.
+    terms_mapping <- x$terms_mapping
+    # Add mapping for interaction term
+    terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
+    orig_term <- terms_mapping[ret$term]
+    orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
+    ret$term <- orig_term
+    ret <- ret %>% dplyr::relocate(term, method, .before = 1)
+    ret <- ret %>% dplyr::rename(`Variable`="term", `Method`="method", `Test Statistic`="test.stat", `Approximate F Value`="approx.F", `Hypothesis DF`="num.Df", `Error DF`="den.Df", `P Value`="p.value")
+  }
+  else if (type == "sphericity") {
+    summary_x <- summary(x$Anova)
+    s_matrix <- as.matrix(summary_x$sphericity.tests)
+    class(s_matrix) <- "matrix" # Necessary to make it work with as.data.frame.
+    ret <- as.data.frame(s_matrix)
+    ret ["term"] <- rownames(ret)
+    # Map the variable names in the term column back to the original.
+    terms_mapping <- x$terms_mapping
+    # Add mapping for interaction term
+    terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
+    orig_term <- terms_mapping[ret$term]
+    orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
+    ret$term <- orig_term
+    # Relocate term column to the first column.
+    ret <- ret %>% dplyr::relocate(term, .before = 1)
+    ret <- ret %>% dplyr::rename(`Variable`="term", `W Value`="Test statistic", `P Value`="p-value")
+    ret <- ret %>% dplyr::mutate(`Method`="Mauchly's Sphericity Test")
+    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
   }
   else if (type == "emmeans") {
     if ("error" %in% class(x)) {
@@ -1964,11 +2309,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
+    # emmeans seems to work even with afex_aov objects, as well as car::Anova objects or aov objects.
     ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
     if (!is.null(x$covariates)) { # ANCOVA case
       # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
-      mean_df <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
+      mean_df <- x$dataframe %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
       ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
     }
     # Set the common order to display means and emmeans.
@@ -1988,12 +2334,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # 1      3.22   20.1 1.07     29     17.9     22.3
     ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Mean`="emmean",
                                           `Standard Error`="SE",
-                                          `Degree of Freedom`="df",
+                                          `DF`="df",
                                           `Conf Low`="lower.CL",
                                           `Conf High`="upper.CL",
                                           `Mean`="mean")))
   }
-  else if (type == "pairs") { # For ANCOVA or 2-way ANOVA
+  else if (type == "pairs") {
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
       return(ret)
@@ -2007,56 +2353,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 1-way/2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
-    emm_fit <- emmeans::emmeans(x, formula)
-    pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust)
-    ret <- tibble::as.tibble(pw_comp)
-    ret <- ret %>% dplyr::mutate(contrast=stringr::str_replace_all(as.character(contrast), "(c2_|c3_)", ""))
-    # Get confidence interval.
-    emm_ci <- confint(pw_comp, level=0.95)
-    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
-    ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
-    # Map the column names back to the original.
-    orig_terms <- x$terms_mapping[colnames(ret)]
-    orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
-    colnames(ret) <- orig_terms
-    # Example output:
-    # A tibble: 1 × 7
-    # contrast    `w t` estimate    SE    df t.ratio p.value
-    # <fct>       <dbl>    <dbl> <dbl> <dbl>   <dbl>   <dbl>
-    # c2_0 - c2_1  1.12     1.38  1.38    28    1.00   0.325
-    ret <- ret %>% dplyr::rename(any_of(c(Pair="contrast",
-                                          `Conf High`="conf.high",
-                                          `Conf Low`="conf.low",
-                                          `Standard Error`="SE",
-                                          `Degree of Freedom`="df",
-                                          `t Value`="t.ratio",
-                                          `P Value`="p.value")))
-    if (!is.null(x$covariates)) { # ANCOVA case
-      ret <- ret %>% dplyr::rename(any_of(c(`Adjusted Difference`="estimate")))
-    } else { # 2-way ANOVA case. For 2-way ANOVA, there is no adjustment here.
-      ret <- ret %>% dplyr::rename(any_of(c(`Difference`="estimate")))
+    ret <- get_pairwise_contrast_df(x, formula, pairs_adjust)
+  }
+  else if (type == "pairs_per_variable") { # For only 2-way ANOVA
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
     }
-
-    # The version that uses multcomp. It had an issue with column names with spaces.
-    # ret <- eval(parse(text=paste0('multcomp::glht(x, linfct = multcomp::mcp(`', x$var2, '`="Tukey"))')))
-    # ret <- broom::tidy(ret)
-    # Output example:
-    # A tibble: 1 × 7
-    # term  contrast null.value estimate std.error statistic adj.p.value
-    # <chr> <chr>         <dbl>    <dbl>     <dbl>     <dbl>       <dbl>
-    # am    1 - 0             0  -0.0236      1.55   -0.0153       0.988
-
-    method <- switch(pairs_adjust,
-      "none" = "Pairwise T-Test with No Adjustment",
-      "tukey" = "Tukey's HSD Test",
-      "bonferroni" = "Pairwise T-Test with Bonferroni Correction",
-      "sheffe" = "Sheffe's Method",
-      "sidak" = "Pairwise T-Test with Sidak Correction",
-      "dunnett" = "Dunnett's Test",
-      "holm" = "Pairwise T-Test with Holm Correction",
-      "hochberg" = "Pairwise T-Test with Hochberg Correction"
-    )
-    ret <- ret %>% dplyr::mutate(`Method`=!!method)
+    formula1 <- as.formula(paste0('~`', x$var2[1], '`'))
+    formula2 <- as.formula(paste0('~`', x$var2[2], '`'))
+    ret <- get_pairwise_contrast_df(x, formula1, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[1]]) %>% dplyr::select(`Variable`, everything())
+    ret2 <- get_pairwise_contrast_df(x, formula2, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[2]]) %>% dplyr::select(`Variable`, everything())
+    ret <- ret %>% dplyr::bind_rows(ret2)
   }
   else if (type == "levene") {
     if ("error" %in% class(x)) {
@@ -2072,11 +2380,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
 
     if (!is.null(x$covariates)) { # ANCOVA case
-      ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=levene_test_center_fun))
+      ret <- broom::tidy(car::leveneTest(x$residuals, x$dataframe[[x$var2]], center=levene_test_center_fun))
     }
     else { # 2-way or 1-way ANOVA case
       formula <- as.formula(paste0('`', x$var1, '`~`', paste(x$var2, collapse='`*`'), '`'))
-      ret <- broom::tidy(car::leveneTest(formula, data=x$data, center=levene_test_center_fun))
+      ret <- broom::tidy(car::leveneTest(formula, data=x$dataframe, center=levene_test_center_fun))
     }
     # Example output:
     # A tibble: 1 × 4
@@ -2085,8 +2393,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # 0.0607   0.807     1          30
     ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
                                           `P Value`="p.value",
-                                          `Degree of Freedom`="df",
-                                          `Residual Degree of Freedom`="df.residual")))
+                                          `DF`="df",
+                                          `Residual DF`="df.residual")))
+    if (levene_test_center == "mean") {
+      ret <- ret %>% dplyr::mutate(`Method`="Levene's Test")
+    }
+    else { # Levene's test with median as the center is called Brown-Forsythe test. https://search.r-project.org/CRAN/refmans/misty/html/test.levene.html
+      ret <- ret %>% dplyr::mutate(`Method`="Brown-Forsythe Test")
+    }
+    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
   }
   else if (type == "shapiro") {
     if ("error" %in% class(x)) {
@@ -2094,14 +2409,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     # Shapiro-Wilk test for residual normality
-    if (length(x$residuals) > 5000) {
-      if (!is.null(shapiro_seed)) {
-        set.seed(shapiro_seed)
-      }
-      resid <- sample(x$residuals, 5000)
+    if (x$with_repeated_measures) { # For afex::aov_car return, x$residuals is not available.
+      resid <- residuals(x)
     }
     else {
       resid <- x$residuals
+    }
+    if (length(resid) > 5000) {
+      if (!is.null(shapiro_seed)) {
+        set.seed(shapiro_seed)
+      }
+      resid <- sample(resid, 5000)
     }
     ret <- broom::tidy(shapiro.test(resid))
     ret$n = length(resid) # Add sample size info
@@ -2110,10 +2428,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # statistic p.value method                          n
     # <dbl>     <dbl>   <chr>                       <int>
     # 0.933     0.0483  Shapiro-Wilk normality test    32
-    ret <- ret %>% dplyr::rename(any_of(c(`W Statistic`="statistic",
+    ret <- ret %>% dplyr::rename(any_of(c(`W Value`="statistic",
                                           `P Value`="p.value",
                                           `Method`="method",
                                           `Number of Rows`="n")))
+    ret <- ret %>% dplyr::mutate(`Method`="Shapiro-Wilk Normality Test") # Just making it in Title Case.
+    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
 
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
@@ -2122,25 +2442,25 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     conf_threshold = 1 - (1 - conf_level)/2
-    ret <- x$data %>%
+    ret <- x$dataframe %>%
       dplyr::group_by(!!!rlang::syms(as.character(x$var2))) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
                        # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
-                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       `Std Error`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                        # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                        # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Conf High` = Mean + `Std Error` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
       dplyr::select(!!!rlang::syms(as.character(x$var2)),
                     `Number of Rows`,
                     Mean,
+                    `Std Error`,
                     `Conf Low`,
                     `Conf High`,
-                    `Std Error of Mean`,
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
@@ -2154,7 +2474,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- tibble::tibble()
       return(ret)
     }
-    if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
+    if (x$with_repeated_measures) { # Repeated measures ANOVA case - x is afex_aov class.
+      ret <- generate_ftest_density_data(x$anova_table$F[1], df1=x$anova_table$`num Df`[1], df2=x$anova_table$`den Df`[1], sig_level=x$test_sig_level)
+    } else if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
       ret0 <- x$ss3
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
       # df1 is from the categorical independent variable row, and df2 is from the residuals row.
@@ -2171,7 +2493,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- tibble::tibble()
       return(ret)
     }
-    ret <- x$data
+    ret <- x$dataframe
+    if (x$with_repeated_measures) {
+      # Remove the subject_id column.
+      ret <- ret %>% dplyr::select(-subject_id)
+    }
     if (sort_factor_levels && !is.null(x$common_var2_order)) { # ANCOVA/one-way ANOVA and for the Means error bar.
       # Set the common order to display means and emmeans.
       # as.character() is needed to avoid error when the var2 column is logical.
