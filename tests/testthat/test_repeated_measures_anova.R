@@ -1,4 +1,4 @@
-df <- afex::obk.long %>% pivot_wider(names_from="hour",values_from = "value")
+df <- afex::obk.long %>% tidyr::pivot_wider(names_from="hour",values_from = "value")
 # 2-way mixed repeated-measures ANOVA case
 model_df <- df %>% exp_anova("value", list("treatment", Measurements=c("1","2","3","4","5")), with_repeated_measures = TRUE)
 res <- model_df %>% tidy_rowwise(model, type="between")
