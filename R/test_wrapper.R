@@ -2161,7 +2161,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         ret <- ret %>% dplyr::add_row(sumsq = total, df = total_df)
         ret <- ret %>% dplyr::mutate(ssr = sumsq/total)
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
-        ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
+        # x$terms_mapping[[2]] is the column name of the explanatory variable.
+        ret <- ret %>% dplyr::mutate(term = c(x$terms_mapping[[2]], "(Residuals)", "(Total)"))
         ret <- ret %>% dplyr::rename(`Type of Variance`="term")
       }
       else { # ANCOVA/2-way ANOVA case
@@ -2225,7 +2226,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret <- ret %>% dplyr::add_row(sumsq = sum(ret$sumsq), df = sum(ret$df))
       ret <- ret %>% dplyr::mutate(ssr = sumsq/sumsq[3])
       ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
-      ret <- ret %>% dplyr::mutate(term = c("Between Groups", "Within Groups", "Total"))
+      # x$terms_mapping[[2]] is the column name of the explanatory variable.
+      ret <- ret %>% dplyr::mutate(term = c(x$terms_mapping[[2]], "(Residuals)", "(Total)"))
       ret <- ret %>% dplyr::rename(`Type of Variance`=term,
                                    `F Value`=statistic,
                                    `P Value`=p.value,
