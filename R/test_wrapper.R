@@ -2172,10 +2172,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         lm_summary <- broom:::glance.lm(x)
         error_sumsq <- (ret %>% filter(term=="Residuals"))$sumsq
         model_sumsq <- total - error_sumsq
-        ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
-                                      statistic = lm_summary$statistic,
-                                      p.value = lm_summary$p.value,
-                                      df = lm_summary$df, .before = 1)
+        # Exclude "(Corrected Model)" row for now.
+        # ret <- ret %>% dplyr::add_row(term="(Corrected Model)", sumsq = model_sumsq,
+        #                               statistic = lm_summary$statistic,
+        #                               p.value = lm_summary$p.value,
+        #                               df = lm_summary$df, .before = 1)
         ret <- ret %>% dplyr::mutate(meansq = sumsq/df)
         error_meansq <- (ret %>% filter(term=="Residuals"))$meansq
         ret <- ret %>% dplyr::relocate(meansq, .after = df)
@@ -2190,12 +2191,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
         ret <- ret %>% dplyr::mutate(`Partial Eta Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Partial Eta Squared`))
         ret <- ret %>% dplyr::mutate(`Cohen's F`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Cohen's F`))
         ret <- ret %>% dplyr::mutate(`Omega Squared`=ifelse(term %in% c("Residuals", "(Corrected Model)"), NA_real_, `Omega Squared`))
-
-        ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total0, df = total_df)
-        ret <- ret %>% dplyr::add_row(term="(Corrected Total)", sumsq = total, df = total_df-1)
+        ret <- ret %>% dplyr::add_row(term="(Total)", sumsq = total, df = total_df-1)
         ret <- ret %>% dplyr::mutate(term = if_else(term=="Residuals", "(Residuals)", term))
         ret <- ret %>% dplyr::mutate(ssr = sumsq/!!total)
         ret <- ret %>% dplyr::relocate(ssr, .after = sumsq)
+        # Remove "(Intercept)" from the result.
+        ret <- ret %>% dplyr::filter(term!="(Intercept)")
         ret <- ret %>% dplyr::rename(`Variable`="term")
       }
       ret <- ret %>% dplyr::rename(any_of(c(`F Value`="statistic",
