@@ -225,10 +225,10 @@ glance.survdiff_exploratory <- function(x, ...) {
       ret <- ret %>% dplyr::relocate(df, .after=p.value) # Adjust order just to be consistent with other Analytics Views.
     }
     colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
-    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-    colnames(ret)[colnames(ret) == "p.value"] <- "P Value (Log-Rank Test)"
+    colnames(ret)[colnames(ret) == "df"] <- "DF"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
-    colnames(ret)[colnames(ret) == "nevent"] <- "Number of Events"
+    colnames(ret)[colnames(ret) == "nevent"] <- "Rows (TRUE)"
   }
   else {
     ret <- data.frame(Note = x$error$message, stringsAsFactors = FALSE)

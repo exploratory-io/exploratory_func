@@ -25,13 +25,13 @@ test_that("binary prediction with character target column", {
 
   ret <- model_data %>% tidy_rowwise(model, type="vif")
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
-  expect_equal(colnames(ret), c("AUC","F Score","Accuracy Rate","Misclassification Rate","Precision",               
-                                "Recall","P Value","Number of Rows","Number of Rows for TRUE","Number of Rows for FALSE",
+  expect_equal(colnames(ret), c("AUC","F1 Score","Accuracy Rate","Misclass. Rate","Precision",               
+                                "Recall","P Value","Number of Rows","Rows (TRUE)","Rows (FALSE)",
                                 "Log Likelihood","AIC","BIC","Residual Deviance","Null Deviance",
                                 "DF for Null Model","Residual DF"))
   expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Rows (TRUE)`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Rows (FALSE)`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% tidy_rowwise(model)
   ret <- model_data %>% augment_rowwise(model)
 
@@ -56,8 +56,8 @@ test_that("binary prediction with factor target column", {
   ret <- model_data %>% prediction(data="newdata", data_frame=test_data)
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Rows (TRUE)`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Rows (FALSE)`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% tidy_rowwise(model)
   ret <- model_data %>% augment_rowwise(model)
 
@@ -699,7 +699,7 @@ test_that("Logistic Regression with test_rate", {
                        "predicted_response", "predicted_label")
     expect_true(all(expected_cols %in% colnames(pred_test)))
     res <- ret %>% tidy_rowwise(model, pretty.name=TRUE)
-    expected_cols <- c("Term", "Coefficient", "Std Error", "t Ratio", "P Value", "Conf High", "Conf Low", "Odds Ratio", "Base Level")
+    expected_cols <- c("Term", "Coefficient", "Std Error", "t Value", "P Value", "Conf High", "Conf Low", "Odds Ratio", "Base Level")
     expect_true(all(expected_cols %in% colnames(res)))
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)

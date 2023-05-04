@@ -438,7 +438,7 @@ do_chisq.test_ <- function(df,
 exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE,
                       test_sig_level = 0.05, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
-    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+    stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
   }
   if (is.null(power) && !is.null(beta)) {
     power <- 1.0 - beta
@@ -692,12 +692,12 @@ glance.chisq_exploratory <- function(x) {
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, everything()) # Reorder to unify order with t-test.
     ret <- ret %>% dplyr::rename(`Chi-Square`=statistic,
                                  `P Value`=p.value,
-                                 `Degree of Freedom`=parameter,
-                                 `Association Coef. (Cramer's V)`=v,
-                                 `Effect Size (Cohen's w)`=w,
+                                 `DF`=parameter,
+                                 `Cramer's V`=v,
+                                 `Cohen's W`=w,
                                  `Power`=power,
-                                 `Probability of Type 2 Error`=beta,
-                                 `Number of Rows`=n)
+                                 `Type 2 Error`=beta,
+                                 `Rows`=n)
   }
   else {
     # If required power is specified in the arguments, estimate required sample size. 
@@ -713,11 +713,11 @@ glance.chisq_exploratory <- function(x) {
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, everything()) # Reorder to unify order with t-test.
     ret <- ret %>% dplyr::rename(`Chi-Square`=statistic,
                                  `P Value`=p.value,
-                                 `Degree of Freedom`=parameter,
-                                 `Association Coef. (Cramer's V)`=v,
-                                 `Effect Size (Cohen's w)`=w,
+                                 `DF`=parameter,
+                                 `Cramer's V`=v,
+                                 `Cohen's W`=w,
                                  `Target Power`=power,
-                                 `Target Probability of Type 2 Error`=beta,
+                                 `Target Type 2 Error`=beta,
                                  `Current Sample Size`=n,
                                  `Required Sample Size`=required_n)
   }
@@ -898,7 +898,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
                                  sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
                                  ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
-    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+    stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
   }
   if (is.null(power) && !is.null(beta)) {
     power <- 1.0 - beta
@@ -1024,7 +1024,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
-    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+    stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
   }
   if (is.null(power) && !is.null(beta)) {
     power <- 1.0 - beta
@@ -1185,9 +1185,9 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     if ("error" %in% class(x)) {
       if (!is.null(x$v1) && !is.null(x$v2) && !is.null(x$n1) && !is.null(x$n2)) {
-        ret <- tibble::tibble(`Number of Rows`=x$n1+x$n2, n1=x$n1, n2=x$n2, Note = x$message)
-        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Number of Rows for ", x$v1)):=n1)
-        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Number of Rows for ", x$v2)):=n2)
+        ret <- tibble::tibble(`Rows`=x$n1+x$n2, n1=x$n1, n2=x$n2, Note = x$message)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Rows for ", x$v1)):=n1)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Rows for ", x$v2)):=n2)
       }
       else {
         ret <- tibble::tibble(Note = x$message)
@@ -1231,14 +1231,14 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
         dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
-                      `Degree of Freedom`=parameter,
+                      `DF`=parameter,
                       Difference=estimate,
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
                       `Base Level`=base.level,
-                      `Effect Size (Cohen's d)`=d,
+                      `Cohen's D`=d,
                       `Power`=power,
-                      `Probability of Type 2 Error`=beta)
+                      `Type 2 Error`=beta)
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
@@ -1255,20 +1255,20 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
         dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
-                      `Degree of Freedom`=parameter,
+                      `DF`=parameter,
                       Difference=estimate,
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
                       `Base Level`=base.level,
-                      `Effect Size (Cohen's d)`=d,
+                      `Cohen's D`=d,
                       `Target Power`=power,
-                      `Target Probability of Type 2 Error`=beta,
+                      `Target Type 2 Error`=beta,
                       `Current Sample Size (Each Group)`=current_sample_size,
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
-    ret <- ret %>% dplyr::mutate(`Number of Rows`=!!(n1+n2))
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v1)):=!!n1)
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v2)):=!!n2)
+    ret <- ret %>% dplyr::mutate(`Rows`=!!(n1+n2))
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v1)):=!!n1)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v2)):=!!n2)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
@@ -1281,19 +1281,19 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     conf_threshold = 1 - (1 - conf_level)/2
     if (x$data_type == "raw") {
       ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-        dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+        dplyr::summarize(`Rows`=length(!!rlang::sym(x$var1)),
                          Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
                          `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
                          # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
                          `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                          # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                          # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                         `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                         `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                         `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Rows`-1),
+                         `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Rows`-1),
                          `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                          `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
         dplyr::select(!!rlang::sym(x$var2),
-                      `Number of Rows`,
+                      `Rows`,
                       Mean,
                       `Conf Low`,
                       `Conf High`,
@@ -1307,7 +1307,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ci_radius <- stderr * qt(p=conf_threshold, df=c(x$n1, x$n2)-1)
       ret <- tibble::tibble(
                       group_ = c(x$v1, x$v2),
-                      `Number of Rows` = c(x$n1, x$n2),
+                      `Rows` = c(x$n1, x$n2),
                       Mean = c(x$m1, x$m2),
                       `Conf Low` = c(x$m1, x$m2) - ci_radius,
                       `Conf High` = c(x$m1, x$m2) + ci_radius,
@@ -1535,9 +1535,9 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
                      `Method`=method)
     }
 
-    ret <- ret %>% dplyr::mutate(`Number of Rows`=!!(n1+n2))
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v1)):=!!n1)
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v2)):=!!n2)
+    ret <- ret %>% dplyr::mutate(`Rows`=!!(n1+n2))
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v1)):=!!n1)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v2)):=!!n2)
     if (!is.null(note)) { # Code to add Note column if there was an error. Not used for this particular function yet.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
@@ -1549,19 +1549,19 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+      dplyr::summarize(`Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
                        # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
                        `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                        # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                        # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_level, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_level, df=`Number of Rows`-1),
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_level, df=`Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_level, df=`Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
       dplyr::select(!!rlang::sym(x$var2),
-                    `Number of Rows`,
+                    `Rows`,
                     Mean,
                     `Conf Low`,
                     `Conf High`,
@@ -1657,7 +1657,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
                       with_interaction = FALSE, with_repeated_measures = FALSE,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
-    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+    stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
   }
   if (is.null(power) && !is.null(beta)) {
     power <- 1.0 - beta
@@ -1998,7 +1998,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       }
       # x$n can match something like x$nxyz. Check if it is numeric to make sure it is the number of rows we set.
       if (!is.null(x$n) && is.numeric(x$n)) {
-        ret <- tibble::tibble(`Number of Rows`=x$n, Note = message)
+        ret <- tibble::tibble(`Rows`=x$n, Note = message)
       }
       else {
         ret <- tibble::tibble(Note = message)
@@ -2206,8 +2206,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                             `SS Ratio`="ssr",
                                             `Effect Size (Cohen's f)`="f",
                                             `Power`="power",
-                                            `Probability of Type 2 Error`="beta",
-                                            `Number of Rows`="n")))
+                                            `Type 2 Error`="beta",
+                                            `Rows`="n")))
     }
     else { # Since we do not support power analysis for ANCOVA or 2-way ANOVA, this is only for one-way ANOVA case.
       # If required power is specified in the arguments, estimate required sample size. 
@@ -2234,10 +2234,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                    `Mean Square`=meansq,
                                    `Effect Size (Cohen's f)`=f,
                                    `Target Power`=power,
-                                   `Target Probability of Type 2 Error`=beta,
+                                   `Target Type 2 Error`=beta,
                                    `Current Sample Size (Each Group)`=current_sample_size,
                                    `Required Sample Size (Each Group)`=required_sample_size,
-                                   `Number of Rows`=n)
+                                   `Rows`=n)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
@@ -2430,7 +2430,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     ret <- ret %>% dplyr::rename(any_of(c(`W Value`="statistic",
                                           `P Value`="p.value",
                                           `Method`="method",
-                                          `Number of Rows`="n")))
+                                          `Rows`="n")))
     ret <- ret %>% dplyr::mutate(`Method`="Shapiro-Wilk Normality Test") # Just making it in Title Case.
     ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
 
@@ -2443,19 +2443,19 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$dataframe %>%
       dplyr::group_by(!!!rlang::syms(as.character(x$var2))) %>%
-      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+      dplyr::summarize(`Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
                        # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
                        `Std Error`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                        # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                        # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Conf High` = Mean + `Std Error` * qt(p=!!conf_threshold, df=`Rows`-1),
+                       `Conf Low` = Mean - `Std Error` * qt(p=!!conf_threshold, df=`Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
       dplyr::select(!!!rlang::syms(as.character(x$var2)),
-                    `Number of Rows`,
+                    `Rows`,
                     Mean,
                     `Std Error`,
                     `Conf Low`,
@@ -2584,9 +2584,9 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- ret %>% dplyr::mutate(df=!!x$parameter, epsilon_squared=!!x$epsilon_squared, n=!!tot_n_rows)
     ret <- ret %>% dplyr::rename(`H Value` = statistic,
                                  `P Value`=p.value,
-                                 `Degree of Freedom`=df,
-                                 `Effect Size (Epsilon Squared)`=epsilon_squared,
-                                 `Number of Rows`=n)
+                                 `DF`=df,
+                                 `Epsilon Squared`=epsilon_squared,
+                                 `Rows`=n)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
@@ -2614,19 +2614,19 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
-      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+      dplyr::summarize(`Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
                        # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
                        `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                        # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                        # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
       dplyr::select(!!rlang::sym(x$var2),
-                    `Number of Rows`,
+                    `Rows`,
                     Mean,
                     `Conf Low`,
                     `Conf High`,
@@ -2818,11 +2818,11 @@ exp_chisq_power_for_ab_test <- function(dummy, a_ratio=0.5, conversion_rate=0.1,
 tidy.chisq_power_exploratory <- function(x, type="summary") {
   if (type == "summary") {
     ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, w=x$w, df=x$df, n=x$required_n)
-    ret <- ret %>% dplyr::rename(any_of(c(`Probability of Type 1 Error`="sig.level",
-                                          `Probability of Type 2 Error`="beta",
+    ret <- ret %>% dplyr::rename(any_of(c(`Type 1 Error`="sig.level",
+                                          `Type 2 Error`="beta",
                                           `Power`="power",
-                                          `Effect Size (Cohen's w)`="w",
-                                          `Degree of Freedom`="df",
+                                          `Cohen's W`="w",
+                                          `DF`="df",
                                           `Required Sample Size`="n")))
   }
   else if (type == "n_to_power") {
@@ -2914,11 +2914,11 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
 tidy.ttest_power_exploratory <- function(x, type="summary") {
   if (type == "summary") {
     ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, d=x$d, df=x$df, n=x$required_n)
-    ret <- ret %>% dplyr::rename(any_of(c(`Probability of Type 1 Error`="sig.level",
-                                          `Probability of Type 2 Error`="beta",
+    ret <- ret %>% dplyr::rename(any_of(c(`Type 1 Error`="sig.level",
+                                          `Type 2 Error`="beta",
                                           `Power`="power",
-                                          `Effect Size (Cohen's d)`="d",
-                                          `Degree of Freedom`="df",
+                                          `Cohen's D`="d",
+                                          `DF`="df",
                                           `Required Sample Size`="n")))
   }
   else if (type == "n_to_power") {

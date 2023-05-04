@@ -838,7 +838,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name){
         colnames(ret)[colnames(ret) == "term"] <- "Term"
-        colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
+        colnames(ret)[colnames(ret) == "statistic"] <- "t Value"
         colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
         colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
         colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"
@@ -878,12 +878,12 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 
   if (data_type == "training") {
     ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
-    # Add VIF Max if VIF is available.
+    # Add Max VIF if VIF is available.
     if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
       vif_df <- vif_to_dataframe(x)
       if (nrow(vif_df) > 0 ) {
         max_vif <- max(vif_df$VIF, na.rm=TRUE)
-        ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+        ret <- ret %>% dplyr::mutate(`Max VIF`=!!max_vif)
       }
     }
     ret <- ret %>% dplyr::mutate(auc = x$auc)
@@ -912,15 +912,15 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
     colnames(ret)[colnames(ret) == "sigma"] <- "RMSE"
-    colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+    colnames(ret)[colnames(ret) == "statistic"] <- "F Value"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
-    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+    colnames(ret)[colnames(ret) == "df"] <- "DF"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
     colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
     # for coxph
-    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
-    colnames(ret)[colnames(ret) == "nevent"] <- "Number of Events"
+    colnames(ret)[colnames(ret) == "n"] <- "Rows"
+    colnames(ret)[colnames(ret) == "nevent"] <- "Rows (TRUE)"
     colnames(ret)[colnames(ret) == "statistic.log"] <- "Likelihood Ratio Test"
     colnames(ret)[colnames(ret) == "p.value.log"] <- "Likelihood Ratio Test P Value"
     colnames(ret)[colnames(ret) == "statistic.sc"] <- "Score Test"
@@ -929,7 +929,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     colnames(ret)[colnames(ret) == "p.value.wald"] <- "Wald Test P Value"
     # colnames(ret)[colnames(ret) == "statistic.robust"] <- "Robust Statistic"
     # colnames(ret)[colnames(ret) == "p.value.robust"] <- "Robust P Value"
-    colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Squared Max"
+    colnames(ret)[colnames(ret) == "r.squared.max"] <- "Max R Squared"
     colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
     colnames(ret)[colnames(ret) == "auc"] <- "Time-dependent AUC"

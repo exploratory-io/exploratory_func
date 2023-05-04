@@ -1230,7 +1230,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
   ret <- broom:::glance.lm(x)
 
-  # Add VIF Max if VIF is available.
+  # Add Max VIF if VIF is available.
   if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
     vif_df <- vif_to_dataframe(x)
     if (nrow(vif_df) > 0 ) {
@@ -1250,7 +1250,10 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, statistic, p.value, n, everything(), -sigma)
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Value`=statistic, `P Value`=p.value, `DF`=df, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `Rows`=n)
+    # Place the Max VIF column after the Residual Deviance.
+    # ret <- ret %>% dplyr::relocate(`Residual DF`, .after=`Residual Deviance`)
+
     # Note column might not exist. Rename if it is there.
     colnames(ret)[colnames(ret) == "note"] <- "Note"
   }
@@ -1277,7 +1280,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   x0 <- glm(f0, x$model, family = x$family) # build null model. Use x$model rather than x$data since x$model seems to be the data after glm handled missingness.
   pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
   if(pretty.name) {
-    ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue, `Number of Rows`=!!length(x$y))
+    ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue, `Rows`=!!length(x$y))
   }
   else {
     ret <- ret %>% dplyr::mutate(p.value=!!pvalue, n=!!length(x$y))
@@ -1325,7 +1328,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
   }
 
-  # Add VIF Max if VIF is available.
+  # Add Max VIF if VIF is available.
   if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
     vif_df <- vif_to_dataframe(x)
     if (nrow(vif_df) > 0 ) {
@@ -1343,7 +1346,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
       colnames(ret)[colnames(ret) == "auc"] <- "AUC"
       
-      ret <- ret %>% dplyr::select(AUC, `F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::select(AUC, `F1 Score`, `Accuracy Rate`, `Misclass. Rate`, `Precision`, `Recall`, `P Value`, `Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -1356,8 +1359,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
         pos_label <- "TRUE"
         neg_label <- "FALSE"
       }
-      colnames(ret)[colnames(ret) == "positives"] <- paste0("Number of Rows for ", pos_label)
-      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Number of Rows for ", neg_label)
+      colnames(ret)[colnames(ret) == "positives"] <- paste0("Rows for ", pos_label)
+      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Rows for ", neg_label)
     }
     else { # for other numeric regressions.
       colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
@@ -1369,7 +1372,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
       colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
 
-      ret <- ret %>% dplyr::select(matches("^R Squared$"), matches("^Adj R Squared$"), matches("^RMSE$"), `P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::select(matches("^R Squared$"), matches("^Adj R Squared$"), matches("^RMSE$"), `P Value`, `Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
   if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
@@ -1481,7 +1484,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value,
+                              `t Value`=statistic, `P Value`=p.value,
                               `Conf Low`=conf.low,
                               `Conf High`=conf.high,
                               `Base Level`=base.level)
@@ -1605,7 +1608,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       if (pretty.name) {
         # Rename to pretty names
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
+                              `t Value`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
                               `Base Level`=base.level)
         if (!is.null(ret$ame)) {
           ret <- ret %>% rename(`Average Marginal Effect`=ame)
@@ -1918,7 +1921,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
                           n = test_n
                           )
         if(pretty.name) {
-          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `Number of Rows`=n)
+          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `Rows`=n)
         }
         test_ret$is_test_data <- TRUE
         test_ret

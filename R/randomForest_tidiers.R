@@ -525,7 +525,7 @@ glance.randomForest.classification <- function(x, pretty.name = FALSE,  ...) {
     )
 
     names(ret) <- if(pretty.name){
-      paste(level, c("F Score", "Accuracy", "Misclassification Rate", "Precision", "Recall"), sep = " ")
+      paste(level, c("F1 Score", "Accuracy", "Misclass. Rate", "Precision", "Recall"), sep = " ")
     } else {
       paste(level, c("f_score", "accuracy", "misclassification_rate", "precision", "recall"), sep = "_")
     }
@@ -1427,7 +1427,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                 map = list(
                            `RMSE` = as.symbol("root_mean_square_error"),
                            `R Squared` = as.symbol("r_squared"),
-                           `Number of Rows` = as.symbol("n")
+                           `Rows` = as.symbol("n")
                            )
                 ret <- ret %>% dplyr::rename(!!!map)
               }
@@ -2520,9 +2520,9 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 
   names(ret) <- if(pretty.name){
     if (multi_class) {
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
+      c("Class", "F1 Score", "Accuracy Rate", "Misclass. Rate", "Precision", "Recall", "Rows")
     } else {
-      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows for TRUE", "Number of Rows for FALSE")
+      c("F1 Score", "Accuracy Rate", "Misclass. Rate", "Precision", "Recall", "Rows (TRUE)", "Rows (FALSE)")
     }
   } else {
     if (multi_class) {
@@ -2578,7 +2578,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     sample_n <- sum(!is.na(predicted)) # Sample size for test.
     ret <- ret %>% dplyr::mutate(n = !!sample_n)
     if(pretty.name){
-      ret <- ret %>% dplyr::rename(`Number of Rows` = n)
+      ret <- ret %>% dplyr::rename(`Rows` = n)
     }
   }
   ret
@@ -2739,7 +2739,7 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
     map = list(
       `R Squared` = as.symbol("r_squared"),
       `RMSE` = as.symbol("root_mean_square_error"),
-      `Number of Rows` = as.symbol("n")
+      `Rows` = as.symbol("n")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
@@ -2779,7 +2779,7 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
 
     ret <- data.frame(f_score, accuracy, 1 - accuracy, precision, recall)
     names(ret) <- if (pretty.name) {
-      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
+      c("F1 Score", "Accuracy Rate", "Misclass. Rate", "Precision", "Recall")
     } else {
       c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
     }
@@ -2827,7 +2827,7 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
     map = list(
       `R Squared` = as.symbol("r_squared"),
       `RMSE` = as.symbol("root_mean_square_error"),
-      `Number of Rows` = as.symbol("n")
+      `Rows` = as.symbol("n")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)

@@ -393,7 +393,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       map <- c(
         group = "Group",
         ab_identifier = "AB Identifier",
-        n = "Number of Rows",
+        n = "Rows",
         converted = "Converted",
         conversion_rate = "Conversion Rate",
         chance_of_being_better = "Chance of Being Better",

@@ -343,8 +343,8 @@ test_that("test exp_chisq", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Number of Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
@@ -355,8 +355,8 @@ test_that("test exp_chisq with power", {
   ret <- model_df %>% glance_rowwise(model)
   model_df <- exp_chisq(mtcars, gear, carb, value=cyl, power = 0.8)
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                     "Target Power","Target Probability of Type 2 Error","Current Sample Size","Required Sample Size") %in% colnames(ret)
+  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+                     "Target Power","Target Type 2 Error","Current Sample Size","Required Sample Size") %in% colnames(ret)
   ))
   expect_true(ret$`Association Coef. (Cramer's V)` >= 0 && ret$`Association Coef. (Cramer's V)` <= 1)
 })
@@ -364,8 +364,8 @@ test_that("test exp_chisq with power", {
 test_that("test exp_chisq with grouping functions", {
   model_df <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
-                 "Probability of Type 2 Error","Number of Rows") %in% colnames(ret)
+  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Cohen's W","Power",
+                 "Type 2 Error","Number of Rows") %in% colnames(ret)
   ))
   expect_true(ret$`Association Coef. (Cramer's V)` >= 0 && ret$`Association Coef. (Cramer's V)` <= 1)
 })
@@ -414,8 +414,8 @@ test_that("test exp_chisq_ab_aggregated", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Number of Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
@@ -429,8 +429,8 @@ test_that("test exp_chisq_ab_aggregated with multiple rows per group", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   expect_equal(summary$`Number of Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Number of Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
@@ -444,8 +444,8 @@ test_that("test exp_chisq_ab_aggregated with more than 2 groups", {
   model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
   summary <- model_df %>% glance_rowwise(model)
   expect_equal(summary$`Number of Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Number of Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
   residuals <- model_df %>% tidy_rowwise(model, type="residuals")
@@ -559,9 +559,9 @@ test_that("test exp_ttest with power", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret),
                c("t Value","P Value","Degree of Freedom","Difference",
-                 "Conf High","Conf Low","Base Level","Effect Size (Cohen's d)","Target Power",
-                 "Target Probability of Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Number of Rows",
-                 "Number of Rows for 0","Number of Rows for 1"))
+                 "Conf High","Conf Low","Base Level","Cohen's D","Target Power",
+                 "Target Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Number of Rows",
+                 "Rows for 0","Rows for 1"))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
                c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
@@ -650,7 +650,7 @@ test_that("test exp_ttest with group-level error (not eough data)", {
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_ttest(`value`, `category`)
   ret <- model_df %>% tidy_rowwise(model, type='model')
   expect_equal(colnames(ret),
-               c("group", "Number of Rows", "Number of Rows for a", "Number of Rows for b", "Note"))
+               c("group", "Number of Rows", "Rows for a", "Rows for b", "Note"))
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })

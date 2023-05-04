@@ -349,8 +349,8 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
     colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"
     colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
     colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
-    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
-    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclass. Rate"
+    colnames(ret)[colnames(ret) == "n"] <- "Rows"
   }
 
   ret
@@ -424,15 +424,15 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
   }
 
   if (pretty.name){
-    colnames(ret)[colnames(ret) == "f_score"] <- "F Score"
+    colnames(ret)[colnames(ret) == "f_score"] <- "F1 Score"
     colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
-    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclass. Rate"
     colnames(ret)[colnames(ret) == "precision"] <- "Precision"
     colnames(ret)[colnames(ret) == "recall"] <- "Recall"
     colnames(ret)[colnames(ret) == "auc"] <- "AUC"
-    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
-    colnames(ret)[colnames(ret) == "positives"] <- "Number of Rows for TRUE"
-    colnames(ret)[colnames(ret) == "negatives"] <- "Number of Rows for FALSE"
+    colnames(ret)[colnames(ret) == "n"] <- "Rows"
+    colnames(ret)[colnames(ret) == "positives"] <- "Rows (TRUE)"
+    colnames(ret)[colnames(ret) == "negatives"] <- "Rows (FALSE)"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
     colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
