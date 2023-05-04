@@ -28,7 +28,7 @@ test_that("binary prediction with character target column", {
   expect_equal(colnames(ret), c("AUC","F1 Score","Accuracy Rate","Misclass. Rate","Precision",               
                                 "Recall","P Value","Number of Rows","Rows (TRUE)","Rows (FALSE)",
                                 "Log Likelihood","AIC","BIC","Residual Deviance","Null Deviance",
-                                "DF for Null Model","Residual DF"))
+                                "Null Model DF","Residual DF"))
   expect_equal(ret$`Number of Rows`, 34)
   expect_equal(ret$`Rows (TRUE)`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Rows (FALSE)`, 30) # This ends up to be 30 after doubling and removing NA rows.

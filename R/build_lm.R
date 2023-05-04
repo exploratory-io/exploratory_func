@@ -1235,7 +1235,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     vif_df <- vif_to_dataframe(x)
     if (nrow(vif_df) > 0 ) {
       max_vif <- max(vif_df$VIF, na.rm=TRUE)
-      ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+      ret <- ret %>% dplyr::mutate(`Max VIF`=!!max_vif)
     }
   }
 
@@ -1333,20 +1333,20 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     vif_df <- vif_to_dataframe(x)
     if (nrow(vif_df) > 0 ) {
       max_vif <- max(vif_df$VIF, na.rm=TRUE)
-      ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+      ret <- ret %>% dplyr::mutate(`Max VIF`=!!max_vif)
     }
   }
 
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
-      colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+      colnames(ret)[colnames(ret) == "df.null"] <- "Null Model DF"
       colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
       colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
       colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
       colnames(ret)[colnames(ret) == "auc"] <- "AUC"
       
-      ret <- ret %>% dplyr::select(AUC, `F1 Score`, `Accuracy Rate`, `Misclass. Rate`, `Precision`, `Recall`, `P Value`, `Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::select(AUC, `F1 Score`, `Accuracy Rate`, `Misclass. Rate`, `Precision`, `Recall`, `P Value`, `Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `Null Model DF`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -1364,7 +1364,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     }
     else { # for other numeric regressions.
       colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
-      colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+      colnames(ret)[colnames(ret) == "df.null"] <- "Null Model DF"
       colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
       colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
       colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
@@ -1372,7 +1372,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
       colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
 
-      ret <- ret %>% dplyr::select(matches("^R Squared$"), matches("^Adj R Squared$"), matches("^RMSE$"), `P Value`, `Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::select(matches("^R Squared$"), matches("^Adj R Squared$"), matches("^RMSE$"), `P Value`, `Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `Null Model DF`, everything())
     }
   }
   if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.

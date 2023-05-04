@@ -437,7 +437,7 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
     colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
-    colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+    colnames(ret)[colnames(ret) == "df.null"] <- "Null Model DF"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
 
     base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]

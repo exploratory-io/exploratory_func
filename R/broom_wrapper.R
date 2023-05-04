@@ -1459,7 +1459,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
-    colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+    colnames(ret)[colnames(ret) == "df.null"] <- "Null Model DF"
     colnames(ret)[colnames(ret) == "nobs"] <- "Rows"
     # for multinom
     colnames(ret)[colnames(ret) == "edf"] <- "Effective Number of DF"
