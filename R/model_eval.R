@@ -447,6 +447,11 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
         colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", gsub("_base$", "", col))
       }
     }
+
+    # Bring "Residual DF" after "Residual Deviance".
+    if (all(c("Residual DF", "Residual Deviance") %in% colnames(ret))) {
+      ret <- ret %>% dplyr::relocate(`Residual DF`, .after=`Residual Deviance`)
+    }
   }
 
   if (length(grouped_col) > 0){
