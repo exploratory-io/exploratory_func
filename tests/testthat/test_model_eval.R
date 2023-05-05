@@ -301,8 +301,8 @@ test_that("evaluate binary classification model by training and test", {
     expect_equal(colnames(eret), expect_cols)
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
     expect_cols <- c("Data Type", "AUC", "F1 Score", "Accuracy Rate", "Misclass. Rate", "Precision", "Recall",
-                     "P Value", "Rows (TRUE)", "Rows (FALSE)", "Number of Rows", "Log Likelihood", "AIC", "BIC",
-                     "Residual Deviance", "Null Deviance", "Null Model DF", "Residual DF", "Max VIF")
+                     "P Value", "Rows (TRUE)", "Rows (FALSE)", "Rows", "Log Likelihood", "AIC", "BIC",
+                     "Residual Deviance", "Residual DF", "Null Deviance", "Null Model DF", "Max VIF")
 
     expect_equal(colnames(eret), expect_cols)
   })
@@ -326,8 +326,8 @@ test_that("Group evaluate binary classification model by training and test", {
     expect_equal(colnames(eret), expect_cols)
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
     expect_cols <- c("klass", "Data Type", "AUC", "F1 Score", "Accuracy Rate", "Misclass. Rate", "Precision", "Recall",
-                     "P Value", "Rows (TRUE)", "Rows (FALSE)", "Number of Rows", "Log Likelihood", "AIC", "BIC",
-                     "Residual Deviance", "Null Deviance", "Null Model DF", "Residual DF")
+                     "P Value", "Rows (TRUE)", "Rows (FALSE)", "Rows", "Log Likelihood", "AIC", "BIC",
+                     "Residual Deviance", "Residual DF", "Null Deviance", "Null Model DF")
 
     expect_equal(colnames(eret), expect_cols)
   })

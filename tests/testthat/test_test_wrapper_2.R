@@ -8,7 +8,7 @@ test_that("test exp_wilcox", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -21,7 +21,7 @@ test_that("test exp_wilcox with factor explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # First *used* factor level should be the base.
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
@@ -32,7 +32,7 @@ test_that("test exp_wilcox with numeric explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # The smaller number should be the base.
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
@@ -44,7 +44,7 @@ test_that("test exp_wilcox with character explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # The majority should be the base
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 test_that("test exp_wilcox with logical explanatory variable", {
@@ -66,7 +66,7 @@ test_that("test exp_wilcox with conf.int = TRUE", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -77,7 +77,7 @@ test_that("test exp_wilcox with paired = TRUE", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -88,7 +88,7 @@ test_that("test exp_wilcox with paired = TRUE, conf.int = TRUE", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
