@@ -343,7 +343,7 @@ test_that("test exp_chisq", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Cramer's V","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
                     "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
@@ -364,7 +364,7 @@ test_that("test exp_chisq with power", {
 test_that("test exp_chisq with grouping functions", {
   model_df <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("Cramer's V","Chi-Square","Degree of Freedom","P Value","Cohen's W","Power",
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W","Power",
                  "Type 2 Error","Rows") %in% colnames(ret)
   ))
   expect_true(ret$`Cramer's V` >= 0 && ret$`Cramer's V` <= 1)
@@ -414,7 +414,7 @@ test_that("test exp_chisq_ab_aggregated", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Cramer's V","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
                     "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
@@ -429,7 +429,7 @@ test_that("test exp_chisq_ab_aggregated with multiple rows per group", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   expect_equal(summary$`Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Cramer's V","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
                     "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
@@ -444,7 +444,7 @@ test_that("test exp_chisq_ab_aggregated with more than 2 groups", {
   model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
   summary <- model_df %>% glance_rowwise(model)
   expect_equal(summary$`Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Cramer's V","Chi-Square","Degree of Freedom","P Value","Cohen's W",
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
                     "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
   expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
