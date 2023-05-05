@@ -227,7 +227,7 @@ glance.survdiff_exploratory <- function(x, ...) {
     colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
     colnames(ret)[colnames(ret) == "df"] <- "DF"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
-    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
+    colnames(ret)[colnames(ret) == "n"] <- "Rows"
     colnames(ret)[colnames(ret) == "nevent"] <- "Rows (TRUE)"
   }
   else {
