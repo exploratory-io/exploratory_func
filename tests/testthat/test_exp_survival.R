@@ -37,8 +37,8 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy_rowwise(model1)
   ret2 <- ret %>% tidy_rowwise(model2)
   ret3 <- ret %>% glance_rowwise(model2)
-  expect_equal(ret3$`Number of Rows`, nrow(data))
-  expect_equal(ret3$`Number of Events`,sum(data$`is churned`))
+  expect_equal(ret3$`Rows`, nrow(data))
+  expect_equal(ret3$`Rows (TRUE)`,sum(data$`is churned`))
 
   # No cohort case
   ret <- data %>% exp_survival(`weeks on service`, `is churned`)

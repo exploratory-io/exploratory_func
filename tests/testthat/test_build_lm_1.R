@@ -25,13 +25,13 @@ test_that("binary prediction with character target column", {
 
   ret <- model_data %>% tidy_rowwise(model, type="vif")
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
-  expect_equal(colnames(ret), c("AUC","F Score","Accuracy Rate","Misclassification Rate","Precision",               
-                                "Recall","P Value","Number of Rows","Number of Rows for TRUE","Number of Rows for FALSE",
+  expect_equal(colnames(ret), c("AUC","F1 Score","Accuracy Rate","Misclass. Rate","Precision",               
+                                "Recall","P Value","Rows","Rows for TRUE","Rows for FALSE",
                                 "Log Likelihood","AIC","BIC","Residual Deviance","Null Deviance",
-                                "DF for Null Model","Residual DF"))
-  expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
+                                "Null Model DF","Residual DF"))
+  expect_equal(ret$`Rows`, 34)
+  expect_equal(ret$`Rows for TRUE`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% tidy_rowwise(model)
   ret <- model_data %>% augment_rowwise(model)
 
@@ -55,9 +55,9 @@ test_that("binary prediction with factor target column", {
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
   ret <- model_data %>% prediction(data="newdata", data_frame=test_data)
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
-  expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Rows`, 34)
+  expect_equal(ret$`Rows for TRUE`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% tidy_rowwise(model)
   ret <- model_data %>% augment_rowwise(model)
 
@@ -161,7 +161,7 @@ test_that("Linear Regression with test rate", {
     expect_true(all(expected_cols %in% colnames(pred_test)))
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    expect_equal(res$`Number of Rows`, 17)
+    expect_equal(res$`Rows`, 17)
     variables <- (ret %>% tidy_rowwise(model, type="importance") %>% arrange(desc(importance)))$variable
     names(variables) <- NULL
     res <- ret %>% lm_partial_dependence()
@@ -207,7 +207,7 @@ test_that("Linear Regression with outlier filtering", {
     expect_true(all(expected_cols %in% colnames(pred_test)))
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    expect_equal(res$`Number of Rows`, 12)
+    expect_equal(res$`Rows`, 12)
    })
 })
 
@@ -699,7 +699,7 @@ test_that("Logistic Regression with test_rate", {
                        "predicted_response", "predicted_label")
     expect_true(all(expected_cols %in% colnames(pred_test)))
     res <- ret %>% tidy_rowwise(model, pretty.name=TRUE)
-    expected_cols <- c("Term", "Coefficient", "Std Error", "t Ratio", "P Value", "Conf High", "Conf Low", "Odds Ratio", "Base Level")
+    expected_cols <- c("Term", "Coefficient", "Std Error", "t Value", "P Value", "Conf High", "Conf Low", "Odds Ratio", "Base Level")
     expect_true(all(expected_cols %in% colnames(res)))
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)

@@ -137,7 +137,7 @@ test_that("test exp_ttest_aggregated", {
   test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
   model_df <- test_df2 %>% exp_ttest_aggregated(cat, n, mean, sd)
   ret <- model_df %>% tidy_rowwise(model, type="model")
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
@@ -343,10 +343,10 @@ test_that("test exp_chisq", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
-  expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
+  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
 })
 
@@ -355,19 +355,19 @@ test_that("test exp_chisq with power", {
   ret <- model_df %>% glance_rowwise(model)
   model_df <- exp_chisq(mtcars, gear, carb, value=cyl, power = 0.8)
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                     "Target Power","Target Probability of Type 2 Error","Current Sample Size","Required Sample Size") %in% colnames(ret)
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
+                     "Target Power","Target Type 2 Error","Current Sample Size","Required Sample Size") %in% colnames(ret)
   ))
-  expect_true(ret$`Association Coef. (Cramer's V)` >= 0 && ret$`Association Coef. (Cramer's V)` <= 1)
+  expect_true(ret$`Cramer's V` >= 0 && ret$`Cramer's V` <= 1)
 })
 
 test_that("test exp_chisq with grouping functions", {
   model_df <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
   ret <- model_df %>% glance_rowwise(model)
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
-                 "Probability of Type 2 Error","Number of Rows") %in% colnames(ret)
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W","Power",
+                 "Type 2 Error","Rows") %in% colnames(ret)
   ))
-  expect_true(ret$`Association Coef. (Cramer's V)` >= 0 && ret$`Association Coef. (Cramer's V)` <= 1)
+  expect_true(ret$`Cramer's V` >= 0 && ret$`Cramer's V` <= 1)
 })
 
 test_that("test exp_chisq with logical", {
@@ -414,10 +414,10 @@ test_that("test exp_chisq_ab_aggregated", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
-  expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
+  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
 })
 
@@ -428,11 +428,11 @@ test_that("test exp_chisq_ab_aggregated with multiple rows per group", {
   ret <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
-  expect_equal(summary$`Number of Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_equal(summary$`Rows`,600) # Number of rows should be added up.
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
-  expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
+  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
 })
@@ -443,11 +443,11 @@ test_that("test exp_chisq_ab_aggregated with more than 2 groups", {
   df <- tibble::tibble(cat=c('A','B','C'), n=c(100,200,300), cr=c(0.22, 0.2, 0.2))
   model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
   summary <- model_df %>% glance_rowwise(model)
-  expect_equal(summary$`Number of Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Association Coef. (Cramer's V)","Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  expect_equal(summary$`Rows`,600) # Number of rows should be added up.
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
-  expect_true(summary$`Association Coef. (Cramer's V)` >= 0 && summary$`Association Coef. (Cramer's V)` <= 1)
+  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
   residuals <- model_df %>% tidy_rowwise(model, type="residuals")
   prob_dist <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
@@ -464,7 +464,7 @@ test_that("test exp_ttest", {
   mtcars2$am[[1]] <- NA # test NA filtering
   model_df <- exp_ttest(mtcars2, mpg, am, test_sig_level=0.05)
   ret <- model_df %>% tidy_rowwise(model, type="model")
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
@@ -478,7 +478,7 @@ test_that("test exp_ttest with factor explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # First *used* factor level should be the base.
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
@@ -489,7 +489,7 @@ test_that("test exp_ttest with numeric explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # The smaller number should be the base.
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
@@ -501,7 +501,7 @@ test_that("test exp_ttest with character explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "0") # The majority should be the base
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
@@ -513,7 +513,7 @@ test_that("test exp_ttest with logical explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "FALSE") # FALSE should be the base
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
@@ -524,7 +524,7 @@ test_that("test exp_ttest with var.equal = TRUE", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -536,7 +536,7 @@ test_that("test exp_ttest with alternative = greater", {
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   colnames(ret)
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -547,7 +547,7 @@ test_that("test exp_ttest with paired = TRUE", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
   ret
 })
@@ -558,13 +558,13 @@ test_that("test exp_ttest with power", {
   model_df <- exp_ttest(mtcars2, mpg, am, beta = 0.2)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret),
-               c("t Value","P Value","Degree of Freedom","Difference",
-                 "Conf High","Conf Low","Base Level","Effect Size (Cohen's d)","Target Power",
-                 "Target Probability of Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Number of Rows",
-                 "Number of Rows for 0","Number of Rows for 1"))
+               c("t Value","P Value","DF","Difference",
+                 "Conf High","Conf Low","Base Level","Cohen's D","Target Power",
+                 "Target Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Rows",
+                 "Rows (0)","Rows (1)"))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -575,7 +575,7 @@ test_that("test exp_ttest with power with paired = TRUE", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
   ret
 })
@@ -588,7 +588,7 @@ test_that("test exp_ttest with diff_to_detect", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
   ret
 })
@@ -600,7 +600,7 @@ test_that("test exp_ttest with diff_to_detect and common_sd", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -612,7 +612,7 @@ test_that("test exp_ttest with asint grouping", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -621,7 +621,7 @@ test_that("test exp_ttest with group_by", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("vs","am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("vs","am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
   ret
 })
@@ -631,7 +631,7 @@ test_that("test exp_ttest with outlier filter", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("vs","am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+               c("vs","am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
 })
 
@@ -650,7 +650,7 @@ test_that("test exp_ttest with group-level error (not eough data)", {
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_ttest(`value`, `category`)
   ret <- model_df %>% tidy_rowwise(model, type='model')
   expect_equal(colnames(ret),
-               c("group", "Number of Rows", "Number of Rows for a", "Number of Rows for b", "Note"))
+               c("group", "Rows", "Rows (a)", "Rows (b)", "Note"))
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })
@@ -708,7 +708,7 @@ test_that("test ANCOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("a m","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
+               c("a m","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 
   # Test broom output to detect changes at upgrade.
@@ -740,7 +740,7 @@ test_that("test ANCOVA with exp_anova with logical group variable", {
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("a m","Number of Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
+               c("a m","Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 
   # Test broom output to detect changes at upgrade.
@@ -793,7 +793,7 @@ test_that("test ANCOVA with exp_anova with some NAs in the data", {
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("a m","Number of Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
+               c("a m","Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -813,7 +813,7 @@ test_that("test exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("gear","Number of Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
+               c("gear","Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
@@ -839,7 +839,7 @@ test_that("test exp_anova with group-level error (not enought data)", {
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_anova(`value`, `category`)
   ret <- model_df %>% tidy_rowwise(model, type='model')
   expect_equal(colnames(ret),
-               c("group","Number of Rows", "Note"))
+               c("group","Rows", "Note"))
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })
@@ -852,7 +852,7 @@ test_that("test exp_anova with outlier filter", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("gear","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
+               c("gear","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -864,7 +864,7 @@ test_that("test exp_anova with required power", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("gear","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
+               c("gear","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -872,7 +872,7 @@ test_that("test exp_anova with grouping functions", {
   model_df <- exp_anova(mtcars, mpg, disp, func2="asintby10")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("disp","Number of Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
+               c("disp","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
@@ -883,7 +883,7 @@ test_that("test exp_anova with group_by", {
   model_df <- mtcars %>% group_by(vs) %>% exp_anova(mpg, gear)
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("vs","gear","Number of Rows","Mean","Std Error","Conf Low","Conf High",
+               c("vs","gear","Rows","Mean","Std Error","Conf Low","Conf High",
                  "Std Deviation","Minimum","Maximum"))
 })
 

@@ -625,7 +625,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
 glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   if (data_type == "training") {
     if (!is.null(x$concordance)) {
-      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var), `Time-dependent AUC`=x$auc, `Number of Rows`=nrow(x$df), `Number of Events`=x$nevent)
+      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var), `Time-dependent AUC`=x$auc, `Rows`=nrow(x$df), `Rows (TRUE)`=x$nevent)
     }
     else {
       data.frame()
@@ -633,7 +633,7 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   }
   else { # data_type == "test"
     if (!is.null(x$concordance_test)) {
-      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var), `Time-dependent AUC`=x$auc_test, `Number of Rows`=nrow(x$df_test), `Number of Events`=x$test_nevent)
+      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var), `Time-dependent AUC`=x$auc_test, `Rows`=nrow(x$df_test), `Rows (TRUE)`=x$test_nevent)
     }
     else {
       data.frame()

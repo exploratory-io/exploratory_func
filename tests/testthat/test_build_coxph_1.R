@@ -99,10 +99,10 @@ test_that("build_coxph.fast with start_time and end_time", {
                    "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                    "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                    # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                   "R Squared","R Squared Max",
+                   "R Squared","Max R Squared",
                    "Log Likelihood","AIC","BIC",
-                   "VIF Max",
-                   "Number of Rows","Number of Events"))
+                   "Max VIF",
+                   "Rows","Rows (TRUE)"))
     ret <- model_df %>% augment_rowwise(model)
   }
 })
@@ -136,10 +136,10 @@ test_that("build_coxph.fast basic with group-by", {
                  "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max",
+                 "R Squared","Max R Squared",
                  "Log Likelihood","AIC","BIC",
-                 "VIF Max",
-                 "Number of Rows","Number of Events"))
+                 "Max VIF",
+                 "Rows","Rows (TRUE)"))
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -173,10 +173,10 @@ test_that("test build_coxph.fast with test mode", {
                  "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max",
+                 "R Squared","Max R Squared",
                  "Log Likelihood","AIC","BIC",
-                 "VIF Max",
-                 "Number of Rows","Number of Events"))
+                 "Max VIF",
+                 "Rows","Rows (TRUE)"))
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -208,10 +208,10 @@ test_that("test build_coxph.fast with test mode with group-by", {
                  "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max",
+                 "R Squared","Max R Squared",
                  "Log Likelihood","AIC","BIC",
-                 "VIF Max",
-                 "Number of Rows","Number of Events"))
+                 "Max VIF",
+                 "Rows","Rows (TRUE)"))
   ret <- model_df %>% augment_rowwise(model)
 })
 

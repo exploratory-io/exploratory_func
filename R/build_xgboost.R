@@ -640,8 +640,8 @@ prettify_xgboost_evaluation_log <- function(df, pretty.name=FALSE) {
     colnames(ret)[colnames(ret) == "train_logloss"] <- "Negative Log Likelihood"
     # this can be train_error@{threshold}
     with_train_error <- stringr::str_detect(colnames(ret), "^train_error")
-    colnames(ret)[with_train_error] <- stringr::str_replace(colnames(ret)[with_train_error], "^train_error", "Misclassification Rate")
-    colnames(ret)[colnames(ret) == "train_merror"] <- "Misclassification Rate" # this is for multiclass
+    colnames(ret)[with_train_error] <- stringr::str_replace(colnames(ret)[with_train_error], "^train_error", "Misclass. Rate")
+    colnames(ret)[colnames(ret) == "train_merror"] <- "Misclass. Rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "train_mlogloss"] <- "Multiclass Logloss"
     colnames(ret)[colnames(ret) == "train_auc"] <- "AUC"
     # this can be train_ndcg@{threshold}
@@ -661,8 +661,8 @@ prettify_xgboost_evaluation_log <- function(df, pretty.name=FALSE) {
     colnames(ret)[colnames(ret) == "validation_logloss"] <- "Validation Negative Log Likelihood"
     # this can be validation_error@{threshold}
     with_validation_error <- stringr::str_detect(colnames(ret), "^validation_error")
-    colnames(ret)[with_validation_error] <- stringr::str_replace(colnames(ret)[with_validation_error], "^validation_error", "Validation Misclassification Rate")
-    colnames(ret)[colnames(ret) == "validation_merror"] <- "Validation Misclassification Rate" # this is for multiclass
+    colnames(ret)[with_validation_error] <- stringr::str_replace(colnames(ret)[with_validation_error], "^validation_error", "Validation Misclass. Rate")
+    colnames(ret)[colnames(ret) == "validation_merror"] <- "Validation Misclass. Rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "validation_mlogloss"] <- "Validation Multiclass Logloss"
     colnames(ret)[colnames(ret) == "validation_auc"] <- "Validation AUC"
     # this can be validation_ndcg@{threshold}
@@ -1440,7 +1440,7 @@ glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
     map = list(
       `R Squared` = as.symbol("r_squared"),
       `RMSE` = as.symbol("root_mean_square_error"),
-      `Number of Rows` = as.symbol("n")
+      `Rows` = as.symbol("n")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
