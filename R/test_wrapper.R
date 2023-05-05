@@ -669,6 +669,7 @@ glance.chisq_exploratory <- function(x) {
   N <- sum(x$observed) # Total number of observations (rows).
   k <- ncol(x$observed)
   r <- nrow(x$observed)
+  phi <- sqrt(x$statistic/N) 
   V <- sqrt(x$statistic/N/min(k-1, r-1)) # Cramer's V - https://en.wikipedia.org/wiki/Cram%C3%A9r%27s_V
   note <- NULL
   if (is.null(x$power)) {
@@ -688,11 +689,12 @@ glance.chisq_exploratory <- function(x) {
       note <- "Could not calculate Cohhen's w." 
       power_val <- NA_real_
     }
-    ret <- ret %>% dplyr::mutate(v=!!V, w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val, n=!!N)
+    ret <- ret %>% dplyr::mutate(phi=!!phi, v=!!V, w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val, n=!!N)
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, everything()) # Reorder to unify order with t-test.
     ret <- ret %>% dplyr::rename(`Chi-Square`=statistic,
                                  `P Value`=p.value,
                                  `DF`=parameter,
+                                 `Phi`=phi,
                                  `Cramer's V`=v,
                                  `Cohen's W`=w,
                                  `Power`=power,
@@ -709,11 +711,12 @@ glance.chisq_exploratory <- function(x) {
       note <<- e$message
       required_sample_size <<- NA_real_
     })
-    ret <- ret %>% dplyr::mutate(v=!!V, w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), n=!!N, required_n=!!required_sample_size)
+    ret <- ret %>% dplyr::mutate(phi=!!phi, v=!!V, w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), n=!!N, required_n=!!required_sample_size)
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, everything()) # Reorder to unify order with t-test.
     ret <- ret %>% dplyr::rename(`Chi-Square`=statistic,
                                  `P Value`=p.value,
                                  `DF`=parameter,
+                                 `Phi`=phi,
                                  `Cramer's V`=v,
                                  `Cohen's W`=w,
                                  `Target Power`=power,
@@ -1186,8 +1189,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     if ("error" %in% class(x)) {
       if (!is.null(x$v1) && !is.null(x$v2) && !is.null(x$n1) && !is.null(x$n2)) {
         ret <- tibble::tibble(`Rows`=x$n1+x$n2, n1=x$n1, n2=x$n2, Note = x$message)
-        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Rows for ", x$v1)):=n1)
-        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Rows for ", x$v2)):=n2)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Rows (", x$v1, ")")):=n1)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Rows (", x$v2, ")")):=n2)
       }
       else {
         ret <- tibble::tibble(Note = x$message)
@@ -1267,8 +1270,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
     ret <- ret %>% dplyr::mutate(`Rows`=!!(n1+n2))
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v1)):=!!n1)
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v2)):=!!n2)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows (", v1, ")")):=!!n1)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows (", v2, ")")):=!!n2)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
@@ -1536,8 +1539,8 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     }
 
     ret <- ret %>% dplyr::mutate(`Rows`=!!(n1+n2))
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v1)):=!!n1)
-    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows for ", v2)):=!!n2)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows (", v1, ")")):=!!n1)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Rows (", v2, ")")):=!!n2)
     if (!is.null(note)) { # Code to add Note column if there was an error. Not used for this particular function yet.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
