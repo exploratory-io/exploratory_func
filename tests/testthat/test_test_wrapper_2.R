@@ -55,7 +55,7 @@ test_that("test exp_wilcox with logical explanatory variable", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(ret$`Base Level`, "FALSE") # FALSE should be the base
   expect_gt(ret$Difference, 0) # Checking the direction of Difference is correct.
-  expect_true("Number of Rows" %in% colnames(ret))
+  expect_true("Rows" %in% colnames(ret))
   model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
