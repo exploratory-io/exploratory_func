@@ -2075,10 +2075,10 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
-recode <- function(x, type_convert = FALSE, ...) {
+recode <- function(x, ..., type_convert = FALSE, .default = NULL, .missing = NULL) {
   # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
   map <- list(...)
-  ret <- dplyr::recode(x, !!!map)
+  ret <- dplyr::recode(x, !!!map, .default = .default, .missing = .missing)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
   # they get garbled. Working it around by converting to UTF-8.
