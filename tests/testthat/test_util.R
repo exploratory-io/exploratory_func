@@ -1809,6 +1809,8 @@ test_that("recode and recode_factor", {
   # type covert is set as TRUE so the result should be numeric 1,2,3 instead of character "1","2","3".
   result8 <- empDF %>% mutate(business_travel = exploratory::recode(business_travel, "たまに" = "1", "なし" = "2", .default = "0", type_convert = TRUE))
   expect_equal(exploratory:::get_unique_values(result8$business_travel, 100), c(0,1,2))
+  result9 <- empDF %>% mutate(job_level = exploratory::recode_factor(job_level, `1` = "10", `4` = "40", .default = "99"))
+  expect_equal(levels(result9$job_level), c("10", "99", "40"))
 
 
   # Test recoding "." to something else.

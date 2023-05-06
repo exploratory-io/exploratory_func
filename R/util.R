@@ -2141,8 +2141,12 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
       # make sure to apply current_levels before doing recode, so that current levels is honored.
       x <- forcats::fct_relevel(x, current_levels)
     }
-    # pass current_levels to .default argument to keep the levels in the input.
-    ret <- dplyr::recode(x, !!!map, .default = current_levels, .missing = .missing)
+    if (is.null(.default)) {
+      # pass current_levels to .default argument to keep the levels in the input.
+      ret <- dplyr::recode(x, !!!map, .default = current_levels, .missing = .missing)
+    } else {
+      ret <- dplyr::recode(x, !!!map, .default = .default, .missing = .missing)
+    }
   }
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
