@@ -1912,6 +1912,13 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     ret <- ret %>% mutate(pair2_1=factor(c2_levels[as.integer(pair2_1)], levels=c2_levels))
     ret <- ret %>% mutate(pair2_2=factor(c3_levels[as.integer(pair2_2)], levels=c3_levels))
     ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
+    # Concat pair1_1 and pair1_2 with ":" and name it as "Group 1".
+    # Concat pair2_1 and pair2_2 with ":" and name it as "Group 2".
+    ret <- ret %>% dplyr::mutate(`Group 1`=stringr::str_c(pair1_1, " : ", pair1_2))
+    ret <- ret %>% dplyr::mutate(`Group 2`=stringr::str_c(pair2_1, " : ", pair2_2)) 
+    ret <- ret %>% dplyr::select(-pair1_1, -pair1_2, -pair2_1, -pair2_2)
+    ret <- ret %>% dplyr::select(`Group 1`, `Group 2`, everything())
+
   }
   else { # Only 1 variable. Either c2_ or c3_.
     if (!is.null(levels(emm_fit)$c2_)) {# c2_ case
@@ -1951,8 +1958,8 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
                                         `Pair 1 Var 2`="pair1_2",
                                         `Pair 2 Var 1`="pair2_1",
                                         `Pair 2 Var 2`="pair2_2",
-                                        `Var 1`="var1",
-                                        `Var 2`="var2",
+                                        `Group 1`="var1",
+                                        `Group 2`="var2",
                                         `Conf High`="conf.high",
                                         `Conf Low`="conf.low",
                                         `Standard Error`="SE",
@@ -2406,7 +2413,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     else { # Levene's test with median as the center is called Brown-Forsythe test. https://search.r-project.org/CRAN/refmans/misty/html/test.levene.html
       ret <- ret %>% dplyr::mutate(`Method`="Brown-Forsythe Test")
     }
-    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
+    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Homogeneity assumption is not valid.", "Homogeneity assumption is valid."))
   }
   else if (type == "shapiro") {
     if ("error" %in% class(x)) {
@@ -2438,7 +2445,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                           `Method`="method",
                                           `Rows`="n")))
     ret <- ret %>% dplyr::mutate(`Method`="Shapiro-Wilk Normality Test") # Just making it in Title Case.
-    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
+    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Normality assumption is not valid.", "Normality assumption is valid."))
 
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
@@ -2600,10 +2607,11 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
   else if (type == "pairs") {
     ret <- tibble::as_tibble(x$dunn.test)
     ret <- ret %>% dplyr::select(-chi2, -P)
-    ret <- ret %>% dplyr::relocate(comparisons, .before = Z)
+    # Separate comparisons values like "Cat 1 - Cat 2" into "Cat 1" and "Cat 2".
+    ret <- ret %>% tidyr::separate(comparisons, into = c("Group 1", "Group 2"), sep = " - ", extra = "merge")
+    ret <- ret %>% dplyr::select(`Group 1`, `Group 2`, everything())
     ret <- ret %>% dplyr::rename(`Z Value`=Z,
-                                 `P Value`=P.adjusted,
-                                 `Pair`=comparisons)
+                                 `P Value`=P.adjusted)
     method <- switch(x$pairs_adjust,
       "none" = "Dunn's Test with No Adjustment",
       "bonferroni" = "Dunn's Test with Bonferroni Correction",
@@ -2772,9 +2780,9 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
   }
   else {
     ret <- x$model_summary
-    ret <- ret %>% dplyr::mutate(normal = p.value > !!signif_level)
+    ret <- ret %>% dplyr::mutate(normal=ifelse(p.value > !!signif_level, "Normality assumption is valid.", "Normality assumption is not valid."))
     ret <- ret %>% dplyr::select(-method)
-    ret <- ret %>% dplyr::rename(`Column`=col, `W Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
+    ret <- ret %>% dplyr::rename(`Column`=col, `W Value`=statistic, `P Value`=p.value, `Result`=normal, `Sample Size`=sample_size)
     ret
   }
 }
