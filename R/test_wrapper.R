@@ -2780,9 +2780,9 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
   }
   else {
     ret <- x$model_summary
-    ret <- ret %>% dplyr::mutate(normal = p.value > !!signif_level)
+    ret <- ret %>% dplyr::mutate(normal=ifelse(p.value > !!signif_level, "Normality assumption is valid.", "Normality assumption is not valid."))
     ret <- ret %>% dplyr::select(-method)
-    ret <- ret %>% dplyr::rename(`Column`=col, `W Value`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
+    ret <- ret %>% dplyr::rename(`Column`=col, `W Value`=statistic, `P Value`=p.value, `Result`=normal, `Sample Size`=sample_size)
     ret
   }
 }
