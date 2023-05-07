@@ -247,8 +247,8 @@ test_that("prediction with glm family (negativebinomial) with target column name
                               family="negativebinomial")
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("P Value", "Rows", "Log Likelihood", "AIC", "BIC", "Residual Deviance", "Null Deviance", "Null Model DF",
-                 "Residual DF", "Theta", "SE Theta", "Max VIF"))
+               c("P Value", "Rows", "Log Likelihood", "AIC", "BIC", "Residual Deviance", "Residual DF", "Null Deviance", "Null Model DF",
+                 "Theta", "SE Theta", "Max VIF"))
   ret <- model_data %>% tidy_rowwise(model)
   expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
                        "conf.high", "conf.low", "base.level")
@@ -346,9 +346,8 @@ test_that("test GLM (Negative Binomial) summary output", {
   model_ret_pretty <- ret %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty),
                c("P Value", "Rows", "Log Likelihood", "AIC",
-                 "BIC", "Residual Deviance", "Null Deviance",
-                 "Null Model DF", "Residual DF",
-                 "Theta", "SE Theta"))
+                 "BIC", "Residual Deviance", "Residual DF", "Null Deviance",
+                 "Null Model DF", "Theta", "SE Theta"))
 })
 
 test_that("test GLM (Negative Binomial) with group columns", {
@@ -381,9 +380,8 @@ test_that("test GLM (Negative Binomial) with group columns", {
   model_ret_pretty <- ret %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty), # Position of Note columns is adjusted on Exploratory-side
                c("CARRIER", "Note", "P Value", "Rows", "Log Likelihood", "AIC",
-                 "BIC", "Residual Deviance", "Null Deviance",
-                 "Null Model DF", "Residual DF",
-                 "Theta", "SE Theta"))
+                 "BIC", "Residual Deviance", "Residual DF", "Null Deviance",
+                 "Null Model DF", "Theta", "SE Theta"))
 })
 
 test_that("test GLM (Negative Binomial) with group columns with weight", {
@@ -421,7 +419,6 @@ test_that("test GLM (Negative Binomial) with group columns with weight", {
   model_ret_pretty <- ret %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty), # Position of Note columns is adjusted on Exploratory-side
                c("CARRIER", "Note", "P Value", "Rows", "Log Likelihood", "AIC",
-                 "BIC", "Residual Deviance", "Null Deviance",
-                 "Null Model DF", "Residual DF",
-                 "Theta", "SE Theta"))
+                 "BIC", "Residual Deviance", "Residual DF", "Null Deviance",
+                 "Null Model DF", "Theta", "SE Theta"))
 })

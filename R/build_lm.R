@@ -1346,7 +1346,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
       colnames(ret)[colnames(ret) == "auc"] <- "AUC"
       
-      ret <- ret %>% dplyr::select(AUC, `F1 Score`, `Accuracy Rate`, `Misclass. Rate`, `Precision`, `Recall`, `P Value`, `Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `Null Model DF`, everything())
+      ret <- ret %>% dplyr::select(AUC, `F1 Score`, `Accuracy Rate`, `Misclass. Rate`, `Precision`, `Recall`, `P Value`, `Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Residual DF`, `Null Deviance`, `Null Model DF`, everything())
+
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -1372,7 +1373,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
       colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
 
-      ret <- ret %>% dplyr::select(matches("^R Squared$"), matches("^Adj R Squared$"), matches("^RMSE$"), `P Value`, `Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `Null Model DF`, everything())
+      ret <- ret %>% dplyr::select(matches("^R Squared$"), matches("^Adj R Squared$"), matches("^RMSE$"), `P Value`, `Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Residual DF`, `Null Deviance`, `Null Model DF`, everything())
     }
   }
   if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
