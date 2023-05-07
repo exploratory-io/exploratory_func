@@ -2406,7 +2406,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     else { # Levene's test with median as the center is called Brown-Forsythe test. https://search.r-project.org/CRAN/refmans/misty/html/test.levene.html
       ret <- ret %>% dplyr::mutate(`Method`="Brown-Forsythe Test")
     }
-    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
+    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Homogeneity assumption is not valid.", "Homogeneity assumption is valid."))
   }
   else if (type == "shapiro") {
     if ("error" %in% class(x)) {
@@ -2438,7 +2438,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
                                           `Method`="method",
                                           `Rows`="n")))
     ret <- ret %>% dplyr::mutate(`Method`="Shapiro-Wilk Normality Test") # Just making it in Title Case.
-    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Assumption is not valid.", "Assumption is valid."))
+    ret <- ret %>% dplyr::mutate(`Result`=ifelse(`P Value` < x$test_sig_level, "Normality assumption is not valid.", "Normality assumption is valid."))
 
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
