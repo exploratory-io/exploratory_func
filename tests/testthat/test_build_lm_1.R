@@ -27,8 +27,8 @@ test_that("binary prediction with character target column", {
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret), c("AUC","F1 Score","Accuracy Rate","Misclass. Rate","Precision",               
                                 "Recall","P Value","Rows","Rows for TRUE","Rows for FALSE",
-                                "Log Likelihood","AIC","BIC","Residual Deviance","Null Deviance",
-                                "Null Model DF","Residual DF"))
+                                "Log Likelihood","AIC","BIC","Residual Deviance","Residual DF","Null Deviance",
+                                "Null Model DF"))
   expect_equal(ret$`Rows`, 34)
   expect_equal(ret$`Rows for TRUE`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.

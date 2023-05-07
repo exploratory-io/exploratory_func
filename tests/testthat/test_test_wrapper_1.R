@@ -681,7 +681,7 @@ test_that("test 2-way ANOVA with exp_anova with repeat-by", {
     c("vs","Variable","Sum of Squares","SS Ratio","DF","Mean Square","F Value","P Value","Eta Squared","Partial Eta Squared","Cohen's F","Omega Squared","Note"))
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
   expect_equal(colnames(ret),
-    c("vs","Pair 1 Var 1","Pair 1 Var 2","Pair 2 Var 1","Pair 2 Var 2","Difference",
+    c("vs","Group 1","Group 2","Difference",
       "Conf High","Conf Low","Standard Error","DF","t Value","P Value","Method"))
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
@@ -893,7 +893,7 @@ test_that("test exp_normality", {
   qq <- ret %>% tidy_rowwise(model, type="qq")
   model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
   expect_equal(colnames(model_summary),
-               c("Column","W Statistic","P Value","Sample Size","Normal Distribution"))
+               c("Column","W Value","P Value","Sample Size","Result"))
 })
 
 test_that("test exp_normality with group", {
@@ -913,5 +913,5 @@ test_that("test exp_normality with column with almost always same value", {
   qq <- ret %>% tidy_rowwise(model, type="qq")
   model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
   expect_equal(colnames(model_summary),
-               c("Column","W Statistic","P Value","Sample Size","Normal Distribution"))
+               c("Column","W Value","P Value","Sample Size","Result"))
 })
