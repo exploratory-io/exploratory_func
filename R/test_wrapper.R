@@ -1914,9 +1914,10 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     ret <- ret %>% arrange(pair1_1, pair1_2, pair2_1, pair2_2)
     # Concat pair1_1 and pair1_2 with ":" and name it as "Group 1".
     # Concat pair2_1 and pair2_2 with ":" and name it as "Group 2".
-    ret <- ret %>% dplyr::mutate(`Group 1`=stringr::str_c(pair1_1, " : ", pair_1_2))
-    ret <- ret %>% dplyr::mutate(`Group 2`=stringr::str_c(pair2_1, " : ", pair_2_2)) 
-    ret <- ret %>% dplyr::select(-pair1_1, pair1_2, pair2_1, pair2_2)
+    ret <- ret %>% dplyr::mutate(`Group 1`=stringr::str_c(pair1_1, " : ", pair1_2))
+    ret <- ret %>% dplyr::mutate(`Group 2`=stringr::str_c(pair2_1, " : ", pair2_2)) 
+    ret <- ret %>% dplyr::select(-pair1_1, -pair1_2, -pair2_1, -pair2_2)
+    ret <- ret %>% dplyr::select(`Group 1`, `Group 2`, everything())
 
   }
   else { # Only 1 variable. Either c2_ or c3_.
