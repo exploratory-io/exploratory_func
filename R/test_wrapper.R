@@ -1709,6 +1709,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     }
   }
 
+  # If explanatory variable(s) are numeric, convet them into factor. 
+  for (i in 1:length(var2_col)) {
+    if (is.numeric(df[[var2_col[[i]]]])) {
+      df[[var2_col[[i]]]] <- factor(df[[var2_col[[i]]]])
+    }
+  }
+
   # Apply preprocessing functions to the covariates.
   if (!is.null(covariates) && !is.null(covariate_funs)) {
     df <- df %>% mutate_predictors(covariates, covariate_funs)
