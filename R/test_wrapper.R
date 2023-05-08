@@ -123,9 +123,6 @@ generate_chisq_density_data_for_power <- function(df, w, N, crit) {
 # Generates data for F distribution probability density with critical section and statistic
 # to depict a result of a F test like one-way ANOVA.
 generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
-
-
-
   tx <- qf(1-sig_level, df1=df1, df2=df2) # The chisq value that corresponds to the significance level.
   l <- max(df1/df2*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
 
