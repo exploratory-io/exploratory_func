@@ -123,6 +123,9 @@ generate_chisq_density_data_for_power <- function(df, w, N, crit) {
 # Generates data for F distribution probability density with critical section and statistic
 # to depict a result of a F test like one-way ANOVA.
 generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
+
+
+
   tx <- qf(1-sig_level, df1=df1, df2=df2) # The chisq value that corresponds to the significance level.
   l <- max(df1/df2*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
 
@@ -1230,7 +1233,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
 
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low, base.level) %>%
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.low, conf.high, base.level) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
         dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
@@ -1253,7 +1256,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         required_sample_size <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low, base.level) %>%
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.low, conf.high, base.level) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
         dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
         dplyr::rename(`t Value`=statistic,
@@ -1496,7 +1499,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     note <- NULL
     ret <- broom:::tidy.htest(x)
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
-      ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method)
+      ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.low, conf.high, method)
     }
     else {
       ret <- ret %>% dplyr::select(statistic, p.value, method)
@@ -1522,7 +1525,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
       # wilcox.test, just like t.test, seems to consider the 2nd category based on alphabetical/numerical/factor sort as the base category.
       # Since group_by/summarize also sorts the group based on alphabetical/numerical/factor order, we can assume that the v2 is the base category.
       ret <- ret %>% dplyr::mutate(base.level = !!x$base.level)
-      ret <- ret %>% dplyr::relocate(base.level, .after = conf.low)
+      ret <- ret %>% dplyr::relocate(base.level, .after = conf.high)
       ret <- ret %>% dplyr::rename(`P Value`=p.value,
                      Difference=estimate,
                      `Conf High`=conf.high,
@@ -1943,7 +1946,7 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
   # Get confidence interval.
   emm_ci <- confint(pw_comp, level=0.95)
   ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
-  ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
+  ret <- ret %>% dplyr::relocate(conf.low, conf.high, .after=estimate)
   # Map the column names back to the original.
   orig_terms <- x$terms_mapping[colnames(ret)]
   orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.

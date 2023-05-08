@@ -1467,7 +1467,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
       # even for lm.
       ret <- broom:::tidy.glm(x)
-      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      ret <- ret %>% mutate(conf.low=estimate-1.96*std.error, conf.high=estimate+1.96*std.error)
       base_level_table <- xlevels_to_base_level_table(x$xlevels)
       # Convert term from factor to character to remove warning at left_join.
       ret <- ret %>% dplyr::mutate(term=as.character(term)) %>% dplyr::left_join(base_level_table, by="term")
@@ -1574,10 +1574,10 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
         if (!is.null(variable_metric) && variable_metric == "odds_ratio") { # For Analytics View, overwrite conf.low/conf.high with those of odds ratio.
           ret <- ret %>% mutate(conf.low=exp(conf.low), conf.high=exp(conf.high))
-          ret <- ret %>% select(term, odds_ratio, conf.high, conf.low, everything()) # Bring odds ratio upfront together with its confidence interval.
+          ret <- ret %>% select(term, odds_ratio, conf.low, conf.high, everything()) # Bring odds ratio upfront together with its confidence interval.
         }
         else {
-          ret <- ret %>% select(term, estimate, conf.high, conf.low, everything()) # Bring coefficient upfront together with its confidence interval.
+          ret <- ret %>% select(term, estimate, conf.low, conf.high, everything()) # Bring coefficient upfront together with its confidence interval.
         }
       }
       if (!is.null(x$marginal_effects)) {
