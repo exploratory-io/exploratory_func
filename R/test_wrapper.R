@@ -1911,6 +1911,12 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
+    # Get confidence interval.
+    emm_ci <- confint(pw_comp, level=0.95)
+    # Bind confint to the base table immediately before arrange().
+    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+    ret <- ret %>% dplyr::relocate(conf.low, conf.high, .after=estimate)
+
     ret <- ret %>% tidyr::separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
     ret <- ret %>% tidyr::separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
     ret <- ret %>% tidyr::separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
@@ -1938,6 +1944,12 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     }
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
+    # Get confidence interval.
+    emm_ci <- confint(pw_comp, level=0.95)
+    # Bind confint to the base table immediately before arrange().
+    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+    ret <- ret %>% dplyr::relocate(conf.low, conf.high, .after=estimate)
+
     ret <- ret %>% tidyr::separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
     if (length(levels(emm_fit)) >=2) { # This means ANCOVA case. Strip the covariate value after the independent variable. e.g. "2 1.97101449275362"
       ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
@@ -1947,10 +1959,8 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     ret <- ret %>% mutate(var2=var_levels[as.integer(var2)])
     ret <- ret %>% arrange(var1, var2)
   }
-  # Get confidence interval.
-  emm_ci <- confint(pw_comp, level=0.95)
-  ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
-  ret <- ret %>% dplyr::relocate(conf.low, conf.high, .after=estimate)
+
+
   # Map the column names back to the original.
   orig_terms <- x$terms_mapping[colnames(ret)]
   orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.
