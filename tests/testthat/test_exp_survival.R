@@ -93,7 +93,7 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy_rowwise(model1)
   ret2 <- ret %>% tidy_rowwise(model2)
   ret3 <- ret %>% glance_rowwise(model2)
-  expect_equal(colnames(ret1), c("grp","Cohort","Time","Observations","Events","Censored","Survival Rate","Std Error","Conf High","Conf Low"))
+  expect_equal(colnames(ret1), c("grp","Cohort","Time","Observations","Events","Censored","Survival Rate","Std Error","Conf Low","Conf High"))
   expect_true("grp" %in% colnames(ret2))
   expect_true("grp" %in% colnames(ret3))
 })
