@@ -1838,6 +1838,19 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
   }
 }
 
+#' Return result of "==" if y is not empty or NULL. Otherwise return TRUE.
+#' We use this for filter condition controlled by a variable so that filtering is effectively
+#' skipped when the variable is empty or NULL.
+#' @export
+`%equal_or_all%` <- function(x,y) {
+  if (y == "" || is.null(y)) {
+    return (TRUE)
+  }
+  else {
+    return(x == y)
+  }
+}
+
 #' Column reorder function we use from Reorder steps of Exploratory.
 #' @export
 reorder_cols <- function(df, ...) {
