@@ -559,7 +559,7 @@ test_that("test exp_ttest with power", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret),
                c("t Value","P Value","DF","Difference",
-                 "Conf High","Conf Low","Base Level","Cohen's D","Target Power",
+                 "Conf Low","Conf High","Base Level","Cohen's D","Target Power",
                  "Target Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Rows",
                  "Rows (0)","Rows (1)"))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
@@ -682,7 +682,7 @@ test_that("test 2-way ANOVA with exp_anova with repeat-by", {
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
   expect_equal(colnames(ret),
     c("vs","Group 1","Group 2","Difference",
-      "Conf High","Conf Low","Standard Error","DF","t Value","P Value","Method"))
+      "Conf Low", "Conf High","Standard Error","DF","t Value","P Value","Method"))
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   ret <- model_df %>% tidy_rowwise(model, type="levene")
