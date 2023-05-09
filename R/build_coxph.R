@@ -837,6 +837,11 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       # Map coefficient names back to original.
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name){
+
+        if (all(c("conf.high", "conf.low") %in% colnames(ret))) {
+          ret <- ret %>% dplyr::relocate(conf.low, .before=conf.high)
+        }
+
         colnames(ret)[colnames(ret) == "term"] <- "Term"
         colnames(ret)[colnames(ret) == "statistic"] <- "t Value"
         colnames(ret)[colnames(ret) == "p.value"] <- "P Value"

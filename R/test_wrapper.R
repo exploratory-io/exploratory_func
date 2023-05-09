@@ -1230,7 +1230,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
 
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low, base.level) %>%
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.low, conf.high, base.level) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
         dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
@@ -1253,7 +1253,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         required_sample_size <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low, base.level) %>%
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.low, conf.high, base.level) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
         dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
         dplyr::rename(`t Value`=statistic,
@@ -1496,7 +1496,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     note <- NULL
     ret <- broom:::tidy.htest(x)
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
-      ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method)
+      ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.low, conf.high, method)
     }
     else {
       ret <- ret %>% dplyr::select(statistic, p.value, method)
@@ -1522,7 +1522,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
       # wilcox.test, just like t.test, seems to consider the 2nd category based on alphabetical/numerical/factor sort as the base category.
       # Since group_by/summarize also sorts the group based on alphabetical/numerical/factor order, we can assume that the v2 is the base category.
       ret <- ret %>% dplyr::mutate(base.level = !!x$base.level)
-      ret <- ret %>% dplyr::relocate(base.level, .after = conf.low)
+      ret <- ret %>% dplyr::relocate(base.level, .after = conf.high)
       ret <- ret %>% dplyr::rename(`P Value`=p.value,
                      Difference=estimate,
                      `Conf High`=conf.high,
@@ -1703,6 +1703,13 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   for (i in 1:length(var2_col)) {
     if (n_distinct(df[[var2_col[i]]]) < 2) {
       stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+    }
+  }
+
+  # If explanatory variable(s) are numeric, convet them into factor. 
+  for (i in 1:length(var2_col)) {
+    if (is.numeric(df[[var2_col[[i]]]])) {
+      df[[var2_col[[i]]]] <- factor(df[[var2_col[[i]]]])
     }
   }
 
@@ -1904,6 +1911,12 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     levels(emm_fit)$c3_ <- 1:length(levels(emm_fit)$c3_)
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
+    # Get confidence interval.
+    emm_ci <- confint(pw_comp, level=0.95)
+    # Bind confint to the base table immediately before arrange().
+    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+    ret <- ret %>% dplyr::relocate(conf.low, conf.high, .after=estimate)
+
     ret <- ret %>% tidyr::separate(contrast, into = c("pair1", "pair2"), sep = " - ", extra = "merge")
     ret <- ret %>% tidyr::separate(pair1, into = c("pair1_1", "pair1_2"), sep = " ", extra = "merge")
     ret <- ret %>% tidyr::separate(pair2, into = c("pair2_1", "pair2_2"), sep = " ", extra = "merge")
@@ -1931,6 +1944,12 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     }
     pw_comp <- emmeans::contrast(emm_fit, "pairwise", adjust=pairs_adjust, enhance.levels=FALSE)
     ret <- tibble::as.tibble(pw_comp)
+    # Get confidence interval.
+    emm_ci <- confint(pw_comp, level=0.95)
+    # Bind confint to the base table immediately before arrange().
+    ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
+    ret <- ret %>% dplyr::relocate(conf.low, conf.high, .after=estimate)
+
     ret <- ret %>% tidyr::separate(contrast, into = c("var1", "var2"), sep = " - ", extra = "merge")
     if (length(levels(emm_fit)) >=2) { # This means ANCOVA case. Strip the covariate value after the independent variable. e.g. "2 1.97101449275362"
       ret <- ret %>% mutate(var1=stringr::str_remove(var1, " .*"))
@@ -1940,10 +1959,8 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
     ret <- ret %>% mutate(var2=var_levels[as.integer(var2)])
     ret <- ret %>% arrange(var1, var2)
   }
-  # Get confidence interval.
-  emm_ci <- confint(pw_comp, level=0.95)
-  ret <- ret %>% dplyr::mutate(conf.low=!!emm_ci$lower.CL, conf.high=!!emm_ci$upper.CL)
-  ret <- ret %>% dplyr::relocate(conf.high, conf.low, .after=estimate)
+
+
   # Map the column names back to the original.
   orig_terms <- x$terms_mapping[colnames(ret)]
   orig_terms[is.na(orig_terms)] <- colnames(ret)[is.na(orig_terms)] # Fill the column names that did not have a matching mapping.

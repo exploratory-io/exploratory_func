@@ -251,7 +251,7 @@ test_that("prediction with glm family (negativebinomial) with target column name
                  "Theta", "SE Theta", "Max VIF"))
   ret <- model_data %>% tidy_rowwise(model)
   expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
-                       "conf.high", "conf.low", "base.level")
+                       "conf.low", "conf.high", "base.level")
 
   # when model has NA value in coefficients, broom::tidy(model) return note column
   expect_true(identical(colnames(ret), expect_colnames) ||
