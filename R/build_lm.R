@@ -1569,7 +1569,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   switch(type,
     coefficients = {
       ret <- broom:::tidy.glm(x)
-      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      ret <- ret %>% mutate(conf.low=estimate-1.96*std.error, conf.high=estimate+1.96*std.error)
       if (x$family$family == "binomial" && x$family$link == "logit") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
         if (!is.null(variable_metric) && variable_metric == "odds_ratio") { # For Analytics View, overwrite conf.low/conf.high with those of odds ratio.

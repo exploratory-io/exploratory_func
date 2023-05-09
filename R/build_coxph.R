@@ -839,7 +839,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       if (pretty.name){
 
         if (all(c("conf.high", "conf.low") %in% colnames(ret))) {
-          ret <- ret %>% dplyr::relocate(conf.low, .after=conf.high)
+          ret <- ret %>% dplyr::relocate(conf.low, .before=conf.high)
         }
 
         colnames(ret)[colnames(ret) == "term"] <- "Term"

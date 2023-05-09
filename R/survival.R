@@ -192,7 +192,7 @@ tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time =
   }
 
   if (all(c("conf.high", "conf.low") %in% colnames(ret))) {
-    ret <- ret %>% dplyr::relocate(conf.low, .after=conf.high)
+    ret <- ret %>% dplyr::relocate(conf.low, .before=conf.high)
   }
 
   colnames(ret)[colnames(ret) == "time"] <- "Time"
