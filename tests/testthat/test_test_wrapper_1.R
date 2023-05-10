@@ -140,6 +140,7 @@ test_that("test exp_ttest_aggregated", {
   expect_true("Rows" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  expect_true("p.value" %in% colnames(ret))
 })
 
 test_that("test two sample t-test with column name", {
@@ -348,6 +349,7 @@ test_that("test exp_chisq", {
   ))
   expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
+  expect_true("p.value" %in% colnames(prob_dist))
 })
 
 test_that("test exp_chisq with power", {
@@ -467,6 +469,8 @@ test_that("test exp_ttest", {
   expect_true("Rows" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  expect_true("p.value" %in% colnames(ret))
+
 })
 
 test_that("test exp_ttest with factor explanatory variable", {
@@ -689,6 +693,8 @@ test_that("test 2-way ANOVA with exp_anova with repeat-by", {
       "Conf Low", "Conf High","Standard Error","DF","t Value","P Value","Method"))
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  expect_true("p.value" %in% colnames(ret))
+
   ret <- model_df %>% tidy_rowwise(model, type="levene")
   ret <- model_df %>% tidy_rowwise(model, type="shapiro")
   ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
@@ -708,6 +714,8 @@ test_that("test ANCOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  expect_true("p.value" %in% colnames(ret))
+
   ret <- model_df %>% tidy_rowwise(model, type="anova")
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
@@ -812,6 +820,8 @@ test_that("test exp_anova", {
 
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  expect_true("p.value" %in% colnames(ret))
+
   ret <- model_df %>% tidy_rowwise(model, type="shapiro")
   ret <- model_df %>% tidy_rowwise(model, type="levene")
   ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
