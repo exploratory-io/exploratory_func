@@ -2507,8 +2507,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       x_matrix <- matrix(as.numeric(x_summary$univariate.tests), ncol=ncol(x_summary$univariate.tests))
       colnames(x_matrix) <- colnames(x_summary$univariate.tests)
       ret0 <- as.data.frame(x_matrix)
-
-      ret <- generate_ftest_density_data(x$anova_table$F[1], p.value=summary.data.frame$p.value, df1=x$anova_table$`num Df`[1], df2=x$anova_table$`den Df`[1], sig_level=x$test_sig_level)
+      ret <- generate_ftest_density_data(x$anova_table$F[1], p.value=ret0$p.value, df1=x$anova_table$`num Df`[1], df2=x$anova_table$`den Df`[1], sig_level=x$test_sig_level)
     } else if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
       ret0 <- x$ss3
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
