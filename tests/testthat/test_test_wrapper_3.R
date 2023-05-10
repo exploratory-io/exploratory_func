@@ -8,6 +8,10 @@ test_that("test exp_kruskal", {
   expect_true("p.value" %in% colnames(ret))
 
   ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_true("Eta Squared" %in% colnames(ret))
+  expect_true(ret$`Eta Squared` > 0.424)
+  expect_true(ret$`Eta Squared` < 0.425)
+  
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
                c("gear","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",

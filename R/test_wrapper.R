@@ -2589,6 +2589,13 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pai
       model$data <- df
       model$epsilon_squared <- epsilon_squared
       model$test_sig_level <- test_sig_level
+      # Calculate effect size: eta2[H] = (H - k + 1)/(n - k)
+      # H: Value obtained in the Kruskal-Wallis test 
+      # k: Number of groups 
+      # n: Total number of observation
+      K <- n_distinct(df[[var2_col]])
+      H <- model$statistic
+      model$effsize <- (H - K + 1)/(N - K)
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -2614,11 +2621,12 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     note <- NULL
     ret <- broom:::tidy.htest(x)
     ret <- ret %>% dplyr::select(statistic, p.value) # Removed method since it is always "Kruskal-Wallis rank sum test" here.
-    ret <- ret %>% dplyr::mutate(df=!!x$parameter, epsilon_squared=!!x$epsilon_squared, n=!!tot_n_rows)
+    ret <- ret %>% dplyr::mutate(df=!!x$parameter, effsize=!!x$effsize, epsilon_squared=!!x$epsilon_squared, n=!!tot_n_rows)
     ret <- ret %>% dplyr::rename(`H Value` = statistic,
                                  `P Value`=p.value,
                                  `DF`=df,
                                  `Epsilon Squared`=epsilon_squared,
+                                 `Eta Squared`=effsize,
                                  `Rows`=n)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
