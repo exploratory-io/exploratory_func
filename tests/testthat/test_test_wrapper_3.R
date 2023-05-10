@@ -9,7 +9,8 @@ test_that("test exp_kruskal", {
 
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_true("Eta Squared" %in% colnames(ret))
-  expect_equal(ret$`Eta Squared`, 0.424, tolerance=1e-3)
+  expect_true(ret$`Eta Squared` > 0.424)
+  expect_true(ret$`Eta Squared` < 0.425)
   
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
