@@ -1,13 +1,13 @@
 
 # Generates data for t distribution probability density with critical section and statistic
 # to depict a result of a t-test.
-generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "two.sided") {
+generate_ttest_density_data <- function(t, p.value, df, sig_level = 0.05, alternative = "two.sided") {
   l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
 
   x <- seq(from=-l,to=l,by=l/500 )
   ret <- tibble::tibble(x=x, y=dt(x, df=df))
 
-  ret2 <- tibble::tibble(x=t, y=dt(x, df=df), statistic=TRUE)
+  ret2 <- tibble::tibble(x=t, y=dt(x, df=df), statistic=TRUE, p.value=p.value[1])
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
@@ -75,14 +75,14 @@ generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 
 
 # Generates data for chi-square distribution probability density with critical section and statistic
 # to depict a result of a chi-square test.
-generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
+generate_chisq_density_data <- function(stat, p.value, df, sig_level = 0.05) {
   tx <- qchisq(1-sig_level, df=df) # The chisq value that corresponds to the significance level.
   l <- max(df*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
 
   x <- seq(from=0, to=l, by=l/1000 )
   ret <- tibble::tibble(x=x, y=dchisq(x, df=df))
 
-  ret2 <- tibble::tibble(x=stat, y=dchisq(x, df=df), statistic=TRUE)
+  ret2 <- tibble::tibble(x=stat, y=dchisq(x, df=df), statistic=TRUE, p.value=p.value[1])
   ret <- bind_rows(ret, ret2)
 
   ret <- ret %>% mutate(critical=x>=tx)
@@ -122,16 +122,14 @@ generate_chisq_density_data_for_power <- function(df, w, N, crit) {
 
 # Generates data for F distribution probability density with critical section and statistic
 # to depict a result of a F test like one-way ANOVA.
-generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
+generate_ftest_density_data <- function(stat, p.value, df1, df2, sig_level = 0.05) {
   tx <- qf(1-sig_level, df1=df1, df2=df2) # The chisq value that corresponds to the significance level.
   l <- max(df1/df2*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
 
   x <- seq(from=0,to=l,by=l/1000 )
   ret <- tibble::tibble(x=x, y=df(x, df1=df1, df2=df2))
-
-  ret2 <- tibble::tibble(x=stat, y=df(x, df1=df1, df2=df2), statistic=TRUE)
+  ret2 <- tibble::tibble(x=stat, y=df(x, df1=df1, df2=df2), statistic=TRUE, p.value=p.value[1])
   ret <- bind_rows(ret, ret2)
-
   ret <- ret %>% mutate(critical=x>=tx)
   ret <- ret %>% mutate(df1=df1, df2=df2)
   ret
@@ -139,13 +137,13 @@ generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
 
 # Generated data of a normal distribution with critical section and statistic for visualization.
 # We currently use it for non-exact Wilcoxon test.
-generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternative = "two.sided") {
+generate_norm_density_data <- function(z, p.value, mu, sigma, sig_level = 0.05, alternative = "two.sided") {
   r <- max(5*sigma, abs(z-mu)*1.1) # radius of x for the data we generate here.
 
   x <- seq(from=mu-r,to=mu+r,by=r/250)
   ret <- tibble::tibble(x=x, y=dnorm(x, mean=mu, sd=sigma))
 
-  ret2 <- tibble::tibble(x=z, y=dnorm(z, mean=mu, sd=sigma), statistic=TRUE)
+  ret2 <- tibble::tibble(x=z, y=dnorm(z, mean=mu, sd=sigma), statistic=TRUE, p.value=p.value[1])
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
@@ -166,7 +164,7 @@ generate_norm_density_data <- function(z, mu, sigma, sig_level = 0.05, alternati
 }
 
 # Generates data for probability density chart for exact Wilcoxon test.
-generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alternative = "two.sided") {
+generate_wilcox_density_data <- function(stat, p.value, n1, n2, sig_level = 0.05, alternative = "two.sided") {
   from <- min(stat, qwilcox(sig_level/4, m=n1, n=n2)) # Start of the x axis range.
   to <- max(stat, qwilcox(1-sig_level/4, m=n1, n=n2)) # End of the x axis range.
   # Give some space around the data range.
@@ -178,7 +176,7 @@ generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alterna
   ret <- tibble::tibble(x=x, y=dwilcox(x, m=n1, n=n2))
 
   # We need to take the mean of the density at the two closest integer values since non-integer density values are zero.
-  ret2 <- tibble::tibble(x=stat, y=mean(dwilcox(c(floor(stat), ceiling(stat)), m=n1, n=n2)), statistic=TRUE)
+  ret2 <- tibble::tibble(x=stat, y=mean(dwilcox(c(floor(stat), ceiling(stat)), m=n1, n=n2)), statistic=TRUE, p.value=p.value[1])
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
@@ -199,7 +197,7 @@ generate_wilcox_density_data <- function(stat, n1, n2, sig_level = 0.05, alterna
 }
 
 # Generates data for probability density chart for exact sign rank test.
-generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternative = "two.sided") {
+generate_signrank_density_data <- function(stat, p.value, n, sig_level = 0.05, alternative = "two.sided") {
   from <- min(stat, qsignrank(sig_level/4, n=n)) # Start of the x axis range.
   to <- max(stat, qsignrank(1-sig_level/4, n=n)) # End of the x axis range.
   # Give some space around the data range.
@@ -211,7 +209,7 @@ generate_signrank_density_data <- function(stat, n, sig_level = 0.05, alternativ
   ret <- tibble::tibble(x=x, y=dsignrank(x, n=n))
 
   # We need to take the mean of the density at the two closest integer values since non-integer density values are zero.
-  ret2 <- tibble::tibble(x=stat, y=mean(dsignrank(c(floor(stat), ceiling(stat)), n=n)), statistic=TRUE)
+  ret2 <- tibble::tibble(x=stat, y=mean(dsignrank(c(floor(stat), ceiling(stat)), n=n)), statistic=TRUE, p.value=p.value[1])
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
@@ -652,7 +650,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     }
   }
   else { # type == "prob_dist"
-    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
+    ret <- generate_chisq_density_data(x$statistic, p.value=x$p.value, x$parameter, sig_level=x$test_sig_level)
     ret
   }
   ret
@@ -1325,7 +1323,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- tibble::tibble()
       return(ret)
     }
-    ret <- generate_ttest_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
+    ret <- generate_ttest_density_data(x$statistic, p.value=x$p.value, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
     ret
   }
   else { # type == "data"
@@ -1581,16 +1579,16 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     tie_counts <- table(x$data[[x$var1]])
     if (x$n1 < 50 && x$n2 < 50 && max(tie_counts) <= 1) { # Use exact method as wilcox.test does.
       if (x$paired) {
-        ret <- generate_signrank_density_data(x$statistic, x$n1, sig_level=x$test_sig_level, alternative=x$alternative)
+        ret <- generate_signrank_density_data(x$statistic, p.value=x$p.value, x$n1, sig_level=x$test_sig_level, alternative=x$alternative)
       }
       else {
-        ret <- generate_wilcox_density_data(x$statistic, x$n1, x$n2, sig_level=x$test_sig_level, alternative=x$alternative)
+        ret <- generate_wilcox_density_data(x$statistic, p.value=x$p.value, x$n1, x$n2, sig_level=x$test_sig_level, alternative=x$alternative)
       }
     }
     else {
       mu <- wilcox_norm_dist_mean(x$alternative, x$paired, x$statistic, x$n1, x$n2)
       sigma <- wilcox_norm_dist_sd(x$alternative, x$paired, x$statistic, x$n1, x$n2, tie_counts)
-      ret <- generate_norm_density_data(x$statistic, mu, sigma, sig_level=x$test_sig_level, alternative=x$alternative)
+      ret <- generate_norm_density_data(x$statistic, p.value=x$p.value, mu, sigma, sig_level=x$test_sig_level, alternative=x$alternative)
     }
     ret
   }
@@ -2504,16 +2502,22 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     if (x$with_repeated_measures) { # Repeated measures ANOVA case - x is afex_aov class.
-      ret <- generate_ftest_density_data(x$anova_table$F[1], df1=x$anova_table$`num Df`[1], df2=x$anova_table$`den Df`[1], sig_level=x$test_sig_level)
+      # Get summary for P-Value.
+      x_summary <- summary(x$Anova)
+      x_matrix <- matrix(as.numeric(x_summary$univariate.tests), ncol=ncol(x_summary$univariate.tests))
+      colnames(x_matrix) <- colnames(x_summary$univariate.tests)
+      ret0 <- as.data.frame(x_matrix)
+
+      ret <- generate_ftest_density_data(x$anova_table$F[1], p.value=summary.data.frame$p.value, df1=x$anova_table$`num Df`[1], df2=x$anova_table$`den Df`[1], sig_level=x$test_sig_level)
     } else if (!is.null(x$covariates) || length(x$var2) > 1) { # ANCOVA or 2-way ANOVA case
       ret0 <- x$ss3
       # filter rows to extract the degree of freedoms (df1, df2) for the F-test.
       # df1 is from the categorical independent variable row, and df2 is from the residuals row.
       ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
-      ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+      ret <- generate_ftest_density_data(ret0$statistic[[1]], p.value=ret0$p.value, df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     } else { # one-way ANOVA case
       ret0 <- broom:::tidy.aov(x)
-      ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+      ret <- generate_ftest_density_data(ret0$statistic[[1]], p.value=ret0$p.value, df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     }
     ret
   }
@@ -2671,7 +2675,7 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- tibble::tibble()
       return(ret)
     }
-    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
+    ret <- generate_chisq_density_data(x$statistic, p.value=x$p.value, x$parameter, sig_level=x$test_sig_level)
     ret
   }
   else { # type == "data"
