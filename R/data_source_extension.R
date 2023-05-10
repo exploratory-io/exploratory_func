@@ -2,10 +2,17 @@
 #' This was initially treated as an extension, but we had to include it in this package to make it run on the server,
 #' which effectively makes it not really an extension.
 #' @export
-get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_end = NULL, full_columns = "Yes", tzone = ""){
+get_riem_measures <- function(station = "SFO", date_start = NULL, date_end = NULL, full_columns = "Yes", tzone = ""){
   loadNamespace("riem")
   if(is.null(date_end)){
     date_end <- as.character(Sys.Date())
+  }
+  if (date_start == "" || is.null(date_start)) {
+    if (tzone != "") {
+      date_start <- as.character(lubridate::today(tzone = tzone) %m-% months(3))
+    } else {
+      date_start <- as.character(lubridate::today() %m-% months(3))
+    }
   }
   # Since we cannot use POSIXct for start_date and end_date
   # We give little bit of buffers for start and end date and use filter to get the exact date range.
@@ -60,7 +67,8 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
 #' Wrapper API for riem_stations
 #' @export
 riem_stations_exp <- function(network = NULL) {
-  df <- riem::riem_stations(network)
+  # make sure only return "online" status stations.
+  df <- riem::riem_stations(network) %>% filter(online)
   df <- df %>% dplyr::mutate(name = dplyr::case_when(
     id == "RJOA" ~ "Hiroshima-shi",
     id == "RJOO" ~ "Osaka (Itami)",
