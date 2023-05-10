@@ -10,6 +10,9 @@ test_that("test exp_wilcox", {
   expect_equal(colnames(ret),
                c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
+
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  expect_true("p.value" %in% colnames(ret))
 })
 
 test_that("test exp_wilcox with factor explanatory variable", {
