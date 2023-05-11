@@ -100,7 +100,7 @@ execute_tidyquant <- function(stocks = NULL, from = NULL, to = NULL) {
     to <- lubridate::today()
   }
 
-  if (is.null(stocks) || stocks == "") {
+  if (is.null(stocks) || all(stocks == "")) {
     # If no stocks identified, return all SP500
     ret <- tidyquant::tq_index("SP500") %>%
       select(1) %>%
