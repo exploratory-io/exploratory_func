@@ -7,7 +7,8 @@ get_riem_measures <- function(station = "SFO", date_start = NULL, date_end = NUL
   if(is.null(date_end)){
     date_end <- as.character(Sys.Date())
   }
-  if (date_start == "" || is.null(date_start)) {
+  if (is.null(date_start) || date_start == "") {
+    # if date_start is not set, use 3 months ago as the date_start.
     if (tzone != "") {
       date_start <- as.character(lubridate::today(tzone = tzone) %m-% months(3))
     } else {
