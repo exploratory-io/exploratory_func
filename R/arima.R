@@ -343,8 +343,8 @@ exp_arima <- function(df, time, valueColumn,
 
     forecast_rows <- tibble(ds=forecasted_df$ds,
                             forecasted_value=mean(forecasted_df$y), # Note that y is a distribution object.
-                            forecasted_value_high=quantile(forecasted_df$y, conf_level),
-                            forecasted_value_low=quantile(forecasted_df$y, 1 - conf_level))
+                            forecasted_value_low=quantile(forecasted_df$y, 1 - conf_level),
+                            forecasted_value_high=quantile(forecasted_df$y, conf_level))
 
     if (test_mode){
       fitted_training_df$is_test_data <- FALSE
