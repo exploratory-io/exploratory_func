@@ -51,6 +51,10 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
 #' @param delimiter
 #' @export
 listItemsInGoogleCloudStorageBucket <- function(bucket, prefix, delimiter){
+  # set token before calling googleCloudStorageR API.
+  token <- exploratory:::getGoogleTokenForCloudStorage()
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+
   googleCloudStorageR::gcs_list_objects(bucket = bucket, detail = "more", prefix = prefix, delimiter = delimiter)
 }
 
@@ -169,6 +173,9 @@ searchAndGetCSVFilesFromGoogleCloudStorage <- function(bucket = "", folder = "",
                                        comment = "", trim_ws = FALSE,
                                        skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                                        progress = interactive()) {
+  # set token before calling googleCloudStorageR API.
+  token <- exploratory:::getGoogleTokenForCloudStorage()
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -227,6 +234,9 @@ getExcelFileFromGoogleCloudStorage <- function(file, bucket, sheet = 1, col_name
 
 #'@export
 searchAndGetExcelFilesFromGoogleCloudStorage <- function(bucket = '', folder = '', search_keyword, for_preview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
+  # set token before calling googleCloudStorageR API.
+  token <- exploratory:::getGoogleTokenForCloudStorage()
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -326,6 +336,9 @@ getParquetFilesFromGoogleCloudStorage <- function(files, bucket, for_preview = F
 #'
 #'@export
 searchAndGetParquetFilesFromGoogleCloudStorage <- function(bucket = '', folder = '', search_keyword, for_preview = FALSE, col_select = NULL) {
+  # set token before calling googleCloudStorageR API.
+  token <- exploratory:::getGoogleTokenForCloudStorage()
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
