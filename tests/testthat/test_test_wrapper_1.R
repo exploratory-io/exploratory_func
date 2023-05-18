@@ -842,6 +842,12 @@ test_that("test exp_anova with logical group column", {
   res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
 })
 
+test_that("test exp_anova with factor group column", {
+  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
+  model_df <- exp_anova(mtcars2, mpg, `a m`)
+  res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
+})
+
 test_that("test exp_anova with group-level error (lack of unique values)", {
   df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_anova(`value`, `category`)

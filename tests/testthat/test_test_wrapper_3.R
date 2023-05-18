@@ -39,3 +39,28 @@ test_that("test exp_kruskal with group-level error", {
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })
+
+
+test_that("test exp_kruskal with pairs_adjust types.", {
+  model_df <- mtcars %>% exp_kruskal(mpg, cyl, pairs_adjust = "bonferroni")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  expect_equal(nrow(ret), 3) # for cyl=4, 6, 8.
+
+  model_df <- mtcars %>% exp_kruskal(mpg, cyl, pairs_adjust = "sidak")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  expect_equal(nrow(ret), 3)
+
+  model_df <- mtcars %>% exp_kruskal(mpg, cyl, pairs_adjust = "holm")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  expect_equal(nrow(ret), 3)
+
+  model_df <- mtcars %>% exp_kruskal(mpg, cyl, pairs_adjust = "hochberg")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  expect_equal(nrow(ret), 3)
+
+  model_df <- mtcars %>% exp_kruskal(mpg, cyl, pairs_adjust = "none")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs")
+  expect_equal(nrow(ret), 3)
+})
+
+

@@ -723,7 +723,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       }
   
       # adjust order of output columns
-      ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+      ret <- ret %>% dplyr::select(ds, y, yhat, yhat_lower, yhat_upper, trend, trend_lower, trend_upper, 
                                    matches('^yearly$'), matches('^yearly_lower$'), matches('^yearly_upper$'),
                                    matches('^quarterly$'), matches('^quarterly_lower$'), matches('^quarterly_upper$'),
                                    matches('^monthly$'), matches('^monthly_lower$'), matches('^monthly_upper$'),
