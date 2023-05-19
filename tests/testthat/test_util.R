@@ -1094,6 +1094,66 @@ test_that("test %equal_or_all%", {
   expect_equal(nrow(ret), 3)
 })
 
+test_that("test %not_equal_or_all%", {
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% 2)
+  expect_equal(nrow(ret), 2)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% NULL)
+  expect_equal(nrow(ret), 3)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% "")
+  expect_equal(nrow(ret), 3)
+})
+
+test_that("test %greater_or_all%", {
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_all% 2)
+  expect_equal(nrow(ret), 1)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_all% NULL)
+  expect_equal(nrow(ret), 3)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_all% "")
+  expect_equal(nrow(ret), 3)
+})
+
+test_that("test %greater_or_equal_or_all%", {
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% 2)
+  expect_equal(nrow(ret), 2)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% NULL)
+  expect_equal(nrow(ret), 3)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% "")
+  expect_equal(nrow(ret), 3)
+})
+
+test_that("test %less_or_all%", {
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_all% 2)
+  expect_equal(nrow(ret), 1)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_all% NULL)
+  expect_equal(nrow(ret), 3)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_all% "")
+  expect_equal(nrow(ret), 3)
+})
+
+test_that("test %less_or_equal_or_all%", {
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% 2)
+  expect_equal(nrow(ret), 2)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% NULL)
+  expect_equal(nrow(ret), 3)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% "")
+  expect_equal(nrow(ret), 3)
+})
+
 test_that("test mase", {
   data <- data.frame(`actual` = c(1,2,NA,2,2.5,3,NA,4),
                      `predicted` = c(1,2,3,3,3,2,4,4),
