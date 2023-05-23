@@ -6,11 +6,12 @@ test_that("build_coxph.fast with start_time and end_time", {
   for (type in c("Date", "POSIXct")) {
     df <- survival::lung # this data has NAs.
     df <- df %>% mutate(status = status==2)
+    # Set the start time to be 1 year before. 
     if (type == "Date") {
-      df <- df %>% mutate(start = as.Date("2021-01-01"), end = start + lubridate::days(time))
+      df <- df %>% mutate(start = lubridate::today() - lubridate::years(1), end = start + lubridate::days(time))
     }
     else {
-      df <- df %>% mutate(start = as.POSIXct("2021-01-01"), end = start + lubridate::days(time))
+      df <- df %>% mutate(start = lubridate::now() - lubridate::years(1), end = start + lubridate::days(time))
     }
     df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
     df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
@@ -43,7 +44,8 @@ test_that("build_coxph.fast with start_time and end_time", {
     expect_equal(sum(is.na(ret$`Predicted Event Time`)), 0)
 
     # Point-of-time-based survival rate prediction with base time specified as a specific date.
-    ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="value", base_time=as.Date("2022-01-01"), pred_time=5)
+    # Set 5 days before the max of start time column as the base time.
+    ret <- df %>% select(-`ti me`, -end, -`sta tus`) %>% add_prediction(model_df=model_df, base_time_type="value", base_time= lubridate::today() - lubridate::days(5), pred_time=5)
     expected_colnames <- c("inst", "a ge", "se-x", "ph.ecog", "ph.karno", "pat.karno", "meal.cal", "wt.loss",
                            "start", "Base Time", "Base Survival Time", "Prediction Time",
                            "Prediction Survival Time", "Predicted Survival Rate", "Linear Predictor", "Std Error",
