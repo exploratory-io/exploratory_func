@@ -122,12 +122,8 @@ test_that("exp_xgboost - regression - evaluate training and test with locale con
   set.seed(1) # For stability of result.
   orig_locale <- Sys.getlocale("LC_TIME")
   tryCatch({
-    if (Sys.info()[["sysname"]] == "Windows") {
-      Sys.setlocale("LC_TIME", "Japanese_Japan.932")
-    }
-    else {
-      Sys.setlocale("LC_TIME", "ja_JP.UTF-8")
-    }
+    # Set Japanese locale for test. 
+    Sys.setlocale("LC_TIME", "ja_JP.UTF-8")
     model_df <- flight %>%
                   exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`, `FL DATE`,
                               predictor_funs=list(`CAR RIER`="none", `ORI GIN`="none", `DEP DELAY`="none", `AIR TIME`="none", list(`FL DATE_y`="year", `FL DATE_m`="monname", `FL DATE_dom`="day", `FL DATE_dow`="wday")),
