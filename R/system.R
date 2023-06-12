@@ -3166,11 +3166,11 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
   }
-  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
+  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  exploratory::read_excel_files(files = files, forPreview = forPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
+  exploratory::read_excel_files(files = as.character(files), forPreview = forPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
@@ -3398,11 +3398,11 @@ searchAndReadDelimFiles <- function(folder, pattern = "", forPreview = FALSE, de
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
   }
-  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
+  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  exploratory::read_delim_files(files = files, forPreview = forPreview, delim = delim, quote = quote,
+  exploratory::read_delim_files(files = as.character(files), forPreview = forPreview, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
                                 col_names = col_names, col_types = col_types,
                                 locale = locale,
@@ -3636,11 +3636,11 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
   }
-  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
+  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  read_parquet_files(files, forPreview = forPreview, col_select = col_select)
+  read_parquet_files(as.character(files), forPreview = forPreview, col_select = col_select)
 }
 
 #'API that imports multiple same structure parquet files and merge it to a single data frame
