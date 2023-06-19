@@ -41,6 +41,9 @@ test_that("bind_rows", {
   # backward compatibility check
   res5 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, .id = "ID")
   expect_equal(unique(res5$ID), c("1","2","3"))
+  # col_index_as_col_name
+  res6 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars2, .id = "ID", use_col_index_as_col_name = TRUE)
+  expect_equal(colnames(res6),c("ID", stringr::str_c("X",c(1:11))))
 })
 
 test_that("union", {

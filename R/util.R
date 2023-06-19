@@ -1962,7 +1962,7 @@ extract_argument_names <- function(...) {
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL, encoding = NULL) {
+bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL, encoding = NULL, use_col_index_as_col_name = FALSE) {
   # for compatiblity with dply::bind_rows
   # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
   # use dplyr::bind_rows' .id argumetn value as id_column_name
@@ -2056,6 +2056,14 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
         }
       }
     }
+    # if use_col_index_as_col_name is set as TRUE
+    # Set X1, X2, ... as column names
+    if (use_col_index_as_col_name) {
+      dataframes_updated <- lapply(dataframes_updated, function(df) {
+        colnames(df) <- stringr::str_c("X", c(1:ncol(df)))
+        df
+      })
+    }
     # create a name for the column that holds data frame name.
     # and make sure to make the column name uniqe with avoid_conflict API.
     if(!is.null(id_column_name)) {
@@ -2079,13 +2087,21 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
     }
   } else {
     # if .id argument is passed, create a name for the column that holds data frame name.
-    # and make sure to make the column name uniqe with avoid_conflict API.
+    # and make sure to make the column name unique with avoid_conflict API.
     if(!is.null(id_column_name)) {
       new_id <- avoid_conflict(colnames(dataframes[[1]]), id_column_name)
     } else {
       new_id <- id_column_name
     }
-    dplyr::bind_rows(..., .id = new_id)
+    # if use_col_index_as_col_name is set as TRUE
+    # Set X1, X2, ... as column names
+    if (use_col_index_as_col_name) {
+      dataframes <- lapply(dataframes, function(df) {
+        colnames(df) <- stringr::str_c("X", c(1:ncol(df)))
+        df
+      })
+    }
+    dplyr::bind_rows(dataframes, .id = new_id)
   }
 }
 
