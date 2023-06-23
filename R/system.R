@@ -3166,6 +3166,13 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
   }
+  if (stringr::str_starts(pattern, "\\^")) {
+    # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
+    pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
+  } else if (pattern != "") {
+    # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
+    pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
+  }
   files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
@@ -3397,6 +3404,13 @@ searchAndReadDelimFiles <- function(folder, pattern = "", forPreview = FALSE, de
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
+  }
+  if (stringr::str_starts(pattern, "\\^")) {
+    # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
+    pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
+  } else if (pattern != "") {
+    # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
+    pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
   files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
@@ -3635,6 +3649,13 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
+  }
+  if (stringr::str_starts(pattern, "\\^")) {
+    # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
+    pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
+  } else if (pattern != "") {
+    # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
+    pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
   files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
