@@ -838,7 +838,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
-                            subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "") {
+                            subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "", role = "") {
 
   drv = NULL
   conn = NULL
@@ -1523,7 +1523,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
 
-    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, additionalParams, sep = ":")
+    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, additionalParams, role, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1559,6 +1559,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         "Driver=", driver, ";Server=", host, ";Port=", port, ";WAREHOUSE=", catalog, ";Database=", databaseName,
         ";UID=", username, ";PWD=", password
       );
+      if (role != "") {
+        connectionString <- stringr::str_c(connectionString, ";role=", role);
+      }
       if (additionalParams != "") {
         connectionString <- stringr::str_c(connectionString, ";", additionalParams);
       }
@@ -1670,7 +1673,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
-                              sslClientCertKey = "", sslCA = "", subType = NULL, driver = "", sslMode = '') {
+                              sslClientCertKey = "", sslCA = "", subType = NULL, driver = "", sslMode = '', role = '') {
   key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
@@ -1756,7 +1759,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     if (timezone == "") {
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
-    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, sep = ":")
+    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, role, sep = ":")
   } else if (type %in% c("oracle")) {
     key <- paste("oracle", host, port, databaseName, username, timezone, sep = ":")
   }
@@ -1793,15 +1796,15 @@ getListOfTablesWithODBC <- function(conn){
 }
 
 #' @export
-getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = "", sslCA = "", sslMode = ""){
+getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = "", sslCA = "", sslMode = "", role = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema, sslCA = sslCA, sslMode = sslMode)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema, sslCA = sslCA, sslMode = sslMode, role = role)
 
   tryCatch({
     tables <- DBI::dbListTables(conn)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, sslMode = sslMode, sslCA = sslCA)
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, sslMode = sslMode, sslCA = sslCA, role = role)
     if (!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
@@ -1822,9 +1825,9 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
 }
 
 #' @export
-getListOfColumns <- function(type, host, port, databaseName, username, password, table, sslMode = '', sslCA = ''){
+getListOfColumns <- function(type, host, port, databaseName, username, password, table, sslMode = '', sslCA = '', role = ''){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, sslMode = sslMode, sslCA = sslCA)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, sslMode = sslMode, sslCA = sslCA, role = role)
   tryCatch({
     columns <- DBI::dbListFields(conn, table)
   }, error = function(err) {
@@ -1851,7 +1854,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 
 #' API to execute a query that can be handled with DBI
 #' @export
-executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = "", sslCA = "", sslMode = "", ...){
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = "", sslCA = "", sslMode = "", role = "", ...){
   if (type %in% c("mysql", "aurora")) { # In case of MySQL, just use queryMySQL, since it has workaround to read multibyte column names without getting garbled.
     df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query, timezone = timezone, sslCA = sslCA)
     df <- readr::type_convert(df)
@@ -1860,7 +1863,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     return(df)
   }
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema, timezone = timezone, sslMode = sslMode, sslCA = sslCA)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema, timezone = timezone, sslMode = sslMode, sslCA = sslCA, role = role)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -1868,7 +1871,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, timezone = timezone, sslMode = sslMode, sslCA = sslCA)
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, timezone = timezone, sslMode = sslMode, sslCA = sslCA, role = role)
     if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
@@ -2034,7 +2037,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param catalog - For Snowflake's Warehouse.
 #' @param timezone - For database session timezone.
 #'
-queryODBC <- function(dsn="", username="", password="", additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", ...){
+queryODBC <- function(dsn="", username="", password="", additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", role = "", ...){
   if(type == "") {
     type <- "odbc"
   }
@@ -2043,7 +2046,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   if (type == "dbiodbc" && numOfRows == 0) {
     numOfRows = -1;
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString, subType = subType)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString, subType = subType, role = role)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -2063,7 +2066,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
-      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams, role = role)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
@@ -2081,7 +2084,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+    clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams, role = role)
     stop(err)
   })
   # mssqlserver uses odbc package and DBI package
@@ -2093,7 +2096,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   }
   if (type == "access") { # clear access connection so that lock file is removed.
     tryCatch({
-      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams, role = role)
       odbc::dbDisconnect(conn)
     })
   }
