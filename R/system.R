@@ -3174,6 +3174,10 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
   files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
+  if (length(files) > 0) {
+    # Exclude Excel temporary files whose name starts with ~$ (e.g. ~$test.xlsx)
+    files <- files[!grepl("/\\~\\$", files)]
+  }
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
