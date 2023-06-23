@@ -3169,7 +3169,7 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "") {
+  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
@@ -3412,7 +3412,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", forPreview = FALSE, de
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "") {
+  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
@@ -3657,7 +3657,7 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "") {
+  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
