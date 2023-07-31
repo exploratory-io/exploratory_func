@@ -2025,7 +2025,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param username - Usernaame of the database
 #' @param password - Password of the database
 #' @param additionalParams - Additional parameters
-#' @param numOfRows - Nuber of rows in result. 0 means fetch all rows
+#' @param numOfRows - Nuber of rows in result. -1 means fetch all rows. if you set 0, it returns no row. The default is 0.
 #' @param query - SQL query
 #' @param stringsAsFactors - Flag to tell if you want to convert character data type to factor data type in result.
 #' @param host - Server where the database is running.
