@@ -1611,6 +1611,9 @@ extract_from_date <- function(x, type = "fltoyear") {
     monnamelong = {
       ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
+    monthname_with_year = {
+      ret <- format(x, "%Y-%m")
+    },
     week = {
       ret <- lubridate::week(x)
     },
@@ -2522,6 +2525,7 @@ column_mutate_quosure <- function(func, cname) {
       "monname",
       "monthnamelong",
       "monnamelong",
+      "monthname_with_year",
       "week",
       "week_of_month",
       "week_of_quarter",

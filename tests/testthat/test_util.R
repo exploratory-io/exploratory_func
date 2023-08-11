@@ -1780,6 +1780,11 @@ test_that("mutate_group", {
   expect_equal(as.character(head(df16)$hired_date_monnamelong[[2]]), "January")
   expect_equal(head(df16)$salary_cumsum[[1]], 2426)
 
+  # group by Date - extract month name (year and month)
+  df16b <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monthname_with_year` = "hired_date"),group_funs = c("monthname_with_year"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df16b)$hired_date_monthname_with_year[[2]]), "1977-06")
+  expect_equal(head(df16b)$salary_cumsum[[1]], 19246)
+
   # group by Date - extract week
   df17 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("week"),salary_cumsum = cumsum(salary))
   expect_equal(head(df17)$hired_date_week[[2]], 1)
