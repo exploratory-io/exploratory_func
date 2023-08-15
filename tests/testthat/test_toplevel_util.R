@@ -29,7 +29,18 @@ test_that("test row_as_header", {
     .Names = c("X2", "X2_2", "b", "i_percent"),
     row.names = c(1L, 3L),
     class = "data.frame"))
-
+  test_df2 <- readr::read_csv("X1,X2
+                              1000,2000
+                              2000,5000
+                              Sales,Quantity")
+  ret4 <- row_as_header(test_df2, row_index = -1, clean_names = TRUE, guess_data_type = TRUE)
+  expect_equal(colnames(ret4), c("Sales", "Quantity"))
+  expect_equal(class(ret4$Sales), "numeric")
+  expect_equal(class(ret4$Quantity), "numeric")
+  ret5 <- row_as_header(test_df2, row_index = 0, clean_names = TRUE, guess_data_type = TRUE)
+  expect_equal(colnames(ret5), c("X1", "X2")) # row_index: 0 does not exist, so no change
+  expect_equal(class(ret5$X1), "character") # row_index: 0 does not exist, so no change
+  expect_equal(class(ret5$X2), "character") # row_index: 0 does not exist, so no change
 })
 
 test_that("test row_as_header with factor", {
