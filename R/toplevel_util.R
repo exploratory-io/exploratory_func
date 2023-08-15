@@ -8,15 +8,14 @@
 #' @export
 row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE, convert_to_ascii = FALSE, guess_data_type = FALSE){
   validate_empty_data(df)
-
-  loadNamespace("stringr")
-  loadNamespace("janitor")
-  if (row_index < 0) { # it means from the bottom
-    row_index <- nrow(df) + row_index + 1; # -1 means the last row (i.e. nrow(df)) so adjust it by adding 1
-  }
   if (row_index == 0) { # there is no 0th row so just return the data frame as is.
     df
   } else {
+    loadNamespace("stringr")
+    loadNamespace("janitor")
+    if (row_index < 0) { # it means from the bottom
+      row_index <- nrow(df) + row_index + 1; # -1 means the last row (i.e. nrow(df)) so adjust it by adding 1
+    }
     header_row <- df[row_index, ]
     # make values to character
     # vapply is used because as.character should be used for each column.
