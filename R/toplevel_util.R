@@ -14,23 +14,27 @@ row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE, co
   if (row_index < 0) { # it means from the bottom
     row_index <- nrow(df) + row_index + 1; # -1 means the last row (i.e. nrow(df)) so adjust it by adding 1
   }
-  header_row <- df[row_index, ]
-  # make values to character
-  # vapply is used because as.character should be used for each column.
-  # otherwise, factor is converted to integer.
-  names <- vapply(header_row, function(val){as.character(val)}, FUN.VALUE="")
-  if (prefix != ""){
-    names <- stringr::str_c(prefix, names)
+  if (row_index == 0) { # there is no 0th row so just return the data frame as is.
+    df
+  } else {
+    header_row <- df[row_index, ]
+    # make values to character
+    # vapply is used because as.character should be used for each column.
+    # otherwise, factor is converted to integer.
+    names <- vapply(header_row, function(val){as.character(val)}, FUN.VALUE="")
+    if (prefix != ""){
+      names <- stringr::str_c(prefix, names)
+    }
+    # remove a row based on row_index
+    ret <- safe_slice(df, row_index, remove = TRUE)
+    colnames(ret) <- names
+    if (clean_names) {
+      # Pass ascii as FALSE to prevent non-ascii column names converted to ascii.
+      ret <- janitor::clean_names(ret, case="parsed", ascii = convert_to_ascii)
+    }
+    if (guess_data_type) {
+      ret <- readr::type_convert(ret)
+    }
+    ret
   }
-  # remove a row based on row_index
-  ret <- safe_slice(df, row_index, remove = TRUE)
-  colnames(ret) <- names
-  if (clean_names) {
-    # Pass ascii as FALSE to prevent non-ascii column names converted to ascii.
-    ret <- janitor::clean_names(ret, case="parsed", ascii = convert_to_ascii)
-  }
-  if (guess_data_type) {
-    ret <- readr::type_convert(ret)
-  }
-  ret
 }
