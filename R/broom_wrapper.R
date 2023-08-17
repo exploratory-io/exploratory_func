@@ -1567,7 +1567,11 @@ model_anova <- function(df, pretty.name = FALSE){
     # for glm anova
     colnames(ret)[colnames(ret) == "Deviance"] <- "deviance"
     colnames(ret)[colnames(ret) == "Resid..Df"] <- "residual_df"
+    # It returns "df.residual" in the newer R package version. 
+    colnames(ret)[colnames(ret) == "df.residual"] <- "residual_df"
     colnames(ret)[colnames(ret) == "Resid..Dev"] <- "residual_deviance"
+    # It returns "df.residual" in the newer R package version. 
+    colnames(ret)[colnames(ret) == "residual.deviance"] <- "residual_deviance"
     # for coxph anova
     colnames(ret)[colnames(ret) == "logLik"] <- "log_likelihood"
     colnames(ret)[colnames(ret) == "Pr...Chi.."] <- "p_value"
