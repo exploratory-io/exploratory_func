@@ -2579,30 +2579,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pai
         }
       }
       model <- kruskal.test(formula, data = df, ...)
-
-      # dunn.test pre-processing.
-      # Escape " - " string in the variable since dunn.test concatenates
-      # the variable names with " - ".
-      df.dunn <- df
-      if (is.character(df.dunn[[var2_col]]) || is.factor(df.dunn[[var2_col]])) {
-        df.dunn[[var2_col]] <- stringr::str_replace_all(df.dunn[[var2_col]], " - ", "__SeP__")
-      }
-
-      # Run dunn.test.
-      res.dunn <- tibble::as.tibble(dunn.test::dunn.test(df.dunn[[var1_col]],df.dunn[[var2_col]], method=pairs_adjust, alpha=test_sig_level))
-
-      # dunn.test post-processing.
-      # Restore " - " string in the "comparisons" variable.
-      if (is.character(res.dunn[["comparisons"]]) || is.factor(res.dunn[["comparisons"]])) {
-        res.dunn <- res.dunn %>%
-          # Separate comparisons values like "Cat 1 - Cat 2" into "Cat 1" and "Cat 2".
-          tidyr::separate(comparisons, into = c("Group 1", "Group 2"), sep = " - ", extra = "merge") %>%
-          # Restore " - " string in the variable.
-          dplyr::mutate(`Group 1` = stringr::str_replace_all(`Group 1`, "__SeP__", " - "),
-                        `Group 2` = stringr::str_replace_all(`Group 2`, "__SeP__", " - "))
-      }
-
-      model$dunn.test <- res.dunn
+      model$dunn.test <- dunn.test::dunn.test(df[[var1_col]],df[[var2_col]], method=pairs_adjust, alpha=test_sig_level)
       model$pairs_adjust <- pairs_adjust
       N <- nrow(df)
       epsilon_squared <- calculate_epsilon_squared(model, N)
@@ -2658,6 +2635,8 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
   else if (type == "pairs") {
     ret <- tibble::as_tibble(x$dunn.test)
     ret <- ret %>% dplyr::select(-chi2, -P)
+    # Separate comparisons values like "Cat 1 - Cat 2" into "Cat 1" and "Cat 2".
+    ret <- ret %>% tidyr::separate(comparisons, into = c("Group 1", "Group 2"), sep = " - ", extra = "merge")
     ret <- ret %>% dplyr::select(`Group 1`, `Group 2`, everything())
     ret <- ret %>% dplyr::rename(`Z Value`=Z,
                                  `P Value`=P.adjusted)
