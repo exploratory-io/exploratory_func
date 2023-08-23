@@ -2580,24 +2580,26 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pai
       }
       model <- kruskal.test(formula, data = df, ...)
 
+      df.dunn <- df
       # dunn.test pre-processing.
       # Escape " - " string in the variable since dunn.test concatenates
       # the variable names with " - ".
-      df.dunn <- df
-      if (is.character(df.dunn[[var2_col]]) || is.factor(df.dunn[[var2_col]])) {
+      preprocessed <- is.character(df.dunn[[var2_col]]) || is.factor(df.dunn[[var2_col]])
+      if (preprocessed) {
         df.dunn[[var2_col]] <- stringr::str_replace_all(df.dunn[[var2_col]], " - ", "__SeP__")
       }
 
       # Run dunn.test.
-      res.dunn <- tibble::as.tibble(dunn.test::dunn.test(df.dunn[[var1_col]],df.dunn[[var2_col]], method=pairs_adjust, alpha=test_sig_level))
+      res.dunn <- dunn.test::dunn.test(df.dunn[[var1_col]],df.dunn[[var2_col]], method=pairs_adjust, alpha=test_sig_level)
+
+      # Separate comparisons values like "Cat 1 - Cat 2" into "Cat 1" and "Cat 2".
+      res.dunn <- tibble::as.tibble(res.dunn) %>%
+        tidyr::separate(comparisons, into = c("Group 1", "Group 2"), sep = " - ", extra = "merge")
 
       # dunn.test post-processing.
-      # Restore " - " string in the "comparisons" variable.
-      if (is.character(res.dunn[["comparisons"]]) || is.factor(res.dunn[["comparisons"]])) {
+      # Restore " - " string in the variable.
+      if (preprocessed) {
         res.dunn <- res.dunn %>%
-          # Separate comparisons values like "Cat 1 - Cat 2" into "Cat 1" and "Cat 2".
-          tidyr::separate(comparisons, into = c("Group 1", "Group 2"), sep = " - ", extra = "merge") %>%
-          # Restore " - " string in the variable.
           dplyr::mutate(`Group 1` = stringr::str_replace_all(`Group 1`, "__SeP__", " - "),
                         `Group 2` = stringr::str_replace_all(`Group 2`, "__SeP__", " - "))
       }
