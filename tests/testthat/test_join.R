@@ -177,6 +177,100 @@ test_that("anti_join with case sensitive", {
   expect_equal(unlist(df12 %>% filter(lower_col == "d1a") %>% select(value_lower_col))[[1]], 4)
 })
 
+test_that("left_join with NA on target", {
+  source_df <- readr::read_csv("a, b, c
+1, 2, 3
+2, 3, 4
+3, 4, 5
+4, 5, 6
+5, 6, 7
+NA,7, 8
+NA,8, 9
+NA,9,10")
+  target_df <- readr::read_csv("a, d
+1, a
+2, b
+3, c
+4, e
+5, f
+NA,g
+NA,h
+NA,i
+NA,j")
+  result <- source_df %>% exploratory::left_join(target_df, dplyr::join_by(`a` == `a`))
+
+# result looks like this and it does not match na with target data frame.
+# a,b,c,d
+# 1,2,3,a
+# 2,3,4,b
+# 3,4,5,c
+# 4,5,6,e
+# 5,6,7,f
+# NA,7,8, NA
+# NA,8,9, NA
+# NA,9,10, NA
+
+  expect_equal(nrow(result),8)
+  expect_equal(ncol(result),4)
+  expect_equal(nrow(dplyr::filter(result, is.na(a))),3)
+
+  result <- source_df %>% exploratory::right_join(target_df, dplyr::join_by(`a` == `a`))
+
+#  a	b	c	d
+#  1	2	3	a
+#  2	3	4	b
+#  3	4	5	c
+#  4	5	6	e
+#  5	6	7	f
+#  NA NA NA g
+#  NA NA NA h
+#  NA NA NA i
+#  NA NA nA j
+
+  expect_equal(nrow(result),9)
+  expect_equal(ncol(result),4)
+  expect_equal(nrow(dplyr::filter(result, is.na(a))),4)
+
+  result <- source_df %>% exploratory::inner_join(target_df, dplyr::join_by(`a` == `a`))
+
+  # a	b	c	d
+  # 1	2	3	a
+  # 2	3	4	b
+  # 3	4	5	c
+  # 4	5	6	e
+  # 5	6	7	f
+
+  expect_equal(nrow(result),5)
+  expect_equal(ncol(result),4)
+  expect_equal(nrow(dplyr::filter(result, is.na(a))),0)
+
+  result <- source_df %>% exploratory::full_join(target_df, dplyr::join_by(`a` == `a`))
+
+  # a	b	c	d
+  # 1	2	3	a
+  # 2	3	4	b
+  # 3	4	5	c
+  # 4	5	6	e
+  # 5	6	7	f
+  # NA 7 8 g
+  # NA 7 8 h
+  # NA 7 8 i
+  # NA 7 8 j
+  # NA 8 9 g
+  # NA 8 9 h
+  # NA 8 9 i
+  # NA 8 9 j
+  # NA 9 10	g
+  # NA 9 10	h
+  # NA 9 10 i
+  # NA 9 10 j
+
+  expect_equal(nrow(result),17)
+  expect_equal(ncol(result),4)
+  expect_equal(nrow(dplyr::filter(result, is.na(a))),12)
+
+})
+
 test_that("cross_join with selected column", {
   source <- readr::read_csv('"ID","製品製品名"
 1,"机"
