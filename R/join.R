@@ -13,9 +13,17 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
       y[[by$y[[i]]]] <- NULL
     }
     if (exists("suffix")) {
-      res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy)
+      if (exists("na_matches")) {
+        res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy, na_matches = na_matches)
+      } else {
+        res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), suffix = suffix, copy = copy)
+      }
     } else {
-      res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), copy = copy)
+      if (exists("na_matches")) {
+        res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), copy = copy, na_matches = na_matches)
+      } else {
+        res <- fun(x, y, list(x = tmp_by_x, y = tmp_by_y), copy = copy)
+      }
     }
     res[tmp_by_x] <- list(NULL)
 
@@ -26,7 +34,7 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
 
 #' Wrapper function for dplyr's inner_join to support case insensitive join.
 #' @export
-inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...){
+inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     if (exclude_target_columns) {
@@ -36,15 +44,15 @@ inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
     }
   }
   if(ignorecase) {
-    insensitive_join(dplyr::inner_join)(x = x, y = y, by = by, copy = copy, suffix = suffix)
+    insensitive_join(dplyr::inner_join)(x = x, y = y, by = by, copy = copy, suffix = suffix, na_matches = na_matches)
   } else {
-    dplyr::inner_join(x = x, y = y, by = by, copy = copy, suffix = suffix);
+    dplyr::inner_join(x = x, y = y, by = by, copy = copy, suffix = suffix, na_matches = na_matches);
   }
 }
 
 #' @export
 #' Wrapper function for dplyr's left_join to support case insensitive join.
-left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...){
+left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     if (exclude_target_columns) {
@@ -54,15 +62,15 @@ left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ign
     }
   }
   if(ignorecase) {
-    insensitive_join(dplyr::left_join)(x = x, y = y, by = by, copy = copy, suffix = suffix)
+    insensitive_join(dplyr::left_join)(x = x, y = y, by = by, copy = copy, suffix = suffix, na_matches = na_matches)
   } else {
-    dplyr::left_join(x = x, y = y, by = by, copy = copy, suffix = suffix);
+    dplyr::left_join(x = x, y = y, by = by, copy = copy, suffix = suffix, na_matches = na_matches);
   }
 }
 
 #' @export
 #' Wrapper function for dplyr's right_join to support case insensitive join.
-right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...){
+right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...){
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     if (exclude_target_columns) {
@@ -72,15 +80,15 @@ right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
     }
   }
   if(ignorecase) {
-    insensitive_join(dplyr::right_join, "RIGHT")(x, y, by = by, copy = copy, suffix = suffix)
+    insensitive_join(dplyr::right_join, "RIGHT")(x, y, by = by, copy = copy, suffix = suffix, na_matches = na_matches)
   } else {
-    dplyr::right_join(x, y, by = by, copy = copy, suffix = suffix);
+    dplyr::right_join(x, y, by = by, copy = copy, suffix = suffix, na_matches = na_matches);
   }
 }
 
 #' @export
 #' Wrapper function for dplyr's full_join to support case insensitive join.
-full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, ...) {
+full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...) {
   # Limit target columns to use for join when target_columns are set.
   if (!is.null(target_columns)) {
     if (exclude_target_columns) {
