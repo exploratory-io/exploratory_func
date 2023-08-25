@@ -2389,8 +2389,13 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     formula1 <- as.formula(paste0('~`', x$var2[1], '`'))
     formula2 <- as.formula(paste0('~`', x$var2[2], '`'))
-    ret <- get_pairwise_contrast_df(x, formula1, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[1]]) %>% dplyr::select(`Variable`, everything())
-    ret2 <- get_pairwise_contrast_df(x, formula2, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[2]]) %>% dplyr::select(`Variable`, everything())
+    # Cast "Group 1" and "Group 2" columns to character to match the data type for bind_rows.
+    ret <- get_pairwise_contrast_df(x, formula1, pairs_adjust) %>% 
+      dplyr::mutate(`Variable`=(x$terms_mapping[x$var2[1]]), `Group 1`=as.character(`Group 1`), `Group 2`=as.character(`Group 2`)) %>% 
+      dplyr::select(`Variable`, everything())
+    ret2 <- get_pairwise_contrast_df(x, formula2, pairs_adjust) %>% 
+      dplyr::mutate(`Variable`=(x$terms_mapping[x$var2[2]]), `Group 1`=as.character(`Group 1`), `Group 2`=as.character(`Group 2`)) %>% 
+      dplyr::select(`Variable`, everything())
     ret <- ret %>% dplyr::bind_rows(ret2)
   }
   else if (type == "levene") {

@@ -677,6 +677,31 @@ test_that("test 2-way ANOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
   ret <- model_df %>% tidy_rowwise(model, type="data")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  ret <- model_df %>% tidy_rowwise(model, type="pairs_per_variable", pairs_adjust="tukey")
+})
+
+test_that("test 2-way ANOVA with with different data types on var1 and var2.", {
+  mtcars2 <- mtcars %>% mutate(`a m`=am == 1, `ge ar`=as.character(gear))
+  model_df <- mtcars2 %>% exp_anova(mpg, c("a m","ge ar"), func2=c("aschar","aschar"))
+  
+  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  # Make sure the estimate is between conf.low and conf.high.
+  expect_equal(all(ret$`Difference` >= ret$`Conf Low`), TRUE)
+  expect_equal(all(ret$`Difference` <= ret$`Conf High`), TRUE)
+
+  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
+  ret <- model_df %>% tidy_rowwise(model, type="levene")
+  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
+  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
+  ret <- model_df %>% tidy_rowwise(model, type="data")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  # Make sure this doesn't fail.
+  ret <- model_df %>% tidy_rowwise(model, type="pairs_per_variable", pairs_adjust="tukey")
+  # Make sure the output for "Group  1" and "Group  2" is in character.
+  expect_equal(ret$`Group 1`, c("FALSE", "3", "3", "4"))
+  expect_equal(ret$`Group 2`, c("TRUE", "4", "5", "5"))
 })
 
 test_that("test 2-way ANOVA with exp_anova with repeat-by", {
