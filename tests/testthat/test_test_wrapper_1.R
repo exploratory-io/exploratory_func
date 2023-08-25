@@ -737,6 +737,12 @@ test_that("test ANCOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="levene")
   ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
+
+  expect_equal(colnames(ret),
+    c("a m", "w t", "q sec", "Rows", "Mean", "Std Deviation", "Std Error", 
+    "Conf Low", "Conf High", "Mean (Adj)", "Std Error (Adj)", 
+    "Conf Low (Adj)", "Conf High (Adj)", "DF", "Minimum", "Maximum"))
+
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   expect_true("p.value" %in% colnames(ret))
