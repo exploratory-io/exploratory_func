@@ -2412,7 +2412,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
 
     if (!is.null(x$covariates)) { # ANCOVA case
-      ret <- broom::tidy(car::leveneTest(x$residuals, x$dataframe[[x$var2]], center=levene_test_center_fun))
+      # x$model[[x$var2]] is the data used to build the model.
+      ret <- broom::tidy(car::leveneTest(x$residuals, x$model[[x$var2]], center=levene_test_center_fun))
     }
     else { # 2-way or 1-way ANOVA case
       formula <- as.formula(paste0('`', x$var1, '`~`', paste(x$var2, collapse='`*`'), '`'))

@@ -761,6 +761,14 @@ test_that("test ANCOVA with exp_anova", {
                c("statistic", "p.value", "method"))
 })
 
+test_that("test ANCOVA with exp_anova with NA and others in the variable.", {
+  df<- readRDS(url("https://www.dropbox.com/scl/fi/ranvxxcihbdeosgvs7z96/28337.rds?rlkey=73xo6c8cig6k1o5xsu9v9gndb&dl=1"))
+  model_df <- df %>% exp_anova(`出発 遅れ表`, `航空 会社表`, covariates = c("到着 遅れ表"), covariate_funs = c("到着 遅れ表" = "none"), with_interaction = TRUE)
+  # Make sure type="levene" doesn't fail.
+  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="median")
+  expect_equal(colnames(ret), c( "F Value", "P Value", "DF", "Residual DF", "Method" ,"Result"))
+})
+
 test_that("test ANCOVA with exp_anova with logical group variable", {
   mtcars2 <- mtcars %>% mutate(`a m`=as.logical(am), `w t`=wt, `q sec`=qsec)
   model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
