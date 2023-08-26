@@ -2340,9 +2340,38 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     ret <- emmeans::emmeans(x, formula)
     ret <- tibble::as.tibble(ret)
     if (!is.null(x$covariates)) { # ANCOVA case
+      conf_threshold = 1 - (1 - conf_level)/2
+
       # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
-      mean_df <- x$dataframe %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
-      ret <- ret %>% dplyr::left_join(mean_df, by = x$var2[[1]])
+      mean_df <- x$dataframe %>% 
+        dplyr::group_by(!!rlang::sym(x$var2)) %>% 
+        dplyr::summarize(`Rows`=length(!!rlang::sym(x$var1)),
+          Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+          `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+          # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+          `Std Error`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+          # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+          # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+          `Conf Low` = Mean - `Std Error` * qt(p=!!conf_threshold, df=`Rows`-1),
+          `Conf High` = Mean + `Std Error` * qt(p=!!conf_threshold, df=`Rows`-1),
+          `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+          `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
+
+      ret <- ret %>% dplyr::rename(any_of(c(`Mean (Adj)`="emmean",
+                                            `Std Error (Adj)`="SE",
+                                            `DF`="df",
+                                            `Conf Low (Adj)`="lower.CL",
+                                            `Conf High (Adj)`="upper.CL",
+                                            `Mean`="mean")))
+
+      ret <- ret %>% 
+        dplyr::left_join(mean_df, by = x$var2[[1]]) %>%
+        dplyr::relocate(any_of(c("Mean (Adj)", 
+                                 "Std Error (Adj)",
+                                 "Conf Low (Adj)", 
+                                 "Conf High (Adj)",
+                                 "DF")), .after=`Conf High`)
+
     }
     # Set the common order to display means and emmeans.
     if (sort_factor_levels && !is.null(x$common_var2_order)) {
@@ -2389,8 +2418,13 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
     formula1 <- as.formula(paste0('~`', x$var2[1], '`'))
     formula2 <- as.formula(paste0('~`', x$var2[2], '`'))
-    ret <- get_pairwise_contrast_df(x, formula1, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[1]]) %>% dplyr::select(`Variable`, everything())
-    ret2 <- get_pairwise_contrast_df(x, formula2, pairs_adjust) %>% dplyr::mutate(`Variable`=x$terms_mapping[x$var2[2]]) %>% dplyr::select(`Variable`, everything())
+    # Cast "Group 1" and "Group 2" columns to character to match the data type for bind_rows.
+    ret <- get_pairwise_contrast_df(x, formula1, pairs_adjust) %>% 
+      dplyr::mutate(`Variable`=(x$terms_mapping[x$var2[1]]), `Group 1`=as.character(`Group 1`), `Group 2`=as.character(`Group 2`)) %>% 
+      dplyr::select(`Variable`, everything())
+    ret2 <- get_pairwise_contrast_df(x, formula2, pairs_adjust) %>% 
+      dplyr::mutate(`Variable`=(x$terms_mapping[x$var2[2]]), `Group 1`=as.character(`Group 1`), `Group 2`=as.character(`Group 2`)) %>% 
+      dplyr::select(`Variable`, everything())
     ret <- ret %>% dplyr::bind_rows(ret2)
   }
   else if (type == "levene") {
@@ -2407,7 +2441,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     }
 
     if (!is.null(x$covariates)) { # ANCOVA case
-      ret <- broom::tidy(car::leveneTest(x$residuals, x$dataframe[[x$var2]], center=levene_test_center_fun))
+      # x$model[[x$var2]] is the data used to build the model.
+      ret <- broom::tidy(car::leveneTest(x$residuals, x$model[[x$var2]], center=levene_test_center_fun))
     }
     else { # 2-way or 1-way ANOVA case
       formula <- as.formula(paste0('`', x$var1, '`~`', paste(x$var2, collapse='`*`'), '`'))
