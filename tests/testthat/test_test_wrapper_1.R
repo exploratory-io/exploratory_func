@@ -739,7 +739,7 @@ test_that("test ANCOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
 
   expect_equal(colnames(ret),
-    c("a m", "w t", "q sec", "Rows", "Mean", "Std Deviation", "Std Error", 
+    c("a m", "w t", "Rows", "Mean", "Std Deviation", "Std Error", 
     "Conf Low", "Conf High", "Mean (Adj)", "Std Error (Adj)", 
     "Conf Low (Adj)", "Conf High (Adj)", "DF", "Minimum", "Maximum"))
 
