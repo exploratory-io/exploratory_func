@@ -246,28 +246,23 @@ NA,j")
 
   result <- source_df %>% exploratory::full_join(target_df, dplyr::join_by(`a` == `a`))
 
-  # a	b	c	d
-  # 1	2	3	a
-  # 2	3	4	b
-  # 3	4	5	c
-  # 4	5	6	e
-  # 5	6	7	f
-  # NA 7 8 g
-  # NA 7 8 h
-  # NA 7 8 i
-  # NA 7 8 j
-  # NA 8 9 g
-  # NA 8 9 h
-  # NA 8 9 i
-  # NA 8 9 j
-  # NA 9 10	g
-  # NA 9 10	h
-  # NA 9 10 i
-  # NA 9 10 j
+  # a   b   c  d
+  # 1   2   3  a
+  # 2   3   4  b
+  # 3   4   5  c
+  # 4   5   6  e
+  # 5   6   7  f
+  # NA  7   8  NA
+  # NA  8   9  NA
+  # NA  9   10 NA
+  # NA  NA  NA g
+  # NA  NA  NA h
+  # NA  NA  NA i
+  # NA  NA  NA j
 
-  expect_equal(nrow(result),17)
+  expect_equal(nrow(result),12)
   expect_equal(ncol(result),4)
-  expect_equal(nrow(dplyr::filter(result, is.na(a))),12)
+  expect_equal(nrow(dplyr::filter(result, is.na(a))),7)
 
 })
 
