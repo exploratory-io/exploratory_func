@@ -100,7 +100,7 @@ full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ign
   if(ignorecase) {
     insensitive_join(dplyr::full_join)(x = x, y = y, by = by, copy = copy, suffix = suffix)
   } else {
-    dplyr::full_join(x = x, y = y, by = by, copy = copy, suffix = suffix);
+    dplyr::full_join(x = x, y = y, by = by, copy = copy, suffix = suffix, na_matches = na_matches);
   }
 }
 
