@@ -3784,11 +3784,11 @@ filter_cascade <- function(.data, ...){
 }
 
 #'API to load economic data from FRED (Federal Reserve Bank Economic Data)
-#'@param series_id - e.g. UNRATE
+#'@param series_ids - e.g. c("UNRATE", "CPIAUCSL", "DGS10")
 #'@param date_start - Start Date for the query. This is optional field.
 #'@param date_end - End Date for the query. By default it's today.
 #'@export
-load_fred <- function(series_id, date_start = "", date_end = "", password) {
+load_fred <- function(series_ids, date_start = "", date_end = "", password) {
   loadNamespace("fredr")
   fredr::fredr_set_key(password)
   # Desktop passes empty string if end date is not selected. For this case fallback to today.
@@ -3799,16 +3799,20 @@ load_fred <- function(series_id, date_start = "", date_end = "", password) {
   }
   # date_start is an optional parameter, so if it's not specified, execute the query without the start_date.
   if (date_start == "") {
-    fredr::fredr(
-      series_id = series_id,
-      observation_end = date_end
-    )
+    purrr::map_dfr(series_ids, function(series_id){
+      fredr::fredr(
+        series_id = series_id,
+        observation_end = date_end
+      )
+    })
   } else {
-    fredr::fredr(
-      series_id = series_id,
-      observation_start = lubridate::ymd(date_start),
-      observation_end = date_end
-    )
+    purrr::map_dfr(series_ids, function(series_id){
+      fredr::fredr(
+        series_id = series_id,
+        observation_start = lubridate::ymd(date_start),
+        observation_end = date_end
+      )
+    })
   }
 }
 
