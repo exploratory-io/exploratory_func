@@ -3368,7 +3368,7 @@ format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.ma
           sign.positive.inf <- ">"
         }
 
-        if (range[1] == "Inf") {
+        if (range[2] == "Inf") {
           # If the upper end is inf, we reverse the order to show the sign 
           # on the left. E.g. (5, Inf) -> (Inf, 5) -> (>, 5) -> "> 5".
           range <- rev(range)
