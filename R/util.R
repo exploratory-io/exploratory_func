@@ -3356,16 +3356,22 @@ format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.ma
       #
       # Both are finite: "[5, 20]" ->  "5.00 - 20.00"
       # Left is -Inf: "(-Inf, 20]" ->  "<= 20.00"
-      # Right is Inf: "(20, Inf]" ->  "20.00 <"
+      # Right is Inf: "(20, Inf]" ->  "> 20.00"
       # Both are infinite: "(-Inf, Inf]" ->  "-Inf - Inf"
       connect.str <- " - "
       if (is.infinite.on.one.side) {
         # Add prefix/suffix. Do not add prefix/suffix to infinites.
         sign.negative.inf <- "<"
-        sign.positive.inf <- "<="
+        sign.positive.inf <- ">="
         if (right) {
           sign.negative.inf <- "<="
-          sign.positive.inf <- "<"
+          sign.positive.inf <- ">"
+        }
+
+        if (range[1] == "Inf") {
+          # If the upper end is inf, we reverse the order to show the sign 
+          # on the left. E.g. (5, Inf) -> (Inf, 5) -> (>, 5) -> "> 5".
+          range <- rev(range)
         }
 
         range <- if_else(range == "-Inf", sign.negative.inf, if_else(range == "Inf", sign.positive.inf, paste0(prefix, range, suffix)))
