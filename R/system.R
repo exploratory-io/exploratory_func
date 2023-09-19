@@ -4262,10 +4262,10 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
           # If include.outside.range option is specified, add the -Inf and
           # Inf in the breaks. If it is already there, do nothing.
           if (include.outside.range) {
-            if (!is.infinite(minv) && !is.na(lower.range) && !any(breaks.with.inf == -Inf)) {
+            if (!is.infinite(minv) && !is.na(lower.range) && !any(break_points == -Inf)) {
               break_points <- c( -Inf, break_points)
             }
-            if (!is.infinite(maxv) && !is.na(upper.range) && !any(breaks.with.inf == Inf)) {
+            if (!is.infinite(maxv) && !is.na(upper.range) && !any(break_points == Inf)) {
               break_points <- c(break_points, Inf)
             }
           }
