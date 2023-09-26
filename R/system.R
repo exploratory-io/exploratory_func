@@ -4145,32 +4145,11 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
 
           minv.no.inf <- min(x.no.inf, na.rm=TRUE)
           maxv.no.inf <- max(x.no.inf, na.rm=TRUE)
-
           if (zero.to.center) {
             # Reduce the bucket size to add infinite values on both ends.
             lenout <- lenout - 1
-
-            minv.no.inf.org <- minv.no.inf
-            maxv.no.inf.org <- maxv.no.inf
-
-            # Set custom range if specified.
-            if (!is.na(upper.range)) {
-              maxv.no.inf <- upper.range
-              # If only upper range is specified, set lower range to 
-              # the smaller value of eigher -upper.range or minv.org.
-              if (is.na(lower.range)) {
-                minv.no.inf <- - max(abs(upper.range), abs(minv.no.inf.org))
-              }
-            }
-            if (!is.na(lower.range)) {
-              minv.no.inf <- lower.range
-              # If only lower range is specified, set upper range to 
-              # the larger value of eigher -lower.range or maxv.org.
-              if (is.na(upper.range)) {
-                maxv.no.inf <- max(abs(lower.range), abs(maxv.no.inf.org))
-              }
-            }
-
+            maxv.no.inf <- max(abs(maxv.no.inf), abs(minv.no.inf))
+            minv.no.inf <- -maxv.no.inf
           } else {
             # If there's only 1 value available after taking off infinites, we add
             # another value to have 2 different values for cut. This is because
@@ -4185,14 +4164,14 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
               # Reduce the bucket size to add infinite values on both ends.
               lenout <- lenout - 1
             }
+          }
 
-            # Set custom range if specified.
-            if (!is.na(upper.range)) {
-              maxv.no.inf <- upper.range
-            }
-            if (!is.na(lower.range)) {
-              minv.no.inf <- lower.range
-            }
+          # Set custom range if specified.
+          if (!is.na(upper.range)) {
+            maxv.no.inf <- upper.range
+          }
+          if (!is.na(lower.range)) {
+            minv.no.inf <- lower.range
           }
 
           breaks.with.inf <- seq(minv.no.inf, maxv.no.inf,  length.out=lenout)
@@ -4210,45 +4189,27 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
           # If include.outside.range is TRUE and range value is specified,
           # add the -Inf and Inf in the breaks.
           if (include.outside.range) {
-            if (!is.infinite(minv) && !is.na(lower.range) && !any(breaks.with.inf == -Inf)) {
+            if (!is.infinite(minv) && !is.na(lower.range)) {
               breaks.with.inf <- c(-Inf, breaks.with.inf)
             }
-            if (!is.infinite(maxv) && !is.na(upper.range) && !any(breaks.with.inf == Inf)) {
+            if (!is.infinite(maxv) && !is.na(upper.range)) {
               breaks.with.inf <- c(breaks.with.inf, Inf)
             }
           }
 
           return (cut(x, breaks=breaks.with.inf, labels=labels, dig.lab=dig.lab, include.lowest=include.lowest, right=right))
         } else {
-
           if (zero.to.center) {
-            minv.org <- minv
-            maxv.org <- maxv
-            # Set custom range if specified.
-            if (!is.na(upper.range)) {
-              maxv <- upper.range
-              # If only upper range is specified, set lower range to 
-              # the smaller value of eigher -upper.range or minv.org.
-              if (is.na(lower.range)) {
-                minv <- - max(abs(upper.range), abs(minv.org))
-              }
-            }
-            if (!is.na(lower.range)) {
-              minv <- lower.range
-              # If only lower range is specified, set upper range to 
-              # the larger value of eigher -lower.range or maxv.org.
-              if (is.na(upper.range)) {
-                maxv <- max(abs(lower.range), abs(maxv.org))
-              }
-            }
-          } else {
-            # Set custom range if specified.
-            if (!is.na(upper.range)) {
-              maxv <- upper.range
-            }
-            if (!is.na(lower.range)) {
-              minv <- lower.range
-            }
+            maxv <- max(abs(maxv), abs(minv))
+            minv <- -maxv
+          }
+
+          # Set custom range if specified.
+          if (!is.na(upper.range)) {
+            maxv <- upper.range
+          }
+          if (!is.na(lower.range)) {
+            minv <- lower.range
           }
 
           break_points = seq(minv, maxv, length.out = breaks+1)
@@ -4262,10 +4223,10 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
           # If include.outside.range option is specified, add the -Inf and
           # Inf in the breaks. If it is already there, do nothing.
           if (include.outside.range) {
-            if (!is.infinite(minv) && !is.na(lower.range) && !any(break_points == -Inf)) {
+            if (!is.infinite(minv) && !is.na(lower.range)) {
               break_points <- c( -Inf, break_points)
             }
-            if (!is.infinite(maxv) && !is.na(upper.range) && !any(break_points == Inf)) {
+            if (!is.infinite(maxv) && !is.na(upper.range)) {
               break_points <- c(break_points, Inf)
             }
           }
