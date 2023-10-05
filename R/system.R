@@ -3696,8 +3696,8 @@ read_parquet_file <- function(file, col_select = NULL) {
     # Remove on exit.
     on.exit(unlink(tf))
     tryCatch({
-      # mode="wb" for binary download
-      utils::download.file(file, tf, mode = "wb")
+      # Download file to temporary location
+      httr::GET(file, httr::write_disk(tf, overwrite = TRUE), httr::timeout(600))
     }, error = function(e) {
       stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to download from the URL.'))
     })
