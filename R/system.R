@@ -3127,18 +3127,10 @@ download_data_file <- function(url, type){
     dir.create(tempdir(), showWarnings = FALSE)
 
     tryCatch({
-      # Get current timeout sec. Default is 60 sec.
-      originalTimeout <- options("timeout")
-      # Increase timeout to 10 minutes (600 sec)
-      options("timeout" = 600)
-      # Download file to tempoprary location
-      download.file(url, destfile = tmp, mode = "wb")
+      # Download file to temporary location
+      httr::GET(url, httr::write_disk(tmp, overwrite = TRUE), httr::timeout(600))
     }, error = function(cond){
        stop(cond)
-    }
-    ,finally = {
-      # Set the original timeout
-      options("timeout" = originalTimeout)
     })
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){

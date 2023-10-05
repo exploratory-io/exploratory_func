@@ -421,7 +421,7 @@ test_that("read_delim_file downlod failed error message", {
   tryCatch({
     df <- exploratory::read_delim_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv", delim = ",")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv\",\"cannot open URL 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv'\"] :: Failed to download from the URL."))
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv\",\"Could not resolve host: dummy.dropbox.com\"] :: Failed to download from the URL."))
   })
 })
 
