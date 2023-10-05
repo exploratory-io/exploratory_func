@@ -385,7 +385,7 @@ test_that("read_parquet_file downlod failed error message", {
   tryCatch({
     df <- exploratory::read_parquet_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet\",\"cannot open URL 'https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet'\"] :: Failed to download from the URL."))
+    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet\",\"Could not resolve host: dummy.dropbox.com\"] :: Failed to download from the URL."))
   })
 })
 
