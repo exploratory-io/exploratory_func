@@ -8,7 +8,7 @@ testdata_filename <- "airline_2013_10_tricky_v3.csv"
 testdata_file_path <- paste0(testdata_dir, '/', testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
-  "https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1"
+  "https://exploratory-download.s3.us-west-2.amazonaws.com/test/airline_2013_10_tricky_v3.csv"
 } else {
   testdata_file_path
 }
