@@ -10,14 +10,27 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE, sheetName= NUL
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   # the first argument of getGoogleTokenForSheet is no longer used but pass empty string to make it work.
-  token <- getGoogleTokenForSheet("")
-  googlesheets4::sheets_set_token(token)
-  googledrive::drive_set_token(token)
-  sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
-  if (!is.null(sheetName)) { # if sheet name is specified, rename the tab (sheet) with the sheet name after uploading the file.
-    googlesheets4::sheet_rename(sheet, sheet = NULL, sheetName)
-  }
-  sheet
+  currentConfig <- getOption("httr_config")
+  tryCatch({
+    # To workaround Error in the HTTP2 framing layer
+    # set below config (see https://github.com/jeroen/curl/issues/156)
+    httr::set_config(httr::config(http_version = 0))
+
+    token <- getGoogleTokenForSheet("")
+    googlesheets4::sheets_set_token(token)
+    googledrive::drive_set_token(token)
+    sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
+    if (!is.null(sheetName)) { # if sheet name is specified, rename the tab (sheet) with the sheet name after uploading the file.
+      googlesheets4::sheet_rename(sheet, sheet = NULL, sheetName)
+    }
+    sheet
+  },finally = function(){
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
 }
 
 #' API to update existing Google Sheet with the local CSV file.
@@ -27,11 +40,24 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE, sheetName= NUL
 updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
+  currentConfig <- getOption("httr_config")
+  tryCatch({
+    # To workaround Error in the HTTP2 framing layer
+    # set below config (see https://github.com/jeroen/curl/issues/156)
+    httr::set_config(httr::config(http_version = 0))
 
-  token <- getGoogleTokenForSheet("")
-  googlesheets4::sheets_set_token(token)
-  googledrive::drive_set_token(token)
-  sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath)
+    token <- getGoogleTokenForSheet("")
+    googlesheets4::sheets_set_token(token)
+    googledrive::drive_set_token(token)
+    sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath)
+    sheet
+  },finally = function(){
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
 }
 
 #' API to upload data frame to Google Sheets.
@@ -45,17 +71,31 @@ updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
 #'
 uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetName = "", workSheet = "") {
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
-  token <- getGoogleTokenForSheet("")
-  googlesheets4::sheets_set_token(token)
-  if (type == "newSpreadSheet") {
-    sheetsList <- list(df)
-    names(sheetsList) <- c(workSheet)
-    googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList)
-  } else if (type == "overrideSpreadSheet" || type == "newWorkSheet") {
-    googlesheets4::sheet_write(df, spreadSheetName, sheet = workSheet)
-  } else if (type == "appendToWorkSheet") {
-    googlesheets4::sheet_append(spreadSheetName, df, sheet = workSheet)
-  }
+  currentConfig <- getOption("httr_config")
+  tryCatch({
+    # To workaround Error in the HTTP2 framing layer
+    # set below config (see https://github.com/jeroen/curl/issues/156)
+    httr::set_config(httr::config(http_version = 0))
+
+    token <- getGoogleTokenForSheet("")
+    googlesheets4::sheets_set_token(token)
+    if (type == "newSpreadSheet") {
+      sheetsList <- list(df)
+      names(sheetsList) <- c(workSheet)
+      googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList)
+    } else if (type == "overrideSpreadSheet" || type == "newWorkSheet") {
+      googlesheets4::sheet_write(df, spreadSheetName, sheet = workSheet)
+    } else if (type == "appendToWorkSheet") {
+      googlesheets4::sheet_append(spreadSheetName, df, sheet = workSheet)
+    }
+  },
+  finally = function(){
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
 }
 
 
@@ -76,7 +116,14 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+  # Remember the current config
+  currentConfig <- getOption("httr_config")
+
   tryCatch({
+    # To workaround Error in the HTTP2 framing layer
+    # set below config (see https://github.com/jeroen/curl/issues/156)
+    httr::set_config(httr::config(http_version = 0))
+
     token <- getGoogleTokenForSheet(tokenFileId)
     googlesheets4::sheets_set_token(token)
     googledrive::drive_set_token(token)
@@ -116,6 +163,12 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
     } else {
       stop(e)
     }
+  }, finally = function(e){
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
   })
 }
 
@@ -125,17 +178,32 @@ getGoogleSheetList <- function(tokenFileId="", teamDriveId="", n_max=5000, patte
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
-  token = getGoogleTokenForSheet(tokenFileId)
-  googlesheets4::sheets_set_token(token)
-  googledrive::drive_set_token(token)
-  if(teamDriveId != "" && !is.null(teamDriveId)) {
-    # To improve performance, only get id, name and canEdit for each spreadsheet.
-    # NOTE: googledrive changed team_drive argument to shared_drive
-    googledrive::drive_find(type = "spreadsheet", shared_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max, q = pattern)
-  } else { #if team id is provided search documents within the team.
-    # To improve performance, only get id, name and canEdit for each spreadsheet.
-    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max, q = pattern )
-  }
+  currentConfig <- getOption("httr_config")
+  tryCatch({
+    # To workaround Error in the HTTP2 framing layer
+    # set below config (see https://github.com/jeroen/curl/issues/156)
+    httr::set_config(httr::config(http_version = 0))
+
+    token = getGoogleTokenForSheet(tokenFileId)
+    googlesheets4::sheets_set_token(token)
+    googledrive::drive_set_token(token)
+    sheetlist <- NULL
+    if(teamDriveId != "" && !is.null(teamDriveId)) {
+      # To improve performance, only get id, name and canEdit for each spreadsheet.
+      # NOTE: googledrive changed team_drive argument to shared_drive
+      sheetlist <- googledrive::drive_find(type = "spreadsheet", shared_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max, q = pattern)
+    } else { #if team id is provided search documents within the team.
+      # To improve performance, only get id, name and canEdit for each spreadsheet.
+      sheetlist <- googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken", n_max = n_max, q = pattern )
+    }
+    sheetlist
+  }, finally = function(){
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
 }
 
 #' API to get a list of available google sheets
@@ -148,18 +216,31 @@ getGoogleSheetWorkSheetList <- function(tokenFileId = "", title, id = NULL){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
-  token = getGoogleTokenForSheet(tokenFileId)
-  googlesheets4::sheets_set_token(token)
-  googledrive::drive_set_token(token)
-  # For some of the sheets, below API does not return result with title so try it with the id if id parameter is passed.
-  # If id is not provided, try it with title.
-  # Exploratory Desktop might send an empty string for id for the existing data source, so check it too.
-  if(!is.null(id) && id != "") {
-    sheet <- googledrive::drive_get(id = id)
-  } else {
-    sheet <- googledrive::drive_get(title)
-  }
-  googlesheets4::sheet_names(sheet)
+  currentConfig <- getOption("httr_config")
+  tryCatch({
+    # To workaround Error in the HTTP2 framing layer
+    # set below config (see https://github.com/jeroen/curl/issues/156)
+    httr::set_config(httr::config(http_version = 0))
+
+    token = getGoogleTokenForSheet(tokenFileId)
+    googlesheets4::sheets_set_token(token)
+    googledrive::drive_set_token(token)
+    # For some of the sheets, below API does not return result with title so try it with the id if id parameter is passed.
+    # If id is not provided, try it with title.
+    # Exploratory Desktop might send an empty string for id for the existing data source, so check it too.
+    if(!is.null(id) && id != "") {
+      sheet <- googledrive::drive_get(id = id)
+    } else {
+      sheet <- googledrive::drive_get(title)
+    }
+    googlesheets4::sheet_names(sheet)
+  },finally = function(){
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
 }
 
 #' API to get Team Drives from Google Drive.
@@ -171,13 +252,26 @@ getGoogleSheetWorkSheetList <- function(tokenFileId = "", title, id = NULL){
 #' @export
 getTeamDrives <- function(tokenFileId = "", useGoogleSheetsToken = TRUE){
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
-  token <- NULL
-  if (useGoogleSheetsToken) {
-    token <- getGoogleTokenForSheet(tokenFileId)
-  } else {
-    token <- getGoogleTokenForDrive(tokenFileId)
-  }
-  googledrive::drive_set_token(token)
-  # NOTE: googledrive changed API name to shared_drive_find
-  googledrive::shared_drive_find()
+  currentConfig <- getOption("httr_config")
+  tryCatch({
+    # To workaround Error in the HTTP2 framing layer
+    # set below config (see https://github.com/jeroen/curl/issues/156)
+    httr::set_config(httr::config(http_version = 0))
+
+    token <- NULL
+    if (useGoogleSheetsToken) {
+      token <- getGoogleTokenForSheet(tokenFileId)
+    } else {
+      token <- getGoogleTokenForDrive(tokenFileId)
+    }
+    googledrive::drive_set_token(token)
+    # NOTE: googledrive changed API name to shared_drive_find
+    googledrive::shared_drive_find()
+  }, finally = function(){
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
 }
