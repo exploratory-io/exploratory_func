@@ -71,6 +71,10 @@ test_that("test exp_wilcox with conf.int = TRUE", {
   expect_equal(colnames(ret),
                c("am","Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
+
+  # check confidence interval
+  expect_equal(round(ret$`Conf Low`, 3), c(15.299, 20.639))
+  expect_equal(round(ret$`Conf High`, 3), c(18.995, 28.711))
 })
 
 test_that("test exp_wilcox with paired = TRUE", {
