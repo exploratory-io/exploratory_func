@@ -1971,3 +1971,11 @@ test_that("likert_sigma", {
   res <- df %>% mutate(sigma=likert_sigma(`DAY OF MONTH`))
   expect_true(all(!is.na(res$sigma))) # The output should not have NAs caused by precision issue.
 })
+
+test_that("renamne_with", {
+  df <- mtcars;
+  colnames(df) <- c("Q1_abc", "Q2_ddd", "Q3_ert", "Q4_dggh", "Q5_eere", "Q6_bbb", "Q7_dadfa", "Q8_1234", "Q9_erere", "Q10", "Q10_ABC")
+  df2 <- df %>% exploratory::rename_with(.fn = ~ stringr::word(.x, 1, sep = "\\s*\\_\\s*"))
+  expect_equal(colnames(df2), c("Q1","Q2","Q3","Q4","Q5","Q6", "Q7","Q8","Q9","Q10...10","Q10...11"))
+
+})
