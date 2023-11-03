@@ -3248,7 +3248,9 @@ separate_japanese_address <- function(df, address, prefecture_col = "prefecture"
 }
 
 # Wrapper function for dplyr::rename_with
-# with this API, it return unique column names when the result columns are duplicated.
+# See https://github.com/tidyverse/dplyr/blob/main/R/rename.R for the original code.
+# This API has the repair argument where as original dplyr's rename_with does not provide such argument.
+# By default this API returns unique column names when the result columns are duplicated.
 rename_with <- function(.data, .fn, .cols = everything(), repair = "unique", ...) {
   .fn <- rlang::as_function(.fn)
   cols <- tidyselect::eval_select(enquo(.cols), .data, allow_rename = FALSE)
