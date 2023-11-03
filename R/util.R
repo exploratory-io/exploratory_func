@@ -3247,6 +3247,36 @@ separate_japanese_address <- function(df, address, prefecture_col = "prefecture"
   df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = ~new_names)
 }
 
+# Wrapper function for dplyr::rename_with
+# See https://github.com/tidyverse/dplyr/blob/main/R/rename.R for the original code.
+# This API has the repair argument where as original dplyr's rename_with does not provide such argument.
+# By default this API returns unique column names when the result columns are duplicated.
+rename_with <- function(.data, .fn, .cols = everything(), repair = "unique", ...) {
+  .fn <- rlang::as_function(.fn)
+  cols <- tidyselect::eval_select(enquo(.cols), .data, allow_rename = FALSE)
+
+  names <- names(.data)
+
+  sel <- vctrs::vec_slice(names, cols)
+  new <- .fn(sel, ...)
+
+  if (!rlang::is_character(new)) {
+    cli::cli_abort(
+      "{.arg .fn} must return a character vector, not {.obj_type_friendly {new}}."
+    )
+  }
+  if (length(new) != length(sel)) {
+    cli::cli_abort(
+      "{.arg .fn} must return a vector of length {length(sel)}, not {length(new)}."
+    )
+  }
+
+  names <- vctrs::vec_assign(names, cols, new)
+  names <- vctrs::vec_as_names(names, repair = repair)
+
+  rlang::set_names(.data, names)
+}
+
 # Constructs a new vector string for the levels.
 # It generates a new character vector based on the base.labels
 # and overrides it with new.labels. The return value has the same
