@@ -838,7 +838,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
-                            subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "", role = "") {
+                            subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "", role = "", authMethod = "", secretKeyFile = "", secretKeyFilePassword = "") {
 
   drv = NULL
   conn = NULL
@@ -1509,6 +1509,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # ref: https://docs.snowflake.com/en/user-guide/odbc-linux.html
       driver <-  "/usr/lib64/snowflake/odbc/lib/libSnowflake.so";
     }
+    # When the Snowflake data source is executed on Linux, it's possible that secretKeyFile parameter is defined, for this case get the file path from environment variable.
+    if(Sys.info()["sysname"] == "Linux" && authMethod == "key-pair" && secretKeyFile != ""){
+      secretKeyFile <- Sys.getenv("SNOWFLAKE_SECRET_KEY_FILE")
+    }
     if (!requireNamespace("DBI")) {
       stop("package DBI must be installed.")
     }
@@ -1523,7 +1527,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
 
-    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, additionalParams, role, sep = ":")
+    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, additionalParams, role, secretKeyFile, secretKeyFilePassword, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1557,8 +1561,19 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # For Snowflake, map catalog argument to "WAREHOUSE".
       connectionString <- stringr::str_c(
         "Driver=", driver, ";Server=", host, ";Port=", port, ";WAREHOUSE=", catalog, ";Database=", databaseName,
-        ";UID=", username, ";PWD=", password
+        ";UID=", username
       );
+      if (authMethod == "key-pair") {
+        connectionString <- stringr::str_c(connectionString, ";AUTHENTICATOR=SNOWFLAKE_JWT");
+      } else {
+        connectionString <- stringr::str_c(connectionString, ";PWD=", password);
+      }
+      if (secretKeyFile != "") {
+        connectionString <- stringr::str_c(connectionString, ";PRIV_KEY_FILE=", secretKeyFile);
+      }
+      if (secretKeyFilePassword != "") {
+        connectionString <- stringr::str_c(connectionString, ";PRIV_KEY_FILE_PWD=", secretKeyFilePassword);
+      }
       if (role != "") {
         connectionString <- stringr::str_c(connectionString, ";role=", role);
       }
@@ -2037,7 +2052,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param catalog - For Snowflake's Warehouse.
 #' @param timezone - For database session timezone.
 #'
-queryODBC <- function(dsn="", username="", password="", additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", role = "", ...){
+queryODBC <- function(dsn="", username="", password="", additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", role = "", authMethod = "", secretKeyFile = "", secretKeyFilePassword = "", ...){
   if(type == "") {
     type <- "odbc"
   }
@@ -2046,7 +2061,8 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   if (type == "dbiodbc" && numOfRows == 0) {
     numOfRows = -1;
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString, subType = subType, role = role)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString, subType = subType, role = role,
+                          authMethod = authMethod, secretKeyFile = secretKeyFile, secretKeyFilePassword = secretKeyFilePassword)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
