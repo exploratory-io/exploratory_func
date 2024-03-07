@@ -58,7 +58,7 @@ test_that("test clean_names", {
 })
 
 test_that("test parse_html_tables",{
-  result <- parse_html_tables('https://www.cbinsights.com/research-unicorn-companies')
+  result <- parse_html_tables('https://download2.exploratory.io/test/table.html')
   expect_equal(length(result), 1)
 })
 
