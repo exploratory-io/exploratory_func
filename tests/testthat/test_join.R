@@ -314,3 +314,10 @@ test_that("column suffix argument with case insensitive and empty source suffix 
   expect_equal("carb" %in% colnames(df15) , TRUE)
   expect_equal("carb_1" %in% colnames(df15) , TRUE)
 })
+
+test_that("group by target data frame case", {
+  target <- mtcars %>% group_by(mpg)
+  df16 <- mtcars %>% select(-mpg) %>% left_join(target, by = c("gear" = "gear", "cyl" = "cyl"), suffix = c("", "_1"), ignorecase = TRUE, target_columns = c("mpg", "am", "vs"), exclude_target_columns = TRUE)
+  expect_equal("mpg" %nin% colnames(df16) , TRUE)
+  expect_equal("mpg_1" %nin% colnames(df16) , TRUE)
+})
