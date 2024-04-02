@@ -2461,6 +2461,20 @@ get_row_numbers_from_index_vector <- function(index_vector) {
   seq(length(index_vector))[index_vector]
 }
 
+# Calculates average moving range of a vector.
+get_average_moving_range <- function(x) {
+  # Remove NAs  
+  x <- x[!is.na(x)]
+  if (length(x) < 2) {
+    return(NA)
+  }
+  # Calculate diffs
+  diffs <- diff(x)
+  diffs <- abs(diffs)
+  sum_diffs <- sum(diffs)
+  return(sum_diffs/length(diffs))
+}
+
 #' Returns NA value included in prediction result excluding NA
 #' @param value - prediction results without NA
 #' @param n_data - original data length
