@@ -98,6 +98,23 @@ uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetNam
   })
 }
 
+#' API to normalize data for Google Sheets Export
+#' @param df - data frame
+#
+normalizeDataForGoogleSheetsExport <- function (df) {
+  requireNamespace("dplyr")
+  requireNamespace("lubridate")
+  requireNamespace("bit64")
+  df <- df %>%
+   mutate(
+     across(where(is.numeric), ~ifelse(is.infinite(.), as.numeric(NA), .)),
+     across(where(lubridate::is.difftime), ~ as.numeric(.)),
+     across(where(lubridate::is.period), ~ as.numeric(.)),
+     across(where(bit64::is.integer64), ~ as.numeric(.))
+   )
+  df
+}
+
 
 #' API to get google sheet data
 #' @export
