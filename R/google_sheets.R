@@ -107,7 +107,7 @@ normalizeDataForGoogleSheetsExport <- function (df) {
   requireNamespace("bit64")
   df <- df %>%
    mutate(
-     across(where(is.numeric), ~ifelse(is.infinite(.), NA, .)),
+     across(where(is.numeric), ~ifelse(is.infinite(.), as.numeric(NA), .)),
      across(where(lubridate::is.difftime), ~ as.numeric(.)),
      across(where(lubridate::is.period), ~ as.numeric(.)),
      across(where(bit64::is.integer64), ~ as.numeric(.))

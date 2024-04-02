@@ -7,4 +7,8 @@ test_that("normalizeDataForGoogleSheetsExport", {
   expect_equal(class(df_cleaned$`hms 表`), "numeric")
   expect_equal(class(df_cleaned$`difftime 表`), "numeric")
   expect_equal(class(df_cleaned$tstint64), "numeric")
+  expect_equal(class(df_cleaned$numAllNA), "logical")
+  expect_equal(class(df_cleaned$numAllNaN), "numeric")
+  expect_equal(class(df_cleaned$numAllInf), "numeric")
+  expect_equal(class(df_cleaned$numAllMixed), "numeric")
 })
