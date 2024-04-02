@@ -1979,3 +1979,8 @@ test_that("renamne_with", {
   expect_equal(colnames(df2), c("Q1","Q2","Q3","Q4","Q5","Q6", "Q7","Q8","Q9","Q10...10","Q10...11"))
 
 })
+
+test_that("get_average_moving_range", {
+  res <- exploratory::get_average_moving_range(c(NA,1,8,3,7,5,NA,9,1,3,2,NA))
+  expect_equal(res, 4.125)
+})
