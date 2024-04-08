@@ -3791,6 +3791,32 @@ filter_cascade <- function(.data, ...){
   df
 }
 
+filter_relative_dates <- function (.data, date_column, operator) {
+  filter_column <- enquo(date_column)
+  if (operator == "today") {
+    result <- dplyr::filter(.data, UQ(filter_column) == lubridate::today())
+  } else if (operator == "last_7_days") {
+    result <- dplyr::filter(.data, dplyr::between(UQ(filter_column), lubridate::today() - 6, lubridate::today()))
+  } else if (operator == "last_4_weeks") {
+    result <- dplyr::filter(.data, dplyr::between(UQ(filter_column), lubridate::today() - lubridate::weeks(4),  lubridate::today()))
+  } else if (operator == "last_3_months") {
+    result <- dplyr::filter(.data, dplyr::between(UQ(filter_column), lubridate::today() %m-% months(3),  lubridate::today()))
+  } else if (operator == "last_12_months") {
+    result <- dplyr::filter(.data, dplyr::between(UQ(filter_column), lubridate::today() %m-% months(12),  lubridate::today()))
+  } else if (operator == "month_to_date") {
+    result <- dplyr::filter(.data, floor_date(UQ(filter_column), unit = "month") == floor_date(lubridate::today(), unit = "month"))
+  } else if (operator == "quarter_to_date") {
+    result <- dplyr::filter(.data, lubridate::quarter(UQ(filter_column), with_year=TRUE) == lubridate::quarter(lubridate::today(), with_year=TRUE))
+  } else if (operator == "year_to_date") {
+    result <- dplyr::filter(.data, lubridate::year(UQ(filter_column)) == lubridate::year(today()))
+  } else if (operator == "all") {
+    result <- .data
+  } else {
+    stop("Invalid operator specified.")
+  }
+  result
+}
+
 #'API to load economic data from FRED (Federal Reserve Bank Economic Data)
 #'@param series_ids - e.g. c("UNRATE", "CPIAUCSL", "DGS10")
 #'@param date_start - Start Date for the query. This is optional field.
