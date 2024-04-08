@@ -3791,6 +3791,12 @@ filter_cascade <- function(.data, ...){
   df
 }
 
+#'API to filter data with the predefined date operation
+#'@param .data
+#'@param date_column - date column for this filter operation.
+#'@param operator - Supported operator is "today", "last_7_days", "last_4_weeks", "last_3_months", "last_12_months",
+#'                  "month_to_date", "quarter_to_date", "year_to_date", "all".
+#'@export
 filter_relative_dates <- function (.data, date_column, operator) {
   filter_column <- enquo(date_column)
   if (operator == "today") {
