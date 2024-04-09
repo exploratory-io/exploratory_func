@@ -3817,7 +3817,7 @@ relative_dates <- function(date_column, operator){
   } else if (operator == "year_to_date") {
     result <- lubridate::year(date_column) == lubridate::year(today())
   } else if (operator == "all") {
-    result <- date_column = date_column
+    result <- date_column == date_column
   } else {
     stop("Invalid operator specified.")
   }

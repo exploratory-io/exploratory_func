@@ -48,7 +48,8 @@ test_that("test filter_ralative_dates", {
   expect_equal(nrow(df_3months), 8)
   df_12months <- df %>% dplyr::filter(exploratory::relative_dates(date, "last_12_months"))
   expect_equal(nrow(df_12months), 10)
-
+  df_all <- df %>% dplyr::filter(exploratory::relative_dates(date, "all"))
+  expect_equal(nrow(df_all), 10)
   df_mtod <- data.frame(
     date = c(
       floor_date(lubridate::today(), unit = "month"),
