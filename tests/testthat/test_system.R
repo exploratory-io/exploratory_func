@@ -38,15 +38,15 @@ test_that("test filter_ralative_dates", {
       lubridate::today() %m-% months(11), lubridate::today() %m-% months(11)
     )
   )
-  df_today <- df %>% exploratory::filter_relative_dates(date, "today")
+  df_today <- df %>% dplyr::filter(exploratory::relative_dates(date, "today"))
   expect_equal(nrow(df_today), 2)
-  df_7days <- df %>% exploratory::filter_relative_dates(date, "last_7_days")
+  df_7days <- df %>% dplyr::filter(exploratory::relative_dates(date, "last_7_days"))
   expect_equal(nrow(df_7days), 4)
-  df_4weeks <- df %>% exploratory::filter_relative_dates(date, "last_4_weeks")
+  df_4weeks <- df %>% dplyr::filter(exploratory::relative_dates(date, "last_4_weeks"))
   expect_equal(nrow(df_4weeks), 6)
-  df_3months <- df %>% exploratory::filter_relative_dates(date, "last_3_months")
+  df_3months <- df %>% dplyr::filter(exploratory::relative_dates(date, "last_3_months"))
   expect_equal(nrow(df_3months), 8)
-  df_12months <- df %>% exploratory::filter_relative_dates(date, "last_12_months")
+  df_12months <- df %>% dplyr::filter(exploratory::relative_dates(date, "last_12_months"))
   expect_equal(nrow(df_12months), 10)
 
   df_mtod <- data.frame(
@@ -55,7 +55,7 @@ test_that("test filter_ralative_dates", {
       floor_date(lubridate::today(), unit = "month")
     )
   )
-  df_mtod_res <- df_mtod %>% exploratory::filter_relative_dates(date, "month_to_date")
+  df_mtod_res <- df_mtod %>% dplyr::filter(exploratory::relative_dates(date, "month_to_date"))
   expect_equal(nrow(df_mtod_res), 2)
 
   df_qtod <- data.frame(
@@ -64,7 +64,7 @@ test_that("test filter_ralative_dates", {
       lubridate::today()
     )
   )
-  df_qtod_res <- df_qtod %>% exploratory::filter_relative_dates(date, "quarter_to_date")
+  df_qtod_res <- df_qtod %>% dplyr::filter(exploratory::relative_dates(date, "quarter_to_date"))
   expect_equal(nrow(df_qtod_res), 2)
 
   df_ytod <- data.frame(
@@ -74,7 +74,7 @@ test_that("test filter_ralative_dates", {
       lubridate::today()
     )
   )
-  df_ytod_res <- df_ytod %>% exploratory::filter_relative_dates(date, "year_to_date")
+  df_ytod_res <- df_ytod %>% dplyr::filter(exploratory::relative_dates(date, "year_to_date"))
   expect_equal(nrow(df_ytod_res),3)
 })
 
