@@ -3791,6 +3791,40 @@ filter_cascade <- function(.data, ...){
   df
 }
 
+#'Helper API that can be used inside filter function for filtering with predefined date operation
+#'@param date_column - date column for this filter operation.
+#'@param operator - Supported operator is "today", "last_7_days", "last_4_weeks", "last_3_months", "last_12_months",
+#'                  "month_to_date", "quarter_to_date", "year_to_date", "all".
+#'@export
+
+within_date_range <- function(date_column, operator){
+  if (operator == "today") {
+    result <- date_column == lubridate::today()
+  } else if (operator == "last_7_days") {
+    result <- dplyr::between(date_column, lubridate::today() - 6, lubridate::today())
+  } else if (operator == "last_4_weeks") {
+    result <- dplyr::between(date_column, lubridate::today() - lubridate::weeks(4),  lubridate::today())
+  } else if (operator == "last_3_months") {
+    result <- dplyr::between(date_column, lubridate::today() %m-% months(3),  lubridate::today())
+  } else if (operator == "last_6_months") {
+    result <-dplyr::between(date_column, lubridate::today() %m-% months(6),  lubridate::today())
+  } else if (operator == "last_12_months") {
+    result <- dplyr::between(date_column, lubridate::today() %m-% months(12),  lubridate::today())
+  } else if (operator == "month_to_date") {
+    result <- floor_date(date_column, unit = "month") == floor_date(lubridate::today(), unit = "month")
+  } else if (operator == "quarter_to_date") {
+    result <- lubridate::quarter(date_column, with_year=TRUE) == lubridate::quarter(lubridate::today(), with_year=TRUE)
+  } else if (operator == "year_to_date") {
+    result <- lubridate::year(date_column) == lubridate::year(today())
+  } else if (operator == "all") {
+    result <- date_column == date_column
+  } else {
+    stop("Invalid operator specified.")
+  }
+  result
+
+}
+
 #'API to load economic data from FRED (Federal Reserve Bank Economic Data)
 #'@param series_ids - e.g. c("UNRATE", "CPIAUCSL", "DGS10")
 #'@param date_start - Start Date for the query. This is optional field.
