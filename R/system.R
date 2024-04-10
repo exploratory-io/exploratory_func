@@ -3797,7 +3797,7 @@ filter_cascade <- function(.data, ...){
 #'                  "month_to_date", "quarter_to_date", "year_to_date", "all".
 #'@export
 
-relative_dates <- function(date_column, operator){
+within_date_range <- function(date_column, operator){
   if (operator == "today") {
     result <- date_column == lubridate::today()
   } else if (operator == "last_7_days") {
