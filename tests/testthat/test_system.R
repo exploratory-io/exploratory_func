@@ -27,7 +27,7 @@ test_that("test clean_data_frame",{
   expect_equal(row.names(df3a), row.names(df3b))
 })
 
-test_that("test filter_ralative_dates", {
+test_that("test within_date_range", {
   library(lubridate)
   df <- data.frame(
     date = c(
