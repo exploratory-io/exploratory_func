@@ -2560,12 +2560,17 @@ parse_html_tables <- function(url, encoding = NULL) {
 #' and returns a data frame as a result.
 #' @param web page url to scrape
 #' @param {string} table index number
-#' @param {string} either use the 1st row as a header or not. TRUE or FALSE
+#' @param {boolean} either use the 1st row as a header or not. TRUE or FALSE
 #' @param {string} web page encoding
 #' @export
 scrape_html_table <- function(url, index, heading, encoding = NULL) {
   loadNamespace("rvest");
   loadNamespace("tibble");
+  if (heading == "TRUE") {
+    heading = TRUE
+  } else if (heading == "FALSE") {
+    heading = FALSE
+  }
   original_locale = Sys.getlocale(category = "LC_CTYPE")
   tryCatch({
     .htmltables <- parse_html_tables(url, encoding)

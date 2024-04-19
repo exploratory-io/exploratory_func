@@ -112,6 +112,8 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
     }, simplify = FALSE), fill = TRUE)
     data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
   } else {
+    # Remove value label from vars to avoid unexpected column name in the result.
+    args$vars = as.character(vars)
     pd = do.call(mmpf::marginalPrediction, args)
     names(pd)[ncol(pd)] = target
   }
