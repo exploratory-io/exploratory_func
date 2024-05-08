@@ -1984,3 +1984,59 @@ test_that("get_average_moving_range", {
   res <- exploratory::get_average_moving_range(c(NA,1,8,3,7,5,NA,9,1,3,2,NA))
   expect_equal(res, 4.125)
 })
+
+test_that("cumsum", {
+  x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
+  expected <- c(NA, 5, 8, 14, NA, NA, 21, NA, 25, 34)
+  expect_equal(exploratory::cumsum(x), expected)
+  expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
+  expect_equal(exploratory::cumsum(x, skip.na=FALSE), expected)
+}
+
+test_that("cummean", {
+  x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
+  expected <- c(NA, 5, 4, 4.67, NA, NA, 5.25, NA, 5, 5.67)
+  expect_equal(exploratory::cummean(x), expected, tolerance=1e-2)
+  expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
+  expect_equal(exploratory::cummean(x, skip.na=FALSE), expected)
+}
+
+test_that("cummin", {
+  x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
+  expected <- c(NA, 5, 3, 3, NA, NA, 3, NA, 3, 3)
+  expect_equal(exploratory::cummin(x), expected)
+  expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
+  expect_equal(exploratory::cummin(x, skip.na=FALSE), expected)
+}
+
+test_that("cummax", {
+  x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
+  expected <- c(NA, 5, 5, 6, NA, NA, 7, NA, 7, 9)
+  expect_equal(exploratory::cummax(x), expected)
+  expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
+  expect_equal(exploratory::cummax(x, skip.na=FALSE), expected)
+}
+
+test_that("cumprod", {
+  x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
+  expected <- c(NA, 5, 15, 90, NA, NA, 630, NA, 2520, 22680)
+  expect_equal(exploratory::cumprod(x), expected)
+  expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
+  expect_equal(exploratory::cumprod(x, skip.na=FALSE), expected)
+}
+
+test_that("cumall", {
+  x <- c(NA, T, T, T, NA, NA, F, NA, T, F)
+  expected <- c(NA, T, T, T, NA, NA, F, NA, F, F)
+  expect_equal(exploratory::cumall(x), expected)
+  expected <- as.logical(c(NA, NA, NA, NA, NA, NA, F, F, F, F))
+  expect_equal(exploratory::cumall(x, skip.na=FALSE), expected)
+}
+
+test_that("cumany", {
+  x <- c(NA, F, F, F, NA, NA, T, NA, F, T)
+  expected <- c(NA, F, F, F, NA, NA, T, NA, T, T)
+  expect_equal(exploratory::cumany(x), expected)
+  expected <- as.logical(c(NA, NA, NA, NA, NA, NA, T, T, T, T))
+  expect_equal(exploratory::cumany(x, skip.na=FALSE), expected)
+}
