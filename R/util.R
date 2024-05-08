@@ -3461,3 +3461,86 @@ likert_sigma <- function(x) {
   res
 }
 
+#' cumsum wrapper function. It skips NA values in the calculation by default.
+#' @param x vector
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+cumsum <- function(x, skip.na = TRUE) {
+  if (skip.na) {
+    x[!is.na(x)] <- base::cumsum(x[!is.na(x)]) 
+    x
+  } else {
+    base::cumsum(x)
+  }
+}
+
+#' cummean wrapper function. It skips NA values in the calculation by default.
+#' @param x vector
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+cummean <- function(x, skip.na = TRUE) {
+  if (skip.na) {
+    x[!is.na(x)] <- dplyr::cummean(x[!is.na(x)]) 
+    x
+  } else {
+    dplyr::cummean(x)
+  }
+}
+
+#' cummin wrapper function. It skips NA values in the calculation by default.
+#' @param x vector
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+cummin <- function(x, skip.na = TRUE) {
+  if (skip.na) {
+    x[!is.na(x)] <- base::cummin(x[!is.na(x)]) 
+    x
+  } else {
+    base::cummin(x)
+  }
+}
+
+#' cummax wrapper function. It skips NA values in the calculation by default.
+#' @param x vector
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+cummax <- function(x, skip.na = TRUE) {
+  if (skip.na) {
+    x[!is.na(x)] <- base::cummax(x[!is.na(x)]) 
+    x
+  } else {
+    base::cummax(x)
+  }
+}
+
+#' cumprod wrapper function. It skips NA values in the calculation by default.
+#' @param x vector
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+cumprod <- function(x, skip.na = TRUE) {
+  if (skip.na) {
+    x[!is.na(x)] <- base::cumprod(x[!is.na(x)]) 
+    x
+  } else {
+    base::cumprod(x)
+  }
+}
+
+#' cumall wrapper function. It skips NA values in the calculation by default.
+#' @param x vector
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+cumall <- function(x, skip.na = TRUE) {
+  if (skip.na) {
+    x[!is.na(x)] <- dplyr::cumall(x[!is.na(x)]) 
+    x
+  } else {
+    dplyr::cumall(x)
+  }
+} 
+
+#' cumany wrapper function. It skips NA values in the calculation by default.
+#' @param x vector
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+cumany <- function(x, skip.na = TRUE) {
+  if (skip.na) {
+    x[!is.na(x)] <- dplyr::cumany(x[!is.na(x)]) 
+    x
+  } else {
+    dplyr::cumany(x)
+  }
+} 
