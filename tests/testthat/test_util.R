@@ -1991,7 +1991,7 @@ test_that("cumsum", {
   expect_equal(exploratory::cumsum(x), expected)
   expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
   expect_equal(exploratory::cumsum(x, skip.na=FALSE), expected)
-}
+})
 
 test_that("cummean", {
   x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
@@ -1999,7 +1999,7 @@ test_that("cummean", {
   expect_equal(exploratory::cummean(x), expected, tolerance=1e-2)
   expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
   expect_equal(exploratory::cummean(x, skip.na=FALSE), expected)
-}
+})
 
 test_that("cummin", {
   x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
@@ -2007,7 +2007,7 @@ test_that("cummin", {
   expect_equal(exploratory::cummin(x), expected)
   expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
   expect_equal(exploratory::cummin(x, skip.na=FALSE), expected)
-}
+})
 
 test_that("cummax", {
   x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
@@ -2015,7 +2015,7 @@ test_that("cummax", {
   expect_equal(exploratory::cummax(x), expected)
   expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
   expect_equal(exploratory::cummax(x, skip.na=FALSE), expected)
-}
+})
 
 test_that("cumprod", {
   x <- c(NA, 5, 3, 6, NA, NA, 7, NA, 4, 9)
@@ -2023,7 +2023,7 @@ test_that("cumprod", {
   expect_equal(exploratory::cumprod(x), expected)
   expected <- as.numeric(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
   expect_equal(exploratory::cumprod(x, skip.na=FALSE), expected)
-}
+})
 
 test_that("cumall", {
   x <- c(NA, T, T, T, NA, NA, F, NA, T, F)
@@ -2031,7 +2031,7 @@ test_that("cumall", {
   expect_equal(exploratory::cumall(x), expected)
   expected <- as.logical(c(NA, NA, NA, NA, NA, NA, F, F, F, F))
   expect_equal(exploratory::cumall(x, skip.na=FALSE), expected)
-}
+})
 
 test_that("cumany", {
   x <- c(NA, F, F, F, NA, NA, T, NA, F, T)
@@ -2039,4 +2039,4 @@ test_that("cumany", {
   expect_equal(exploratory::cumany(x), expected)
   expected <- as.logical(c(NA, NA, NA, NA, NA, NA, T, T, T, T))
   expect_equal(exploratory::cumany(x, skip.na=FALSE), expected)
-}
+})
