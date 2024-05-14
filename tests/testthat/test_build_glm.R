@@ -98,7 +98,7 @@ test_that("predict glm with new data", {
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "deviance", "residual_df",
-                                      "residual_deviance"))
+                                      "residual_deviance", "p_value"))
 })
 
 test_that("prediction with categorical columns", {
