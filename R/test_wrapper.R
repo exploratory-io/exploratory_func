@@ -1022,7 +1022,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
 #' @param diff_to_detect - Used for calculation of Cohen's d.
 exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
-                      outlier_filter_type = NULL, outlier_filter_threshold = NULL,
+                      outlier_filter_type = NULL, outlier_filter_threshold = NULL, paired = FALSE,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
@@ -1060,8 +1060,13 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       stop("The explanatory variable needs to have 2 unique values.")
     }
   }
-
-  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  # Use a different syntax for paired in R4.4.
+  # https://bugs.r-project.org/show_bug.cgi?id=14359
+  if (paired) {
+    formula = as.formula(paste0('Pair(`', var1_col, '`, `', var2_col, '`) ~ 1'))
+  } else {
+    formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  }
 
   ttest_each <- function(df) {
     tryCatch({
@@ -1425,7 +1430,13 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
     }
   }
 
-  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  # Use a different syntax for paired in R4.4.
+  # https://bugs.r-project.org/show_bug.cgi?id=14359
+  if (paired) {
+    formula = as.formula(paste0('Pair(`', var1_col, '`, `', var2_col, '`) ~ 1'))
+  } else {
+    formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  }
 
   each_func <- function(df) {
     tryCatch({
@@ -1457,7 +1468,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
         df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(forcats::fct_infreq(as.factor(!!rlang::sym(var2_col)))))
       }
       base.level <- levels(df_test[[var2_col]])[2]
-      model <- wilcox.test(formula, data = df_test, paired = paired, ...)
+      model <- wilcox.test(formula, data = df_test, ...)
       count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% dplyr::summarize(n=n())
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
