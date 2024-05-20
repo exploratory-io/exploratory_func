@@ -3754,12 +3754,13 @@ read_parquet_file <- function(file, col_select = NULL) {
 
 # Wrapper around arrow::read_parquet to work around https://issues.apache.org/jira/browse/ARROW-13860 by applying group_by column stored in the parquet file
 # as one of the class names.
-read_parquet_file_internal <- function(filepath, col_select = NULL) {
+# To avoid the resource lock issue, set mmap as FALSE by default.
+read_parquet_file_internal <- function(filepath, col_select = NULL, mmap = FALSE) {
   res <- NULL
   if (is.null(col_select)) {
-    res <- arrow::read_parquet(filepath)
+    res <- arrow::read_parquet(filepath, mmap = mmap)
   } else {
-    res <- arrow::read_parquet(filepath, col_select = col_select)
+    res <- arrow::read_parquet(filepath, col_select = col_select, mmap = mmap)
   }
   if (stringr::str_starts(class(res)[1], '...grouped_by_')) {
     group_col <- stringr::str_remove(class(res)[1], '^\\.\\.\\.grouped_by_')
