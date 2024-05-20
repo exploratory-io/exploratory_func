@@ -3160,7 +3160,7 @@ ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   }
 
   # Use add_with_rollback to avoid null such as a month ago of 2024-03-31. 
-  base_time <- add_with_rollback(time, time_unit_func(-n))
+  base_time <- lubridate::add_with_rollback(time, time_unit_func(-n))
   tmp_df <- tibble::tibble(t=time, x=x)
   join_df <- tmp_df %>% tidyr::complete(t=base_time) %>% dplyr::arrange(t)
   if (na_fill_type == "none") {
