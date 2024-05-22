@@ -2271,7 +2271,7 @@ extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table,
 
 #' API to download data from Google Storage to client and create a data frame from it
 #' @export
-downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId){
+downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId, colTypes = NULL){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
@@ -2294,7 +2294,12 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   # pass progress as FALSE to prevent SIGPIPE error on Exploratory Desktop.
   # To avoid the issue that bind_rows throws an error due to column data type mismatch,
   # First, import all the csv files with column data types as character, then convert the column data types with readr::type_convert.
-  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = readr::cols(.default = "c"), progress = FALSE)}) %>% dplyr::bind_rows() %>% readr::type_convert()
+  if (is.null(colTypes)) {
+    # if colTypes is not provided, guess data types.
+    df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = readr::cols(.default = "c"), progress = FALSE)}) %>% dplyr::bind_rows() %>% readr::type_convert()
+  } else {
+    df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = colTypes, progress = FALSE)}) %>% dplyr::bind_rows()
+  }
 }
 
 #' API to get a list of buckets from Google Cloud Storage
@@ -2332,9 +2337,10 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 #' @param table - Google BigQuery table where query result is saved
 #' @param bucket - Google Cloud Storage Bucket
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
-#' @param tokenFileId - file id for auth token
+#' @param tokenFileId - file id for auth token,
+#' @param colTypes
 #' @export
-getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, ...){
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, colTypes, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
@@ -2342,7 +2348,7 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
   uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
   job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
   # download tgzip file to client
-  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
+  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId, colTypes = colTypes)
 }
 
 #' Get data from google big query
@@ -2356,8 +2362,11 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @param bqProjectId - Id of the Project where Google Cloud Storage Bucket belongs
 #' @param csBucket - Google Cloud Storage Bucket
 #' @param bucketFolder - Folder under Google Cloud Storage Bucket where temp files are extracted.
+#' @param max_connections
+#' @param useStandardSQL
+#' @param colTypes
 #' @export
-executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bqProjectId, csBucket=NULL, bucketFolder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
+executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bqProjectId, csBucket=NULL, bucketFolder=NULL, max_connections = 8, useStandardSQL = FALSE, colTypes, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
@@ -2382,7 +2391,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       # extranct result from Google BigQuery to Google Cloud Storage and import
       # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
       # To get the only one value for datasetId and tableId, use dplyr::first.
-      df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId)
+      df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId, colTypes)
     } else {
       # direct import case (for refresh data frame case)
 
