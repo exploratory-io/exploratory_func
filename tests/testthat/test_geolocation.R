@@ -13,12 +13,18 @@ test_that("countrycode", {
   # German to French
   res <- countrycode('Albanien', 'country.name.de', 'iso.name.fr')
   expect_equal(res, "Albanie (l')")
-  
-  
+
+  res <- countrycode(c("estoniA","latVia","LithuanIa", "IrAn", "jaPan", "Canada"), origin = "country.name", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c("estoniA","latVia","LithuanIa", "IrAn", "jaPan", "Canada"), origin = "country.name", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+
   # origin="flex" special mode. Input can be in either iso2c, iso3c or name.
   res <- exploratory::countrycode(c('Afghanistan', 'USA', 'NZ'), 'flex', 'iso2c')
   expect_equal(res, c('AF', 'US', 'NZ'))
-  
+
 })
 
 test_that("ip to country", {

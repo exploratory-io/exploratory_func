@@ -20,26 +20,69 @@ maxmind_closure <- function(type){
 ip_to_country <- maxmind_closure("country_name")
 
 
-#' countrycode wrapper. 
-#' 
+#' countrycode wrapper.
+#'
 #' There is one special origin type "flex". By setting this, you can pass
-#' the country data in either "iso2c", "iso3c" or "country.name" format. 
-#' Multiple formats can be mixed.  
-#'  
+#' the country data in either "iso2c", "iso3c" or "country.name" format.
+#' Multiple formats can be mixed.
+#'
 #' @export
-countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = NA, 
+countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = NA,
   custom_dict = NULL, custom_match = NULL, origin_regex = NULL) {
   loadNamespace("countrycode")
-      
+
   if (origin=="flex") {
     df <- data.frame(q=sourcevar) %>%
       mutate(iso2c= countrycode::countrycode(q, origin = "iso2c", destination = destination, warn=F),
-             iso3c= countrycode::countrycode(q, origin = "iso3c", destination = destination, warn=F), 
+             iso3c= countrycode::countrycode(q, origin = "iso3c", destination = destination, warn=F),
              name = countrycode::countrycode(q, origin = "country.name", destination = destination, warn=F),
              a=coalesce(iso2c, iso3c, name))
     df$a
   } else {
-    countrycode::countrycode(sourcevar, origin, destination, warn, nomatch, 
-      custom_dict, custom_match, origin_regex)
+    if (destination == "region11") {
+      res <- countrycode::countrycode(sourcevar, origin, "region23", warn, nomatch,
+                                      custom_dict, custom_match, origin_regex)
+      res <- case_when(res == "Australia and New Zealand" ~ "Oceania",
+                res == "Caribbean" ~ "Central America",
+                res == "Eastern Africa" ~ "Africa",
+                res == "Eastern Asia" ~ "East Asia",
+                res == "Eastern Europe" ~ "East Europe",
+                res == "Melanesia" ~ "Pacific",
+                res == "Micronesia" ~ "Pacific",
+                res == "Middle Africa" ~ "Africa",
+                res == "Northern Africa" ~ "Africa",
+                res == "Northern America" ~ "North America",
+                res == "Northern Europe" ~ "West Europe",
+                res == "Polynesia" ~ "Pacific",
+                res == "South-Eastern Asia" ~ "East Asia",
+                res == "Southern Africa" ~ "Africa",
+                res == "Southern Asia" ~ "Central Asia",
+                res == "Southern Europe" ~ "West Europe",
+                res == "Western Africa" ~ "Africa",
+                res == "Western Asia" ~ "West Asia",
+                res == "Western Europe" ~ "West Europe",
+                TRUE ~ res
+      )
+      # Manually override the results for specific countries
+      override <- c("East Europe", "East Europe", "East Europe", "West Asia")
+      names(override) <- c("estonia", "latvia", "lithuania", "iran")
+
+      # Apply the overrides
+      res <- ifelse(stringr::str_to_lower(sourcevar) %in% names(override), override[stringr::str_to_lower(sourcevar)], res)
+    } else if (destination == "region23") {
+      # Get the result using countrycode with custom dictionary
+      res <- countrycode::countrycode(sourcevar, origin, destination, warn, nomatch,
+                        custom_dict, custom_match, origin_regex)
+      # Manually override the results for specific countries
+      override <- c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia")
+      names(override) <- c("estonia", "latvia", "lithuania", "iran")
+
+      # Apply the overrides
+      res <- ifelse(stringr::str_to_lower(sourcevar) %in% names(override), override[stringr::str_to_lower(sourcevar)], res)
+    } else {
+      res <- countrycode::countrycode(sourcevar, origin, destination, warn, nomatch,
+                  custom_dict, custom_match, origin_regex)
+    }
+    res
   }
 }
