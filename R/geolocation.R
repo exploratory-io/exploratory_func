@@ -41,6 +41,9 @@ countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = N
   } else {
     # Manually override the results for specific countries
     override <- c("East Europe", "East Europe", "East Europe", "West Asia")
+    if (destination == "region23") {
+      override <- c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia")
+    }
     if (origin == "country.name") {
       names(override) <- c("estonia", "latvia", "lithuania", "iran")
     } else if (origin == "iso2c") {
