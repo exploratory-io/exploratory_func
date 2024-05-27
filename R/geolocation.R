@@ -92,10 +92,6 @@ countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = N
       # Get the result using countrycode with custom dictionary
       res <- countrycode::countrycode(sourcevar, origin, destination, warn, nomatch,
                         custom_dict, custom_match, origin_regex)
-      # Manually override the results for specific countries
-      override <- c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia")
-      names(override) <- c("estonia", "latvia", "lithuania", "iran")
-
       # Apply the overrides
       res <- ifelse(stringr::str_to_lower(sourcevar) %in% names(override), override[stringr::str_to_lower(sourcevar)], res)
     } else {
