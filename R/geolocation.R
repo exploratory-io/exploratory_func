@@ -39,6 +39,28 @@ countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = N
              a=coalesce(iso2c, iso3c, name))
     df$a
   } else {
+    # Manually override the results for specific countries
+    override <- c("East Europe", "East Europe", "East Europe", "West Asia")
+    if (origin == "country.name") {
+      names(override) <- c("estonia", "latvia", "lithuania", "iran")
+    } else if (origin == "iso2c") {
+      names(override) <- c("ee", "lv", "lt", "ir")
+    } else if (origin == "iso3c") {
+      names(override) <- c("est", "lva", "ltu", "irn")
+    } else if (origin == "iso3n") {
+      names(override) <- c(233, 418, 440, 364)
+    } else if (origin == "imf") {
+      names(override) <- c(939, 941, 946, 429)
+    } else if (origin == "fao") {
+      names(override) <- c(63, 119, 126, 102)
+    } else if (origin == "ioc") {
+      names(override) <- c("est", "lat", "ltu", "iri")
+    } else if (origin == "un") {
+      names(override) <- c(233, 428, 440, 364)
+    } else if (origin == "wb") {
+      names(override) <- c("est", "lva", "ltu", "irn")
+    }
+
     if (destination == "region11") {
       res <- countrycode::countrycode(sourcevar, origin, "region23", warn, nomatch,
                                       custom_dict, custom_match, origin_regex)
@@ -63,9 +85,6 @@ countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = N
                 res == "Western Europe" ~ "West Europe",
                 TRUE ~ res
       )
-      # Manually override the results for specific countries
-      override <- c("East Europe", "East Europe", "East Europe", "West Asia")
-      names(override) <- c("estonia", "latvia", "lithuania", "iran")
 
       # Apply the overrides
       res <- ifelse(stringr::str_to_lower(sourcevar) %in% names(override), override[stringr::str_to_lower(sourcevar)], res)
