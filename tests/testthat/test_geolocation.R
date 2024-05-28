@@ -13,12 +13,66 @@ test_that("countrycode", {
   # German to French
   res <- countrycode('Albanien', 'country.name.de', 'iso.name.fr')
   expect_equal(res, "Albanie (l')")
-  
-  
+
+  res <- countrycode(c("estoniA","latVia","LithuanIa", "IrAn", "jaPan", "Canada"), origin = "country.name", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c("EE","LV","LT", "IR", "JP", "CA"), origin = "iso2c", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c("EST","LVA","LTU", "IRN", "JPN", "CAN"), origin = "iso3c", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c(233, 428, 440, 364, 392, 124), origin = "iso3n", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c(939, 941, 946, 429, 158, 156), origin = "imf", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c(63, 119, 126, 102, 110, 33), origin = "fao", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c("EST", "LAT", "LTU", "IRI", "JPN", "CAN"), origin = "ioc", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c(233, 428, 440, 364, 392, 124), origin = "un", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c("EST", "LVA", "LTU", "IRN", "JPN", "CAN"), origin = "wb", destination = "region23")
+  expect_equal(res, c("Eastern Europe", "Eastern Europe", "Eastern Europe", "Western Asia", "Eastern Asia", "Northern America"))
+
+  res <- countrycode(c("estoniA","latVia","LithuanIa", "IrAn", "jaPan", "Canada"), origin = "country.name", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c("EE","LV","LT", "IR", "JP", "CA"), origin = "iso2c", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c("EST","LVA","LTU", "IRN", "JPN", "CAN"), origin = "iso3c", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c(233, 428, 440, 364, 392, 124), origin = "iso3n", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c(939, 941, 946, 429, 158, 156), origin = "imf", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c(63, 119, 126, 102, 110, 33), origin = "fao", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c("EST", "LAT", "LTU", "IRI", "JPN", "CAN"), origin = "ioc", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c(233, 428, 440, 364, 392, 124), origin = "un", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+  res <- countrycode(c("EST", "LVA", "LTU", "IRN", "JPN", "CAN"), origin = "wb", destination = "region11")
+  expect_equal(res, c("East Europe","East Europe","East Europe","West Asia","East Asia","North America"))
+
+
   # origin="flex" special mode. Input can be in either iso2c, iso3c or name.
   res <- exploratory::countrycode(c('Afghanistan', 'USA', 'NZ'), 'flex', 'iso2c')
   expect_equal(res, c('AF', 'US', 'NZ'))
-  
+
 })
 
 test_that("ip to country", {
