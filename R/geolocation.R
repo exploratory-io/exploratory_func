@@ -51,7 +51,7 @@ countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = N
     } else if (origin == "iso3c") {
       names(override) <- c("est", "lva", "ltu", "irn")
     } else if (origin == "iso3n") {
-      names(override) <- c(233, 418, 440, 364)
+      names(override) <- c(233, 428, 440, 364)
     } else if (origin == "imf") {
       names(override) <- c(939, 941, 946, 429)
     } else if (origin == "fao") {
