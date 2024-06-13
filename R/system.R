@@ -2300,6 +2300,11 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   } else {
     df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = colTypes, progress = FALSE)}) %>% dplyr::bind_rows()
   }
+  tryCatch({
+    files_full_path <- file.path(download_dir, files)
+    file.remove(files_full_path)
+  })
+  df
 }
 
 #' API to get a list of buckets from Google Cloud Storage
@@ -2331,6 +2336,14 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
   bigrquery::copy_table(src, dest)
 }
 
+generate_random_string <- function(length) {
+  # Define the allowed characters
+  chars <- c(letters, LETTERS, 0:9)
+  # Randomly sample from these characters to create a string of the specified length
+  random_string <- paste0(sample(chars, length, replace = TRUE), collapse = "")
+  return(random_string)
+}
+
 #' Get data from google big query
 #' @param bucketProjectId - Google Cloud Storage/BigQuery project id
 #' @param dataSet - Google BigQuery data tht your query result table is associated with
@@ -2343,12 +2356,15 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, colTypes = NULL, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
   # submit a job to extract query result to cloud storage
   uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
   job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
-  # download tgzip file to client
-  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId, colTypes = colTypes)
+  # download tgzip file to client. Make sure to create a temporary directory for download with unique location to avoid conflicitng with another import.
+  downloadDir <- file.path(tempdir(), generate_random_string(10))
+  tryCatch({
+    dir.create(downloadDir)
+  })
+  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = downloadDir, tokenFileId = tokenFileId, colTypes = colTypes)
 }
 
 #' Get data from google big query
