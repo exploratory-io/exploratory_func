@@ -2301,7 +2301,8 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
     df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = colTypes, progress = FALSE)}) %>% dplyr::bind_rows()
   }
   tryCatch({
-    file.remove(files)
+    files_full_path <- file.path(download_dir, files)
+    file.remove(files_full_path)
   })
   df
 }
