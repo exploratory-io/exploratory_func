@@ -2344,7 +2344,6 @@ generate_random_string <- function(length) {
   return(random_string)
 }
 
-
 #' Get data from google big query
 #' @param bucketProjectId - Google Cloud Storage/BigQuery project id
 #' @param dataSet - Google BigQuery data tht your query result table is associated with
@@ -2354,17 +2353,18 @@ generate_random_string <- function(length) {
 #' @param tokenFileId - file id for auth token,
 #' @param colTypes
 #' @export
-getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder = "", tokenFileId, colTypes = NULL, ...){
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, colTypes = NULL, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-  if(folder == "") { # if folder is not provided, assign random string so that download folder does not conflict with other import.
-    folder = generate_random_string(10)
-  }
   # submit a job to extract query result to cloud storage
   uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
   job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
-  # download tgzip file to client
-  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId, colTypes = colTypes)
+  # download tgzip file to client. Make sure to create a temporary directory for download with unique location to avoid conflicitng with another import.
+  downloadDir <- file.path(tempdir(), generate_random_string(10))
+  tryCatch({
+    dir.create(downloadDir)
+  })
+  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = downloadDir, tokenFileId = tokenFileId, colTypes = colTypes)
 }
 
 #' Get data from google big query
