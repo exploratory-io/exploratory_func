@@ -2300,6 +2300,10 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   } else {
     df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = colTypes, progress = FALSE)}) %>% dplyr::bind_rows()
   }
+  tryCatch({
+    file.remove(files)
+  })
+  df
 }
 
 #' API to get a list of buckets from Google Cloud Storage
@@ -2331,6 +2335,15 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
   bigrquery::copy_table(src, dest)
 }
 
+generate_random_string <- function(length) {
+  # Define the allowed characters
+  chars <- c(letters, LETTERS, 0:9)
+  # Randomly sample from these characters to create a string of the specified length
+  random_string <- paste0(sample(chars, length, replace = TRUE), collapse = "")
+  return(random_string)
+}
+
+
 #' Get data from google big query
 #' @param bucketProjectId - Google Cloud Storage/BigQuery project id
 #' @param dataSet - Google BigQuery data tht your query result table is associated with
@@ -2340,10 +2353,12 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 #' @param tokenFileId - file id for auth token,
 #' @param colTypes
 #' @export
-getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, colTypes = NULL, ...){
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder = "", tokenFileId, colTypes = NULL, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
+  if(folder == "") { # if folder is not provided, assign random string so that download folder does not conflict with other import.
+    folder = generate_random_string(10)
+  }
   # submit a job to extract query result to cloud storage
   uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
   job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
