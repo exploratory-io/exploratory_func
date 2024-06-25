@@ -924,12 +924,15 @@ str_logical <- function(column, true_value = NULL) {
 #' @param pattern Pattern to look for.
 #' @param negate If TRUE, return non-matching elements.
 #' @param ignore_case If TRUE, detect the pattern with case insensitive way.
+#' @param allow_empty_pattern if TRUE, assumes it matches (i.e. return TRUE), if FALSE underlying stringr::str_detect raises an error.
 #' @export
-str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE) {
+str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE, allow_empty_pattern = TRUE) {
   # if pattern is not empty string and case insensitive is specified, use regex to handle the case insensitive match.
   # any() is necessary to avoid error when pattern is a vector.
   if (any(pattern != "") && ignore_case) {
     stringr::str_detect(string, stringr::regex(pattern, ignore_case = TRUE), negate = negate)
+  } else if (all(pattern == "") && allow_empty_pattern) {
+    rep(TRUE, length(string))
   } else { # if the pattern is empty string stringr::regexp throws warning, so simply use stringr::str_detect as is.
     stringr::str_detect(string, pattern, negate)
   }
