@@ -3609,6 +3609,9 @@ read_delim_file <- function(file, delim, quote = '"',
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) {
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
       } else {
+        if (is_free_input_text) {
+          stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c("", e$message)), ' :: Failed to import file.'))
+        }
         stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
     })
