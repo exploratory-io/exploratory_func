@@ -2270,7 +2270,7 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
 
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
 #'@export
-case_when <- function(x, ...) {
+case_when <- function(x, ..., type_convert = FALSE) {
   ret <- dplyr::case_when(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
@@ -2281,6 +2281,12 @@ case_when <- function(x, ...) {
       enc2utf8(ret)
     }, error = function(e) { # In case of error, just use the original.
       ret
+    })
+  }
+  if (type_convert && is.character(ret)) {
+    # try to guess the data type for case_when result.
+    tryCatch({
+      ret <- readr::type_convert(tibble::tibble(x = ret))$x
     })
   }
   ret

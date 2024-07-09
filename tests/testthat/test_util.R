@@ -771,6 +771,21 @@ test_that("append_colnames", {
   expect_equal(colnames(ret), c("a.col1.b", "a.col2.b"))
 })
 
+test_that("case_when", {
+  test_df <- data.frame(
+    salary = c(1,2,3),
+    marital_status = c("single","divoerced","married")
+  )
+  test_df <- test_df %>% dplyr::mutate(
+    calc1 = exploratory::case_when(
+      marital_status == "single" ~ as.character(salary *2),
+      TRUE ~ as.character(NA),
+      type_convert = TRUE
+    )
+  )
+  expect_true(class(test_df$calc1) == "numeric")
+})
+
 test_that("test pivot", {
   set.seed(1)
   test_df <- data.frame(
