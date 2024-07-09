@@ -2302,10 +2302,19 @@ pivot_longer <- function(data,
                               values_transform = values_transform
                             )
    # if type_convert argument is TRUE and names_to column is character, auto-detect data types.
-   if (type_convert && is.character(ret[names_to][[1]])) {
-     tryCatch({
-       ret <- ret %>% dplyr::mutate(!!sym(names_to) := readr::type_convert(ret[names_to])[[1]])
-     })
+   # if type_convert argument is TRUE, auto-detect data types for each names_to column.
+   if (type_convert) {
+     names_to_cols <- if (is.character(names_to)) {
+       names_to
+     } else {
+       rlang::eval_tidy(names_to)
+     }
+
+     for (name_col in names_to_cols) {
+       if (is.character(ret[[name_col]])) {
+         ret[[name_col]] <- readr::type_convert(data.frame(x = ret[[name_col]]))$x
+       }
+     }
    }
    ret
 }
