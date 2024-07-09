@@ -2268,6 +2268,48 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
   }
 }
 
+#'Wrapper function for tidyr::pivot_longer to support type_convert argument.
+#'@export
+pivot_longer <- function(data,
+                         cols,
+                         ...,
+                         cols_vary = "fastest",
+                         names_to = "name",
+                         names_prefix = NULL,
+                         names_sep = NULL,
+                         names_pattern = NULL,
+                         names_ptypes = NULL,
+                         names_transform = NULL,
+                         names_repair = "check_unique",
+                         values_to = "value",
+                         values_drop_na = FALSE,
+                         values_ptypes = NULL,
+                         values_transform = NULL,
+                         type_convert = FALSE) {
+   ret <- tidyr::pivot_longer(data = data,
+                              cols = {{ cols }},
+                              ...,
+                              cols_vary = cols_vary,
+                              names_to = names_to,
+                              names_prefix = names_prefix,
+                              names_sep = names_sep,
+                              names_pattern = names_pattern,
+                              names_ptypes = names_ptypes,
+                              names_repair = names_repair,
+                              values_to = values_to,
+                              values_drop_na = values_drop_na,
+                              values_ptypes = values_ptypes,
+                              values_transform = values_transform
+                            )
+   # if type_convert argument is TRUE and names_to column is character, auto-detect data types.
+   if (type_convert && is.character(ret[names_to][[1]])) {
+     tryCatch({
+       ret <- ret %>% dplyr::mutate(!!sym(names_to) := readr::type_convert(ret[names_to])[[1]])
+     })
+   }
+   ret
+}
+
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
 #'@export
 case_when <- function(x, ..., type_convert = FALSE) {
