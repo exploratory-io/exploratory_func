@@ -771,6 +771,53 @@ test_that("append_colnames", {
   expect_equal(colnames(ret), c("a.col1.b", "a.col2.b"))
 })
 
+test_that("case_when", {
+  test_df <- data.frame(
+    salary = c(1,2,3),
+    marital_status = c("single","divoerced","married")
+  )
+  df <- test_df %>% dplyr::mutate(
+    calc1 = exploratory::case_when(
+      marital_status == "single" ~ as.character(salary *2),
+      TRUE ~ as.character(NA),
+      type_convert = TRUE
+    )
+  )
+  expect_true(class(df$calc1) == "numeric")
+  df <- test_df %>% dplyr::mutate(
+    calc1 = exploratory::case_when(
+      marital_status == "single" ~ as.character(salary *2),
+      TRUE ~ as.character(NA)
+    )
+  )
+  expect_true(class(df$calc1) == "character")
+})
+
+test_that("pivot_longer", {
+  test_df <- data.frame(
+    country = c("Japan", "US", "UK"),
+    `2024-01-01` = c(1,2,3),
+    `2024-02-01` = c(2,3,4),
+    `2024-03-01` = c(3,4,5)
+  )
+  colnames(test_df) <- c("country", "2024-01-01", "2024-02-01", "2024-03-01")
+  df <- test_df %>% exploratory::pivot_longer(
+    cols = c(`2024-01-01`, `2024-02-01`, `2024-03-01`),
+    values_to = 'value',
+    names_to = c("date"),
+    values_drop_na = TRUE,
+    names_repair = 'unique',
+    type_convert = TRUE)
+  expect_true(class(df$date) == "Date")
+  df <- test_df %>% exploratory::pivot_longer(
+    cols = c(`2024-01-01`, `2024-02-01`, `2024-03-01`),
+    values_to = 'value',
+    names_to = c("date"),
+    values_drop_na = TRUE,
+    names_repair = 'unique')
+  expect_true(class(df$date) == "character")
+});
+
 test_that("test pivot", {
   set.seed(1)
   test_df <- data.frame(

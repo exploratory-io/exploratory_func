@@ -2268,9 +2268,60 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
   }
 }
 
+#'Wrapper function for tidyr::pivot_longer to support type_convert argument.
+#'@export
+pivot_longer <- function(data,
+                         cols,
+                         ...,
+                         cols_vary = "fastest",
+                         names_to = "name",
+                         names_prefix = NULL,
+                         names_sep = NULL,
+                         names_pattern = NULL,
+                         names_ptypes = NULL,
+                         names_transform = NULL,
+                         names_repair = "check_unique",
+                         values_to = "value",
+                         values_drop_na = FALSE,
+                         values_ptypes = NULL,
+                         values_transform = NULL,
+                         type_convert = FALSE) {
+   ret <- tidyr::pivot_longer(data = data,
+                              cols = {{ cols }},
+                              ...,
+                              cols_vary = cols_vary,
+                              names_to = names_to,
+                              names_prefix = names_prefix,
+                              names_sep = names_sep,
+                              names_pattern = names_pattern,
+                              names_ptypes = names_ptypes,
+                              names_repair = names_repair,
+                              values_to = values_to,
+                              values_drop_na = values_drop_na,
+                              values_ptypes = values_ptypes,
+                              values_transform = values_transform
+                            )
+   # if type_convert argument is TRUE and names_to column is character, auto-detect data types.
+   # if type_convert argument is TRUE, auto-detect data types for each names_to column.
+   if (type_convert) {
+     names_to_cols <- if (is.character(names_to)) {
+       names_to
+     } else {
+       rlang::eval_tidy(names_to)
+     }
+
+     for (name_col in names_to_cols) {
+       if (is.character(ret[[name_col]])) {
+         ret[[name_col]] <- readr::type_convert(data.frame(x = ret[[name_col]]))$x
+       }
+     }
+   }
+   ret
+}
+
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
 #'@export
-case_when <- function(x, ...) {
+case_when <- function(x, ..., type_convert = FALSE) {
   ret <- dplyr::case_when(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
@@ -2281,6 +2332,12 @@ case_when <- function(x, ...) {
       enc2utf8(ret)
     }, error = function(e) { # In case of error, just use the original.
       ret
+    })
+  }
+  if (type_convert && is.character(ret)) {
+    # try to guess the data type for case_when result.
+    tryCatch({
+      ret <- readr::type_convert(tibble::tibble(x = ret))$x
     })
   }
   ret
