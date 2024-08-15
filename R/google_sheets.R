@@ -6,32 +6,44 @@
 #' @param filepath path of source CSV file that you want to upload to Google Sheet
 #' @param title name of the new sheet on Google Sheets.
 #' @param overwrite flag to control if you want to overwrite existing sheet
-uploadGoogleSheet <- function(filepath, title, overwrite = FALSE, sheetName= NULL){
-  if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
-  if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
-  # the first argument of getGoogleTokenForSheet is no longer used but pass empty string to make it work.
-  currentConfig <- getOption("httr_config")
-  tryCatch({
-    # To workaround Error in the HTTP2 framing layer
-    # set below config (see https://github.com/jeroen/curl/issues/156)
-    httr::set_config(httr::config(http_version = 0))
+uploadGoogleSheet <- function(filepath, title, overwrite = FALSE, sheetName = NULL) {
+  if (!requireNamespace("googlesheets4", quietly = TRUE)) {
+    stop("The 'googlesheets4' package must be installed.")
+  }
+  if (!requireNamespace("googledrive", quietly = TRUE)) {
+    stop("The 'googledrive' package must be installed.")
+  }
 
-    token <- getGoogleTokenForSheet("")
-    googlesheets4::sheets_set_token(token)
-    googledrive::drive_set_token(token)
-    sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
-    if (!is.null(sheetName)) { # if sheet name is specified, rename the tab (sheet) with the sheet name after uploading the file.
-      googlesheets4::sheet_rename(sheet, sheet = NULL, sheetName)
-    }
-    sheet
-  },finally = function(){
+  currentConfig <- getOption("httr_config")
+
+  # Ensure that the HTTP configuration is reset upon function exit
+  on.exit({
     if (is.null(currentConfig)) {
       httr::reset_config()
     } else {
       httr::set_config(currentConfig)
     }
-  })
+  }, add = TRUE)
+
+  # Set HTTP configuration to workaround the HTTP2 framing layer error
+  httr::set_config(httr::config(http_version = 0))
+
+  # Obtain the Google token
+  token <- getGoogleTokenForSheet("")
+  googlesheets4::sheets_set_token(token)
+  googledrive::drive_set_token(token)
+
+  # Upload the file to Google Drive as a spreadsheet
+  sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
+
+  # Rename the sheet tab if 'sheetName' is provided
+  if (!is.null(sheetName)) {
+    googlesheets4::sheet_rename(sheet, sheet = NULL, sheetName)
+  }
+
+  return(sheet)
 }
+
 
 #' API to update existing Google Sheet with the local CSV file.
 #' @export
