@@ -1846,7 +1846,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1859,7 +1859,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%not_equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1872,7 +1872,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1885,7 +1885,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1898,7 +1898,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1911,7 +1911,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -3086,6 +3086,15 @@ week <- function(date, unit="year") {
   }
 }
 
+#' Wrapper function for between.
+#' if both left and right are NULL, return TRUE for all
+between <- function(x, left, right) {
+  if (is.null(left) && is.null(right)) {
+    return(rep(TRUE, length(x)))
+  }
+  return(dplyr::between(x, left, right))
+
+}
 
 #' API to calculate duration between the start_date and the end_date in the provided time unit.
 time_between <- function(start_date, end_date, unit = "years") {

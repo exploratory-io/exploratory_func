@@ -1142,6 +1142,11 @@ test_that("test %equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),1)
+  ret <- df %>% dplyr::filter(x %equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %not_equal_or_all%", {
@@ -1154,6 +1159,11 @@ test_that("test %not_equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %not_equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),2)
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %greater_or_all%", {
@@ -1166,6 +1176,11 @@ test_that("test %greater_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %greater_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %greater_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),1)
+  ret <- df %>% dplyr::filter(x %greater_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %greater_or_equal_or_all%", {
@@ -1178,6 +1193,11 @@ test_that("test %greater_or_equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),2)
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %less_or_all%", {
@@ -1190,6 +1210,11 @@ test_that("test %less_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %less_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %less_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),1)
+  ret <- df %>% dplyr::filter(x %less_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %less_or_equal_or_all%", {
@@ -1202,6 +1227,11 @@ test_that("test %less_or_equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %less_or_equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),2)
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test mase", {
@@ -1684,11 +1714,11 @@ test_that("ts_lag", {
   res <- ts_lag(t, y, unit="week", n=2)
   expect_equal(res, c(NA, 1, 1, 3))
 
-  # NA handling fix. 
+  # NA handling fix.
   t <- as.Date(c('2024-02-11', '2024-02-18', '2024-02-25', '2024-03-03', '2024-03-10', '2024-03-17', '2024-03-24', '2024-03-31', '2024-04-07', '2024-04-14', '2024-04-21', '2024-04-28', '2024-05-05', '2024-05-12'))
   y <- c(267, 1628, 1829, 1742, 2209, 1773, 2124, 2070, 2814, 2402, 2359, 1346, 1905, 943)
   res <- ts_lag(t, y, unit="month", n=1)
-  # Make sure the 8th value is 1829, not 943. 
+  # Make sure the 8th value is 1829, not 943.
   expect_equal(res, c(NA, NA, NA, NA, NA, 267, 1628, 1829, 1742, 2209, 1773, 2124, 2070, 2814))
 })
 
@@ -2093,4 +2123,22 @@ test_that("cumany", {
   expect_equal(exploratory::cumany(x), expected)
   expected <- as.logical(c(NA, NA, NA, NA, NA, NA, T, T, T, T))
   expect_equal(exploratory::cumany(x, skip.na=FALSE), expected)
+})
+
+test_that("between", {
+  x <- c(1,2,3,4,5)
+  expected <- c(T,T,T,F,F)
+  actual <- exploratory::between(x, 1,3)
+  expect_equal(actual, expected)
+  expected2 <- c(T,T,T,T,T)
+  actual2 <- exploratory::between(x, NULL, NULL)
+  expect_equal(actual2, expected2)
+  x_date <- c(lubridate::ymd("2024-01-01"),
+              lubridate::ymd("2024-01-02"),
+              lubridate::ymd("2024-01-03"),
+              lubridate::ymd("2024-01-04"))
+  expected3 <- c(T,T,T,F)
+  actual3 <- exploratory::between(x_date, lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-03"))
+  expect_equal(actual3, expected3)
+
 })
