@@ -1142,6 +1142,11 @@ test_that("test %equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),1)
+  ret <- df %>% dplyr::filter(x %equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %not_equal_or_all%", {
@@ -1154,6 +1159,11 @@ test_that("test %not_equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %not_equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),2)
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %greater_or_all%", {
@@ -1166,6 +1176,11 @@ test_that("test %greater_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %greater_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %greater_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),1)
+  ret <- df %>% dplyr::filter(x %greater_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %greater_or_equal_or_all%", {
@@ -1178,6 +1193,11 @@ test_that("test %greater_or_equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),2)
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %less_or_all%", {
@@ -1190,6 +1210,11 @@ test_that("test %less_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %less_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %less_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),1)
+  ret <- df %>% dplyr::filter(x %less_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test %less_or_equal_or_all%", {
@@ -1202,6 +1227,11 @@ test_that("test %less_or_equal_or_all%", {
   df <- data.frame(x  = c (1,2,3))
   ret <- df %>% dplyr::filter(x %less_or_equal_or_all% "")
   expect_equal(nrow(ret), 3)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% lubridate::ymd("2024-01-02"))
+  expect_equal(nrow(ret),2)
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% NULL)
+  expect_equal(nrow(ret),3)
 })
 
 test_that("test mase", {

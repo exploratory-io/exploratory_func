@@ -1846,7 +1846,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1859,7 +1859,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%not_equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1872,7 +1872,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1885,7 +1885,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1898,7 +1898,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1911,7 +1911,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_equal_or_all%` <- function(x,y) {
-  if (y == "" || is.null(y)) {
+  if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
