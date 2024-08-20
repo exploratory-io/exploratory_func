@@ -121,6 +121,11 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
         ret <- list(error=simpleError("Test was not performed because there is only one group."))
         class(ret) <- c("survdiff_exploratory", class(ret))
       }
+    } else {
+      # If there is no cohort, return a list with n (the total number of rows) 
+      # and nevent (number of rows with event).
+      ret <- list(n = nrow(df), nevent = sum(df[[status_col]], na.rm = TRUE))
+      class(ret) <- c("survdiff_exploratory", class(ret))
     }
     ret
   }
@@ -211,8 +216,15 @@ tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time =
 #' @export
 tidy.survdiff_exploratory <- function(x, ...) {
   if (is.null(x$error)) {
-    ret <- broom:::tidy.survdiff(x, ...)
-    # TODO: rename .cohort column to original name
+    # If x doesn't contain pvalue, it means it is not a survdiff output.
+    # Just simply create an empty data frame for now if that's the case.
+    # This is the case when there is no cohort.
+    if (is.null(x$pvalue)) {
+      ret <- data.frame();
+    } else {
+      ret <- broom:::tidy.survdiff(x, ...)
+      # TODO: rename .cohort column to original name
+    }
   }
   else {
     ret <- data.frame(Note = x$error$message, stringsAsFactors = FALSE)
@@ -223,10 +235,17 @@ tidy.survdiff_exploratory <- function(x, ...) {
 #' @export
 glance.survdiff_exploratory <- function(x, ...) {
   if (is.null(x$error)) {
-    ret <- broom:::glance.survdiff(x, ...)
-    ret <- ret %>% dplyr::mutate(n = !!sum(x$n, na.rm = TRUE), nevent = !!sum(x$obs, na.rm = TRUE))
-    if ("df" %in% colnames(ret) && "p.value" %in% colnames(ret)) {
-      ret <- ret %>% dplyr::relocate(df, .after=p.value) # Adjust order just to be consistent with other Analytics Views.
+    # If x doesn't contain pvalue, it means it is not a survdiff output.
+    # Just simply create a data frame with x if that's the case.
+    # This is the case when there is no cohort.
+    if (is.null(x$pvalue)) {
+      ret <- data.frame(x);
+    } else {
+      ret <- broom:::glance.survdiff(x, ...)
+      ret <- ret %>% dplyr::mutate(n = !!sum(x$n, na.rm = TRUE), nevent = !!sum(x$obs, na.rm = TRUE))
+      if ("df" %in% colnames(ret) && "p.value" %in% colnames(ret)) {
+        ret <- ret %>% dplyr::relocate(df, .after=p.value) # Adjust order just to be consistent with other Analytics Views.
+      }
     }
     colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
     colnames(ret)[colnames(ret) == "df"] <- "DF"
