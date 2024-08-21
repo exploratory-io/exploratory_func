@@ -3,7 +3,7 @@ context("test exp_survival")
 test_that("test exp_survival", {
   # log simulation data
   data <- tibble::tibble(weeks_on_service = c(18, 13, 1, 7, 1, 1, 2, 1, 1, 1),
-                         is_churned = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE),
+                         is_churned = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, NA, FALSE, TRUE),
                          os = structure(c(1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1L),
                                         .Label = c("Windows", "Mac"), class = "factor"),
                          country = structure(c(13L, 82L, 27L, 82L, 82L, 27L, 13L,
@@ -37,8 +37,10 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy_rowwise(model1)
   ret2 <- ret %>% tidy_rowwise(model2)
   ret3 <- ret %>% glance_rowwise(model2)
-  expect_equal(ret3$`Rows`, nrow(data))
-  expect_equal(ret3$`Rows (TRUE)`,sum(data$`is churned`))
+  # Rows is the number of data except NAs.
+  expect_equal(ret3$`Rows`, sum(!is.na(data$`is churned`), na.rm=TRUE))
+  # Rows (TRUE) is the number of TRUEs.
+  expect_equal(ret3$`Rows (TRUE)`,sum(data$`is churned`, na.rm=TRUE))
 
   # No cohort case
   ret <- data %>% exp_survival(`weeks on service`, `is churned`)
@@ -48,8 +50,10 @@ test_that("test exp_survival", {
   ret3 <- ret %>% glance_rowwise(model2)
   # ret3 should return a data frame with "Rows" and "Rows (TRUE)" columns
   expect_equal(colnames(ret3), c("Rows","Rows (TRUE)"))
-  expect_equal(ret3$`Rows`, nrow(data))
-  expect_equal(ret3$`Rows (TRUE)`,sum(data$`is churned`))
+  # Rows is the number of data except NAs.
+  expect_equal(ret3$`Rows`, sum(!is.na(data$`is churned`), na.rm=TRUE))
+  # Rows (TRUE) is the number of TRUEs.
+  expect_equal(ret3$`Rows (TRUE)`,sum(data$`is churned`, na.rm=TRUE))
 
   data2 <- data %>% mutate(`o s` = "Windows") # test single value cohort case
   ret <- data2 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
