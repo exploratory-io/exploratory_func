@@ -122,9 +122,9 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
         class(ret) <- c("survdiff_exploratory", class(ret))
       }
     } else {
-      # If there is no cohort, return a list with n (the total number of rows) 
-      # and nevent (number of rows with event).
-      ret <- list(n = nrow(df), nevent = sum(df[[status_col]], na.rm = TRUE))
+      # If there is no cohort, return the number of data except NAs (n) 
+      # and number of TRUEs (nevent).
+      ret <- list(n = sum(!is.na(df[[status_col]]), na.rm = TRUE), nevent = sum(df[[status_col]], na.rm = TRUE))
       class(ret) <- c("survdiff_exploratory", class(ret))
     }
     ret
