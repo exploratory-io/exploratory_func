@@ -4245,9 +4245,25 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
           # Set custom range if specified.
           if (!is.na(upper.range)) {
             maxv.no.inf <- upper.range
+            # If upper.range is less than minv.no.inf, set it as minv.no.inf and create a single bucket.
+            if (upper.range < minv.no.inf) {
+              if (isFALSE(include.outside.range)) {
+                stop("The upper range is less than the minimum value.")
+              }
+              minv.no.inf <- upper.range
+              lenout <- 1
+            }
           }
           if (!is.na(lower.range)) {
             minv.no.inf <- lower.range
+            # If lower.range is greater than maxv.no.inf, set it as maxv.no.inf and create a single bucket.
+            if (lower.range > maxv.no.inf) {
+              if (isFALSE(include.outside.range)) {
+                stop("The lower range is greater than the maximum value.")
+              }
+              maxv.no.inf <- lower.range
+              lenout <- 1
+            }
           }
 
           breaks.with.inf <- seq(minv.no.inf, maxv.no.inf,  length.out=lenout)
@@ -4283,9 +4299,25 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
           # Set custom range if specified.
           if (!is.na(upper.range)) {
             maxv <- upper.range
+            # If upper.range is less than minv, set it as minv and create a single bucket.
+            if (upper.range < minv) {
+              if (isFALSE(include.outside.range)) {
+                stop("The upper range is less than the minimum value.")
+              }
+              minv <- upper.range
+              breaks <- 0
+            }
           }
           if (!is.na(lower.range)) {
             minv <- lower.range
+            # If lower.range is greater than maxv, set it as maxv and create a single bucket.
+            if (lower.range > maxv) {
+              if (isFALSE(include.outside.range)) {
+                stop("The lower range is greater than the maximum value.")
+              }
+              maxv <- lower.range
+              breaks <- 0
+            }
           }
 
           break_points = seq(minv, maxv, length.out = breaks+1)
@@ -4328,7 +4360,7 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
 #                    If you don't specify, max(x) will be used.
 # @param include.outside.range If you set it to TRUE, it will create buckets
 #                              for outside of the upper and lower ranges.
-exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.outside.range=TRUE, right=TRUE, ...) {
+exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.outside.range=TRUE, right=TRUE, include.lowest=TRUE, ...) {
   # If it is not numeric, return a vector of NAs. Since pivot table now
   # accepts non-numeric for measure values, we need this handling.
   if (!is.numeric(x)) {
@@ -4346,7 +4378,7 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
     # > cut(x, breaks=c(-Inf, Inf), include.lowest=T)
     # [1] [-Inf, Inf] [-Inf, Inf] <NA>        <NA>
     # Levels: [-Inf, Inf]
-    return (cut(x, breaks=c(-Inf, Inf), include.lowest=T))
+    return (cut(x, breaks=c(-Inf, Inf), include.lowest=include.lowest))
   }
 
   lower <- lower.range
@@ -4362,6 +4394,26 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
     # Remove inf, NA, NaN etc from the range.
     upper <- max(x.finite)
   }
+
+  # If speicified lower range is larger than the max value, set the lower
+  # range to the max value.
+  if (!is.na(lower.range) && lower.range > upper) {
+    if (isFALSE(include.outside.range)) {
+      stop("The lower range is greater than the maximum value.")
+    }
+    lower <- lower.range
+    upper <- lower.range
+  } 
+  # If speicified upper range is smaller than the min value, set the upper
+  # range to the min value.
+  else if (!is.na(upper.range) && upper.range < lower) {
+    if (isFALSE(include.outside.range)) {
+      stop("The upper range is less than the minimum value.")
+    }
+    lower <- upper.range
+    upper <- upper.range
+  }
+
   # If step is not specified, set the default step which divides
   # the group into 5.
   if (is.na(step)) {
@@ -4374,7 +4426,7 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
   }
 
   # Create breaks by specifying cut points.
-  breaks <- seq(lower, upper, by=step)
+  breaks <- seq(min(lower, upper), max(lower, upper), by=step)
 
   # min/max values without NA. Those can include Inf/-Inf.
   min.x <- min(x, na.rm=TRUE)
@@ -4446,6 +4498,6 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
   }
 
   # Call cut with the constructed breaks.
-  cut(x, breaks=breaks, right=right, ...)
+  cut(x, breaks=breaks, right=right, include.lowest=include.lowest, ...)
 }
 
