@@ -919,6 +919,11 @@ augment.prophet_exploratory <- function(x, data = NULL, newdata = NULL, data_typ
       return(data.frame())
     }
 
+    # The model requires the time column to be named "ds".
+    if (time_col != "ds") {
+      cleaned_data <- cleaned_data %>% dplyr::rename(ds = !!rlang::sym(time_col))
+    }
+
     # Run prediction.
     predicted_data <- stats::predict(x$model, cleaned_data)
 
