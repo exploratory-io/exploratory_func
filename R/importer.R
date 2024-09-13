@@ -20,7 +20,7 @@ urltools::url_decode
 
 #' @importFrom psych logistic
 #' @export
-psych::logistic
+# psych::logistic
 
 # #' @importFrom anonymizer anonymize
 # #' @export
