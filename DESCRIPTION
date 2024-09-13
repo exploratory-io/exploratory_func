@@ -20,7 +20,6 @@ Imports:
     countrycode,
     reshape2,
     lazyeval,
-    qlcMatrix,
     purrr,
     httr,
     quanteda,
@@ -35,11 +34,12 @@ Imports:
     ggplot2,
     iterators,
     scales,
-    dtw,
     snakecase,
     textshape
 Suggests:
+    qlcMatrix,
     zoo,
+    dtw,
     psych,
     anonymizer,
     V8,
