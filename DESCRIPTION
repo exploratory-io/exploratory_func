@@ -35,11 +35,11 @@ Imports:
     ggplot2,
     iterators,
     scales,
-    zoo,
     dtw,
     snakecase,
     textshape
 Suggests:
+    zoo,
     psych,
     anonymizer,
     V8,
