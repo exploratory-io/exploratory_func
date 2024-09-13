@@ -28,7 +28,6 @@ Imports:
     Matrix,
     rvest,
     stats,
-    anonymizer,
     forcats,
     tidytext,
     boot,
@@ -40,9 +39,10 @@ Imports:
     zoo,
     dtw,
     snakecase,
-    textshape,
-    V8
+    textshape
 Suggests:
+    anonymizer,
+    V8,
     testthat,
     twitteR,
     sentimentr,
