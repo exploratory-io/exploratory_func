@@ -13,7 +13,6 @@ Imports:
     broom, 
     prediction, 
     urltools,
-    psych,
     dplyr,
     tidyr,
     tibble,
@@ -41,6 +40,7 @@ Imports:
     snakecase,
     textshape
 Suggests:
+    psych,
     anonymizer,
     V8,
     testthat,
