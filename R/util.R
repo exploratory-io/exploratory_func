@@ -935,7 +935,11 @@ pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, val
 #' @param cols_sep - If na should be removed from values
 #' @export
 pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
-
+  # make sure to ungroup the data frame first if the row_cols are same as grouped columns.
+  grouped_col <- grouped_by(df)
+  if (!is.null(row_cols) && any(grouped_col %in% row_cols)) {
+    df <- df %>% dplyr::ungroup()
+  }
   value_col <- if(!missing(value)){
     tidyselect::vars_select(names(df), !! rlang::enquo(value))
   }
@@ -2520,7 +2524,7 @@ get_row_numbers_from_index_vector <- function(index_vector) {
 
 # Calculates average moving range of a vector.
 get_average_moving_range <- function(x) {
-  # Remove NAs  
+  # Remove NAs
   x <- x[!is.na(x)]
   if (length(x) < 2) {
     return(NA)
@@ -3225,7 +3229,7 @@ ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
     time_unit_func <- lubridate::years
   }
 
-  # Use add_with_rollback to avoid null such as a month ago of 2024-03-31. 
+  # Use add_with_rollback to avoid null such as a month ago of 2024-03-31.
   base_time <- lubridate::add_with_rollback(time, time_unit_func(-n))
   tmp_df <- tibble::tibble(t=time, x=x)
   join_df <- tmp_df %>% tidyr::complete(t=base_time) %>% dplyr::arrange(t)
@@ -3531,10 +3535,10 @@ likert_sigma <- function(x) {
 
 #' cumsum wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
-#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
 cumsum <- function(x, skip.na = TRUE) {
   if (skip.na) {
-    x[!is.na(x)] <- base::cumsum(x[!is.na(x)]) 
+    x[!is.na(x)] <- base::cumsum(x[!is.na(x)])
     x
   } else {
     base::cumsum(x)
@@ -3543,10 +3547,10 @@ cumsum <- function(x, skip.na = TRUE) {
 
 #' cummean wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
-#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
 cummean <- function(x, skip.na = TRUE) {
   if (skip.na) {
-    x[!is.na(x)] <- dplyr::cummean(x[!is.na(x)]) 
+    x[!is.na(x)] <- dplyr::cummean(x[!is.na(x)])
     x
   } else {
     dplyr::cummean(x)
@@ -3555,10 +3559,10 @@ cummean <- function(x, skip.na = TRUE) {
 
 #' cummin wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
-#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
 cummin <- function(x, skip.na = TRUE) {
   if (skip.na) {
-    x[!is.na(x)] <- base::cummin(x[!is.na(x)]) 
+    x[!is.na(x)] <- base::cummin(x[!is.na(x)])
     x
   } else {
     base::cummin(x)
@@ -3567,10 +3571,10 @@ cummin <- function(x, skip.na = TRUE) {
 
 #' cummax wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
-#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
 cummax <- function(x, skip.na = TRUE) {
   if (skip.na) {
-    x[!is.na(x)] <- base::cummax(x[!is.na(x)]) 
+    x[!is.na(x)] <- base::cummax(x[!is.na(x)])
     x
   } else {
     base::cummax(x)
@@ -3579,10 +3583,10 @@ cummax <- function(x, skip.na = TRUE) {
 
 #' cumprod wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
-#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
 cumprod <- function(x, skip.na = TRUE) {
   if (skip.na) {
-    x[!is.na(x)] <- base::cumprod(x[!is.na(x)]) 
+    x[!is.na(x)] <- base::cumprod(x[!is.na(x)])
     x
   } else {
     base::cumprod(x)
@@ -3591,24 +3595,24 @@ cumprod <- function(x, skip.na = TRUE) {
 
 #' cumall wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
-#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
 cumall <- function(x, skip.na = TRUE) {
   if (skip.na) {
-    x[!is.na(x)] <- dplyr::cumall(x[!is.na(x)]) 
+    x[!is.na(x)] <- dplyr::cumall(x[!is.na(x)])
     x
   } else {
     dplyr::cumall(x)
   }
-} 
+}
 
 #' cumany wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
-#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE. 
+#' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
 cumany <- function(x, skip.na = TRUE) {
   if (skip.na) {
-    x[!is.na(x)] <- dplyr::cumany(x[!is.na(x)]) 
+    x[!is.na(x)] <- dplyr::cumany(x[!is.na(x)])
     x
   } else {
     dplyr::cumany(x)
   }
-} 
+}
