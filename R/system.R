@@ -3256,8 +3256,12 @@ read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1),
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.sheet.id to the id column.
   df[[id_col]] <- df[["exp.sheet.id"]]
+
   # drop internal column and move the id column to the very beginning.
-  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.sheet.id)
+  df <- df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.sheet.id)
+  # make the column names unique
+  colnames(df) <- make.unique(colnames(df), sep = "")
+  df
 }
 
 
@@ -3287,8 +3291,12 @@ read_excel_files <- function(files, forPreview = FALSE, sheet = 1, col_names = T
     id_col <- avoid_conflict(colnames(df), "id")
     # copy internal exp.file.id to the id column.
     df[[id_col]] <- df[["exp.file.id"]]
+
     # drop internal column and move the id column to the very beginning.
-    df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+    df <- df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+    # make the column names unique
+    colnames(df) <- make.unique(colnames(df), sep = "")
+    df
 }
 
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
