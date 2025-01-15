@@ -573,3 +573,15 @@ test_that("test filter_cascade",{
   df <- df %>% filter_cascade(detect_outlier(reviews_per_month, "iqr") == "Normal", cut(reviews_per_month, breaks = 5, dig.lab = 10) %in% c("(0.21,0.31]"))
   expect_equal(nrow(df), 2661)
 })
+
+test_that("read_excel_files", {
+  # Download the files to a local directory
+  t_file <- tempfile(fileext = ".xls")
+  t_file2 <- tempfile(fileext = ".xls")
+  download.file("https://www.dropbox.com/scl/fi/7m4ay1x18jm1kq7kv58if/merge1.xls?rlkey=4wyi45j2cer002deefi7ndaav&dl=1", destfile = t_file, mode = "wb")
+  download.file("https://www.dropbox.com/scl/fi/by7ulgjstptwo7jnftnrm/merge2.xls?rlkey=fql98njdx0vbgrw13h4n23iaz&dl=1", destfile = t_file2, mode = "wb")
+
+  # Read the downloaded files
+  df <- exploratory::read_excel_files(c(t_file, t_file2))
+  expect_equal(colnames(df), c("id", "放送...1", "放送...2", "個人...3", "個人...4"))
+})
