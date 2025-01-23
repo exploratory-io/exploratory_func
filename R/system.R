@@ -4400,10 +4400,6 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
   # Create breaks by specifying cut points.
   breaks <- seq(lower, upper, by=step)
 
-  # # min/max values without NA. Those can include Inf/-Inf.
-  # min.x <- min(x, na.rm=TRUE)
-  # max.x <- max(x, na.rm=TRUE)
-
   # If the max.breaks doesn't include the upper range value,
   # add one more bucket. For example, if you set step=10 for 0:15,
   # we should create 2 buckets, 0-10, 10-20.
