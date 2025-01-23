@@ -273,9 +273,30 @@ test_that("_tam_cut_by_step", {
   expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4), step=5, include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
   expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), step=5)), c("[-Inf, Inf]"))
   expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+
+  # upper range is smaller than the min data range.
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0)), c("(-Inf,1]","(1,6]",   "(6,11]",  "(11,16]", "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0, include.outside.range=F)), c("(1,6]",  "(6,11]", "(11,16]","(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0, include.outside.range=F, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)"))
+
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0)), c("(-10,-5]","(-5,0]" , "(0,5]"   , "(5,10]"  , "(10,15]" , "(15,20]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0, include.outside.range=F)), c("(-10,-5]","(-5,0]" , "(0,5]"   , "(5,10]"  , "(10,15]" , "(15,20]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0, right=F)), c("[-10,-5)","[-5,0)"   , "[0,5)"    , "[5,10)"   , "[10,15)"  , "[15,20)"  , "[20,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0, include.outside.range=F, right=F)), c("[-10,-5)","[-5,0)" , "[0,5)" ,  "[5,10)" , "[10,15)", "[15,20)"  ))
+
+  # lower range is larger than the max data range.
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA)), c("(-Inf,1]" , "(1,6]" , "(6,11]" , "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA, include.outside.range=F)), c("(1,6]"   , "(6,11]"  , "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA, right=F)), c( "[1,6)"    , "[6,11)"   , "[11,16)"  , "[16,21)"  , "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA, include.outside.range=F, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)"))
+
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30)), c("(-Inf,1]" , "(1,6]" , "(6,11]" , "(11,16]" , "(16,21]" , "(21,26]" , "(26,31]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30, include.outside.range=F)), c("(1,6]"   , "(6,11]"  , "(11,16]" , "(16,21]" , "(21,26]" , "(26,31]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)" , "[21,26)" , "[26,31)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30, include.outside.range=F, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)" , "[21,26)" , "[26,31)"))
+
 })
-
-
 
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)

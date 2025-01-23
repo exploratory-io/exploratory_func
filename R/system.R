@@ -4357,16 +4357,32 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
     return (cut(x, breaks=c(-Inf, Inf), include.lowest=T))
   }
 
+
+  # min/max values without NA. Those can include Inf/-Inf.
+  min.x <- min(x, na.rm=TRUE)
+  max.x <- max(x, na.rm=TRUE)
+
   lower <- lower.range
   upper <- upper.range
 
+  # If the min value is larger than the upper range, the upper range is 
+  # invalid so we ignore it.
+  if (!is.na(upper) && min.x > upper) {
+    upper <- NA
+  }
+  # If the max value is smaller than the lower range, the lower range is
+  # invalid so we ignore it.
+  if (!is.na(lower) && max.x < lower) {
+    lower <- NA
+  }
+
   # Use the min value for the lower range if not specified.
-  if (is.na(lower.range)) {
+  if (is.na(lower)) {
     # Remove inf, NA, NaN etc from the range.
     lower <- min(x.finite)
   }
   # Use the max value for the upper range if not specified.
-  if (is.na(upper.range)) {
+  if (is.na(upper)) {
     # Remove inf, NA, NaN etc from the range.
     upper <- max(x.finite)
   }
@@ -4383,10 +4399,6 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
 
   # Create breaks by specifying cut points.
   breaks <- seq(lower, upper, by=step)
-
-  # min/max values without NA. Those can include Inf/-Inf.
-  min.x <- min(x, na.rm=TRUE)
-  max.x <- max(x, na.rm=TRUE)
 
   # If the max.breaks doesn't include the upper range value,
   # add one more bucket. For example, if you set step=10 for 0:15,
