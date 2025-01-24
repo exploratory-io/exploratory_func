@@ -1845,27 +1845,43 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
   }
 }
 
-#' Return result of "==" if y is not empty or NULL. Otherwise return TRUE.
-#' We use this for filter condition controlled by a variable so that filtering is effectively
-#' skipped when the variable is empty or NULL.
+#' Return result of "==" if y is a single value and not empty or NULL.
+#' If y is not a single value, use `%in_or_all%`.
+#' If y is empty or NULL, return TRUE.
+#' This is used for filter conditions controlled by a variable, so that filtering
+#' is effectively skipped when the variable is empty or NULL.
 #' @export
-`%equal_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
-    return (TRUE)
+`%equal_or_all%` <- function(x, y) {
+  # Use %in_or_all% if y has more than one element
+  if (length(y) > 1) {
+    return(x %in_or_all% y)
   }
+  # Check if y is NULL or empty
+  else if (is.null(y) || (is.character(y) && all(y == ""))) {
+    return(TRUE)
+  }
+  # Otherwise, perform equality comparison
   else {
     return(x == y)
   }
 }
 
-#' Return result of "!=" if y is not empty or NULL. Otherwise return TRUE.
-#' We use this for filter condition controlled by a variable so that filtering is effectively
-#' skipped when the variable is empty or NULL.
+#' Return result of "!=" if y is a single value and not empty or NULL.
+#' If y is not a single value, use `x %nin% y`.
+#' If y is empty or NULL, return TRUE.
+#' This is used for filter conditions controlled by a variable, so that filtering
+#' is effectively skipped when the variable is empty or NULL.
 #' @export
-`%not_equal_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
-    return (TRUE)
+`%not_equal_or_all%` <- function(x, y) {
+  # Use x %nin% y if y has more than one element
+  if (length(y) > 1) {
+    return(x %nin% y)
   }
+  # Check if y is NULL or empty
+  else if (is.null(y) || (is.character(y) && y == "")) {
+    return(TRUE)
+  }
+  # Otherwise, perform inequality comparison
   else {
     return(x != y)
   }
