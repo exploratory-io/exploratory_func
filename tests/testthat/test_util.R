@@ -1171,37 +1171,65 @@ test_that("test %in_or_all%", {
 })
 
 test_that("test %equal_or_all%", {
-  df <- data.frame(x  = c (1,2,3))
+  # Test with numeric single value
+  df <- data.frame(x = c(1, 2, 3))
   ret <- df %>% dplyr::filter(x %equal_or_all% 2)
   expect_equal(nrow(ret), 1)
-  df <- data.frame(x  = c (1,2,3))
+
+  # Test with NULL (should return all rows)
   ret <- df %>% dplyr::filter(x %equal_or_all% NULL)
   expect_equal(nrow(ret), 3)
-  df <- data.frame(x  = c (1,2,3))
+
+  # Test with empty string (should return all rows)
   ret <- df %>% dplyr::filter(x %equal_or_all% "")
   expect_equal(nrow(ret), 3)
-  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+
+  # Test with single Date value
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"),
+                         lubridate::ymd("2024-01-02"),
+                         lubridate::ymd("2024-01-03")))
   ret <- df %>% dplyr::filter(x %equal_or_all% lubridate::ymd("2024-01-02"))
-  expect_equal(nrow(ret),1)
+  expect_equal(nrow(ret), 1)
+
+  # Test with NULL for Date (should return all rows)
   ret <- df %>% dplyr::filter(x %equal_or_all% NULL)
-  expect_equal(nrow(ret),3)
+  expect_equal(nrow(ret), 3)
+
+  # Test with multiple values (fallback to %in%)
+  ret <- df %>% dplyr::filter(x %equal_or_all% c(lubridate::ymd("2024-01-01"),
+                                                 lubridate::ymd("2024-01-03")))
+  expect_equal(nrow(ret), 2)
 })
 
 test_that("test %not_equal_or_all%", {
-  df <- data.frame(x  = c (1,2,3))
+  # Test with numeric single value
+  df <- data.frame(x = c(1, 2, 3))
   ret <- df %>% dplyr::filter(x %not_equal_or_all% 2)
   expect_equal(nrow(ret), 2)
-  df <- data.frame(x  = c (1,2,3))
+
+  # Test with NULL (should return all rows)
   ret <- df %>% dplyr::filter(x %not_equal_or_all% NULL)
   expect_equal(nrow(ret), 3)
-  df <- data.frame(x  = c (1,2,3))
+
+  # Test with empty string (should return all rows)
   ret <- df %>% dplyr::filter(x %not_equal_or_all% "")
   expect_equal(nrow(ret), 3)
-  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+
+  # Test with single Date value
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"),
+                         lubridate::ymd("2024-01-02"),
+                         lubridate::ymd("2024-01-03")))
   ret <- df %>% dplyr::filter(x %not_equal_or_all% lubridate::ymd("2024-01-02"))
-  expect_equal(nrow(ret),2)
+  expect_equal(nrow(ret), 2)
+
+  # Test with NULL for Date (should return all rows)
   ret <- df %>% dplyr::filter(x %not_equal_or_all% NULL)
-  expect_equal(nrow(ret),3)
+  expect_equal(nrow(ret), 3)
+
+  # Test with multiple values (fallback to %nin%)
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% c(lubridate::ymd("2024-01-01"),
+                                                     lubridate::ymd("2024-01-03")))
+  expect_equal(nrow(ret), 1)
 })
 
 test_that("test %greater_or_all%", {
