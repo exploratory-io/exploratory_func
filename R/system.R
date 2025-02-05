@@ -1152,7 +1152,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     key <- paste(type, subType, dsn, hoststr, username, additionalParams, driverstr, timezone, connectionString, sep = ":")
     conn <- connection_pool[[key]]
-    conn <- NULL
     if (!is.null(conn)){
       tryCatch({
         # test connection
