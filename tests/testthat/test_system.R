@@ -585,3 +585,19 @@ test_that("read_excel_files", {
   df <- exploratory::read_excel_files(c(t_file, t_file2))
   expect_equal(colnames(df), c("id", "放送...1", "放送...2", "個人...3", "個人...4"))
 })
+
+test_that("test setConnectionPoolMode", {
+  # Save the original pool_connection value to restore later
+  original_pool_connection <- exploratory::getConnectionPoolMode()
+
+  # Test setting connection pool mode to TRUE
+  exploratory::setConnectionPoolMode(TRUE)
+  expect_true(exploratory::getConnectionPoolMode())
+
+  # Test setting connection pool mode to FALSE
+  exploratory::setConnectionPoolMode(FALSE)
+  expect_false(exploratory::getConnectionPoolMode())
+
+  # Restore the original value
+  exploratory::setConnectionPoolMode(original_pool_connection)
+})

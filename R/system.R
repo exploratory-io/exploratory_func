@@ -54,6 +54,7 @@ setConnectionPoolMode <- function(val) {
         }, warning = function(w) {
         }, error = function(e) {
         })
+        rm(list = key, envir = connection_pool)
       }
     })
   }
