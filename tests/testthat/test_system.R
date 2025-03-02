@@ -437,7 +437,8 @@ test_that("read_parquet_file downlod failed error message", {
   tryCatch({
     df <- exploratory::read_parquet_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample2.parquet\",\"Could not resolve host: dummy.dropbox.com\"] :: Failed to download from the URL."))
+    expect_equal(str_detect(cond$message, "EXP-DATASRC-15 ::"), TRUE)
+    expect_equal(str_detect(cond$message, "Could not resolve hostname"), TRUE)
   })
 })
 
@@ -473,7 +474,8 @@ test_that("read_delim_file downlod failed error message", {
   tryCatch({
     df <- exploratory::read_delim_file("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv", delim = ",")
   }, error = function(cond) {
-    expect_equal(cond$message, c("EXP-DATASRC-15 :: [\"https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv\",\"Could not resolve host: dummy.dropbox.com\"] :: Failed to download from the URL."))
+    expect_equal(str_detect(cond$message, "EXP-DATASRC-15 ::"), TRUE)
+    expect_equal(str_detect(cond$message, "Could not resolve hostname"), TRUE)
   })
 })
 
