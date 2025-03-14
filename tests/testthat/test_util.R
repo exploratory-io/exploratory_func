@@ -2208,3 +2208,14 @@ test_that("between", {
   expect_equal(actual3, expected3)
 
 })
+
+test_that("extract_numeric", {
+  # Make sure it works for cases even tidyr::extract_numeric doesn't work.
+  x <- c('Bytedance $75 2017-04-07 AI',
+         'Didi Chuxing $56 2014-12-31 Auto & Transportation',
+         'Stripe $36 2014-01-23 Finance',
+         'SpaceX $33.3 2012-12-01 Other')
+  expected <- c(75, 56, 36, 33.3)
+  actual <- exploratory::extract_numeric(x)
+  expect_equal(actual, expected)
+})

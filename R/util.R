@@ -3632,3 +3632,10 @@ cumany <- function(x, skip.na = TRUE) {
     dplyr::cumany(x)
   }
 }
+
+#' extract_numeric wrapper function. It overrides the tidyr::extract_numeric function.
+#' @param x vector
+#' @return numeric vector
+extract_numeric <- function(x) {
+  exploratory::parse_number(x)  
+}
