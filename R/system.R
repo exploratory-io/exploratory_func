@@ -1606,7 +1606,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (Sys.info()["sysname"] == "Linux") {
       driver <- Sys.getenv("ORACLE_ODBC_DRIVER_FILE")
       if (driver == "") { # if environment variable is not set, fallback to default one.
-        driver <-  "/lib/oracle/19.18/client64/lib/libsqora.so.19.1";
+        driver <-  "/lib/oracle/23/client64/lib/libsqora.so.23.1";
       }
     }
     if (!requireNamespace("DBI")) {
