@@ -367,20 +367,22 @@ do_chisq.test <- function(df, ...,
                           rescale.p = TRUE,
                           simulate.p.value = FALSE,
                           B = 2000){
-  select_dots <- lazyeval::lazy_dots(...)
-  cols <- evaluate_select(df, select_dots, excluded = grouped_by(df))
+  # Comment out below since we switch to use exp_chis and make this do_chisq.test as a wrapper function.
+  #select_dots <- lazyeval::lazy_dots(...)
+  #cols <- evaluate_select(df, select_dots, excluded = grouped_by(df))
   # p should be able to be NSE column name or numeric vector
   # , so evaluated lazily
-  lazy_p <- lazyeval::lazy(p)
-  p <- lazyeval::lazy_eval(lazy_p, data = df)
+  #lazy_p <- lazyeval::lazy(p)
+  #p <- lazyeval::lazy_eval(lazy_p, data = df)
 
-  do_chisq.test_(df,
-                 selected_cols = cols,
-                 correct = correct,
-                 p = p,
-                 rescale.p = rescale.p,
-                 simulate.p.value = simulate.p.value,
-                 B = B)
+  #do_chisq.test_(df,
+  #               selected_cols = cols,
+  #               correct = correct,
+  #               p = p,
+  #               rescale.p = rescale.p,
+  #               simulate.p.value = simulate.p.value,
+  #               B = B)
+  exp_chisq(df, ...) %>% exploratory::glance_rowwise(model)
 }
 
 #' chisq.test wrapper
