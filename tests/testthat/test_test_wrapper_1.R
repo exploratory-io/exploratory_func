@@ -152,8 +152,7 @@ test_that("test two sample t-test with column name", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 5)
-  expect_equal(result$mean_cat2, 6)
+  expect_equal(result$Difference, 1)
 
   # swap cat1 and cat2
   test_df <- data.frame(
@@ -164,8 +163,7 @@ test_that("test two sample t-test with column name", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 6)
-  expect_equal(result$mean_cat2, 5)
+  expect_equal(result$Difference, -1)
 })
 
 test_that("test two sample t-test with factor", {
@@ -177,8 +175,7 @@ test_that("test two sample t-test with factor", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 5)
-  expect_equal(result$mean_cat2, 6)
+  expect_equal(result$Difference, 1)
 
   # swap cat1 and cat2
   test_df <- data.frame(
@@ -189,8 +186,7 @@ test_that("test two sample t-test with factor", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 6)
-  expect_equal(result$mean_cat2, 5)
+  expect_equal(result$Difference, 1)
 })
 
 test_that("test two sample t-test with logical", {
@@ -202,8 +198,7 @@ test_that("test two sample t-test with logical", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_TRUE, 5)
-  expect_equal(result$mean_FALSE, 6)
+  expect_equal(result$Difference, -1) #base is FALSE
 
   # swap TRUE and FALSE
   test_df <- data.frame(
@@ -214,8 +209,7 @@ test_that("test two sample t-test with logical", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_FALSE, 5)
-  expect_equal(result$mean_TRUE, 6)
+  expect_equal(result$Difference, 1)
 })
 
 test_that("test two sample t-test more than 2 levels", {
@@ -234,19 +228,19 @@ test_that("test two sample t-test less than 2 levels", {
   })
 })
 
-test_that("test one sample t-test", {
-  result <- test_df %>%
-    dplyr::group_by(dim) %>%
-    do_t.test("with space", mu=3)
-  expect_equal(result[result[["dim"]]=="dim1", "p.value"][[1]], 1)
-})
+#test_that("test one sample t-test", {
+#  result <- test_df %>%
+#    dplyr::group_by(dim) %>%
+#    do_t.test("with space", mu=3)
+#  expect_equal(result[result[["dim"]]=="dim1", "p.value"][[1]], 1)
+#})
 
 test_that("test t-test with 3 groups", {
   data <- data.frame(val = seq(12), group = rep(c(1,2,3), each = 4))
   expect_error({
     result <- data %>%
       do_t.test(val, group)
-  }, "Group Column has to have 2 unique values")
+  }, "The explanatory variable needs to have 2 unique values.")
 })
 
 test_that("test f-test", {

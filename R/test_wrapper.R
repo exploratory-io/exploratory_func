@@ -236,76 +236,8 @@ generate_signrank_density_data <- function(stat, p.value, n, sig_level = 0.05, a
 
 #' wrapper for t.test, which compares means
 #' @export
-do_t.test <- function(df, value, key=NULL, ...){
-  value_col <- col_name(substitute(value))
-  with_key <- !is.null(substitute(key))
-
-  if(with_key){
-    # make a formula for two sample t-test
-    # value_col is values and key_col is labels in which grouop the values are in
-    key_col <- col_name(substitute(key))
-    # this creates a formula like `val`~`group key`
-    fml <- as.formula(paste(paste("`", value_col, "`", sep=""), paste("`", key_col, "`", sep=""), sep="~"))
-  }
-  # otherwise, one sample t-test from values in value_col is executed
-
-  grouped_col <- grouped_by(df)
-
-  model_col <- avoid_conflict(grouped_col, "model")
-
-  # this is executed on each group
-  do_t.test_each <- function(df, ...){
-    if(with_key){
-      # make key column factor
-      # so that which key
-      # the result columns (estimate1 and estimate2)
-      # are from can be clear
-      df[[key_col]] <- as.factor(df[[key_col]])
-      mean_col_names <- paste("mean_", levels(df[[key_col]]), sep = "")
-
-      # use formula (`value_col`~`key_col`) for two sample t-test
-      model <- tryCatch({
-        t.test(data=df, fml, ...)
-      }, error = function(e){
-        if(e$message == "grouping factor must have exactly 2 levels"){
-          stop("Group Column has to have 2 unique values")
-        }
-        stop(e$message)
-      })
-    } else {
-      # use df[[value_col]] for one sample t-test (comparison with indicated normal distribution)
-      model <- t.test(df[[value_col]], ...)
-    }
-    ret <- broom::tidy(model)
-
-    # convert from factor to character
-    ret[["method"]] <- as.character(ret[["method"]])
-    ret[["alternative"]] <- as.character(ret[["alternative"]])
-
-    # "two.sided" should be "two sided" because "two.sided" is confused as a url by Exploratory Desktop
-    # this can be "greater" or "lower" but they are okay.
-    ret[["alternative"]] <- ifelse(ret[["alternative"]] == "two.sided", "two sided", ret[["alternative"]])
-
-    # change column names
-    col_names <- avoid_conflict(grouped_col, vapply(colnames(ret), function(name){
-      switch (name,
-              estimate = "effect_size",
-              estimate1 = mean_col_names[[1]],
-              estimate2 = mean_col_names[[2]],
-              statistic = "t.value",
-              parameter = "degrees_of_freedom",
-              name
-      )
-    }, FUN.VALUE = ""))
-
-    colnames(ret) <- col_names
-    ret
-  }
-
-  df %>%
-    dplyr::do_(.dots=setNames(list(~do_t.test_each(df = ., ...)), model_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(model_col))
+do_t.test <- function(df, ...){
+  exploratory::exp_ttest(df, ...) %>% exploratory::tidy_rowwise(model, type="model")
 }
 
 #' wrapper for var.test, which compares variances
