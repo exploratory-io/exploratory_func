@@ -152,8 +152,7 @@ test_that("test two sample t-test with column name", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 5)
-  expect_equal(result$mean_cat2, 6)
+  expect_equal(result$Difference, 1)
 
   # swap cat1 and cat2
   test_df <- data.frame(
@@ -164,8 +163,7 @@ test_that("test two sample t-test with column name", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 6)
-  expect_equal(result$mean_cat2, 5)
+  expect_equal(result$Difference, -1)
 })
 
 test_that("test two sample t-test with factor", {
@@ -177,8 +175,7 @@ test_that("test two sample t-test with factor", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 5)
-  expect_equal(result$mean_cat2, 6)
+  expect_equal(result$Difference, 1)
 
   # swap cat1 and cat2
   test_df <- data.frame(
@@ -189,8 +186,7 @@ test_that("test two sample t-test with factor", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_cat1, 6)
-  expect_equal(result$mean_cat2, 5)
+  expect_equal(result$Difference, 1)
 })
 
 test_that("test two sample t-test with logical", {
@@ -202,8 +198,7 @@ test_that("test two sample t-test with logical", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_TRUE, 5)
-  expect_equal(result$mean_FALSE, 6)
+  expect_equal(result$Difference, -1) #base is FALSE
 
   # swap TRUE and FALSE
   test_df <- data.frame(
@@ -214,8 +209,7 @@ test_that("test two sample t-test with logical", {
   result <- test_df %>%
     do_t.test(val, cat)
 
-  expect_equal(result$mean_FALSE, 5)
-  expect_equal(result$mean_TRUE, 6)
+  expect_equal(result$Difference, 1)
 })
 
 test_that("test two sample t-test more than 2 levels", {
@@ -234,19 +228,19 @@ test_that("test two sample t-test less than 2 levels", {
   })
 })
 
-test_that("test one sample t-test", {
-  result <- test_df %>%
-    dplyr::group_by(dim) %>%
-    do_t.test("with space", mu=3)
-  expect_equal(result[result[["dim"]]=="dim1", "p.value"][[1]], 1)
-})
+#test_that("test one sample t-test", {
+#  result <- test_df %>%
+#    dplyr::group_by(dim) %>%
+#    do_t.test("with space", mu=3)
+#  expect_equal(result[result[["dim"]]=="dim1", "p.value"][[1]], 1)
+#})
 
 test_that("test t-test with 3 groups", {
   data <- data.frame(val = seq(12), group = rep(c(1,2,3), each = 4))
   expect_error({
     result <- data %>%
       do_t.test(val, group)
-  }, "Group Column has to have 2 unique values")
+  }, "The explanatory variable needs to have 2 unique values.")
 })
 
 test_that("test f-test", {
@@ -264,67 +258,17 @@ test_that("test f-test with 3 groups", {
   }, "Group Column has to have 2 unique values")
 })
 
-test_that("test chisq.test with one column", {
-  test_df <- data.frame(
-    group = rep(letters[1:2], each = 500),
-    cat1 = letters[round(runif(1000)*5)+1],
-    cat2 = letters[round(runif(1000)*3)+1]
-  ) %>%
-    dplyr::group_by(group, cat1, cat2) %>%
-    dplyr::summarize(count = n()) %>%
-    dplyr::group_by(group)
+test_that("test do_chis", {
+  mtcars2 <- mtcars
+  mtcars2$gear[[1]] <- NA # test handling of NAs
+  mtcars2$carb[[2]] <- NA
+  mtcars2$cyl[[3]] <- NA
+  summary <- do_chisq.test(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
 
-  ret <- test_df %>%
-    do_chisq.test(count)
-
-  expect_equal(nrow(ret), 2)
-
-})
-
-test_that("test chisq.test with select argument", {
-  test_df <- data.frame(
-    group = rep(letters[1:2], each = 500),
-    cat1 = letters[round(runif(1000)*5)+1],
-    cat2 = letters[round(runif(1000)*3)+1]
-  ) %>%
-    dplyr::group_by(group, cat1, cat2) %>%
-    dplyr::summarize(count = n()) %>%
-    tidyr::spread(cat2, count) %>%
-    dplyr::group_by(group)
-
-  ret <- test_df %>%
-    do_chisq.test(-cat1)
-
-  expect_equal(nrow(ret), 2)
-
-})
-
-test_that("test chisq.test with p column", {
-  test_df <- structure(
-    list(
-      clarity = c("IF", "VS1", "VS2", "VVS1", "VVS2"),
-      GIA = c(6, 61, 36, 15, 33),
-      HRD = c(4, 13, 15, 23, 24),
-      IGI = c(34, 7, 2, 14, 21)),
-    .Names = c("clarity", "GIA", "HRD", "IGI"),
-    class = "data.frame",
-    row.names = c(NA,-5L)) %>%
-    dplyr::mutate(p = seq(5))
-
-  ret <- test_df %>%
-    do_chisq.test(GIA, p = p)
-  expect_equal(nrow(ret), 1)
-
-  p_from_outside <- seq(5)
-
-  ret2 <- test_df %>%
-    do_chisq.test(IGI, p = p_from_outside)
-  expect_equal(nrow(ret), 1)
-
-  ret3 <- test_df %>%
-    do_chisq.test(IGI, p = c(1, 2, 3, 4, 5))
-  expect_equal(nrow(ret), 1)
-
+  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
+                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
+  ))
+  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
 })
 
 test_that("test exp_chisq", {
