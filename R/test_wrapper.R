@@ -997,6 +997,9 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   # Use a different syntax for paired in R4.4.
   # https://bugs.r-project.org/show_bug.cgi?id=14359
   if (paired) {
+    # For the paired t-test, we actually use the 2-vector interface
+    # instead of the formula interface. See ttest_each for details. 
+    # We keep this for the reference.
     formula = as.formula(paste0('Pair(`', var1_col, '`, `', var2_col, '`) ~ 1'))
   } else {
     formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
@@ -1079,7 +1082,32 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(forcats::fct_infreq(as.factor(!!rlang::sym(var2_col)))))
       }
       base.level <- levels(df_test[[var2_col]])[2]
-      model <- t.test(formula, data = df_test, ...)
+
+      if (paired) {
+        # Split the target value column (var1_col) into two vectores 
+        # by the category of the explanatory variable (var2_col).
+        
+        # First, we should check that the var2_col has only two categories.
+        if (n_distinct(df[[var2_col]]) != 2) {
+          stop("The explanatory variable needs to have 2 unique values.")
+        }
+
+        # Split the target value column (var1_col) into two vectores 
+        # by the category of the explanatory variable (var2_col).
+        var1_before <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[1]]
+        var1_after <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[2]]
+
+        # Check that the number of observations in both groups are the same.
+        if (length(var1_before) != length(var1_after)) {
+          stop("Paired t-test requires equal number of observations in both groups")
+        }
+
+        # Call t.test with the two vectors.
+        model <- t.test(var1_before, var1_after, paired = TRUE, ...)
+      } else {
+        model <- t.test(formula, data = df_test, ...)
+      }
+
       class(model) <- c("ttest_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
