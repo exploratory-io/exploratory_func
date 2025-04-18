@@ -999,7 +999,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   if (paired) {
     # For the paired t-test, we actually use the 2-vector interface
     # instead of the formula interface. See ttest_each for details. 
-    # We keep this for the reference.
+    # Please keep the follwing for the reference.
     formula = as.formula(paste0('Pair(`', var1_col, '`, `', var2_col, '`) ~ 1'))
   } else {
     formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
