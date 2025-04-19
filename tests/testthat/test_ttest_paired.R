@@ -1,4 +1,3 @@
-
 context("test paired ttest")
 
 test_that("test paired ttest", {
