@@ -1,7 +1,6 @@
 # Test paired t-test.
 context("test paired ttest")
 
-# Test paired t-test.
 test_that("test paired ttest", {
   # Base data for the paired sample t-test.
   wide.data <- data.frame(
