@@ -18,3 +18,4 @@ Take a look at
 ## License
 The exploratory R package is [MIT licensed](https://github.com/exploratory-io/exploratory_func/blob/master/LICENSE.md).
 
+
