@@ -1828,6 +1828,17 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$lm.model <- lm(formula, data = df)
         # Remember the var.equal argument.
         model$var.equal <- var.equal
+        # Calculate residuals for one-way ANOVA.
+        if (var.equal) {
+          group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
+          model$residuals <- df[[var1_col]] - group_means[df[[var2_col]]]
+        }
+        else {
+          # Calculate standardized residuals for var.equal=FALSE case.
+          group_vars <- tapply(df[[var1_col]], df[[var2_col]], var)
+          group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
+          model$residuals <- (df[[var1_col]] - group_means[df[[var2_col]]]) / sqrt(group_vars[df[[var2_col]]])
+        }
       }
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
