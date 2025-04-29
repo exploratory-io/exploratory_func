@@ -1625,11 +1625,21 @@ get_gather_repeated_measures_colnames <- function(column_list) {
 #'               If there are 2 columns (2-way ANOVA case), it is a character vector with 2 elements of character.
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
+#' @param f - Effect size.
+#' @param power - Power.
+#' @param beta - Type 2 error.
+#' @param outlier_filter_type - Type of outlier filter.
+#' @param outlier_filter_threshold - Threshold for outlier filter.
+#' @param with_interaction - Whether to include interaction term.
+#' @param with_repeated_measures - Whether to include repeated measures.
+#' @param var.equal - Whether to assume equal variances. 
+#'                   If you set it to FALSE, it will run Welch's ANOVA.
+#'                   Applicable only to one-way ANOVA. Default is FALSE.
 exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       with_interaction = FALSE, with_repeated_measures = FALSE,
-                      ...) {
+                      var.equal = FALSE, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
   }
@@ -1812,7 +1822,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$ss3 <- ss3
       }
       else {
-        model <- aov(formula, data = df)
+        # Use oneway.test() for one-way ANOVA.
+        model <- oneway.test(formula, data = df, var.equal = var.equal)
+        # Create a lm object for post-hoc test.
+        model$lm.model <- lm(formula, data = df)
+        # Remember the var.equal argument.
+        model$var.equal <- var.equal
       }
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
@@ -1873,7 +1888,19 @@ glance.anova_exploratory <- function(x) {
 
 # Returns a data frame for pairwise contrast. This is a common utility function for "pairs" and "pairs_per_variable" type of the tidier.
 get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
-  emm_fit <- emmeans::emmeans(x, formula)
+  if (is.null(x$lm.model)) {
+    emm_fit <- emmeans::emmeans(x, formula)
+  } else {
+    # If lm.model is provided, use it for post-hoc test.
+    if (x$var.equal) {
+      emm_fit <- emmeans::emmeans(x$lm.model, formula)
+    } else {
+      # Uses sandwich::vcovHC() to get heteroscedasticity-consistent standard errors
+      # for unequal variances.
+      emm_fit <- emmeans::emmeans(x$lm.model, formula, vcov = sandwich::vcovHC)
+    }
+  }
+
   if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) { # 2-way ANOVA (repeated measures or regular)
     c2_levels <- levels(emm_fit)$c2_
     c3_levels <- levels(emm_fit)$c3_
