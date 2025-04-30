@@ -1822,23 +1822,86 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$ss3 <- ss3
       }
       else {
+        # One-way ANOVA case.
         # Use oneway.test() for one-way ANOVA.
         model <- oneway.test(formula, data = df, var.equal = var.equal)
         # Create a lm object for post-hoc test.
         model$lm.model <- lm(formula, data = df)
         # Remember the var.equal argument.
         model$var.equal <- var.equal
-        # Calculate residuals for one-way ANOVA.
+        # Calculate metrics 
         if (var.equal) {
+          # Equal variance caase (standard ANOVA)
+          # Calculate residuals.
           group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
           model$residuals <- df[[var1_col]] - group_means[df[[var2_col]]]
+
+          # === Equal variance case (standard ANOVA) ===
+          n_groups <- nlevels(df[[var2_col]])
+          n_total <- nrow(df)
+          
+          # Degrees of freedom
+          df_groups <- n_groups - 1
+          df_residuals <- n_total - n_groups
+          
+          # Calculate sums of squares
+          grand_mean <- mean(df[[var1_col]])
+          ss_total <- sum((df[[var1_col]] - grand_mean)^2)
+          
+          group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
+          ss_groups <- sum(tapply(df[[var1_col]], df[[var2_col]], length) * 
+                          (group_means - grand_mean)^2)
+          
+          ss_residuals <- ss_total - ss_groups
+          
+          # Mean squares
+          ms_groups <- ss_groups / df_groups
+          ms_residuals <- ss_residuals / df_residuals
+
         }
         else {
-          # Calculate standardized residuals for var.equal=FALSE case.
+          # Unequal variance case (Welch's ANOVA)
+
+          # Calculate standardized residuals.
           group_vars <- tapply(df[[var1_col]], df[[var2_col]], var)
           group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
           model$residuals <- (df[[var1_col]] - group_means[df[[var2_col]]]) / sqrt(group_vars[df[[var2_col]]])
+
+          df_groups <- fit$parameter[1]
+          df_residuals <- fit$parameter[2]
+          # Group statistics
+          group_stats <- aggregate(df[[var1_col]], 
+                                by = list(df[[var2_col]]), 
+                                FUN = function(x) c(mean = mean(x), 
+                                                  var = var(x), 
+                                                  n = length(x)))
+          
+          # Welch's modified calculations
+          weights <- 1 / (group_stats$x[,"var"] / group_stats$x[,"n"])
+          grand_mean <- sum(group_stats$x[,"mean"] * weights) / sum(weights)
+          
+          ss_groups <- sum(weights * (group_stats$x[,"mean"] - grand_mean)^2)
+          ss_residuals <- sum((group_stats$x[,"n"] - 1) * group_stats$x[,"var"])
+          
+          ms_groups <- ss_groups / df_groups
+          ms_residuals <- ss_residuals / df_residuals
         }
+
+        # Create output data frame matching broom::tidy format
+        model.tidy <- data.frame(
+            term = c(var2_col, "Residuals"),  # Note: broom uses "Residuals" not "(Residuals)"
+            df = c(df_groups, df_residuals),
+            sumsq = c(ss_groups, ss_residuals),
+            meansq = c(ms_groups, ms_residuals),
+            statistic = c(fit$statistic, NA),
+            p.value = c(fit$p.value, NA)
+        )
+        
+        # Set row names to NULL to match broom::tidy output
+        rownames(model.tidy) <- NULL
+        # Save the broom::tidy like output for later use.
+        model$model.tidy <- model.tidy
+
       }
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
@@ -2042,11 +2105,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     note <- NULL
-
     # Power analysis is for one-way ANOVA case only.
     one_way_anova_without_repeated_measures <- is.null(x$covariates) && (length(x$var2) == 1) && !x$with_repeated_measures
     if (one_way_anova_without_repeated_measures) { # one-way ANOVA case
-      ret <- broom:::tidy.aov(x)
+      # broom doesn't support oneway.test() model.
+      # Use the broom::tidy like output saved in x$model.tidy.
+      ret <- x$model.tidy
     } else if (x$with_repeated_measures) { # For repeated measures ANOVA, we need to extract results from Anova.mlm object from car package.
       x_summary <- summary(x$Anova)
       x_matrix <- matrix(as.numeric(x_summary$univariate.tests), ncol=ncol(x_summary$univariate.tests))
