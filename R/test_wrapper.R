@@ -1867,8 +1867,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
           group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
           model$residuals <- (df[[var1_col]] - group_means[df[[var2_col]]]) / sqrt(group_vars[df[[var2_col]]])
 
-          df_groups <- fit$parameter[1]
-          df_residuals <- fit$parameter[2]
+          df_groups <- model$parameter[1]
+          df_residuals <- model$parameter[2]
           # Group statistics
           group_stats <- aggregate(df[[var1_col]], 
                                 by = list(df[[var2_col]]), 
@@ -1893,8 +1893,8 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
             df = c(df_groups, df_residuals),
             sumsq = c(ss_groups, ss_residuals),
             meansq = c(ms_groups, ms_residuals),
-            statistic = c(fit$statistic, NA),
-            p.value = c(fit$p.value, NA)
+            statistic = c(model$statistic, NA),
+            p.value = c(model$p.value, NA)
         )
         
         # Set row names to NULL to match broom::tidy output
