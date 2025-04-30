@@ -2561,8 +2561,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
       ret <- generate_ftest_density_data(ret0$statistic[[1]], p.value=ret0$p.value, df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     } else { # one-way ANOVA case
-      ret0 <- broom:::tidy.aov(x)
-      ret <- generate_ftest_density_data(ret0$statistic[[1]], p.value=ret0$p.value, df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+      # oneway.test model doesn't support broom::tidy()
+      ret <- generate_ftest_density_data(
+        x$statistic, 
+        p.value=x$p.value, 
+        df1=x$parameter[1], 
+        df2=x$parameter[2], 
+        sig_level=x$test_sig_level
+      )
     }
     ret
   }
