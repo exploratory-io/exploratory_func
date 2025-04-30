@@ -1829,14 +1829,15 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$lm.model <- lm(formula, data = df)
         # Remember the var.equal argument.
         model$var.equal <- var.equal
+
         # Calculate metrics 
         if (var.equal) {
           # Equal variance caase (standard ANOVA)
+
           # Calculate residuals.
           group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
           model$residuals <- df[[var1_col]] - group_means[df[[var2_col]]]
 
-          # === Equal variance case (standard ANOVA) ===
           n_groups <- nlevels(df[[var2_col]])
           n_total <- nrow(df)
           
@@ -1887,9 +1888,9 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
           ms_residuals <- ss_residuals / df_residuals
         }
 
-        # Create output data frame matching broom::tidy format
+        # Create output data frame matching broom::tidy output format.
         model.tidy <- data.frame(
-            term = c(var2_col, "Residuals"),  # Note: broom uses "Residuals" not "(Residuals)"
+            term = c(var2_col, "Residuals"),
             df = c(df_groups, df_residuals),
             sumsq = c(ss_groups, ss_residuals),
             meansq = c(ms_groups, ms_residuals),
@@ -1965,12 +1966,13 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
   if (is.null(x$lm.model)) {
     emm_fit <- emmeans::emmeans(x, formula)
   } else {
-    # If lm.model is provided, use it for post-hoc test.
+    # If lm.model is provided, it is One-way ANOVA. 
+    # Use the lm model for post-hoc test.
     if (x$var.equal) {
       emm_fit <- emmeans::emmeans(x$lm.model, formula)
     } else {
-      # Uses sandwich::vcovHC() to get heteroscedasticity-consistent standard errors
-      # for unequal variances.
+      # For unequal variances case, use sandwich::vcovHC() 
+      # to get heteroscedasticity-consistent standard errors.
       emm_fit <- emmeans::emmeans(x$lm.model, formula, vcov = sandwich::vcovHC)
     }
   }
@@ -2108,7 +2110,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     # Power analysis is for one-way ANOVA case only.
     one_way_anova_without_repeated_measures <- is.null(x$covariates) && (length(x$var2) == 1) && !x$with_repeated_measures
     if (one_way_anova_without_repeated_measures) { # one-way ANOVA case
-      # broom doesn't support oneway.test() model.
+      # broom::tidy doesn't support oneway.test model.
       # Use the broom::tidy like output saved in x$model.tidy.
       ret <- x$model.tidy
     } else if (x$with_repeated_measures) { # For repeated measures ANOVA, we need to extract results from Anova.mlm object from car package.
@@ -2625,7 +2627,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
       ret <- generate_ftest_density_data(ret0$statistic[[1]], p.value=ret0$p.value, df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     } else { # one-way ANOVA case
-      # oneway.test model doesn't support broom::tidy()
+      # broom::tidy() doesn't support oneway.test model.
+      # Pass the metrics to generate_ftest_density_data directly.
       ret <- generate_ftest_density_data(
         x$statistic, 
         p.value=x$p.value, 
