@@ -108,8 +108,6 @@ test_that("Test One-way ANOVA", {
 
   # With group_by
   ret <- test_df %>% 
-    dplyr::mutate(`facet` = `_tam_create_logical_factor`(`facet`)) %>%
-    dplyr::mutate(`facet` = `_tam_convert_na`(`facet`, drop.unused.levels=FALSE)) %>%
     dplyr::mutate(`facet` = forcats::fct_lump(factor(`facet`), n=20, other_level = "Others", ties.method ="first")) %>%
     dplyr::mutate(`group` = forcats::fct_lump(factor(`group`), n=20, other_level = "Others", ties.method ="first")) %>%
     group_by(`facet`) %>%
@@ -207,8 +205,6 @@ test_that("Test One-way ANOVA", {
 
   # With group_by
   ret <- test_df %>% 
-    dplyr::mutate(`facet` = `_tam_create_logical_factor`(`facet`)) %>%
-    dplyr::mutate(`facet` = `_tam_convert_na`(`facet`, drop.unused.levels=FALSE)) %>%
     dplyr::mutate(`facet` = forcats::fct_lump(factor(`facet`), n=20, other_level = "Others", ties.method ="first")) %>%
     dplyr::mutate(`group` = forcats::fct_lump(factor(`group`), n=20, other_level = "Others", ties.method ="first")) %>%
     group_by(`facet`) %>%
