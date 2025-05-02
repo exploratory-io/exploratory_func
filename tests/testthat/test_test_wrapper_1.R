@@ -879,7 +879,7 @@ test_that("test exp_anova with grouping functions", {
   model_df <- exp_anova(mtcars, mpg, am, func2="asint")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("disp","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
+               c("am","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
