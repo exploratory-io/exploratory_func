@@ -1625,11 +1625,21 @@ get_gather_repeated_measures_colnames <- function(column_list) {
 #'               If there are 2 columns (2-way ANOVA case), it is a character vector with 2 elements of character.
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
+#' @param f - Effect size.
+#' @param power - Power.
+#' @param beta - Type 2 error.
+#' @param outlier_filter_type - Type of outlier filter.
+#' @param outlier_filter_threshold - Threshold for outlier filter.
+#' @param with_interaction - Whether to include interaction term.
+#' @param with_repeated_measures - Whether to include repeated measures.
+#' @param var.equal - Whether to assume equal variances. 
+#'                   If you set it to FALSE, it will run Welch's ANOVA.
+#'                   Applicable only to one-way ANOVA. Default is FALSE.
 exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate_funs = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       with_interaction = FALSE, with_repeated_measures = FALSE,
-                      ...) {
+                      var.equal = FALSE, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
   }
@@ -1812,7 +1822,87 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         model$ss3 <- ss3
       }
       else {
-        model <- aov(formula, data = df)
+        # One-way ANOVA case.
+        # Use oneway.test() for one-way ANOVA.
+        model <- oneway.test(formula, data = df, var.equal = var.equal)
+        # Create a lm object for post-hoc test.
+        model$lm.model <- lm(formula, data = df)
+        # Remember the var.equal argument.
+        model$var.equal <- var.equal
+
+        # Calculate metrics 
+        if (var.equal) {
+          # Equal variance caase (standard ANOVA)
+
+          # Calculate residuals.
+          group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
+          model$residuals <- df[[var1_col]] - group_means[df[[var2_col]]]
+
+          n_groups <- nlevels(df[[var2_col]])
+          n_total <- nrow(df)
+          
+          # Degrees of freedom
+          df_groups <- n_groups - 1
+          df_residuals <- n_total - n_groups
+          
+          # Calculate sums of squares
+          grand_mean <- mean(df[[var1_col]])
+          ss_total <- sum((df[[var1_col]] - grand_mean)^2)
+          
+          group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
+          ss_groups <- sum(tapply(df[[var1_col]], df[[var2_col]], length) * 
+                          (group_means - grand_mean)^2)
+          
+          ss_residuals <- ss_total - ss_groups
+          
+          # Mean squares
+          ms_groups <- ss_groups / df_groups
+          ms_residuals <- ss_residuals / df_residuals
+
+        }
+        else {
+          # Unequal variance case (Welch's ANOVA)
+
+          # Calculate standardized residuals.
+          group_vars <- tapply(df[[var1_col]], df[[var2_col]], var)
+          group_means <- tapply(df[[var1_col]], df[[var2_col]], mean)
+          model$residuals <- (df[[var1_col]] - group_means[df[[var2_col]]]) / sqrt(group_vars[df[[var2_col]]])
+
+          df_groups <- model$parameter[1]
+          df_residuals <- model$parameter[2]
+          # Group statistics
+          group_stats <- aggregate(df[[var1_col]], 
+                                by = list(df[[var2_col]]), 
+                                FUN = function(x) c(mean = mean(x), 
+                                                  var = var(x), 
+                                                  n = length(x)))
+          
+          # Welch's modified calculations
+          weights <- 1 / (group_stats$x[,"var"] / group_stats$x[,"n"])
+          grand_mean <- sum(group_stats$x[,"mean"] * weights) / sum(weights)
+          
+          ss_groups <- sum(weights * (group_stats$x[,"mean"] - grand_mean)^2)
+          ss_residuals <- sum((group_stats$x[,"n"] - 1) * group_stats$x[,"var"])
+          
+          ms_groups <- ss_groups / df_groups
+          ms_residuals <- ss_residuals / df_residuals
+        }
+
+        # Create output data frame matching broom::tidy output format.
+        model.tidy <- data.frame(
+            term = c(var2_col, "Residuals"),
+            df = c(df_groups, df_residuals),
+            sumsq = c(ss_groups, ss_residuals),
+            meansq = c(ms_groups, ms_residuals),
+            statistic = c(model$statistic, NA),
+            p.value = c(model$p.value, NA)
+        )
+        
+        # Set row names to NULL to match broom::tidy output
+        rownames(model.tidy) <- NULL
+        # Save the broom::tidy like output for later use.
+        model$model.tidy <- model.tidy
+
       }
       # calculate Cohen's f from actual data #TODO: Support 2-way case. Also, is this valid for ANCOVA?
       if (length(var2_col) == 1) {
@@ -1873,7 +1963,20 @@ glance.anova_exploratory <- function(x) {
 
 # Returns a data frame for pairwise contrast. This is a common utility function for "pairs" and "pairs_per_variable" type of the tidier.
 get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
-  emm_fit <- emmeans::emmeans(x, formula)
+  if (is.null(x$lm.model)) {
+    emm_fit <- emmeans::emmeans(x, formula)
+  } else {
+    # If lm.model is provided, it is One-way ANOVA. 
+    # Use the lm model for post-hoc test.
+    if (x$var.equal) {
+      emm_fit <- emmeans::emmeans(x$lm.model, formula)
+    } else {
+      # For unequal variances case, use sandwich::vcovHC() 
+      # to get heteroscedasticity-consistent standard errors.
+      emm_fit <- emmeans::emmeans(x$lm.model, formula, vcov = sandwich::vcovHC)
+    }
+  }
+
   if (length(levels(emm_fit)) >=2 && length(levels(emm_fit)$c3_) >= 2) { # 2-way ANOVA (repeated measures or regular)
     c2_levels <- levels(emm_fit)$c2_
     c3_levels <- levels(emm_fit)$c3_
@@ -2004,11 +2107,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       return(ret)
     }
     note <- NULL
-
     # Power analysis is for one-way ANOVA case only.
     one_way_anova_without_repeated_measures <- is.null(x$covariates) && (length(x$var2) == 1) && !x$with_repeated_measures
     if (one_way_anova_without_repeated_measures) { # one-way ANOVA case
-      ret <- broom:::tidy.aov(x)
+      # broom::tidy doesn't support oneway.test model.
+      # Use the broom::tidy like output saved in x$model.tidy.
+      ret <- x$model.tidy
     } else if (x$with_repeated_measures) { # For repeated measures ANOVA, we need to extract results from Anova.mlm object from car package.
       x_summary <- summary(x$Anova)
       x_matrix <- matrix(as.numeric(x_summary$univariate.tests), ncol=ncol(x_summary$univariate.tests))
@@ -2523,8 +2627,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       ret0 <- ret0 %>% filter(term %in% c(x$var2[1],"Residuals"))
       ret <- generate_ftest_density_data(ret0$statistic[[1]], p.value=ret0$p.value, df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     } else { # one-way ANOVA case
-      ret0 <- broom:::tidy.aov(x)
-      ret <- generate_ftest_density_data(ret0$statistic[[1]], p.value=ret0$p.value, df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+      # broom::tidy() doesn't support oneway.test model.
+      # Pass the metrics to generate_ftest_density_data directly.
+      ret <- generate_ftest_density_data(
+        x$statistic, 
+        p.value=x$p.value, 
+        df1=x$parameter[1], 
+        df2=x$parameter[2], 
+        sig_level=x$test_sig_level
+      )
     }
     ret
   }

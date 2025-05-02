@@ -820,7 +820,7 @@ test_that("test exp_anova", {
 })
 
 test_that("test exp_anova with logical group column", {
-  mtcars2 <- mtcars %>% mutate(`a m`=as.logical(am), `w t`=wt, `q sec`=qsec)
+  mtcars2 <- mtcars %>% mutate(`a m`=factor(as.logical(am)), `w t`=wt, `q sec`=qsec)
   model_df <- exp_anova(mtcars2, mpg, `a m`)
   res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
 })
@@ -876,10 +876,10 @@ test_that("test exp_anova with required power", {
 })
 
 test_that("test exp_anova with grouping functions", {
-  model_df <- exp_anova(mtcars, mpg, disp, func2="asintby10")
+  model_df <- exp_anova(mtcars, mpg, am, func2="asint")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
-               c("disp","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
+               c("am","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
                  "Minimum","Maximum"))
 })
 
