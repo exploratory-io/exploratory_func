@@ -123,6 +123,14 @@ test_that("Test One-way ANOVA", {
   expect_equal(ret.pairs$`P Value`, c(0.328, 0.255, 0.686), tolerance = 0.001)
   expect_equal(ret.pairs$DF, c(275, 282, 159))
 
+  ret.pairs <- ret %>% tidy_rowwise(model, type="pairs", pairs_adjust="bonferroni")
+  expect_equal(colnames(ret.pairs), 
+              c("facet", "Group 1", "Group 2", "Difference", "Conf Low", "Conf High", 
+                "Standard Error", "DF", "t Value", "P Value", "Method"))
+  expect_equal(nrow(ret.pairs), 3)  # One for each facet level
+  expect_equal(ret.pairs$Difference, c(0.243, 0.268, 0.125), tolerance = 0.001)
+  expect_equal(ret.pairs$`P Value`, c(0.326, 0.252, 0.684), tolerance = 0.005)
+  expect_equal(ret.pairs$DF, c(275, 282, 159))
 
   ret.model <- ret %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret.model),
@@ -133,14 +141,6 @@ test_that("Test One-way ANOVA", {
   expect_equal(ret.model$`F Value`[c(1,4,7)], c(0.966, 1.31, 0.166), tolerance = 0.01)
   expect_equal(ret.model$Power[c(1,4,7)], c(0.210, 0.125, 0.0645), tolerance = 0.001)
 
-  ret.pairs <- ret %>% tidy_rowwise(model, type="pairs", pairs_adjust="bonferroni")
-  expect_equal(colnames(ret.pairs), 
-              c("facet", "Group 1", "Group 2", "Difference", "Conf Low", "Conf High", 
-                "Standard Error", "DF", "t Value", "P Value", "Method"))
-  expect_equal(nrow(ret.pairs), 3)  # One for each facet level
-  expect_equal(ret.pairs$Difference, c(0.243, 0.268, 0.125), tolerance = 0.001)
-  expect_equal(ret.pairs$`P Value`, c(0.326, 0.252, 0.684), tolerance = 0.005)
-  expect_equal(ret.pairs$DF, c(275, 282, 159))
 
   ret.shapiro <- ret %>% tidy_rowwise(model, type="shapiro", shapiro_seed=)
   expect_equal(colnames(ret.shapiro),
