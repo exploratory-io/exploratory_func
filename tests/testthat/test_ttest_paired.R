@@ -36,7 +36,7 @@ test_that("test paired ttest", {
   # model type output
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret),
-               c("t Value", "P Value", "DF", "Difference", "Conf Low", "Conf High", "Base Level", "Cohen's D", "Power", "Type 2 Error",
+               c("Difference", "Std Error", "t Value", "P Value", "DF", "Conf Low", "Conf High", "Base Level", "Cohen's D", "Power", "Type 2 Error",
                  "Rows", "Rows (After_Treatment)", "Rows (Before_Treatment)"))
 
   # data summary type output
