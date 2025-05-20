@@ -1170,6 +1170,9 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
     }
 
+    # Calculate stderr.  Difference (estimate) / t-value (statistic)
+    ret <- ret %>% dplyr::mutate(stderr = estimate / statistic)
+
     # Get sample sizes for the 2 groups (n1, n2).
     n1 <- x$n1 # number of 1st class
     n2 <- x$n2 # number of 2nd class
@@ -1195,12 +1198,13 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
 
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.low, conf.high, base.level) %>%
+      ret <- ret %>% dplyr::select(estimate, stderr, statistic, p.value, parameter, conf.low, conf.high, base.level) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
         dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
                       `DF`=parameter,
                       Difference=estimate,
+                      `Std Error`=stderr,
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
                       `Base Level`=base.level,
