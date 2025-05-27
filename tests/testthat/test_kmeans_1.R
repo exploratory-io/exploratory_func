@@ -63,12 +63,12 @@ test_that("exp_kmeans with single column name", {
 test_that("exp_kmeans elbow method mode", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
   model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
-  res <- model_df %>% tidyr::unnest(model)
-  expect_equal(colnames(res), c("center","totss","tot.withinss","betweenss","iter"))
+  res <- model_df %>% tidyr::unnest(elbow_result)
+  expect_equal(colnames(res), c("model", "center","totss","tot.withinss","betweenss","iter"))
   # Test the case the rows are fewer and we have to limit the search.
   df <- df %>% head(9)
   model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
-  res <- model_df %>% tidyr::unnest(model)
+  res <- model_df %>% tidyr::unnest(elbow_result)
   # Search should be limited up to 8 (9 - 1).
   expect_equal(nrow(res), 8)
 })
