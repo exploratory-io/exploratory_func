@@ -97,14 +97,9 @@ exp_kmeans <- function(df, ...,
                    na.rm = FALSE, # Skip NA filtering since it is already done.
                    !!!rlang::syms(selected_cols))
   ret <- dplyr::ungroup(ret) # ungroup once so that the following mutate with purrr::map2 works.
-  ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
-    x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
-    x$sampled_nrow <- sampled_nrow
-    x$excluded_nrow <- excluded_nrow
-    x
-  }))
 
-  # If elbow_method_mode is TRUE, also compute the elbow method results and add as a new column
+  # If elbow_method_mode is TRUE, also compute the elbow method results and attach to model
+  elbow_result <- NULL
   if (elbow_method_mode) {
     kmeans_df <- df %>% dplyr::select(!!!rlang::syms(selected_cols))
     elbow_result <- iterate_kmeans(kmeans_df,
@@ -115,9 +110,17 @@ exp_kmeans <- function(df, ...,
                                    trace = trace,
                                    normalize_data = normalize_data,
                                    seed=NULL) # Seed is already done in do_prcomp. Skip it.
-    # Add as a new column (list-column)
-    ret <- ret %>% dplyr::mutate(elbow_result = list(elbow_result))
   }
+
+  ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
+    x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
+    x$sampled_nrow <- sampled_nrow
+    x$excluded_nrow <- excluded_nrow
+    if (!is.null(elbow_result)) {
+      x$elbow_result <- elbow_result
+    }
+    x
+  }))
 
   # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
   if (length(grouped_cols) > 0) {
