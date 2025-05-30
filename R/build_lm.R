@@ -1610,8 +1610,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         # Rename to pretty names
+        # statistic is Wald z value for glm.
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Value`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
+                              `z Value`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
                               `Base Level`=base.level)
         if (!is.null(ret$ame)) {
           ret <- ret %>% rename(`Average Marginal Effect`=ame)
@@ -1963,7 +1964,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
 
   # Prettify is_test_data column. Do this after the above select calls, since it looks at is_test_data column.
   if (!is.null(ret$is_test_data) && pretty.name) {
-    ret <- ret %>% dplyr::select(is_test_data, everything()) %>%
+    ret <- ret %>% 
       dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
       dplyr::rename(`Data Type` = is_test_data)
   }
