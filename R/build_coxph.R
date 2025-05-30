@@ -843,7 +843,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
         }
 
         colnames(ret)[colnames(ret) == "term"] <- "Term"
-        colnames(ret)[colnames(ret) == "statistic"] <- "t Value"
+        colnames(ret)[colnames(ret) == "statistic"] <- "z Value"
         colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
         colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
         colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"

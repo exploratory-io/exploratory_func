@@ -1530,7 +1530,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
   # Prettify is_test_data column. Do this after the above arrange calls, since it looks at is_test_data column.
   if (!is.null(ret$is_test_data) && pretty.name) {
-    ret <- ret %>% dplyr::select(is_test_data, everything()) %>%
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything()) 
+    } else {
+      ret <- ret %>% dplyr::select(is_test_data, everything()) 
+    }
+    ret <- ret %>% 
       dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
       dplyr::rename(`Data Type` = is_test_data)
   }

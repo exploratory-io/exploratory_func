@@ -936,7 +936,14 @@ evaluation <- function(df, ...){
 
   # Prettify is_test_data column. Do this after the above arrange calls, since it looks at is_test_data column.
   if (!is.null(df$is_test_data)) {
-    df <- df %>% dplyr::select(is_test_data, everything()) %>%
+ 
+    if (length(grouping_cols) > 0) {
+      df <- df %>% dplyr::select(!!!rlang::syms(grouping_cols), is_test_data, everything()) 
+    } else {
+      df <- df %>% dplyr::select(is_test_data, everything()) 
+    }
+
+    df <- df %>% 
       dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
       dplyr::rename(`Data Type` = is_test_data)
   }
