@@ -1620,7 +1620,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
                               `Base Level`=base.level)
 
         # Rename statistic to t or z value depending on the family.
-        family <- x$family$family
+        family <- if (!is.null(x$family) && !is.null(x$family$family) && !is.na(x$family$family)) x$family$family else ""
         if (family == "gaussian" || family == "quasi" || family == "quasibinomial" || family == "quasipoisson") {
           ret <- ret %>% rename(`t Value`=statistic)
         }
