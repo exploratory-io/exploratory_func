@@ -1615,7 +1615,6 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         # Rename to pretty names
-        # statistic is Wald z value for glm.
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
                               `Base Level`=base.level)
