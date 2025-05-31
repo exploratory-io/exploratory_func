@@ -937,6 +937,11 @@ build_lm.fast <- function(df,
           }
         }
         else {
+
+
+
+
+
           if (family == "gaussian") {
             family_arg <- stats::gaussian(link=link)
           }
@@ -1612,8 +1617,18 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         # Rename to pretty names
         # statistic is Wald z value for glm.
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `z Value`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
+                              `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
                               `Base Level`=base.level)
+
+        # Rename statistic to t or z value depending on the family.
+        family <- x$family$family
+        if (family == "gaussian" || family == "quasi" || family == "quasibinomial" || family == "quasipoisson") {
+          ret <- ret %>% rename(`t Value`=statistic)
+        }
+        else {
+          ret <- ret %>% rename(`z Value`=statistic)
+        }
+
         if (!is.null(ret$ame)) {
           ret <- ret %>% rename(`Average Marginal Effect`=ame)
         }
