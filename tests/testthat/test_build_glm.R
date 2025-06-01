@@ -172,3 +172,95 @@ test_that("test prediction binary", {
   expect_true("predicted_probability" %in% colnames(prediction_train_ret))
 
 })
+
+# Prepare models for GLM families (Gamma, Inverse Gaussian, Poisson, Negative Binomial) only once
+models_glm_families <- local({
+  skip_if_not_installed("MASS")
+  skip_if_not_installed("dplyr")
+  skip_if_not_installed("tibble")
+  skip_if_not_installed("purrr")
+  data(mtcars)
+  df <- mtcars
+  list(
+    Gamma = build_lm.fast(df, target = "mpg", predictor_funs = list(hp = "none"), target_fun = "none", model_type = "glm", family = "Gamma", link = "log", test_rate = 0.3),
+    InverseGaussian = build_lm.fast(df, target = "mpg", predictor_funs = list(hp = "none"), target_fun = "none", model_type = "glm", family = "inverse.gaussian", link = "log", test_rate = 0.3),
+    Poisson = build_lm.fast(df, target = "mpg", predictor_funs = list(hp = "none"), target_fun = "none", model_type = "glm", family = "poisson", link = "log", test_rate = 0.3),
+    NegativeBinomial = build_lm.fast(df, target = "mpg", predictor_funs = list(hp = "none"), target_fun = "none", model_type = "glm", family = "negativebinomial", link = "log", test_rate = 0.3)
+  )
+})
+
+test_that("evaluate_glm_training_and_test works for GLM families (Gamma, Inverse Gaussian, Poisson, Negative Binomial)", {
+  # Gamma
+  gamma_eval <- evaluate_glm_training_and_test(models_glm_families$Gamma)
+  expect_true(any(grepl("test_data", colnames(gamma_eval))) || any(grepl("is_test_data", colnames(gamma_eval))),
+              info = "Test data column missing for Gamma")
+  expect_true(any(gamma_eval$is_test_data == TRUE),
+              info = "No test data row for Gamma")
+  expect_true(all(c("logLik", "deviance", "n") %in% colnames(gamma_eval)),
+              info = "Missing columns for Gamma")
+
+  # Inverse Gaussian
+  ig_eval <- evaluate_glm_training_and_test(models_glm_families$InverseGaussian)
+  expect_true(any(grepl("test_data", colnames(ig_eval))) || any(grepl("is_test_data", colnames(ig_eval))),
+              info = "Test data column missing for Inverse Gaussian")
+  expect_true(any(ig_eval$is_test_data == TRUE),
+              info = "No test data row for Inverse Gaussian")
+  expect_true(all(c("logLik", "deviance", "n") %in% colnames(ig_eval)),
+              info = "Missing columns for Inverse Gaussian")
+
+  # Poisson
+  pois_eval <- evaluate_glm_training_and_test(models_glm_families$Poisson)
+  expect_true(any(grepl("test_data", colnames(pois_eval))) || any(grepl("is_test_data", colnames(pois_eval))),
+              info = "Test data column missing for Poisson")
+  expect_true(any(pois_eval$is_test_data == TRUE),
+              info = "No test data row for Poisson")
+  expect_true(all(c("logLik", "deviance", "n") %in% colnames(pois_eval)),
+              info = "Missing columns for Poisson")
+
+  # Negative Binomial
+  nb_eval <- evaluate_glm_training_and_test(models_glm_families$NegativeBinomial)
+  expect_true(any(grepl("test_data", colnames(nb_eval))) || any(grepl("is_test_data", colnames(nb_eval))),
+              info = "Test data column missing for Negative Binomial")
+  expect_true(any(nb_eval$is_test_data == TRUE),
+              info = "No test data row for Negative Binomial")
+  expect_true(all(c("logLik", "deviance", "n") %in% colnames(nb_eval)),
+              info = "Missing columns for Negative Binomial")
+})
+
+test_that("calc_glm_test_metrics works for GLM families (Gamma, Inverse Gaussian, Poisson, Negative Binomial)", {
+  # Gamma
+  m_gamma <- models_glm_families$Gamma$model[[1]]
+  pred_gamma <- predict(m_gamma, m_gamma$model, type = "response")
+  res_gamma <- calc_glm_test_metrics(m_gamma$model$mpg, pred_gamma, m_gamma)
+  expect_true(is.numeric(res_gamma$log_likelihood) && is.finite(res_gamma$log_likelihood),
+              info = "log_likelihood not numeric/finite for Gamma")
+  expect_true(is.numeric(res_gamma$residual_deviance) && is.finite(res_gamma$residual_deviance),
+              info = "residual_deviance not numeric/finite for Gamma")
+
+  # Inverse Gaussian
+  m_ig <- models_glm_families$InverseGaussian$model[[1]]
+  pred_ig <- predict(m_ig, m_ig$model, type = "response")
+  res_ig <- calc_glm_test_metrics(m_ig$model$mpg, pred_ig, m_ig)
+  expect_true(is.numeric(res_ig$log_likelihood) && is.finite(res_ig$log_likelihood),
+              info = "log_likelihood not numeric/finite for Inverse Gaussian")
+  expect_true(is.numeric(res_ig$residual_deviance) && is.finite(res_ig$residual_deviance),
+              info = "residual_deviance not numeric/finite for Inverse Gaussian")
+
+  # Poisson
+  m_pois <- models_glm_families$Poisson$model[[1]]
+  pred_pois <- predict(m_pois, m_pois$model, type = "response")
+  res_pois <- calc_glm_test_metrics(m_pois$model$mpg, pred_pois, m_pois)
+  expect_true(is.numeric(res_pois$log_likelihood) && is.finite(res_pois$log_likelihood),
+              info = "log_likelihood not numeric/finite for Poisson")
+  expect_true(is.numeric(res_pois$residual_deviance) && is.finite(res_pois$residual_deviance),
+              info = "residual_deviance not numeric/finite for Poisson")
+
+  # Negative Binomial
+  m_nb <- models_glm_families$NegativeBinomial$model[[1]]
+  pred_nb <- predict(m_nb, m_nb$model, type = "response")
+  res_nb <- calc_glm_test_metrics(m_nb$model$mpg, pred_nb, m_nb)
+  expect_true(is.numeric(res_nb$log_likelihood) && is.finite(res_nb$log_likelihood),
+              info = "log_likelihood not numeric/finite for Negative Binomial")
+  expect_true(is.numeric(res_nb$residual_deviance) && is.finite(res_nb$residual_deviance),
+              info = "residual_deviance not numeric/finite for Negative Binomial")
+})
