@@ -1990,3 +1990,147 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
 
   ret
 }
+
+
+# Generates Summary table for glm based analytics view.
+# (Gamma, Inverse Gaussian, Poisson, Negative Binomial) 
+evaluate_glm_training_and_test <- function(df, pretty.name = FALSE){
+  # Get the summary row for traninng data. Info is retrieved from model by glance()
+  training_ret <- df %>% glance_rowwise(model, pretty.name = pretty.name)
+  ret <- training_ret
+
+  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
+
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and generate summary row for test data.
+  # Unlike training data, this involves calculating metrics by ourselves from test prediction result.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
+    ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
+    each_func <- function(df){
+      # With the way this is called, df becomes list rather than data.frame.
+      # Make it data.frame again so that prediction() can be applied on it.
+      if (!is.data.frame(df)) {
+        df <- tibble::tribble(~model, ~.test_index, ~source.data,
+                              df$model, df$.test_index, df$source.data)
+      }
+
+      tryCatch({
+        test_pred_ret <- prediction(df, data = "test")
+        ## get Model Object
+        m <- (df %>% filter(!is.null(model)))$model[[1]]
+        actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
+        # Get original target column name.
+        actual_val_col_orig <- df$model[[1]]$terms_mapping[[actual_val_col]]
+
+        actual <- test_pred_ret[[actual_val_col_orig]]
+        predicted <- test_pred_ret$predicted_value
+
+        # Calculate log likelihood and residual deviance from actual and predicted values
+        glm_metrics <- calc_glm_test_metrics(actual, predicted, m)
+        log_likelihood <- glm_metrics$log_likelihood
+        residual_deviance <- glm_metrics$residual_deviance
+        test_n <- sum(!is.na(predicted)) # Sample size for test.
+
+        test_ret <- data.frame(
+                          # r.squared = rsq,
+                          # adj.r.squared = adj_rsq,
+                          # rmse = root_mean_square_error,
+                          logLik = log_likelihood,
+                          deviance = residual_deviance,
+                          n = test_n
+                          )
+        if(pretty.name) {
+          # test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `Rows`=n)
+          test_ret <- test_ret %>% dplyr::rename(`Log Likelihood`=logLik, `Residual Deviance`=deviance, `Rows`=n)
+        }
+        test_ret$is_test_data <- TRUE
+        test_ret
+      }, error = function(e){
+        data.frame()
+      })
+    }
+
+    # df is already grouped rowwise, but to get group column value on the output, we need to group it explicitly with the group column.
+    if (length(grouped_col) > 0) {
+      df <- df %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+    }
+
+    test_ret <- do_on_each_group(df, each_func, with_unnest = TRUE)
+    ret <- ret %>% dplyr::bind_rows(test_ret)
+  }
+
+  # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
+  if (!is.null(ret$is_test_data)) {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+    }
+    else {
+      ret <- ret %>% dplyr::select(is_test_data, everything())
+    }
+  }
+  else {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), everything())
+    }
+  }
+
+  if (length(grouped_col) > 0){
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
+  }
+
+  # Prettify is_test_data column. Do this after the above select calls, since it looks at is_test_data column.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>% 
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+
+  # Bring Note column at the end.
+  if (!is.null(ret$Note)) {
+    ret <- ret %>% dplyr::select(-Note, everything(), Note)
+  }
+
+  ret
+}
+
+# Calculate log likelihood and residual deviance from actual and predicted values for GLM families
+calc_glm_test_metrics <- function(actual, predicted, m) {
+  # The smallest positive floating-point number that can be represented on your computer.
+  # This is used to avoid log(0) and other numerical issues.
+  eps <- .Machine$double.eps
+  predicted <- pmax(predicted, eps)
+  actual <- pmax(actual, eps)
+  family <- if (!is.null(m$family) && !is.null(m$family$family)) m$family$family else ""
+  log_likelihood <- NA
+  residual_deviance <- NA
+  if (family == "poisson") {
+    log_likelihood <- sum(actual * log(predicted) - predicted - lfactorial(actual))
+    residual_deviance <- 2 * sum(ifelse(actual == 0, 0, actual * log(actual / predicted)) - (actual - predicted))
+  } else if (family == "negativebinomial") {
+    theta <- if (!is.null(m$theta)) m$theta else stop("theta (dispersion) not found in model for negative binomial")
+    log_likelihood <- sum(
+      lgamma(actual + theta) - lgamma(theta) - lgamma(actual + 1) +
+      theta * log(theta / (theta + predicted)) +
+      actual * log(predicted / (theta + predicted))
+    )
+    term1 <- ifelse(actual == 0, 0, actual * log(actual / predicted))
+    term2 <- (actual + theta) * log((actual + theta) / (predicted + theta))
+    residual_deviance <- 2 * sum(term1 - term2)
+  } else if (family == "Gamma") {
+    shape <- tryCatch(1 / summary(m)$dispersion, error = function(e) NULL)
+    if (is.null(shape)) stop("shape parameter not found for Gamma model")
+    log_likelihood <- sum(
+      shape * (log(shape) + log(actual) - log(predicted)) -
+      shape * (actual / predicted) - lgamma(shape)
+    )
+    residual_deviance <- 2 * sum((actual - predicted) / predicted - log(actual / predicted))
+  } else if (family == "inverse.gaussian") {
+    dispersion <- tryCatch(summary(m)$dispersion, error = function(e) NULL)
+    if (is.null(dispersion)) stop("dispersion parameter not found for inverse gaussian model")
+    log_likelihood <- sum(
+      -0.5 * log(2 * pi * dispersion * actual^3) -
+      ((actual - predicted)^2) / (2 * dispersion * predicted^2 * actual)
+    )
+    residual_deviance <- sum(((actual - predicted)^2) / (predicted^2 * actual))
+  }
+  list(log_likelihood = log_likelihood, residual_deviance = residual_deviance)
+}
