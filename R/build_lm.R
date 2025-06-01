@@ -2100,6 +2100,10 @@ calc_glm_test_metrics <- function(actual, predicted, m) {
   predicted <- pmax(predicted, eps)
   actual <- pmax(actual, eps)
   family <- if (!is.null(m$family) && !is.null(m$family$family)) m$family$family else ""
+
+  # family can be "Negative Binomial(456719.3)". In that case, we treat it as "negativebinomial".
+  family <- if (grepl("Negative Binomial", family)) "negativebinomial" else family
+
   # Support both 'negativebinomial' and 'negbin' as family names for negative binomial models
   log_likelihood <- NA
   residual_deviance <- NA
