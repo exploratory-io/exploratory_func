@@ -2100,22 +2100,35 @@ calc_glm_test_metrics <- function(actual, predicted, m) {
   predicted <- pmax(predicted, eps)
   actual <- pmax(actual, eps)
   family <- if (!is.null(m$family) && !is.null(m$family$family)) m$family$family else ""
+  # Support both 'negativebinomial' and 'negbin' as family names for negative binomial models
   log_likelihood <- NA
   residual_deviance <- NA
   if (family == "poisson") {
+    # Poisson log likelihood and deviance
+    # logLik: sum(y * log(mu) - mu - log(y!))
+    # Deviance: 2 * sum(y * log(y/mu) - (y - mu)), with 0*log(0) defined as 0
     log_likelihood <- sum(actual * log(predicted) - predicted - lfactorial(actual))
     residual_deviance <- 2 * sum(ifelse(actual == 0, 0, actual * log(actual / predicted)) - (actual - predicted))
-  } else if (family == "negativebinomial") {
+  } else if (family == "negativebinomial" || family == "negbin") {
+    # Negative binomial log likelihood and deviance
+    # logLik: sum(lgamma(y + theta) - lgamma(theta) - lgamma(y + 1) +
+    #             theta * log(theta / (theta + mu)) + y * log(mu / (theta + mu)))
+    # Deviance: 2 * sum(y * log(y/mu) - (y + theta) * log((y + theta)/(mu + theta)))
+    # where theta is the dispersion parameter, mu is the predicted mean
     theta <- if (!is.null(m$theta)) m$theta else stop("theta (dispersion) not found in model for negative binomial")
     log_likelihood <- sum(
       lgamma(actual + theta) - lgamma(theta) - lgamma(actual + 1) +
       theta * log(theta / (theta + predicted)) +
       actual * log(predicted / (theta + predicted))
     )
+    # For deviance, handle 0*log(0) as 0
     term1 <- ifelse(actual == 0, 0, actual * log(actual / predicted))
     term2 <- (actual + theta) * log((actual + theta) / (predicted + theta))
     residual_deviance <- 2 * sum(term1 - term2)
   } else if (family == "Gamma") {
+    # Gamma log likelihood and deviance
+    # logLik: sum(shape * (log(shape) + log(y) - log(mu)) - shape * (y/mu) - lgamma(shape))
+    # Deviance: 2 * sum((y - mu)/mu - log(y/mu))
     shape <- tryCatch(1 / summary(m)$dispersion, error = function(e) NULL)
     if (is.null(shape)) stop("shape parameter not found for Gamma model")
     log_likelihood <- sum(
@@ -2124,6 +2137,9 @@ calc_glm_test_metrics <- function(actual, predicted, m) {
     )
     residual_deviance <- 2 * sum((actual - predicted) / predicted - log(actual / predicted))
   } else if (family == "inverse.gaussian") {
+    # Inverse Gaussian log likelihood and deviance
+    # logLik: sum(-0.5 * log(2 * pi * dispersion * y^3) - ((y - mu)^2) / (2 * dispersion * mu^2 * y))
+    # Deviance: sum(((y - mu)^2) / (mu^2 * y))
     dispersion <- tryCatch(summary(m)$dispersion, error = function(e) NULL)
     if (is.null(dispersion)) stop("dispersion parameter not found for inverse gaussian model")
     log_likelihood <- sum(
