@@ -2031,15 +2031,11 @@ evaluate_glm_training_and_test <- function(df, pretty.name = FALSE){
         test_n <- sum(!is.na(predicted)) # Sample size for test.
 
         test_ret <- data.frame(
-                          # r.squared = rsq,
-                          # adj.r.squared = adj_rsq,
-                          # rmse = root_mean_square_error,
                           logLik = log_likelihood,
                           deviance = residual_deviance,
                           n = test_n
                           )
         if(pretty.name) {
-          # test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `Rows`=n)
           test_ret <- test_ret %>% dplyr::rename(`Log Likelihood`=logLik, `Residual Deviance`=deviance, `Rows`=n)
         }
         test_ret$is_test_data <- TRUE
