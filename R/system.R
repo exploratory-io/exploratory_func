@@ -3570,6 +3570,28 @@ read_delim_file <- function(file, delim, quote = '"',
         }
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
         stop(stringr::str_c("Could not read data from ", file)); # Show the original URL name in the error message.
+      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter")) {
+        # retry with default delimiter which is comma. This error only happens when delimiter is not specified.
+        exploratory::read_delim_file(
+          file,
+          delim = ",",
+          quote = quote,
+          escape_backslash = escape_backslash,
+          escape_double = escape_double,
+          col_names = col_names,
+          col_types = col_types,
+          locale = locale,
+          na = na,
+          quoted_na = quoted_na,
+          comment = comment,
+          trim_ws = trim_ws,
+          skip = skip,
+          n_max = n_max,
+          guess_max = guess_max,
+          progress = progress,
+          with_api_key = with_api_key,
+          data_text = data_text
+        )
       } else {
         stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
       }
@@ -3616,6 +3638,28 @@ read_delim_file <- function(file, delim, quote = '"',
         stop(paste0("EXP-DATASRC-1 :: ", jsonlite::toJSON(file), " ::  Failed to read file."))
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) {
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
+      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter")) {
+        # retry with default delimiter which is comma. This error only happens when delimiter is not specified.
+        exploratory::read_delim_file(
+          file,
+          delim = ",",
+          quote = quote,
+          escape_backslash = escape_backslash,
+          escape_double = escape_double,
+          col_names = col_names,
+          col_types = col_types,
+          locale = locale,
+          na = na,
+          quoted_na = quoted_na,
+          comment = comment,
+          trim_ws = trim_ws,
+          skip = skip,
+          n_max = n_max,
+          guess_max = guess_max,
+          progress = progress,
+          with_api_key = with_api_key,
+          data_text = data_text
+        )
       } else {
         if (is_free_input_text) {
           stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c("", e$message)), ' :: Failed to import file.'))
