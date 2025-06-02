@@ -479,6 +479,11 @@ test_that("read_delim_file downlod failed error message", {
   })
 })
 
+test_that("read_delim_file with guess delimiter error handling and retry with default comma delimiter", {
+  df <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/o3vuqea89mp6t24e61cmg/one-col.csv?rlkey=6ko09im7w4bn5x0yrj9kjduzv&dl=1", delim = NULL)
+  expect_equal(colnames(df), c("a"))
+})
+
 test_that("read_delim_file witout requirement delim argument error message", {
   tryCatch({
     df <- exploratory::read_delim_file("https://www.dropbox.com/s/tb6ppzockjao7vg/too_longer_header.csv?dl=1")
