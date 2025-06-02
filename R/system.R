@@ -3571,7 +3571,7 @@ read_delim_file <- function(file, delim, quote = '"',
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
         stop(stringr::str_c("Could not read data from ", file)); # Show the original URL name in the error message.
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter")) {
-        # retry with default delimiter which is comma.
+        # retry with default delimiter which is comma. This error only happens when delimiter is not specified.
         exploratory::read_delim_file(
           file,
           delim = ",",
@@ -3639,7 +3639,7 @@ read_delim_file <- function(file, delim, quote = '"',
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) {
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter")) {
-        # retry with default delimiter which is comma.
+        # retry with default delimiter which is comma. This error only happens when delimiter is not specified.
         exploratory::read_delim_file(
           file,
           delim = ",",
