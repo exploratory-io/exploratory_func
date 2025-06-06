@@ -4513,7 +4513,7 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
   cut(x, breaks=breaks, right=right, ...)
 }
 
-#' It does select() before unnest() to avoid the error from dplyr::select()
+#' It does select() and unnest() at once to avoid the error from unnest()
 #' when the column name for group_by is too complex.
 #' @param df A data frame.
 #' @param col The column to unnest.
