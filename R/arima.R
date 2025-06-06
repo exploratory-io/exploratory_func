@@ -722,7 +722,7 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
 #' @export
 glance_with_ts_metric <- function(df) {
   ret1 <- df %>% glance_rowwise(model)
-  ret2 <- df %>% dplyr::select(data) %>% tidyr::unnest(data)
+  ret2 <- df %>% unnest_safe("data")
   value_col <- attr(df$data[[1]], "value_col")
   if (any(ret2$is_test_data)) {
     ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, is_test_data), `MAPE (Ratio)`=exploratory::mape(!!rlang::sym(value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(value_col), forecasted_value, is_test_data), `R Squared`=r_squared(!!rlang::sym(value_col), forecasted_value, is_test_data=is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))

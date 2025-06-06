@@ -608,3 +608,37 @@ test_that("test setConnectionPoolMode", {
   # Restore the original value
   exploratory::setConnectionPoolMode(original_pool_connection)
 })
+
+test_that("unnest_safe handles group columns with and without '|' and other edge cases", {
+  # 1. No grouping columns, simple unnest
+  df1 <- tibble(id = 1:2, val = list(1:2, 3:4))
+  res1 <- df1 %>% unnest_safe("val")
+  expect_equal(res1$val, c(1,2,3,4))
+
+  # 2. Grouping column with '|'
+  df2 <- tibble(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~` = c("A", "A", "B"), val = list(1:2, 3:4, 5:6)) %>% group_by(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`)
+  res2 <- df2 %>% unnest_safe("val")
+  expect_equal(res2$val, c(1,2,3,4,5,6))
+  expect_true("group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~" %in% colnames(res2))
+  expect_equal(unique(res2$`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`), c("A", "B"))
+
+  # 3. Grouping column without '|'
+  df3 <- tibble(g = c("A", "A", "B"), val = list(1:2, 3:4, 5:6)) %>% group_by(g)
+  res3 <- df3 %>% unnest_safe("val")
+  expect_equal(res3$val, c(1,2,3,4,5,6))
+  expect_true("g" %in% colnames(res3))
+  expect_equal(unique(res3$g), c("A", "B"))
+
+  # 4. Multiple grouping columns, some with '|'
+  df4 <- tibble(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~` = c("A", "A", "B"), g2 = c(1,1,2), val = list(1:2, 3:4, 5:6)) %>% group_by(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`, g2)
+  res4 <- df4 %>% unnest_safe("val")
+  expect_equal(res4$val, c(1,2,3,4,5,6))
+  expect_true(all(c("group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~", "g2") %in% colnames(res4)))
+  expect_equal(unique(res4$`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`), c("A", "B"))
+  expect_equal(unique(res4$g2), c(1, 2))
+
+  # 5. Unnesting a column with empty lists
+  df5 <- tibble(id = 1:3, val = list(1:2, integer(0), 3:4))
+  res5 <- df5 %>% unnest_safe("val")
+  expect_equal(res5$val, c(1,2,3,4))
+})

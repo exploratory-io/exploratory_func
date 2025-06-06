@@ -4513,3 +4513,30 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
   cut(x, breaks=breaks, right=right, ...)
 }
 
+#' It does select() and unnest() at once to avoid the error from unnest()
+#' when the column name for group_by is too complex.
+#' @param df A data frame.
+#' @param col The column to unnest.
+#' @return A data frame with the unnested column.
+#' @export
+unnest_safe <- function(df, col) {
+  ret <- df
+  group_col <- grouped_by(ret)
+  group_col_simple <- NULL
+
+  if (length(group_col) > 0) {
+    # Create simple names for group_col.
+    group_col_simple <- setNames(stringr::str_c("...g", 1:length(group_col)), group_col)
+    # Create a mapping from original column name to simple column name.
+    group_col <- setNames(group_col, group_col_simple)
+    # Rename the grouped column names to simple ones.
+    ret <- ret %>% dplyr::rename_at(group_col, ~group_col_simple[.])
+  }
+  ret <- ret %>% dplyr::select(col) %>% tidyr::unnest(col)
+
+  # Restore the original column names.
+  if (length(group_col) > 0) {
+    ret <- ret %>% dplyr::rename_at(group_col_simple, ~group_col[.])
+  }
+  ret
+}
