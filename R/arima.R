@@ -722,7 +722,28 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
 #' @export
 glance_with_ts_metric <- function(df) {
   ret1 <- df %>% glance_rowwise(model)
+  
+  # Rename grouped column names to simple ones like '.group1' because unnest()
+  # complains if the group column name is too complex.
+  group_col <- grouped_by(df)
+  group_col_simple <- NULL
+
+  if (length(group_col) > 0) {
+    # Create simple names for group_col.
+    # df is controlled and we are sure there is no column named ".group1", ".group2", ...
+    group_col_simple <- setNames(stringr::str_c(".group", 1:length(group_col)), group_col)
+    # Create a mapping from original column name to simple column name.
+    group_col <- setNames(group_col, group_col_simple)
+    # Rename the grouped column names to simple ones.
+    df <- df %>% dplyr::rename_at(group_col, ~group_col_simple[.])
+  }
   ret2 <- df %>% dplyr::select(data) %>% tidyr::unnest(data)
+
+  # Restore the original column names.
+  if (length(group_col) > 0) {
+    df <- df %>% dplyr::rename_at(group_col_simple, ~group_col[.])
+  }
+
   value_col <- attr(df$data[[1]], "value_col")
   if (any(ret2$is_test_data)) {
     ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, is_test_data), `MAPE (Ratio)`=exploratory::mape(!!rlang::sym(value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(value_col), forecasted_value, is_test_data), `R Squared`=r_squared(!!rlang::sym(value_col), forecasted_value, is_test_data=is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))

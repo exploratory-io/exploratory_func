@@ -34,3 +34,19 @@ test_that("exp_arima with aggregation", {
   ret <- model_df %>% glance_with_ts_metric()
   expect_true(all(c("RMSE","MAE","MAPE (Ratio)","R Squared") %in% names(ret)))
 })
+
+test_that("exp_arima with column names including special characters with group_by." , {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2010-01-13"), by="day")
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts)), group="A") %>% 
+    dplyr::rename(`time stamp !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`=timestamp, `data !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`=data, `group !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`=group) %>%
+    dplyr::group_by(`group !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`)
+  model_df <- raw_data %>%
+    exp_arima(`time stamp !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`, `data !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`, 10, time_unit = "day", funs.aggregate.regressors = c(mean), yearly.seasonality = "auto", weekly.seasonality = "auto", output="model")
+
+  expect_equal(last(model_df$data[[1]]$`time stamp !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`), as.Date("2010-01-23")) 
+  # Make sure glance_with_ts_metric works with group_by including special characters, especially pipe '|' characters.
+  ret <- model_df %>% glance_with_ts_metric()
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)") %in% names(ret)))
+  expect_true(!is.na(model_df$data[[1]]$forecasted_value[[length(model_df$data[[1]]$forecasted_value)]]))
+})
+
