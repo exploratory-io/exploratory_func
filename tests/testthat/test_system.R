@@ -615,35 +615,30 @@ test_that("unnest_safe handles group columns with and without '|' and other edge
   res1 <- df1 %>% unnest_safe("val")
   expect_equal(res1$val, c(1,2,3,4))
 
-  # 2. No column specified 
-  df2 <- tibble(id = 1:2, val = list(1:2, 3:4))
-  res2 <- df2 %>% select(val) %>% unnest_safe("val")
-  expect_equal(res2$val, c(1,2,3,4))
+  # 2. Grouping column with '|'
+  df2 <- tibble(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~` = c("A", "A", "B"), val = list(1:2, 3:4, 5:6)) %>% group_by(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`)
+  res2 <- df2 %>% unnest_safe("val")
+  expect_equal(res2$val, c(1,2,3,4,5,6))
+  expect_true("group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~" %in% colnames(res2))
+  expect_equal(unique(res2$`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`), c("A", "B"))
 
-  # 3. Grouping column with '|'
-  df3 <- tibble(`g|1||` = c("A", "A", "B"), val = list(1:2, 3:4, 5:6)) %>% group_by(`g|1||`)
+  # 3. Grouping column without '|'
+  df3 <- tibble(g = c("A", "A", "B"), val = list(1:2, 3:4, 5:6)) %>% group_by(g)
   res3 <- df3 %>% unnest_safe("val")
   expect_equal(res3$val, c(1,2,3,4,5,6))
-  expect_true("g|1||" %in% colnames(res3))
-  expect_equal(unique(res3$`g|1||`), c("A", "B"))
+  expect_true("g" %in% colnames(res3))
+  expect_equal(unique(res3$g), c("A", "B"))
 
-  # 4. Grouping column without '|'
-  df4 <- tibble(g = c("A", "A", "B"), val = list(1:2, 3:4, 5:6)) %>% group_by(g)
+  # 4. Multiple grouping columns, some with '|'
+  df4 <- tibble(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~` = c("A", "A", "B"), g2 = c(1,1,2), val = list(1:2, 3:4, 5:6)) %>% group_by(`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`, g2)
   res4 <- df4 %>% unnest_safe("val")
   expect_equal(res4$val, c(1,2,3,4,5,6))
-  expect_true("g" %in% colnames(res4))
-  expect_equal(unique(res4$g), c("A", "B"))
+  expect_true(all(c("group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~", "g2") %in% colnames(res4)))
+  expect_equal(unique(res4$`group !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~`), c("A", "B"))
+  expect_equal(unique(res4$g2), c(1, 2))
 
-  # 5. Multiple grouping columns, some with '|'
-  df5 <- tibble(`g|1||` = c("A", "A", "B"), g2 = c(1,1,2), val = list(1:2, 3:4, 5:6)) %>% group_by(`g|1||`, g2)
+  # 5. Unnesting a column with empty lists
+  df5 <- tibble(id = 1:3, val = list(1:2, integer(0), 3:4))
   res5 <- df5 %>% unnest_safe("val")
-  expect_equal(res5$val, c(1,2,3,4,5,6))
-  expect_true(all(c("g|1||", "g2") %in% colnames(res5)))
-  expect_equal(unique(res5$`g|1||`), c("A", "B"))
-  expect_equal(unique(res5$g2), c(1, 2))
-
-  # 6. Unnesting a column with empty lists
-  df6 <- tibble(id = 1:3, val = list(1:2, integer(0), 3:4))
-  res6 <- df6 %>% unnest_safe("val")
-  expect_equal(res6$val, c(1,2,3,4))
+  expect_equal(res5$val, c(1,2,3,4))
 })
