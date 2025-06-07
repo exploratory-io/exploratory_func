@@ -165,38 +165,35 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
           df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=FALSE, scale=TRUE)))
         }
       )
-      if (distance %in% c("dtw_lb", "lbk", "lbi")) { # Distance algorithms that require window.size.
-        window_size <- as.integer(nrow(df) * 0.1) # Let's use 10% of length of data as the default window size.
-        if (window_size < 1) { # window.size should be at least 1.
-          window_size <- 1L
-        }
-        if (!elbow_method_mode) {
-          model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
-                                     args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
-          model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
-        }
-        else { # Elbow method mode. Create a list of models.
-          n_centers <- 2:max_centers
-          models <- n_centers %>% purrr::map(function(n_center) {
-            dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
-                              args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
-          })
-          model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
+
+      # A function to run tsclust to avoid repetition.
+      run_tsclust <- function(k) {
+        if (distance %in% c("dtw_lb", "lbk", "lbi")) { # Distance algorithms that require window.size.
+          window_size <- as.integer(nrow(df) * 0.1) # Let's use 10% of length of data as the default window size.
+          if (window_size < 1) { # window.size should be at least 1.
+            window_size <- 1L
+          }
+          dtwclust::tsclust(t(as.matrix(df)), k = k, distance = distance, centroid = centroid,
+                            args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+        } else {
+          dtwclust::tsclust(t(as.matrix(df)), k = k, distance = distance, centroid = centroid)
         }
       }
-      else {
-        if (!elbow_method_mode) {
-          model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
-          model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
-        }
-        else { # Elbow method mode. Create a list of models.
-          n_centers <- 2:max_centers
-          models <- n_centers %>% purrr::map(function(n_center) {
-            dtwclust::tsclust(t(as.matrix(df)), k = n_center, distance = distance, centroid = centroid)
-          })
-          model <- list(models = models, n_centers = n_centers) # Since the original model is S4 object, we create an S3 object that wraps it.
-        }
+
+      # Always run for the specified number of centers.
+      single_model <- run_tsclust(centers)
+      model <- list(model = single_model) # Since the original model is S4 object, we create an S3 object that wraps it.
+
+      if (elbow_method_mode) {
+        n_centers <- 2:max_centers
+        # Note: this part can be slow.
+        models <- n_centers %>% purrr::map(function(n_center) {
+          run_tsclust(n_center)
+        })
+        model$models <- models # Add models for elbow method.
+        model$n_centers <- n_centers
       }
+
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col

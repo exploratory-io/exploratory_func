@@ -4,7 +4,7 @@
 context("test time series clustering")
 
 testdata_dir <- tempdir()
-testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv"
 testdata_file_path <- paste0(testdata_dir, '/', testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
@@ -29,7 +29,7 @@ test_that("exp_ts_cluster elbow method mode", {
 })
 
 test_that("exp_ts_cluster elbow method mode with algorithm that requires window_size", {
-  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, distance='dtw_lb', output="model", elbow_method_mode=TRUE)
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, distance='dtw_lb', output="model", centroid = 'pam', elbow_method_mode=TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="elbow_method")
   expect_equal(colnames(ret), c("n_center","av_dist","iter","converged"))
 })
