@@ -803,3 +803,153 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
   # }
   res
 }
+
+#' Get the original data frame with a cluster column
+#' @export
+#' @param model - The model object
+#' @return A data frame with the cluster column
+exp_get_original_df_with_cluster_column <- function(model, text_column) {
+  cluster_keywords_df <- model %>%
+    get_cooccurrence_graph_data(
+      max_vertex_size=20,
+      vertex_size_method='equal_length',
+      vertex_opacity=0.6,
+      max_edge_width=8,
+      min_edge_width=1,
+      edge_color='#4A90E2',
+      font_size_ratio=1.2,
+      area_factor=50,
+      cluster_method='louvain') %>%
+    (function(df) { df$model[[1]]$vertices }) %>%
+    arrange(cluster, dplyr::desc(size))
+  exp_add_cluster_column(model$model[[1]]$df, cluster_keywords_df, text_column)
+}
+#' Add a cluster column to the data frame
+#' @export
+#' @param data - The data frame to analyze
+#' @param cluster_keywords_source_df - The data frame containing the cluster keywords
+#' @param text_column - The column containing the text to analyze
+#' @return A data frame with the cluster column
+exp_add_cluster_column <- function(data, cluster_keywords_source_df, text_column) {
+    cluster_keywords_df <- cluster_keywords_source_df %>%
+    summarize_group(group_cols = c(`cluster` = "cluster"),group_funs = c("asint"),Text = stringr::str_c(name, collapse="|"))
+
+  # Get the names of the columns (assuming first is cluster, second is keywords)
+  cluster_col_name <- names(cluster_keywords_df)[1]
+  keywords_col_name <- names(cluster_keywords_df)[2]
+
+  # Extract unique cluster names and their keywords
+  cluster_info <- cluster_keywords_df %>%
+    group_by(.data[[cluster_col_name]]) %>%
+    summarise(keywords = paste(.data[[keywords_col_name]], collapse = "|"), .groups = 'drop')
+
+  # Rename the first column to 'cluster' using standard indexing
+  names(cluster_info)[1] <- "cluster"
+
+  # Convert cluster names to character to ensure they work as column names
+  cluster_info$cluster <- as.character(cluster_info$cluster)
+
+  # Step 1: Create cluster count columns dynamically
+  newly_added_cluster_cols <- c()
+  for(i in 1:nrow(cluster_info)) {
+    cluster_name <- as.character(cluster_info$cluster[i])
+    new_col_name <- paste0("cluster_", cluster_name)
+    newly_added_cluster_cols <- c(newly_added_cluster_cols, new_col_name)
+    keywords_pattern <- cluster_info$keywords[i]
+    data <- data %>%
+      mutate(!!new_col_name := stringr::str_count(.data[[text_column]], keywords_pattern))
+  }
+
+  # Step 2: Find the maximum cluster for each row
+  cluster_cols <- newly_added_cluster_cols
+
+  # Create a matrix of cluster values for easier comparison
+  cluster_matrix <- data %>%
+    select(all_of(cluster_cols)) %>%
+    as.matrix()
+
+  # Find which cluster has the maximum value for each row
+  max_cluster_indices <- max.col(cluster_matrix, ties.method = "first")
+  max_cluster_names <- cluster_info$cluster[max_cluster_indices] # Use original cluster name for joining
+  max_cluster_values <- apply(cluster_matrix, 1, max)
+
+  # Step 3: Add maximum cluster information
+  data <- data %>%
+    mutate(
+      group_id = max_cluster_names,
+      max_cluster_value = max_cluster_values
+    )
+  # align the data type so that left_join works.
+  data <- data %>% mutate(max_cluster_name = as.double(group_id)) %>% dplyr::left_join(cluster_keywords_df, by=c("max_cluster_name" = "cluster"))
+  # Drop the dynamically created cluster count columns and max_cluster_value column.
+  data <- data %>% dplyr::select(-dplyr::all_of(newly_added_cluster_cols), -max_cluster_value, -max_cluster_name) %>% dplyr::rename(words = Text)
+  return(data)
+}
+
+#' Get the top 5 sentences for each cluster
+#' @export
+#' @param data - The data frame to analyze
+#' @param cluster_keywords_source_df - The data frame containing the cluster keywords
+#' @param text_column - The column containing the text to analyze
+#' @return A data frame with the top 5 sentences for each cluster
+exp_get_top5_sentences_for_cluster <- function(data, cluster_keywords_source_df, text_column) {
+  cluster_keywords_df <- cluster_keywords_source_df %>%
+    summarize_group(group_cols = c(`cluster` = "cluster"),group_funs = c("asint"),Text = stringr::str_c(name, collapse="|"))
+
+  # Get the names of the columns (assuming first is cluster, second is keywords)
+  cluster_col_name <- names(cluster_keywords_df)[1]
+  keywords_col_name <- names(cluster_keywords_df)[2]
+
+  # Extract unique cluster names and their keywords
+  cluster_info <- cluster_keywords_df %>%
+    group_by(.data[[cluster_col_name]]) %>%
+    summarise(keywords = paste(.data[[keywords_col_name]], collapse = "|"), .groups = 'drop')
+
+  # Rename the first column to 'cluster' using standard indexing
+  names(cluster_info)[1] <- "cluster"
+
+  # Convert cluster names to character to ensure they work as column names
+  cluster_info$cluster <- as.character(cluster_info$cluster)
+
+  # Step 1: Create cluster count columns dynamically
+  for(i in 1:nrow(cluster_info)) {
+    cluster_name <- as.character(cluster_info$cluster[i])
+    keywords_pattern <- cluster_info$keywords[i]
+
+    data <- data %>%
+      mutate(!!cluster_name := stringr::str_count(.data[[text_column]], keywords_pattern))
+  }
+
+  # Step 2: Find the maximum cluster for each row
+  cluster_cols <- cluster_info$cluster
+
+  # Create a matrix of cluster values for easier comparison
+  cluster_matrix <- data %>%
+    select(all_of(cluster_cols)) %>%
+    as.matrix()
+
+  # Find which cluster has the maximum value for each row
+  max_cluster_indices <- max.col(cluster_matrix, ties.method = "first")
+  max_cluster_names <- cluster_cols[max_cluster_indices]
+  max_cluster_values <- apply(cluster_matrix, 1, max)
+
+  # Step 3: Add maximum cluster information
+  data <- data %>%
+    mutate(
+      max_cluster_name = max_cluster_names,
+      max_cluster_value = max_cluster_values
+    )
+
+  # Step 4: Group by cluster, arrange, and select top 5 from each
+  result <- data %>%
+    group_by(max_cluster_name) %>%
+    arrange(desc(max_cluster_value)) %>%
+    slice(1:5) %>%
+    ungroup() %>%
+    select(all_of(text_column), max_cluster_name) %>%
+    rename(cluster = max_cluster_name) %>%
+    relocate(cluster, .before = 1)  # Move cluster column to first position
+
+  return(result)
+}
+

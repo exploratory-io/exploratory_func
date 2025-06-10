@@ -4,6 +4,10 @@ context("test text analysis function, exp_textanal")
 
 twitter_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
 
+nps_raw <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/7iur1jvyldqoxpieish2r/nps_raw.csv?rlkey=y3cwyosrplx6awt8wvwzut1ly&dl=1", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+nps_cluster <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/c6saij8if1iq76yfo2v0d/NPS_cluster.csv?rlkey=3lajklwltbe5tnijot1iujr7b&dl=1", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
 test_that("exp_textanal with Japanese twitter data", {
   lang_res <- exploratory:::guess_lang_for_stopwords(twitter_df$text)
 
@@ -74,4 +78,23 @@ test_that("exp_textanal", {
   # c_scale <- grDevices::colorRamp(c("white","red"))
   # E(g)$color <- apply(c_scale((log(edges$value)+1)/max(log(edges$value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8) )
   # plot(g, edge.arrow.size=0.5, layout=layout_with_graphopt, vertex.label.family="HiraKakuProN-W3", vertex.label.color=rgb(0.4,0.4,0.4), vertex.label.cex=0.9, vertex.frame.color=NA)
+})
+
+
+
+test_that("exp_get_top5_sentences_for_cluster", {
+  df <- exp_get_top5_sentences_for_cluster(nps_raw, nps_cluster, "よりよくするための提案")
+  expect_equal(nrow(df), 30)
+  expect_equal(ncol(df), 2)
+  expect_equal(df$cluster, c("1","1","1","1","1","2","2","2","2","2","3","3","3","3","3","4","4","4","4","4","5","5","5","5","5","6","6","6","6","6"))
+  expect_equal(df$`よりよくするための提案`[[3]], c("発表者を減らして1人あたりの時間がもう少し余裕があってもいいかと思います。"))
+})
+
+test_that("exp_get_top5_sentences_for_cluster", {
+  model_df <- nps_raw %>% exp_textanal(`よりよくするための提案`, stopwords_lang = "auto", remove_punct = TRUE, remove_numbers = TRUE, remove_alphabets = FALSE, tokenize_tweets = FALSE, remove_url = TRUE, hiragana_word_length_to_remove = 2, cooccurrence_context = "window")
+
+  df <- model_df %>% exp_get_original_df_with_cluster_column("よりよくするための提案")
+  expect_equal(nrow(df), 164)
+  expect_equal(ncol(df), 5)
+  expect_equal(df$`よりよくするための提案`[[3]], c("特にはないですが、もっとアップデート内容を聞きたかったです！ みなさんの発表も参考になりました。"))
 })
