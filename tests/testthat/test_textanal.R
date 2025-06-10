@@ -56,7 +56,7 @@ test_that("exp_textanal", {
   expect_true("And" %in% res$word) # Test stopwords_to_remove.
   res <- model_df %>% tidy_rowwise(model, type="words")
   expect_equal(colnames(res), c("document", "word"))
-  expect_equal(length(unique(res$document)), 4) # NA and empty string are skipped. 
+  expect_equal(length(unique(res$document)), 4) # NA and empty string are skipped.
   res <- model_df %>% tidy_rowwise(model, type="word_pairs")
 
   # Test network clustering.
