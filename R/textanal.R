@@ -804,29 +804,6 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
   res
 }
 
-#' Get the original data frame with a cluster column
-#' @export
-#' @param model - The model object
-#' @param text_column - The column containing the text to analyze
-#' @param area_factor - The area factor for the cooccurrence graph
-#' @param cluster_method - The method to use for clustering
-#' @return A data frame with the cluster column
-exp_get_original_df_with_cluster_column <- function(model, text_column, area_factor = 50, cluster_method = 'louvain') {
-  cluster_keywords_df <- model %>%
-    get_cooccurrence_graph_data(
-      max_vertex_size=20,
-      vertex_size_method='equal_length',
-      vertex_opacity=0.6,
-      max_edge_width=8,
-      min_edge_width=1,
-      edge_color='#4A90E2',
-      font_size_ratio=1.2,
-      area_factor=area_factor,
-      cluster_method=cluster_method) %>%
-    (function(df) { df$model[[1]]$vertices }) %>%
-    arrange(cluster, dplyr::desc(size))
-  exp_add_cluster_column(model$model[[1]]$df, cluster_keywords_df, text_column)
-}
 #' Add a cluster column to the data frame
 #' @export
 #' @param data - The data frame to analyze

@@ -92,8 +92,22 @@ test_that("exp_get_top5_sentences_for_cluster", {
 
 test_that("exp_get_top5_sentences_for_cluster", {
   model_df <- nps_raw %>% exp_textanal(`よりよくするための提案`, stopwords_lang = "auto", remove_punct = TRUE, remove_numbers = TRUE, remove_alphabets = FALSE, tokenize_tweets = FALSE, remove_url = TRUE, hiragana_word_length_to_remove = 2, cooccurrence_context = "window")
+  cluster_keywords_df <- model_df %>%
+    get_cooccurrence_graph_data(
+      max_vertex_size=20,
+      vertex_size_method='equal_length',
+      vertex_opacity=0.6,
+      max_edge_width=8,
+      min_edge_width=1,
+      edge_color='#4A90E2',
+      font_size_ratio=1.2,
+      area_factor=50,
+      cluster_method='louvain') %>%
+    (function(df) { df$model[[1]]$vertices }) %>%
+    arrange(cluster, dplyr::desc(size))
 
-  df <- model_df %>% exp_get_original_df_with_cluster_column("よりよくするための提案")
+  df <- exp_add_cluster_column(model_df$model[[1]]$df, cluster_keywords_df, "よりよくするための提案")
+
   expect_equal(nrow(df), 164)
   expect_equal(ncol(df), 5)
   expect_equal(df$`よりよくするための提案`[[3]], c("特にはないですが、もっとアップデート内容を聞きたかったです！ みなさんの発表も参考になりました。"))
