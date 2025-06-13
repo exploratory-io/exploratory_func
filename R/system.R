@@ -2511,11 +2511,10 @@ getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery", serv
       token <- '';
       if (service == "cloudstorage") {
         token <- getGoogleTokenForCloudStorage();
-        googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
       } else if (service == "bigquery") {
         token <- getGoogleTokenForBigQuery(tokenFileId);
-        bigrquery::set_access_cred(token)
       }
+      bigrquery::set_access_cred(token)
     }
     # The previous edit was incorrect and replaced this with gcs_list_buckets. Reverting to bq_projects.
     bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
