@@ -2207,12 +2207,19 @@ getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFile
 
 #' API to submit a Google Big Query Job
 #' @export
-submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId, useStandardSQL = FALSE,  ...){
+submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId, useStandardSQL = FALSE, service_account_file = NULL,  ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
-  token <- getGoogleTokenForBigQuery(tokenFieldId)
-  bigrquery::set_access_cred(token)
+  if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+     service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+  }
+  if (!is.null(service_account_file)) {
+    bigrquery::bq_auth(path = service_account_file)
+  } else {
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+    bigrquery::set_access_cred(token)
+  }
   sqlquery <- convertUserInputToUtf8(sqlquery)
   # pass desitiona_table to support large data
   # check if the query contains special key word for standardSQL
@@ -2222,7 +2229,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
     isStandardSQL = TRUE; # honor value provided by paramerer
   }
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  sqlquery <- glue_exploratory(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+  sqlquery <- glue_exploratory(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.parent.frame())
   job <- bigrquery::bq_perform_query(query = sqlquery, billing = project,  use_legacy_sql = !isStandardSQL)
   bigrquery::bq_job_wait(job)
   meta <- bigrquery::bq_job_meta(job)
@@ -2237,7 +2244,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
 
 #' API to get a data from google BigQuery table
 #' @export
-getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connections = 8){
+getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connections = 8, service_account_file = NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   # Remember original scipen
   original_scipen = getOption("scipen")
@@ -2245,8 +2252,15 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
     # Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
     # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
     options(scipen = 20)
-    token <- getGoogleTokenForBigQuery(tokenFileId)
-    bigrquery::set_access_cred(token)
+    if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+       service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+    }
+    if (!is.null(service_account_file)) {
+      bigrquery::bq_auth(path = service_account_file)
+    } else {
+      token <- getGoogleTokenForBigQuery(tokenFileId)
+      bigrquery::set_access_cred(token)
+    }
     tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
     # Since Exploratory Desktop does not handle int64, convert int64 to numeric by passing bigint = "numeric" ref: https://bigrquery.r-dbi.org/reference/bq_table_download.html
     bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, bigint = "numeric", quiet = TRUE, max_connections = max_connections)
@@ -2258,10 +2272,17 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
 #' @export
-extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table, destinationUri, tokenFileId){
+extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table, destinationUri, tokenFileId, service_account_file = NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId)
-  bigrquery::set_access_cred(token)
+  if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+     service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+  }
+  if (!is.null(service_account_file)) {
+    bigrquery::bq_auth(path = service_account_file)
+  } else {
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+    bigrquery::set_access_cred(token)
+  }
   # call forked bigrquery for submitting extract job
   table <- bigrquery::bq_table(project, dataset, table = table)
   job <- bigrquery::bq_perform_extract(x = table, destination_uris = destinationUri, print_header = TRUE, destination_format = "CSV", compression = "GZIP")
@@ -2271,11 +2292,18 @@ extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table,
 
 #' API to download data from Google Storage to client and create a data frame from it
 #' @export
-downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId, colTypes = NULL){
+downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId, colTypes = NULL, service_account_file = NULL){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId)
-  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+     service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+  }
+  if (!is.null(service_account_file)) {
+    googleAuthR::gar_auth(json_file = service_account_file)
+  } else {
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+    googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  }
   googleCloudStorageR::gcs_global_bucket(bucket)
   objects <- googleCloudStorageR::gcs_list_objects()
   # set bucket
@@ -2309,16 +2337,23 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
 
 #' API to get a list of buckets from Google Cloud Storage
 #' @export
-listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "bigquery"){
+listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "bigquery", service_account_file = NULL){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
-  token <- '';
-  if (service == "cloudstorage") {
-    token <- getGoogleTokenForCloudStorage();
-  } else if (service == "bigquery") {
-    token <- getGoogleTokenForBigQuery(tokenFileId)
+  if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+     service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
   }
-  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  if (!is.null(service_account_file)) {
+    googleAuthR::gar_auth(json_file = service_account_file)
+  } else {
+    token <- '';
+    if (service == "cloudstorage") {
+      token <- getGoogleTokenForCloudStorage();
+    } else if (service == "bigquery") {
+      token <- getGoogleTokenForBigQuery(tokenFileId)
+    }
+    googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  }
   # make sure to pass "noAcl" as projection so that Google won't limit maxResults as 200.
   # ref: https://cloud.google.com/storage/docs/json_api/v1/buckets/list
   googleCloudStorageR::gcs_list_buckets(projectId = project, maxResults = 1000, projection = c("noAcl"))
@@ -2326,10 +2361,17 @@ listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "
 
 #' API to get a data from google BigQuery table
 #' @export
-saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetProjectId, targetDatasetId, targetTableId, tokenFileId){
+saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetProjectId, targetDatasetId, targetTableId, tokenFileId, service_account_file = NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId)
-  bigrquery::set_access_cred(token)
+  if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+     service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+  }
+  if (!is.null(service_account_file)) {
+    bigrquery::bq_auth(path = service_account_file)
+  } else {
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+    bigrquery::set_access_cred(token)
+  }
 
   src <- list(project_id = projectId, dataset_id = sourceDatasetId, table_id = sourceTableId)
   dest <- list(project_id = targetProjectId, dataset_id = targetDatasetId, table_id = targetTableId)
@@ -2353,18 +2395,18 @@ generate_random_string <- function(length) {
 #' @param tokenFileId - file id for auth token,
 #' @param colTypes
 #' @export
-getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, colTypes = NULL, ...){
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, colTypes = NULL, service_account_file = NULL, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
   # submit a job to extract query result to cloud storage
   uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
-  job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
+  job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId, service_account_file = service_account_file);
   # download tgzip file to client. Make sure to create a temporary directory for download with unique location to avoid conflicitng with another import.
   downloadDir <- file.path(tempdir(), generate_random_string(10))
   tryCatch({
     dir.create(downloadDir)
   })
-  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = downloadDir, tokenFileId = tokenFileId, colTypes = colTypes)
+  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = downloadDir, tokenFileId = tokenFileId, colTypes = colTypes, service_account_file = service_account_file)
 }
 
 #' Get data from google big query
@@ -2382,10 +2424,10 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @param useStandardSQL
 #' @param colTypes
 #' @export
-executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bqProjectId, csBucket=NULL, bucketFolder=NULL, max_connections = 8, useStandardSQL = FALSE, colTypes = NULL, ...){
+executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bqProjectId, csBucket=NULL, bucketFolder=NULL, max_connections = 8, useStandardSQL = FALSE, colTypes = NULL, service_account_file = NULL, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId)
+
   # Remember original scipen
   original_scipen = getOption("scipen")
   tryCatch({
@@ -2403,18 +2445,26 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       # submit a query to get a result (for refresh data frame case)
       # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
       # so just pass query as is.
-      result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
+      result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL, service_account_file = service_account_file);
       # extranct result from Google BigQuery to Google Cloud Storage and import
       # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
       # To get the only one value for datasetId and tableId, use dplyr::first.
-      df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId, colTypes)
+      df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId, colTypes, service_account_file = service_account_file)
     } else {
       # direct import case (for refresh data frame case)
 
       # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
       # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
       # so for now, stick to bigrquery::set_access_cred
-      bigrquery::set_access_cred(token)
+      if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+         service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+      }
+      if (!is.null(service_account_file)) {
+        bigrquery::bq_auth(path = service_account_file)
+      } else {
+        token <- getGoogleTokenForBigQuery(tokenFileId)
+        bigrquery::set_access_cred(token)
+      }
       # check if the query contains special key word for standardSQL
       # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
       isStandardSQL <- stringr::str_detect(query, "#standardSQL")
@@ -2443,7 +2493,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
 #' by the service argument.
 #'
 #' @export
-getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery"){
+getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery", service_account_file = NULL){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2452,13 +2502,22 @@ getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery"){
     warningMessage <<- w
   }
   main <- function(){
-    token <- ''
-    if (service == "cloudstorage") {
-      token <- getGoogleTokenForCloudStorage();
-    } else if (service == "bigquery") {
-      token <- getGoogleTokenForBigQuery(tokenFileId);
+    if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+       service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
     }
-    bigrquery::set_access_cred(token)
+    if (!is.null(service_account_file)) {
+      bigrquery::bq_auth(path = service_account_file)
+    } else {
+      token <- '';
+      if (service == "cloudstorage") {
+        token <- getGoogleTokenForCloudStorage();
+        googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+      } else if (service == "bigquery") {
+        token <- getGoogleTokenForBigQuery(tokenFileId);
+        bigrquery::set_access_cred(token)
+      }
+    }
+    # The previous edit was incorrect and replaced this with gcs_list_buckets. Reverting to bq_projects.
     bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
   }
   projects <- withCallingHandlers(main(), warning = warningHandler)
@@ -2473,7 +2532,7 @@ getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery"){
 
 #' API to get datasets for a project
 #' @export
-getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
+getGoogleBigQueryDataSets <- function(project, tokenFileId="", service_account_file = NULL){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2482,8 +2541,15 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
     warningMessage <<- w
   }
   main <- function(){
-    token <- getGoogleTokenForBigQuery(tokenFileId);
-    bigrquery::set_access_cred(token)
+    if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+       service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+    }
+    if (!is.null(service_account_file)) {
+      bigrquery::bq_auth(path = service_account_file)
+    } else {
+      token <- getGoogleTokenForBigQuery(tokenFileId);
+      bigrquery::set_access_cred(token)
+    }
     # make sure to pass max_pages as Inf to get all the datasets
     resultdatasets <- bigrquery::bq_project_datasets(project, page_size=1000, max_pages=Inf);
     lapply(resultdatasets, function(x){x$dataset})
@@ -2500,7 +2566,7 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
 
 #' API to get tables for current project, data set
 #' @export
-getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
+getGoogleBigQueryTables <- function(project, dataset, tokenFileId="", service_account_file = NULL){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2509,8 +2575,15 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     warningMessage <<- w
   }
   main <- function(){
-    token <- getGoogleTokenForBigQuery(tokenFileId);
-    bigrquery::set_access_cred(token)
+    if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+       service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+    }
+    if (!is.null(service_account_file)) {
+      bigrquery::bq_auth(path = service_account_file)
+    } else {
+      token <- getGoogleTokenForBigQuery(tokenFileId);
+      bigrquery::set_access_cred(token)
+    }
     # if we do not pass max_results (via page_size argument), it only returnss 50 items. so explicitly set it.
     # See https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list for max_results
     # If we pass large value to max_results (via page_size argument) like 1,000,000, Google BigQuery gives
@@ -2533,7 +2606,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
 
 #' API to get table info
 #' @export
-getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
+getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId="", service_account_file = NULL){
   if (!requireNamespace("bigrquery")) {
     stop("package bigrquery must be installed.")
   }
@@ -2542,8 +2615,15 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
     warningMessage <<- w
   }
   main <- function(){
-    token <- getGoogleTokenForBigQuery(tokenFileId);
-    bigrquery::set_access_cred(token)
+    if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+       service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+    }
+    if (!is.null(service_account_file)) {
+      bigrquery::bq_auth(path = service_account_file)
+    } else {
+      token <- getGoogleTokenForBigQuery(tokenFileId);
+      bigrquery::set_access_cred(token)
+    }
     table <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
     bigrquery::bq_table_meta(table);
   }
@@ -2559,10 +2639,17 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
 
 #' API to get tables for current project, data set
 #' @export
-deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
+deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId="", service_account_file = NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId);
-  bigrquery::set_access_cred(token)
+  if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
+     service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
+  }
+  if (!is.null(service_account_file)) {
+    bigrquery::bq_auth(path = service_account_file)
+  } else {
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+  }
   bigrquery::delete_table(project, dataset, table);
 }
 
@@ -3246,9 +3333,9 @@ read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1),
                        trim_ws = trim_ws,
                        n_max = n_max,
                        use_readxl = use_readxl,
-                       detectDates = detecDates,
+                       detectDates = detectDates,
                        skipEmptyRows = skipEmptyRows,
-                       skipEmptyCols = skipEmptyCols,
+                       skipEmptyCols = skipEmptyCols ,
                        check.names = check.names,
                        tzone = tzone,
                        convertDataTypeToChar = convertDataTypeToChar),
