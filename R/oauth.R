@@ -233,7 +233,7 @@ refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
 }
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
+#' tokenFileId is a unique value per data frame and is used to create a token cache file
 #' @export
 getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}

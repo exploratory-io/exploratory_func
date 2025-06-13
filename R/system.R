@@ -2229,7 +2229,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
     isStandardSQL = TRUE; # honor value provided by paramerer
   }
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  sqlquery <- glue_exploratory(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.parent.frame())
+  sqlquery <- glue_exploratory(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.frame())
   job <- bigrquery::bq_perform_query(query = sqlquery, billing = project,  use_legacy_sql = !isStandardSQL)
   bigrquery::bq_job_wait(job)
   meta <- bigrquery::bq_job_meta(job)
