@@ -2344,7 +2344,11 @@ listGoogleCloudStorageBuckets <- function(project, tokenFileId = "", service = "
      service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
   }
   if (!is.null(service_account_file)) {
-    googleAuthR::gar_auth(json_file = service_account_file)
+    options(googleAuthR.scopes.selected = c(
+    "https://www.googleapis.com/auth/bigquery",
+    "https://www.googleapis.com/auth/cloud-platform"
+    ))
+    googleAuthR::gar_auth_service(json_file = service_account_file)
   } else {
     token <- '';
     if (service == "cloudstorage") {
@@ -2522,7 +2526,7 @@ getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery", serv
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (!is.null(warningMessage) && stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   projects
@@ -2556,7 +2560,7 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId="", service_account_f
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (!is.null(warningMessage) && stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   dataSets
@@ -2596,7 +2600,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId="", service_ac
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (!is.null(warningMessage) && stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   tables
@@ -2629,7 +2633,7 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId="", serv
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (!is.null(warningMessage) && stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   table
@@ -4494,7 +4498,7 @@ exp_cut_by_step <- function(x, step=NA, lower.range=NA, upper.range=NA, include.
   lower <- lower.range
   upper <- upper.range
 
-  # If the min value is larger than the upper range, the upper range is 
+  # If the min value is larger than the upper range, the upper range is
   # invalid so we ignore it.
   if (!is.na(upper) && min.x > upper) {
     upper <- NA
