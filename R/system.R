@@ -2299,7 +2299,7 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
      service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
   }
   if (!is.null(service_account_file)) {
-    googleAuthR::gar_auth(json_file = service_account_file)
+    googleAuthR::gar_auth_service(json_file = service_account_file)
   } else {
     token <- getGoogleTokenForBigQuery(tokenFileId)
     googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
