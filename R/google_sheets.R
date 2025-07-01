@@ -183,14 +183,14 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
     } else {
       gsheet <- googledrive::drive_get(title)
     }
-    if(!is.null(col_types)) {
-      # if col_types is provided, use it.
-    } else if(!guessDataType) {
-      # if guessDataType is FALSE, use character as the default column data type.
-      col_types <- c(.default="c")
-    } else {
-      # if guessDataType is TRUE, use the default column data type.
-      col_types <- NULL
+    if(is.null(col_types)) {
+      if(!guessDataType) {
+        # if guessDataType is FALSE, use character as the default column data type.
+        col_types <- c(.default="c")
+      } else {
+        # if guessDataType is TRUE, use the default column data type.
+        col_types <- NULL
+      }
     }
     # The "na" argument of googlesheets4::read_sheet does not accept null,
     # so if the treatTheseAsNA is null, do not pass it to googlesheets4::read_sheet
