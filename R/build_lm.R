@@ -2107,6 +2107,8 @@ calc_glm_test_metrics <- function(actual, predicted, m) {
     # Poisson log likelihood and deviance
     # logLik: sum(y * log(mu) - mu - log(y!))
     # Deviance: 2 * sum(y * log(y/mu) - (y - mu)), with 0*log(0) defined as 0
+    # Ensure predicted values are strictly positive to avoid log(0) or log of negative numbers
+    predicted <- pmax(predicted, .Machine$double.eps)
     log_likelihood <- sum(actual * log(predicted) - predicted - lfactorial(actual), na.rm = TRUE)
     residual_deviance <- 2 * sum(
       actual * log(ifelse(actual == 0, 1, actual / predicted)) - (actual - predicted),
