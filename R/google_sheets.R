@@ -157,8 +157,10 @@ normalizeDataForGoogleSheetsExport <- function (df) {
 #' @param guessDataType - flag to tell if you want googlesheets::gs_read to guess column data type
 #' @param tzone - timezone
 #' @param id - ID of the sheet
+#' @param col_types - column data type
+#' @param guess_max - maximum number of rows to guess column data type (default is Inf)
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId = NULL, guessDataType = TRUE, tzone = NULL, id = NULL, ...){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId = NULL, guessDataType = TRUE, tzone = NULL, id = NULL, col_types = NULL, guess_max = Inf, ...){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -181,19 +183,23 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
     } else {
       gsheet <- googledrive::drive_get(title)
     }
-    col_types <- NULL
-    if(!guessDataType) {
-      # if guessDataType is FALSE, use character as the default column data type.
-      col_types <- c(.default="c")
+    if(is.null(col_types)) {
+      if(!guessDataType) {
+        # if guessDataType is FALSE, use character as the default column data type.
+        col_types <- c(.default="c")
+      } else {
+        # if guessDataType is TRUE, use the default column data type.
+        col_types <- NULL
+      }
     }
     # The "na" argument of googlesheets4::read_sheet does not accept null,
     # so if the treatTheseAsNA is null, do not pass it to googlesheets4::read_sheet
     if(!is.null(treatTheseAsNA)) {
-      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types)
+      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types, guess_max = guess_max)
     } else {
-      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types)
+      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types, guess_max = guess_max)
     }
-    if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+    if(!is.null(tzone)) { # if timezone is specified, apply the timezone to POSIXct columns
       df <- df %>% dplyr::mutate(across(where(lubridate::is.POSIXct), ~ lubridate::force_tz(.x, tzone=tzone)))
     }
     # For list columns, change the data type to characters
