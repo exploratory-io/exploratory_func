@@ -922,10 +922,12 @@ exp_get_top5_sentences_for_cluster <- function(data, cluster_keywords_source_df,
       max_cluster_value = max_cluster_values
     )
 
-  # Step 4: Group by cluster, arrange, and select top 5 from each
+  # Step 4: Group by cluster, arrange, and select top 5 unique entries from each
   result <- data %>%
     group_by(max_cluster_name) %>%
     arrange(desc(max_cluster_value)) %>%
+    # Remove duplicates within each cluster based on text content
+    distinct(!!rlang::sym(text_column), .keep_all = TRUE) %>%
     slice(1:5) %>%
     ungroup() %>%
     select(all_of(text_column), max_cluster_name) %>%
