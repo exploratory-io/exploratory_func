@@ -122,7 +122,7 @@ test_that("exp_get_top5_sentences_for_cluster", {
   expect_equal(df$`よりよくするための提案`[[3]], c("特にはないですが、もっとアップデート内容を聞きたかったです！ みなさんの発表も参考になりました。"))
 })
 
-test_that("exp_get_top5_sentences_for_cluster: Englihs", {
+test_that("exp_get_top5_sentences_for_cluster: English", {
   df <- exp_get_top5_sentences_for_cluster(Survey_English_raw, Word_Size_Cluster, "what would it be? (Multiple answers are acceptable)")
   expect_equal(nrow(df), 30)
   expect_equal(ncol(df), 2)
