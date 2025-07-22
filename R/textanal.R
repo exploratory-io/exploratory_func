@@ -62,7 +62,7 @@ which.max.safe <- function(x) {
   if (length(y) == 0) 1 else y
 }
 
-tokenize_with_postprocess <- function(text, 
+tokenize_with_postprocess <- function(text,
                                       remove_punct = TRUE, remove_numbers = TRUE,
                                       remove_alphabets = FALSE,
                                       tokenize_tweets = FALSE,
@@ -182,7 +182,7 @@ exp_textanal <- function(df, text, category = NULL,
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
                          cooccurrence_context = "window", # "document" or "window"
-                         cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
+                         cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run.
                          cooccurrence_network_num_words = 50,
                          max_nrow = 5000,
                          seed = 1,
@@ -839,8 +839,8 @@ exp_add_cluster_column <- function(data, cluster_keywords_source_df, text_column
     newly_added_cluster_cols <- c(newly_added_cluster_cols, new_col_name)
     keywords_pattern <- cluster_info$keywords[i]
     data <- data %>%
-      mutate(!!new_col_name := stringr::str_count(.data[[text_column]], keywords_pattern))
-  }
+      mutate(!!new_col_name := stringr::str_count(stringr::str_to_lower(.data[[text_column]]), stringr::regex(stringr::str_to_lower(keywords_pattern))))
+    }
 
   # Step 2: Find the maximum cluster for each row
   cluster_cols <- newly_added_cluster_cols
@@ -899,7 +899,7 @@ exp_get_top5_sentences_for_cluster <- function(data, cluster_keywords_source_df,
     keywords_pattern <- cluster_info$keywords[i]
 
     data <- data %>%
-      mutate(!!cluster_name := stringr::str_count(.data[[text_column]], keywords_pattern))
+      mutate(!!cluster_name := stringr::str_count(stringr::str_to_lower(.data[[text_column]]), stringr::regex(stringr::str_to_lower(keywords_pattern))))
   }
 
   # Step 2: Find the maximum cluster for each row
