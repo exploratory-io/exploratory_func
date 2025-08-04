@@ -99,15 +99,15 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       # Summarize
       grouped_df <- renamed_df %>% dplyr::group_by(category, time)
       if (value_col == "") {
-        df <- grouped_df %>% 
+        df <- grouped_df %>%
           dplyr::summarise(value = n(), !!!summarise_args)
       }
       else if (is_na_rm_func(fun.aggregate)) {
-        df <- grouped_df %>% 
+        df <- grouped_df %>%
           dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
       }
       else {
-        df <- grouped_df %>% 
+        df <- grouped_df %>%
           dplyr::summarise(value = fun.aggregate(value), !!!summarise_args)
       }
       df <- df %>% dplyr::ungroup()
@@ -185,22 +185,32 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       model <- list(model = single_model) # Since the original model is S4 object, we create an S3 object that wraps it.
 
       if (elbow_method_mode) {
-        n_centers <- 2:max_centers
-        # Note: this part can be slow.
-        models <- n_centers %>% purrr::map(function(n_center) {
-          run_tsclust(n_center)
-        })
-        model$models <- models # Add models for elbow method.
-        model$n_centers <- n_centers
-      }
+        # Limit the numbers of centers to search up to nrow(df) - 1.
+        # Otherwise we will get "Cannot have more clusters than series in the dataset" error.
+        max_centers <- min(max_centers, ncol(df) - 1)
 
+        # Only proceed if we can create at least 2 clusters
+        if (max_centers >= 2) {
+          n_centers <- 2:max_centers
+          # Note: this part can be slow.
+          models <- n_centers %>% purrr::map(function(n_center) {
+            run_tsclust(n_center)
+          })
+          model$models <- models # Add models for elbow method.
+          model$n_centers <- n_centers
+        } else {
+          # Not enough series for elbow method, skip it
+          model$models <- NULL
+          model$n_centers <- NULL
+        }
+      }
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
       attr(model, "orig_n_categories") <- orig_n_categories
       attr(model, "time_values") <- time_values
       if (!is.null(variables)) {
-        attr(model, "variable_cols") <- variables 
+        attr(model, "variable_cols") <- variables
       }
       # Pass original data.
       # - So that the output has other variables too.
