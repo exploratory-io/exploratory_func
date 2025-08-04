@@ -15,6 +15,9 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 
 flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
 
+gdp_data <- arrow::read_parquet("https://www.dropbox.com/scl/fi/ywgdaynw4no8sjjydpdhw/GDP_Japan.parquet?rlkey=5wa3199f9pxznvn4tdsrd20e9&dl=1")
+
+
 if (!testdata_filename %in% list.files(testdata_dir)) {
   set.seed(1)
   flight <- flight %>% slice_sample(n=5000)
@@ -133,4 +136,12 @@ test_that("exp_ts_cluster with elbow method mode with max_category_na_ratio for 
   expect_equal(nrow(ret), 0)
   ret <- model_df %>% tidy_rowwise(model, type="summary")
   expect_equal(nrow(ret), 0)
+})
+
+test_that("exp_ts_cluster with very few clusters with elbow method mode", {
+  model_df <- gdp_data %>% exp_ts_cluster(`date`, `value`, `ID`, time_unit = "quarter", fun.aggregate = mean, na_fill_type = c("extend", "previous", "extend"), with_centroids = TRUE, distance = "dtw2", centroid = "dba", normalize = "center_and_scale", output = "model", stop_for_no_data = FALSE, elbow_method_mode = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="elbow_method")
+  expect_equal(nrow(ret), 3)
+  ret <- model_df %>% tidy_rowwise(model, type="summary")
+  expect_equal(nrow(ret), 4)
 })
