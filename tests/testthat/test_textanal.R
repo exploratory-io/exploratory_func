@@ -10,7 +10,7 @@ nps_cluster <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/c6sa
 
 
 Word_Size_Cluster_Tmp <- tempfile(fileext = ".rds")
-download.file("https://www.dropbox.com/scl/fi/s7g3rf7td0f207jsg627w/Word-Size-Cluster.rds?rlkey=bbm01rxf6y7uhirz5flic08xw&dl=1", destfile = Word_Size_Cluster_Tmp)
+download.file("https://www.dropbox.com/scl/fi/8gpyh4575zpsh3jnapsj0/Word_Size_Cluster2.rds?rlkey=s3o0p1i9oylprbe0qtj23fsr2&dl=1", destfile = Word_Size_Cluster_Tmp)
 Word_Size_Cluster <- readRDS(Word_Size_Cluster_Tmp)
 
 Survey_English_raw_Tmp <- tempfile(fileext = ".rds")
