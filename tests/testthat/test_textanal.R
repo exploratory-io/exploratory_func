@@ -8,10 +8,7 @@ nps_raw <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/7iur1jvy
 
 nps_cluster <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/c6saij8if1iq76yfo2v0d/NPS_cluster.csv?rlkey=3lajklwltbe5tnijot1iujr7b&dl=1", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
 
-
-Word_Size_Cluster_Tmp <- tempfile(fileext = ".parquet")
-download.file("https://www.dropbox.com/scl/fi/xaqguzxqqfeom7101zcwg/Word_Size_Cluster.parquet?rlkey=746fvo89lxa9kwnybvke65e97&dl=1", destfile = Word_Size_Cluster_Tmp)
-Word_Size_Cluster <- arrow::read_parquet(Word_Size_Cluster_Tmp)
+Word_Size_Cluster <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/pjtl1qe8bnabsu8fqhbl4/Word_Size_Cluster.csv?rlkey=smi99mx36tn7c6khkl4x9yoel&dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
 
 Survey_English_raw_Tmp <- tempfile(fileext = ".rds")
 download.file("https://www.dropbox.com/scl/fi/tk33gojc1la86zp3nwrms/Survey_text_data_english.rds?rlkey=w4t7doqg9cvnxgz24qhmk4u52&dl=1", destfile = Survey_English_raw_Tmp)
