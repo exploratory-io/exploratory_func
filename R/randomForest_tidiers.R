@@ -808,7 +808,7 @@ align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
         training_predictor_levels <- unique(training_predictor)
       }
       # ordered factor here causes error in xgboost. Make it not ordered.
-      ret <- forcats::fct_explicit_na(forcats::fct_other(factor(cleaned_data[[predictor_col]], ordered=FALSE), keep=training_predictor_levels))
+      ret <- forcats::fct_na_value_to_level(forcats::fct_other(factor(cleaned_data[[predictor_col]], ordered=FALSE), keep=training_predictor_levels))
       # In case model does not know (Missing) level, do fct_other again. (Missing) will be absorbed in Other.
       ret <- forcats::fct_other(ret, keep=training_predictor_levels)
       # If "Other" is not included in the model levels, replace them with NA. They will be handled as NA rows.
@@ -1792,17 +1792,17 @@ exp_balance <- function(df,
         factorized_cols <- c(factorized_cols, col)
         # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
-        df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
+        df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(as.factor(!!rlang::sym(col))))
       }
       else if(is.factor(df[[col]])) {
         # if already factor, just turn NAs into explicit levels.
         if (is.ordered(df[[col]])) {
           # if ordered, make it not ordered, since ordered factor columns are filled with NAs by ubSMOTE().
-          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(factor(!!rlang::sym(col), ordered=FALSE)))
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(factor(!!rlang::sym(col), ordered=FALSE)))
         }
         else {
           # if not ordered, just turn NAs into explicit levels.
-          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(!!rlang::sym(col)))
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(!!rlang::sym(col)))
         }
       }
     }
