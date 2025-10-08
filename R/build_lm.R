@@ -555,7 +555,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       }
       # turn NA into (Missing) factor level. Without this, lm or glm drops rows internally.
       if (any(is.na(df[[col]]))) {
-        df[[col]] <- forcats::fct_na_value_to_level(df[[col]])
+        df[[col]] <- forcats::fct_na_value_to_level(df[[col]], level = "(Missing)")
       }
     } else if(is.logical(df[[col]])) {
       # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
@@ -563,7 +563,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       # For ranger, we need to convert logical to factor too since na.roughfix only works for numeric or factor.
       df[[col]] <- as.factor(df[[col]])
       if (any(is.na(df[[col]]))) {
-        df[[col]] <- forcats::fct_na_value_to_level(df[[col]])
+        df[[col]] <- forcats::fct_na_value_to_level(df[[col]], level = "(Missing)")
       }
     } else if(!is.numeric(df[[col]])) {
       # 1. convert data to factor if predictors are not numeric or logical
@@ -573,7 +573,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
       df[[col]] <- forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first", other_level=other_level)
       if (any(is.na(df[[col]]))) {
-        df[[col]] <- forcats::fct_na_value_to_level(df[[col]])
+        df[[col]] <- forcats::fct_na_value_to_level(df[[col]], level = "(Missing)")
       }
     } else if(is.integer(df[[col]])) {
       # Convert integer to numeric. mmpf::marginalPrediction we use for partial dependence throws assertion error, if the data is integer and specified grid points are not integer.
