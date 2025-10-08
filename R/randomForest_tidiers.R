@@ -1276,7 +1276,7 @@ predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL)
     # Values in the matrix is the probabilities.
     true_index <- match("TRUE",colnames(pred)) # Find which index is TRUE
     if (is.na(true_index)) {
-      false_index <- match("FALSE",colnames(pred)) # Find which index is FALSE 
+      false_index <- match("FALSE",colnames(pred)) # Find which index is FALSE
       if (is.na(false_index)) {
         # For old analytics step that can take non-logical column for binary classification. Treat the first value as TRUE.
         true_index <- 1
@@ -1531,11 +1531,11 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # Prettify is_test_data column. Do this after the above arrange calls, since it looks at is_test_data column.
   if (!is.null(ret$is_test_data) && pretty.name) {
     if (length(grouped_col) > 0) {
-      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything()) 
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
     } else {
-      ret <- ret %>% dplyr::select(is_test_data, everything()) 
+      ret <- ret %>% dplyr::select(is_test_data, everything())
     }
-    ret <- ret %>% 
+    ret <- ret %>%
       dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
       dplyr::rename(`Data Type` = is_test_data)
   }
@@ -1792,17 +1792,17 @@ exp_balance <- function(df,
         factorized_cols <- c(factorized_cols, col)
         # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
-        df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(as.factor(!!rlang::sym(col))))
+        df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(as.factor(!!rlang::sym(col)), "(Missing)"))
       }
       else if(is.factor(df[[col]])) {
         # if already factor, just turn NAs into explicit levels.
         if (is.ordered(df[[col]])) {
           # if ordered, make it not ordered, since ordered factor columns are filled with NAs by ubSMOTE().
-          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(factor(!!rlang::sym(col), ordered=FALSE)))
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(factor(!!rlang::sym(col), ordered=FALSE), "(Missing)"))
         }
         else {
           # if not ordered, just turn NAs into explicit levels.
-          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(!!rlang::sym(col)))
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(!!rlang::sym(col),"(Missing)"))
         }
       }
     }
@@ -2106,7 +2106,7 @@ calc_feature_imp <- function(df,
                              smote_k = 5,
                              importance_measure = "permutation", # "permutation", "firm", or "impurity".
                              max_pd_vars = NULL,
-                             # Number of most important variables to calculate partial dependences on. 
+                             # Number of most important variables to calculate partial dependences on.
                              # By default, when Boruta is on, all Confirmed/Tentative variables.
                              # 12 when Boruta is off.
                              pd_sample_size = 500,
@@ -2613,8 +2613,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
             importance = imp
           ) %>% dplyr::arrange(-importance)
 
-        }, error = function(e){	
-          ret <<- data.frame()	
+        }, error = function(e){
+          ret <<- data.frame()
         })
         return(ret)
       }
@@ -2880,7 +2880,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
     "predict.fun" = predict.fun,
     ...
   )
-  
+
   if (length(vars) > 1L & !interaction) {
     pd = rbindlist(sapply(vars, function(x) {
       args$vars = x
@@ -2950,7 +2950,7 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
     "predict.fun" = predict.fun,
     ...
   )
-  
+
   if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
     pd = rbindlist(sapply(vars, function(x) {
       args$vars = x
@@ -2977,7 +2977,7 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
   pd
 }
 
-# Calculates permutation importance for regression by rpart. 
+# Calculates permutation importance for regression by rpart.
 calc_permutation_importance_rpart_regression <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
