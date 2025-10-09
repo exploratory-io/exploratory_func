@@ -1792,17 +1792,17 @@ exp_balance <- function(df,
         factorized_cols <- c(factorized_cols, col)
         # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
-        df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(as.factor(!!rlang::sym(col)), "(Missing)"))
+        df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(as.factor(!!rlang::sym(col)), level="(Missing)"))
       }
       else if(is.factor(df[[col]])) {
         # if already factor, just turn NAs into explicit levels.
         if (is.ordered(df[[col]])) {
           # if ordered, make it not ordered, since ordered factor columns are filled with NAs by ubSMOTE().
-          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(factor(!!rlang::sym(col), ordered=FALSE), "(Missing)"))
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(factor(!!rlang::sym(col), ordered=FALSE), level="(Missing)"))
         }
         else {
           # if not ordered, just turn NAs into explicit levels.
-          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(!!rlang::sym(col),"(Missing)"))
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_na_value_to_level(!!rlang::sym(col), level="(Missing)"))
         }
       }
     }
