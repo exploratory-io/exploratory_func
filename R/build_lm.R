@@ -554,19 +554,27 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
         df[[col]] <- factor(df[[col]], ordered=FALSE)
       }
       # turn NA into (Missing) factor level. Without this, lm or glm drops rows internally.
-      df[[col]] <- forcats::fct_explicit_na(df[[col]])
+      if (any(is.na(df[[col]]))) {
+        df[[col]] <- forcats::fct_na_value_to_level(df[[col]], level = "(Missing)")
+      }
     } else if(is.logical(df[[col]])) {
       # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
       # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
       # For ranger, we need to convert logical to factor too since na.roughfix only works for numeric or factor.
-      df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
+      df[[col]] <- as.factor(df[[col]])
+      if (any(is.na(df[[col]]))) {
+        df[[col]] <- forcats::fct_na_value_to_level(df[[col]], level = "(Missing)")
+      }
     } else if(!is.numeric(df[[col]])) {
       # 1. convert data to factor if predictors are not numeric or logical
       #    and limit the number of levels in factor by fct_lump.
       #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
       #    TODO: see if ties.method would make sense for calc_feature_imp.
       # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
-      df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first", other_level=other_level))
+      df[[col]] <- forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first", other_level=other_level)
+      if (any(is.na(df[[col]]))) {
+        df[[col]] <- forcats::fct_na_value_to_level(df[[col]], level = "(Missing)")
+      }
     } else if(is.integer(df[[col]])) {
       # Convert integer to numeric. mmpf::marginalPrediction we use for partial dependence throws assertion error, if the data is integer and specified grid points are not integer.
       # To avoid something like that, we just convert integer to numeric before building predictive models.
