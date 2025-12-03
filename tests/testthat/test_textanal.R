@@ -57,9 +57,9 @@ test_that("exp_textanal", {
 
   model_df <- df %>% exp_textanal(text, stopwords_lang = "english", compound_tokens=c("Jack and jill"), stopwords_to_remove=c("And")) # Testing both lower and upper case for compound_token.
   res <- model_df %>% tidy_rowwise(model, type="word_count")
-  # Words are kept in lowercase (compound tokens are also lowercase)
-  expect_true("jack and jill" %in% res$word)
-  expect_true("and" %in% res$word) # Test stopwords_to_remove.
+  # Words are converted to title case for display
+  expect_true("Jack And Jill" %in% res$word)
+  expect_true("And" %in% res$word) # Test stopwords_to_remove - "and" is excluded from stopwords so it should appear.
   res <- model_df %>% tidy_rowwise(model, type="words")
   expect_equal(colnames(res), c("document", "word"))
   expect_equal(length(unique(res$document)), 4) # NA and empty string are skipped.
@@ -166,12 +166,12 @@ test_that("exp_textanal Pattern B2: word column with whitespace", {
     )
   )
 
-  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "english")
+  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "english", remove_numbers = FALSE)
   res <- model_df %>% tidy_rowwise(model, type="word_count")
-  # Words are kept in lowercase
-  expect_true("word1" %in% res$word)
-  expect_true("word2" %in% res$word)
-  expect_true("word5" %in% res$word)
+  # Words are converted to title case for display
+  expect_true("Word1" %in% res$word)
+  expect_true("Word2" %in% res$word)
+  expect_true("Word5" %in% res$word)
   expect_equal(length(unique(res$word)), 9) # All 9 words should be present
 })
 
@@ -186,11 +186,11 @@ test_that("exp_textanal Pattern B2: word column with empty strings and NA", {
     )
   )
 
-  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "english")
+  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "english", remove_numbers = FALSE)
   res <- model_df %>% tidy_rowwise(model, type="word_count")
-  # Words are kept in lowercase
-  expect_true("word1" %in% res$word)
-  expect_true("word3" %in% res$word)
+  # Words are converted to title case for display
+  expect_true("Word1" %in% res$word)
+  expect_true("Word3" %in% res$word)
 
   res <- model_df %>% tidy_rowwise(model, type="words")
   # Empty string and NA rows should be filtered out
@@ -234,17 +234,17 @@ test_that("exp_textanal Pattern B1: multiple rows per document_id", {
     word = c("word1, word2", "word3, word4", "word5")
   )
 
-  model_df <- df %>% exp_textanal(word = word, document_id = doc_id, stopwords_lang = "english")
+  model_df <- df %>% exp_textanal(word = word, document_id = doc_id, stopwords_lang = "english", remove_numbers = FALSE)
   res <- model_df %>% tidy_rowwise(model, type="words")
 
   # All words from document A should be present
-  # Words are kept in lowercase
+  # Words are converted to title case for display
   doc_a_words <- res %>% dplyr::filter(document == "A") %>% dplyr::pull(word)
-  expect_true("word1" %in% doc_a_words)
-  expect_true("word2" %in% doc_a_words)
-  expect_true("word3" %in% doc_a_words)
-  expect_true("word4" %in% doc_a_words)
-  expect_true("word5" %in% doc_a_words)
+  expect_true("Word1" %in% doc_a_words)
+  expect_true("Word2" %in% doc_a_words)
+  expect_true("Word3" %in% doc_a_words)
+  expect_true("Word4" %in% doc_a_words)
+  expect_true("Word5" %in% doc_a_words)
 })
 
 test_that("exp_textanal Pattern B: stopword removal", {
@@ -288,8 +288,8 @@ test_that("exp_textanal Pattern B: backward compatibility with Pattern A", {
 
   model_df <- df %>% exp_textanal(text = text, stopwords_lang = "english")
   res <- model_df %>% tidy_rowwise(model, type="word_count")
-  # Words are kept in lowercase (tokenize_with_postprocess lowercases them)
-  expect_true("jack" %in% res$word)
-  expect_true("jill" %in% res$word)
-  expect_true("hill" %in% res$word)
+  # Words are converted to title case for display
+  expect_true("Jack" %in% res$word)
+  expect_true("Jill" %in% res$word)
+  expect_true("Hill" %in% res$word)
 })

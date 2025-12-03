@@ -481,7 +481,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
       doc_names <- seq(length(tokens_list))
     }
     res <- tibble::tibble(document=doc_names, lst=tokens_list)
-    res <- res %>% tidyr::unnest_longer(lst, values_to = "word")
+    res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
   }
   if (type == "word_count" || type == "category_word_count") {
     feats <- quanteda::featfreq(x$dfm)
@@ -506,11 +506,12 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
         dplyr::rename(word = token, count=value) # Align output column names with the case without category_col.
       res <- res2 %>% dplyr::group_by(!!rlang::sym(x$category_col), word) %>% dplyr::summarize(count = sum(count))
     }
-    # Keep words in lowercase (as they are stored in the dfm)
+    res <- res %>% dplyr::mutate(word=stringr::str_to_title(word)) # Make it title case for displaying.
   }
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm) %>%
       dplyr::filter(token.x != token.y) %>%
+      dplyr::mutate(token.x = stringr::str_to_title(token.x), token.y = stringr::str_to_title(token.y)) %>%
       dplyr::rename(word.1 = token.x, word.2 = token.y, count=value)
     if (!is.null(max_word_pairs)) { # This means it is for bar chart.
       if (max_word_pairs < 100) {
@@ -533,7 +534,7 @@ get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_verte
   }
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% dplyr::rename(from=token.x,to=token.y) %>% filter(from!=to)
-  # Keep words in lowercase
+  edges <- edges %>% dplyr::mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
 
   edges <- edges %>% dplyr::mutate(width=log(value+1)) # +1 to avoid 0 width.
   # Re-scale the range from min(width) to max(width) into the range between min_edge_width and max_edge_width.
@@ -548,7 +549,7 @@ get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_verte
 
   # Prepare vertices data
   feat_names <- names(model_df$model[[1]]$feats_selected)
-  # Keep words in lowercase
+  feat_names <- stringr::str_to_title(feat_names)
   feat_counts <- model_df$model[[1]]$feats_selected
   names(feat_counts) <- NULL
   if (vertex_size_method == "equal_length") {
