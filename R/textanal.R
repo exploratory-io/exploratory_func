@@ -62,6 +62,20 @@ which.max.safe <- function(x) {
   if (length(y) == 0) 1 else y
 }
 
+# Helper function to parse comma-separated tokens from a character vector
+parse_comma_separated_tokens <- function(word_column) {
+  # Split by comma
+  tokens_list <- stringr::str_split(word_column, pattern = ",")
+  
+  # Trim whitespace and filter empty strings
+  tokens_list <- purrr::map(tokens_list, function(tokens) {
+    trimmed <- stringr::str_trim(tokens)
+    trimmed[trimmed != "" & !is.na(trimmed)]
+  })
+  
+  tokens_list
+}
+
 tokenize_with_postprocess <- function(text,
                                       remove_punct = TRUE, remove_numbers = TRUE,
                                       remove_alphabets = FALSE,
@@ -173,7 +187,9 @@ tokenize_with_postprocess <- function(text,
 
 #' Function for Text Analysis Analytics View
 #' @export
-exp_textanal <- function(df, text, category = NULL,
+exp_textanal <- function(df, text = NULL,
+                         word = NULL, document_id = NULL,
+                         category = NULL,
                          remove_punct = TRUE, remove_numbers = TRUE,
                          remove_alphabets = FALSE,
                          tokenize_tweets = FALSE,
@@ -187,35 +203,198 @@ exp_textanal <- function(df, text, category = NULL,
                          max_nrow = 5000,
                          seed = 1,
                          ...) {
-  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  text_col <- tidyselect::vars_select(names(df), !! rlang::enquo(text))
+  names(text_col) <- NULL # strip names that cause error in tidier
+  word_col <- tidyselect::vars_select(names(df), !! rlang::enquo(word))
+  document_id_col <- tidyselect::vars_select(names(df), !! rlang::enquo(document_id))
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
   if (length(category_col) == 0) { # It seems that when no category is specified, category_col becomes character(0).
     category_col <- NULL
   }
+
+  # Validation
+  if (length(text_col) == 0 && length(word_col) == 0) {
+    stop("Either 'text' or 'word' must be provided")
+  }
+  if (length(text_col) != 0 && length(word_col) != 0) {
+    stop("Cannot specify both 'text' and 'word' arguments")
+  }
+
+  # Set seed just once.
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
   each_func <- function(df) {
-    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
-    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+    if (length(text_col) != 0) {
+      # Pattern A: Existing tokenization logic
+      # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
 
-    if (!is.null(seed)) {
-      set.seed(seed)
-    }
-    # sample the data for performance if data size is too large.
-    sampled_nrow <- NULL
-    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
-      # Record that sampling happened.
-      sampled_nrow <- max_nrow
-      df <- df %>% sample_rows(max_nrow)
-    }
+      # sample the data for performance if data size is too large.
+      sampled_nrow <- NULL
+      if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+        # Record that sampling happened.
+        sampled_nrow <- max_nrow
+        df <- df %>% sample_rows(max_nrow)
+      }
 
-    tokens <- tokenize_with_postprocess(df[[text_col]],
-                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
-                                        remove_alphabets = remove_alphabets,
-                                        tokenize_tweets = tokenize_tweets,
-                                        remove_url = remove_url, remove_twitter = remove_twitter,
-                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
-                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
-                                        compound_tokens = compound_tokens)
+      tokens <- tokenize_with_postprocess(df[[text_col]],
+                                          remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                          remove_alphabets = remove_alphabets,
+                                          tokenize_tweets = tokenize_tweets,
+                                          remove_url = remove_url, remove_twitter = remove_twitter,
+                                          stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
+                                          hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                          compound_tokens = compound_tokens)
+    } else {
+      # Pattern B: Parse comma-separated tokens
+      if (length(document_id_col) != 0) {
+        # Pattern B1: document_id provided
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(word_col)))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(document_id_col)))
+
+        # sample the data for performance if data size is too large.
+        sampled_nrow <- NULL
+        if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+          # Record that sampling happened.
+          sampled_nrow <- max_nrow
+          df <- df %>% sample_rows(max_nrow)
+        }
+
+        # Parse comma-separated tokens
+        # Parse tokens and remove the original word column to avoid name conflict when unnesting
+        df <- df %>% dplyr::mutate(
+          tokens_parsed = parse_comma_separated_tokens(!!rlang::sym(word_col))
+        ) %>% dplyr::select(-!!rlang::sym(word_col))
+
+        # Expand to long format: one row per token
+        df_long <- df %>%
+          tidyr::unnest_longer(tokens_parsed, values_to = "word")
+
+        # Lowercase the word column for consistency with tokenization
+        df_long <- df_long %>% dplyr::mutate(word = stringr::str_to_lower(word))
+
+        # Group by Document
+        if (is.null(category_col)) {
+          df_grouped <- df_long %>% dplyr::group_by(!!rlang::sym(document_id_col)) %>%
+            dplyr::summarize(tokens = list(word), .groups = 'drop')
+        } else {
+          df_grouped <- df_long %>% dplyr::group_by(!!rlang::sym(document_id_col)) %>%
+            dplyr::summarize(
+              tokens = list(word),
+              !!rlang::sym(category_col) := first(!!rlang::sym(category_col)),
+              .groups = 'drop'
+            )
+        }
+
+        # Convert to quanteda tokens
+        names(df_grouped$tokens) <- df_grouped[[document_id_col]]
+        tokens <- quanteda::tokens(df_grouped$tokens)
+
+        # Preserve original df structure - get unique documents with their categories
+        if (is.null(category_col)) {
+          df <- df %>% dplyr::distinct(!!rlang::sym(document_id_col), .keep_all = TRUE) %>%
+            dplyr::select(!!rlang::sym(document_id_col))
+        } else {
+          df <- df %>% dplyr::distinct(!!rlang::sym(document_id_col), .keep_all = TRUE) %>%
+            dplyr::select(!!rlang::sym(document_id_col), !!rlang::sym(category_col))
+        }
+      } else {
+        # Pattern B2: document_id NOT provided, assign internally
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(word_col)))
+
+        # Assign row numbers as document IDs (before sampling)
+        df <- df %>% dplyr::mutate(.doc_id = row_number())
+        document_id_col <- ".doc_id"
+
+        # sample the data for performance if data size is too large.
+        sampled_nrow <- NULL
+        if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+          # Record that sampling happened.
+          sampled_nrow <- max_nrow
+          df <- df %>% sample_rows(max_nrow)
+          # Reassign doc_id after sampling
+          df <- df %>% dplyr::mutate(.doc_id = row_number())
+        }
+
+        # Parse comma-separated tokens
+        # Remove the original word column to avoid name conflict when unnesting
+        df <- df %>% dplyr::mutate(
+          tokens_parsed = parse_comma_separated_tokens(!!rlang::sym(word_col))
+        ) %>% dplyr::select(-!!rlang::sym(word_col))
+
+        # Expand to long format: one row per token
+        if (is.null(category_col)) {
+          df_long <- df %>%
+            tidyr::unnest_longer(tokens_parsed, values_to = "word") %>%
+            dplyr::select(.doc_id, word)
+        } else {
+          df_long <- df %>%
+            tidyr::unnest_longer(tokens_parsed, values_to = "word") %>%
+            dplyr::select(.doc_id, word, !!rlang::sym(category_col))
+        }
+
+        # Lowercase the word column for consistency with tokenization
+        df_long <- df_long %>% dplyr::mutate(word = stringr::str_to_lower(word))
+
+        # Group by Document
+        if (is.null(category_col)) {
+          df_grouped <- df_long %>% dplyr::group_by(.doc_id) %>%
+            dplyr::summarize(tokens = list(word), .groups = 'drop')
+        } else {
+          df_grouped <- df_long %>% dplyr::group_by(.doc_id) %>%
+            dplyr::summarize(
+              tokens = list(word),
+              !!rlang::sym(category_col) := first(!!rlang::sym(category_col)),
+              .groups = 'drop'
+            )
+        }
+
+        # Convert to quanteda tokens
+        names(df_grouped$tokens) <- df_grouped[[".doc_id"]]
+        tokens <- quanteda::tokens(df_grouped$tokens)
+
+        # Preserve original df structure - each row is a document
+        if (is.null(category_col)) {
+          df <- df %>% dplyr::select(.doc_id)
+        } else {
+          df <- df %>% dplyr::select(.doc_id, !!rlang::sym(category_col))
+        }
+      }
+    }
     # It is possible that character(0) is returned for document that did not have any tokens, but this still can be handled in subsequent process.
+
+    # Apply post-processing for Pattern B (Pattern A already has this in tokenize_with_postprocess)
+    if (length(text_col) == 0) {
+      # Pattern B: Apply stopword removal if needed
+      if (!is.null(stopwords_lang)) {
+        if (stopwords_lang == "auto") {
+          # For Pattern B, we can't auto-detect from text, so default to English
+          stopwords_lang <- "english"
+        }
+        stopwords <- stringr::str_to_lower(stopwords)
+        stopwords_to_remove <- stringr::str_to_lower(stopwords_to_remove)
+        stopwords_final <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords, exclude = stopwords_to_remove)
+        tokens <- tokens %>% quanteda::tokens_remove(stopwords_final, valuetype = "fixed")
+      }
+
+      # Remove numbers if needed
+      if (remove_numbers) {
+        if (remove_alphabets) {
+          tokens <- tokens %>% quanteda::tokens_remove("^[a-zA-Z0-9\uff10-\uff19]+$", valuetype = "regex")
+        } else {
+          tokens <- tokens %>% quanteda::tokens_remove("^[0-9\uff10-\uff19]+$", valuetype = "regex")
+        }
+      } else if (remove_alphabets) {
+        tokens <- tokens %>% quanteda::tokens_remove("^[a-zA-Z]+$", valuetype = "regex")
+      }
+
+      # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
+      if (hiragana_word_length_to_remove > 0) {
+        tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
+      }
+    }
 
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
@@ -295,8 +474,14 @@ fcm_to_df <- function(fcm) {
 #' @param type - Type of output.
 tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, ...) {
   if (type == "words") {
-    res <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
-    res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
+    tokens_list <- as.list(x$tokens)
+    # Use actual document names from tokens if available, otherwise use sequential numbers
+    doc_names <- quanteda::docnames(x$tokens)
+    if (length(doc_names) == 0 || all(doc_names == "")) {
+      doc_names <- seq(length(tokens_list))
+    }
+    res <- tibble::tibble(document=doc_names, lst=tokens_list)
+    res <- res %>% tidyr::unnest_longer(lst, values_to = "word")
   }
   if (type == "word_count" || type == "category_word_count") {
     feats <- quanteda::featfreq(x$dfm)
@@ -321,12 +506,11 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
         dplyr::rename(word = token, count=value) # Align output column names with the case without category_col.
       res <- res2 %>% dplyr::group_by(!!rlang::sym(x$category_col), word) %>% dplyr::summarize(count = sum(count))
     }
-    res <- res %>% dplyr::mutate(word=stringr::str_to_title(word)) # Make it title case for displaying.
+    # Keep words in lowercase (as they are stored in the dfm)
   }
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm) %>%
       dplyr::filter(token.x != token.y) %>%
-      dplyr::mutate(token.x = stringr::str_to_title(token.x), token.y = stringr::str_to_title(token.y)) %>%
       dplyr::rename(word.1 = token.x, word.2 = token.y, count=value)
     if (!is.null(max_word_pairs)) { # This means it is for bar chart.
       if (max_word_pairs < 100) {
@@ -349,7 +533,7 @@ get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_verte
   }
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% dplyr::rename(from=token.x,to=token.y) %>% filter(from!=to)
-  edges <- edges %>% dplyr::mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
+  # Keep words in lowercase
 
   edges <- edges %>% dplyr::mutate(width=log(value+1)) # +1 to avoid 0 width.
   # Re-scale the range from min(width) to max(width) into the range between min_edge_width and max_edge_width.
@@ -364,7 +548,7 @@ get_cooccurrence_graph_data <- function(model_df, min_vertex_size = 4, max_verte
 
   # Prepare vertices data
   feat_names <- names(model_df$model[[1]]$feats_selected)
-  feat_names <- stringr::str_to_title(feat_names)
+  # Keep words in lowercase
   feat_counts <- model_df$model[[1]]$feats_selected
   names(feat_counts) <- NULL
   if (vertex_size_method == "equal_length") {
@@ -598,7 +782,7 @@ exp_topic_model <- function(df, text = NULL,
   }
 
   each_func <- function(df) {
-    if (length(text_col) != 0) { # This means text was NULL
+    if (length(text_col) != 0) { # This means text was note NULL
       # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
 
