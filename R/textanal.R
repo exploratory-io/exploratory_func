@@ -378,6 +378,25 @@ exp_textanal <- function(df, text = NULL,
         tokens <- tokens %>% quanteda::tokens_remove(stopwords_final, valuetype = "fixed")
       }
 
+      # Remove URLs if needed
+      if (remove_url) {
+        # URL pattern from str_remove_url function
+        url_pattern <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+        tokens <- tokens %>% quanteda::tokens_remove(url_pattern, valuetype = "regex")
+      }
+
+      # Remove Twitter tags if needed
+      if (remove_twitter) {
+        # Remove twitter social tags with the same regex as in tokenize_with_postprocess
+        tokens <- tokens %>% quanteda::tokens_remove("^#[A-Za-z]+\\w*|^@\\w+", valuetype = "regex")
+      }
+
+      # Remove punctuation-only tokens if needed
+      if (remove_punct) {
+        # Remove tokens that consist entirely of punctuation characters
+        tokens <- tokens %>% quanteda::tokens_remove("^[[:punct:]]+$", valuetype = "regex")
+      }
+
       # Remove numbers if needed
       if (remove_numbers) {
         if (remove_alphabets) {

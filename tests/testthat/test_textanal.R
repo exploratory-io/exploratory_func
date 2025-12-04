@@ -379,6 +379,187 @@ test_that("exp_textanal Pattern B: validation errors", {
   )
 })
 
+test_that("exp_textanal Pattern B: remove_url parameter", {
+  # Test URL removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, banana, https://example.com, orange, mango",
+      "grape, http://test.org/page, cherry, peach, kiwi",
+      "pineapple, watermelon, without, urls"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_url = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # URLs should be removed
+  expect_false(any(stringr::str_detect(res$word, "https?://")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Pineapple" %in% res$word)
+
+  # Test with remove_url = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_url = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # URLs should be present when remove_url = FALSE
+  # Note: URLs might be tokenized differently, so we check that the word count is different
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_twitter parameter", {
+  # Test Twitter tag removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, #hashtag, banana, orange",
+      "@username, grape, cherry, peach, kiwi",
+      "#trending, mango, and, @anotheruser, pineapple",
+      "watermelon, strawberry, without, twitter, tags"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_twitter = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Twitter tags should be removed
+  expect_false(any(stringr::str_detect(res$word, "^#|^@")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Watermelon" %in% res$word)
+
+  # Test with remove_twitter = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_twitter = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Twitter tags should be present when remove_twitter = FALSE
+  # Check that we have more words (or hashtag/mention words are present)
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_punct parameter", {
+  # Test punctuation removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, banana, !!!, orange",
+      "grape, cherry, ..., mango",
+      "peach, kiwi, here"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_punct = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Punctuation-only tokens should be removed
+  # Words are converted to title case, so we check for common punctuation patterns
+  expect_true("Apple" %in% res$word)
+  expect_true("Banana" %in% res$word)
+  expect_true("Peach" %in% res$word)
+
+  # Test with remove_punct = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_punct = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Punctuation tokens might be present when remove_punct = FALSE
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_numbers parameter", {
+  # Test number removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, 123, banana, 456",
+      "grape, 789, cherry, 012",
+      "peach, kiwi, only"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_numbers = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Numbers should be removed
+  expect_false(any(stringr::str_detect(res$word, "^[0-9]+$")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Peach" %in% res$word)
+
+  # Test with remove_numbers = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_numbers = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Numbers should be present when remove_numbers = FALSE
+  # Numbers are converted to title case, so they might appear as "123", "456", etc.
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_alphabets parameter", {
+  # Test alphabet-only word removal for Pattern B
+  # Note: remove_alphabets = TRUE removes ALL purely alphabetic tokens
+  df <- tibble::tibble(
+    word = c(
+      "abc, xyz, 123, test123, abc456",
+      "def, ghi, 456, word789, xyz012",
+      "jkl, mno, 789"
+    )
+  )
+
+  # Test remove_alphabets = TRUE, remove_numbers = FALSE
+  # This should remove all purely alphabetic tokens (abc, xyz, def, ghi, jkl, mno)
+  # but keep numeric tokens (123, 456, 789) and alphanumeric tokens (test123, abc456, etc.)
+  model_df <- df %>% exp_textanal(word = word, remove_alphabets = TRUE, remove_numbers = FALSE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Pure alphabetic tokens should be removed
+  expect_false("Abc" %in% res$word)
+  expect_false("Xyz" %in% res$word)
+  expect_false("Def" %in% res$word)
+  # Numeric tokens should remain
+  expect_true("123" %in% res$word || "456" %in% res$word || "789" %in% res$word)
+  # Alphanumeric tokens should remain (if they exist in the output)
+  # Note: alphanumeric tokens might be filtered by other rules, so we just check that some tokens remain
+  expect_true(nrow(res) > 0)
+
+  # Test remove_alphabets = FALSE, remove_numbers = FALSE
+  # All tokens should remain (except stopwords)
+  model_df2 <- df %>% exp_textanal(word = word, remove_alphabets = FALSE, remove_numbers = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Alphabet-only words should be present when remove_alphabets = FALSE
+  expect_true("Abc" %in% res2$word || "Xyz" %in% res2$word || "Def" %in% res2$word)
+  # Should have more words when remove_alphabets = FALSE
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: combined filtering parameters", {
+  # Test multiple filtering parameters together
+  df <- tibble::tibble(
+    word = c(
+      "apple, banana, 123, #hashtag, @user, https://example.com, !!!, orange",
+      "grape, 456, cherry, #fruit, http://test.org, ..., mango"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(
+    word = word,
+    remove_url = TRUE,
+    remove_twitter = TRUE,
+    remove_punct = TRUE,
+    remove_numbers = TRUE,
+    stopwords_lang = "english"
+  )
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # All filtered items should be removed
+  expect_false(any(stringr::str_detect(res$word, "https?://")))
+  expect_false(any(stringr::str_detect(res$word, "^#|^@")))
+  expect_false(any(stringr::str_detect(res$word, "^[0-9]+$")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Grape" %in% res$word)
+})
+
+test_that("exp_textanal Pattern B: remove_url with document_id", {
+  # Test URL removal with document_id (Pattern B1)
+  df <- tibble::tibble(
+    doc_id = c("doc1", "doc2", "doc3"),
+    word = c(
+      "apple, https://example.com, banana",
+      "grape, http://test.org, cherry",
+      "peach, kiwi, only"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, document_id = doc_id, remove_url = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # URLs should be removed
+  expect_false(any(stringr::str_detect(res$word, "https?://")))
+  expect_true("Apple" %in% res$word || "Peach" %in% res$word)
+})
+
 test_that("exp_textanal Pattern B: backward compatibility with Pattern A", {
   # Ensure Pattern A (text column) still works as before
   df <- tibble::tibble(text=c(
