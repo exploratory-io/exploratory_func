@@ -782,7 +782,7 @@ exp_topic_model <- function(df, text = NULL,
   }
 
   each_func <- function(df) {
-    if (length(text_col) != 0) { # This means text was note NULL
+    if (length(text_col) != 0) { # This means text was not NULL
       # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
 
