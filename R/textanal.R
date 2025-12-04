@@ -262,6 +262,9 @@ exp_textanal <- function(df, text = NULL,
           df <- df %>% sample_rows(max_nrow)
         }
 
+        # Save original df before removing word column (to restore it later in model$df)
+        df_original <- df
+        
         # Parse comma-separated tokens
         # Parse tokens and remove the original word column to avoid name conflict when unnesting
         df <- df %>% dplyr::mutate(
@@ -292,14 +295,10 @@ exp_textanal <- function(df, text = NULL,
         names(df_grouped$tokens) <- df_grouped[[document_id_col]]
         tokens <- quanteda::tokens(df_grouped$tokens)
 
-        # Preserve original df structure - get unique documents with their categories
-        if (is.null(category_col)) {
-          df <- df %>% dplyr::distinct(!!rlang::sym(document_id_col), .keep_all = TRUE) %>%
-            dplyr::select(!!rlang::sym(document_id_col))
-        } else {
-          df <- df %>% dplyr::distinct(!!rlang::sym(document_id_col), .keep_all = TRUE) %>%
-            dplyr::select(!!rlang::sym(document_id_col), !!rlang::sym(category_col))
-        }
+        # Preserve original df structure - get unique documents with all their columns
+        # Use the saved original df to restore all columns including the word column
+        df <- df_original %>%
+          dplyr::distinct(!!rlang::sym(document_id_col), .keep_all = TRUE)
       } else {
         # Pattern B2: document_id NOT provided, assign internally
         df <- df %>% dplyr::filter(!is.na(!!rlang::sym(word_col)))
@@ -318,6 +317,9 @@ exp_textanal <- function(df, text = NULL,
           df <- df %>% dplyr::mutate(.doc_id = row_number())
         }
 
+        # Save original df before removing word column (to restore it later in model$df)
+        df_original <- df
+        
         # Parse comma-separated tokens
         # Remove the original word column to avoid name conflict when unnesting
         df <- df %>% dplyr::mutate(
@@ -355,12 +357,9 @@ exp_textanal <- function(df, text = NULL,
         names(df_grouped$tokens) <- df_grouped[[".doc_id"]]
         tokens <- quanteda::tokens(df_grouped$tokens)
 
-        # Preserve original df structure - each row is a document
-        if (is.null(category_col)) {
-          df <- df %>% dplyr::select(.doc_id)
-        } else {
-          df <- df %>% dplyr::select(.doc_id, !!rlang::sym(category_col))
-        }
+        # Preserve original df structure - each row is a document with all columns
+        # Use the saved original df to restore all columns including the word column
+        df <- df_original
       }
     }
     # It is possible that character(0) is returned for document that did not have any tokens, but this still can be handled in subsequent process.

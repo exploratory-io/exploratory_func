@@ -119,6 +119,106 @@ test_that("exp_get_top5_sentences_for_cluster", {
   expect_equal(df$`よりよくするための提案`[[3]], c("特にはないですが、もっとアップデート内容を聞きたかったです！ みなさんの発表も参考になりました。"))
 })
 
+test_that("exp_textanal with word column and clustering", {
+  # Create test data with pre-tokenized words (comma-separated)
+  df <- tibble::tibble(
+    doc_id = c("doc1", "doc2", "doc3", "doc4", "doc5", "doc6", "doc7", "doc8"),
+    word_tokens = c(
+      "データ,分析,可視化,ツール",
+      "機械,学習,モデル,精度,向上",
+      "データ,クレンジング,前処理",
+      "予測,モデル,精度,検証",
+      "可視化,グラフ,チャート",
+      "機械,学習,アルゴリズム,選択",
+      "データ,サイエンス,分析",
+      "モデル,評価,精度,改善"
+    )
+  )
+
+  # Test exp_textanal with word argument
+  model_df <- df %>% exp_textanal(word = word_tokens, document_id = doc_id, stopwords_lang = "japanese")
+
+  # Test that we can get cooccurrence graph data with clustering
+  cluster_keywords_df <- model_df %>%
+    get_cooccurrence_graph_data(
+      max_vertex_size=20,
+      vertex_size_method='equal_length',
+      vertex_opacity=0.6,
+      max_edge_width=8,
+      min_edge_width=1,
+      edge_color='#4A90E2',
+      font_size_ratio=1.2,
+      area_factor=50,
+      cluster_method='louvain') %>%
+    (function(df) { df$model[[1]]$vertices })
+
+  # Check that clustering was performed
+  expect_true("cluster" %in% colnames(cluster_keywords_df))
+  expect_true(nrow(cluster_keywords_df) > 0)
+
+  # Test various tidy outputs
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  expect_true("データ" %in% res$word)
+  expect_true("モデル" %in% res$word)
+  expect_true("精度" %in% res$word)
+
+  res <- model_df %>% tidy_rowwise(model, type="words")
+  expect_equal(colnames(res), c("document", "word"))
+  expect_equal(length(unique(res$document)), 8) # Eight documents
+
+  res <- model_df %>% tidy_rowwise(model, type="word_pairs")
+  expect_true(nrow(res) > 0) # Should have word pairs
+})
+
+test_that("exp_textanal with word column preserves original dataframe columns", {
+  # Test Pattern B1: with document_id
+  df <- tibble::tibble(
+    doc_id = c("doc1", "doc2", "doc3"),
+    category = c("cat1", "cat2", "cat1"),
+    extra_col = c("extra1", "extra2", "extra3"),
+    metadata = c(100, 200, 300),
+    word_tokens = c(
+      "データ,分析,可視化",
+      "機械,学習,モデル",
+      "データ,クレンジング,前処理"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word_tokens, document_id = doc_id, category = category, stopwords_lang = "japanese")
+
+  # Check that model$df preserves all original columns
+  result_df <- model_df$model[[1]]$df
+  expect_true("doc_id" %in% colnames(result_df))
+  expect_true("category" %in% colnames(result_df))
+  expect_true("extra_col" %in% colnames(result_df))
+  expect_true("metadata" %in% colnames(result_df))
+  expect_true("word_tokens" %in% colnames(result_df)) # word column should be preserved
+  expect_false("tokens_parsed" %in% colnames(result_df)) # temporary column should be removed
+  expect_equal(nrow(result_df), 3)
+
+  # Test Pattern B2: without document_id
+  df2 <- tibble::tibble(
+    reason = c("理由1", "理由2", "理由3"),
+    score = c(5, 4, 3),
+    word_tokens = c(
+      "データ,分析,可視化",
+      "機械,学習,モデル",
+      "データ,クレンジング,前処理"
+    )
+  )
+
+  model_df2 <- df2 %>% exp_textanal(word = word_tokens, stopwords_lang = "japanese")
+
+  # Check that model$df preserves all original columns including word_tokens
+  result_df2 <- model_df2$model[[1]]$df
+  expect_true(".doc_id" %in% colnames(result_df2)) # .doc_id is added
+  expect_true("reason" %in% colnames(result_df2))
+  expect_true("score" %in% colnames(result_df2))
+  expect_true("word_tokens" %in% colnames(result_df2)) # word column should be preserved
+  expect_false("tokens_parsed" %in% colnames(result_df2)) # temporary column should be removed
+  expect_equal(nrow(result_df2), 3)
+})
+
 test_that("exp_get_top5_sentences_for_cluster: English", {
   df <- exp_get_top5_sentences_for_cluster(Survey_English_raw, Word_Size_Cluster, "what would it be? (Multiple answers are acceptable)")
   expect_equal(nrow(df), 30)
