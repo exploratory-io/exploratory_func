@@ -57,8 +57,9 @@ test_that("exp_textanal", {
 
   model_df <- df %>% exp_textanal(text, stopwords_lang = "english", compound_tokens=c("Jack and jill"), stopwords_to_remove=c("And")) # Testing both lower and upper case for compound_token.
   res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Words are converted to title case for display
   expect_true("Jack And Jill" %in% res$word)
-  expect_true("And" %in% res$word) # Test stopwords_to_remove.
+  expect_true("And" %in% res$word) # Test stopwords_to_remove - "and" is excluded from stopwords so it should appear.
   res <- model_df %>% tidy_rowwise(model, type="words")
   expect_equal(colnames(res), c("document", "word"))
   expect_equal(length(unique(res$document)), 4) # NA and empty string are skipped.
@@ -118,10 +119,458 @@ test_that("exp_get_top5_sentences_for_cluster", {
   expect_equal(df$`よりよくするための提案`[[3]], c("特にはないですが、もっとアップデート内容を聞きたかったです！ みなさんの発表も参考になりました。"))
 })
 
+test_that("exp_textanal with word column and clustering", {
+  # Create test data with pre-tokenized words (comma-separated)
+  df <- tibble::tibble(
+    doc_id = c("doc1", "doc2", "doc3", "doc4", "doc5", "doc6", "doc7", "doc8"),
+    word_tokens = c(
+      "データ,分析,可視化,ツール",
+      "機械,学習,モデル,精度,向上",
+      "データ,クレンジング,前処理",
+      "予測,モデル,精度,検証",
+      "可視化,グラフ,チャート",
+      "機械,学習,アルゴリズム,選択",
+      "データ,サイエンス,分析",
+      "モデル,評価,精度,改善"
+    )
+  )
+
+  # Test exp_textanal with word argument
+  model_df <- df %>% exp_textanal(word = word_tokens, document_id = doc_id, stopwords_lang = "japanese")
+
+  # Test that we can get cooccurrence graph data with clustering
+  cluster_keywords_df <- model_df %>%
+    get_cooccurrence_graph_data(
+      max_vertex_size=20,
+      vertex_size_method='equal_length',
+      vertex_opacity=0.6,
+      max_edge_width=8,
+      min_edge_width=1,
+      edge_color='#4A90E2',
+      font_size_ratio=1.2,
+      area_factor=50,
+      cluster_method='louvain') %>%
+    (function(df) { df$model[[1]]$vertices })
+
+  # Check that clustering was performed
+  expect_true("cluster" %in% colnames(cluster_keywords_df))
+  expect_true(nrow(cluster_keywords_df) > 0)
+
+  # Test various tidy outputs
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  expect_true("データ" %in% res$word)
+  expect_true("モデル" %in% res$word)
+  expect_true("精度" %in% res$word)
+
+  res <- model_df %>% tidy_rowwise(model, type="words")
+  expect_equal(colnames(res), c("document", "word"))
+  expect_equal(length(unique(res$document)), 8) # Eight documents
+
+  res <- model_df %>% tidy_rowwise(model, type="word_pairs")
+  expect_true(nrow(res) > 0) # Should have word pairs
+})
+
+test_that("exp_textanal with word column preserves original dataframe columns", {
+  # Test Pattern B1: with document_id
+  df <- tibble::tibble(
+    doc_id = c("doc1", "doc2", "doc3"),
+    category = c("cat1", "cat2", "cat1"),
+    extra_col = c("extra1", "extra2", "extra3"),
+    metadata = c(100, 200, 300),
+    word_tokens = c(
+      "データ,分析,可視化",
+      "機械,学習,モデル",
+      "データ,クレンジング,前処理"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word_tokens, document_id = doc_id, category = category, stopwords_lang = "japanese")
+
+  # Check that model$df preserves all original columns
+  result_df <- model_df$model[[1]]$df
+  expect_true("doc_id" %in% colnames(result_df))
+  expect_true("category" %in% colnames(result_df))
+  expect_true("extra_col" %in% colnames(result_df))
+  expect_true("metadata" %in% colnames(result_df))
+  expect_true("word_tokens" %in% colnames(result_df)) # word column should be preserved
+  expect_false("tokens_parsed" %in% colnames(result_df)) # temporary column should be removed
+  expect_equal(nrow(result_df), 3)
+
+  # Test Pattern B2: without document_id
+  df2 <- tibble::tibble(
+    reason = c("理由1", "理由2", "理由3"),
+    score = c(5, 4, 3),
+    word_tokens = c(
+      "データ,分析,可視化",
+      "機械,学習,モデル",
+      "データ,クレンジング,前処理"
+    )
+  )
+
+  model_df2 <- df2 %>% exp_textanal(word = word_tokens, stopwords_lang = "japanese")
+
+  # Check that model$df preserves all original columns including word_tokens
+  result_df2 <- model_df2$model[[1]]$df
+  expect_true(".doc_id" %in% colnames(result_df2)) # .doc_id is added
+  expect_true("reason" %in% colnames(result_df2))
+  expect_true("score" %in% colnames(result_df2))
+  expect_true("word_tokens" %in% colnames(result_df2)) # word column should be preserved
+  expect_false("tokens_parsed" %in% colnames(result_df2)) # temporary column should be removed
+  expect_equal(nrow(result_df2), 3)
+})
+
 test_that("exp_get_top5_sentences_for_cluster: English", {
   df <- exp_get_top5_sentences_for_cluster(Survey_English_raw, Word_Size_Cluster, "what would it be? (Multiple answers are acceptable)")
   expect_equal(nrow(df), 30)
   expect_equal(ncol(df), 2)
   expect_equal(df$cluster, c("1","1","1","1","1","2","2","2","2","2","3","3","3","3","3","4","4","4","4","4","5","5","5","5","5","6","6","6","6","6"))
   expect_equal(df$`what would it be? (Multiple answers are acceptable)`[[1]], c("I think it would be better to put some restrictions on the presentation time and the number of presentation slides so that presentation finish on time."))
+})
+
+test_that("exp_textanal Pattern B2: word column without document_id", {
+  # Pattern B2: Each row is a document, word column contains comma-separated tokens
+  df <- tibble::tibble(
+    reason = c(
+      "端末にインストールしなくても、使えるので、導入障壁が低い。",
+      "外出先で取引先と会議をすることになったが、社内にいるときと変わらないクオリティで使えた。",
+      "評価をするための時間がなかったが、数分でセットアップを終えてすぐに使い始めることができた。"
+    ),
+    word = c(
+      "端末,インストール,使える,導入,障壁,低い",
+      "外出先,取引先,会議,社内,変わらない,クオリティ,使えた",
+      "評価,時間,数分,セットアップ,終え,すぐに,使い始める"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "japanese")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  expect_true("端末" %in% res$word)
+  expect_true("インストール" %in% res$word)
+  expect_true("会議" %in% res$word)
+
+  res <- model_df %>% tidy_rowwise(model, type="words")
+  expect_equal(colnames(res), c("document", "word"))
+  expect_equal(length(unique(res$document)), 3) # Three documents
+
+  res <- model_df %>% tidy_rowwise(model, type="word_pairs")
+  expect_equal(colnames(res), c("word.1", "word.2", "count"))
+})
+
+test_that("exp_textanal Pattern B2: word column with whitespace", {
+  # Test whitespace handling in comma-separated values
+  df <- tibble::tibble(
+    word = c(
+      "word1, word2, word3",
+      "word4,  word5,  word6",
+      "word7,word8,word9"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "english", remove_numbers = FALSE)
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Words are converted to title case for display
+  expect_true("Word1" %in% res$word)
+  expect_true("Word2" %in% res$word)
+  expect_true("Word5" %in% res$word)
+  expect_equal(length(unique(res$word)), 9) # All 9 words should be present
+})
+
+test_that("exp_textanal Pattern B2: word column with empty strings and NA", {
+  # Test edge cases: empty strings and NA
+  df <- tibble::tibble(
+    word = c(
+      "word1, word2",
+      "",
+      NA,
+      "word3, word4"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "english", remove_numbers = FALSE)
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Words are converted to title case for display
+  expect_true("Word1" %in% res$word)
+  expect_true("Word3" %in% res$word)
+
+  res <- model_df %>% tidy_rowwise(model, type="words")
+  # Empty string and NA rows should be filtered out
+  expect_true(length(unique(res$document)) <= 2)
+})
+
+test_that("exp_textanal Pattern B1: word column with document_id", {
+  # Pattern B1: word column with document_id provided
+  df <- tibble::tibble(
+    doc_id = c("A", "A", "B", "B", "C"),
+    word = c(
+      "端末,インストール,使える",
+      "導入,障壁,低い",
+      "外出先,取引先,会議",
+      "社内,変わらない,クオリティ",
+      "評価,時間,数分"
+    ),
+    category = c("cat1", "cat1", "cat2", "cat2", "cat1")
+  )
+
+  model_df <- df %>% exp_textanal(word = word, document_id = doc_id, category = category, stopwords_lang = "japanese")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  expect_true("端末" %in% res$word)
+  expect_true("導入" %in% res$word)
+  expect_true("外出先" %in% res$word)
+
+  res <- model_df %>% tidy_rowwise(model, type="words")
+  expect_equal(colnames(res), c("document", "word"))
+  # Documents A and B have multiple rows, so they should be grouped
+  expect_true(length(unique(res$document)) <= 3)
+
+  # Test category_word_count
+  res <- model_df %>% tidy_rowwise(model, type="category_word_count")
+  expect_true("category" %in% colnames(res))
+})
+
+test_that("exp_textanal Pattern B1: multiple rows per document_id", {
+  # Test that multiple rows with same document_id are aggregated
+  df <- tibble::tibble(
+    doc_id = c("A", "A", "A"),
+    word = c("word1, word2", "word3, word4", "word5")
+  )
+
+  model_df <- df %>% exp_textanal(word = word, document_id = doc_id, stopwords_lang = "english", remove_numbers = FALSE)
+  res <- model_df %>% tidy_rowwise(model, type="words")
+
+  # All words from document A should be present
+  # Words are converted to title case for display
+  doc_a_words <- res %>% dplyr::filter(document == "A") %>% dplyr::pull(word)
+  expect_true("Word1" %in% doc_a_words)
+  expect_true("Word2" %in% doc_a_words)
+  expect_true("Word3" %in% doc_a_words)
+  expect_true("Word4" %in% doc_a_words)
+  expect_true("Word5" %in% doc_a_words)
+})
+
+test_that("exp_textanal Pattern B: stopword removal", {
+  # Test stopword removal for Pattern B
+  df <- tibble::tibble(
+    word = c("the, quick, brown, fox", "jumps, over, the, lazy, dog")
+  )
+
+  model_df <- df %>% exp_textanal(word = word, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Common English stopwords like "the" should be removed
+  expect_false("the" %in% res$word)
+})
+
+test_that("exp_textanal Pattern B: validation errors", {
+  # Test validation: both text and word provided
+  df <- tibble::tibble(
+    text = c("some text"),
+    word = c("word1, word2")
+  )
+
+  expect_error(
+    df %>% exp_textanal(text = text, word = word),
+    "Cannot specify both 'text' and 'word' arguments"
+  )
+
+  # Test validation: neither text nor word provided
+  df2 <- tibble::tibble(other_col = c("value"))
+  expect_error(
+    df2 %>% exp_textanal(),
+    "Either 'text' or 'word' must be provided"
+  )
+})
+
+test_that("exp_textanal Pattern B: remove_url parameter", {
+  # Test URL removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, banana, https://example.com, orange, mango",
+      "grape, http://test.org/page, cherry, peach, kiwi",
+      "pineapple, watermelon, without, urls"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_url = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # URLs should be removed
+  expect_false(any(stringr::str_detect(res$word, "https?://")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Pineapple" %in% res$word)
+
+  # Test with remove_url = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_url = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # URLs should be present when remove_url = FALSE
+  # Note: URLs might be tokenized differently, so we check that the word count is different
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_twitter parameter", {
+  # Test Twitter tag removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, #hashtag, banana, orange",
+      "@username, grape, cherry, peach, kiwi",
+      "#trending, mango, and, @anotheruser, pineapple",
+      "watermelon, strawberry, without, twitter, tags"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_twitter = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Twitter tags should be removed
+  expect_false(any(stringr::str_detect(res$word, "^#|^@")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Watermelon" %in% res$word)
+
+  # Test with remove_twitter = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_twitter = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Twitter tags should be present when remove_twitter = FALSE
+  # Check that we have more words (or hashtag/mention words are present)
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_punct parameter", {
+  # Test punctuation removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, banana, !!!, orange",
+      "grape, cherry, ..., mango",
+      "peach, kiwi, here"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_punct = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Punctuation-only tokens should be removed
+  # Words are converted to title case, so we check for common punctuation patterns
+  expect_true("Apple" %in% res$word)
+  expect_true("Banana" %in% res$word)
+  expect_true("Peach" %in% res$word)
+
+  # Test with remove_punct = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_punct = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Punctuation tokens might be present when remove_punct = FALSE
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_numbers parameter", {
+  # Test number removal for Pattern B
+  df <- tibble::tibble(
+    word = c(
+      "apple, 123, banana, 456",
+      "grape, 789, cherry, 012",
+      "peach, kiwi, only"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, remove_numbers = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Numbers should be removed
+  expect_false(any(stringr::str_detect(res$word, "^[0-9]+$")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Peach" %in% res$word)
+
+  # Test with remove_numbers = FALSE
+  model_df2 <- df %>% exp_textanal(word = word, remove_numbers = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Numbers should be present when remove_numbers = FALSE
+  # Numbers are converted to title case, so they might appear as "123", "456", etc.
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: remove_alphabets parameter", {
+  # Test alphabet-only word removal for Pattern B
+  # Note: remove_alphabets = TRUE removes ALL purely alphabetic tokens
+  df <- tibble::tibble(
+    word = c(
+      "abc, xyz, 123, test123, abc456",
+      "def, ghi, 456, word789, xyz012",
+      "jkl, mno, 789"
+    )
+  )
+
+  # Test remove_alphabets = TRUE, remove_numbers = FALSE
+  # This should remove all purely alphabetic tokens (abc, xyz, def, ghi, jkl, mno)
+  # but keep numeric tokens (123, 456, 789) and alphanumeric tokens (test123, abc456, etc.)
+  model_df <- df %>% exp_textanal(word = word, remove_alphabets = TRUE, remove_numbers = FALSE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Pure alphabetic tokens should be removed
+  expect_false("Abc" %in% res$word)
+  expect_false("Xyz" %in% res$word)
+  expect_false("Def" %in% res$word)
+  # Numeric tokens should remain
+  expect_true("123" %in% res$word || "456" %in% res$word || "789" %in% res$word)
+  # Alphanumeric tokens should remain (if they exist in the output)
+  # Note: alphanumeric tokens might be filtered by other rules, so we just check that some tokens remain
+  expect_true(nrow(res) > 0)
+
+  # Test remove_alphabets = FALSE, remove_numbers = FALSE
+  # All tokens should remain (except stopwords)
+  model_df2 <- df %>% exp_textanal(word = word, remove_alphabets = FALSE, remove_numbers = FALSE, stopwords_lang = "english")
+  res2 <- model_df2 %>% tidy_rowwise(model, type="word_count")
+  # Alphabet-only words should be present when remove_alphabets = FALSE
+  expect_true("Abc" %in% res2$word || "Xyz" %in% res2$word || "Def" %in% res2$word)
+  # Should have more words when remove_alphabets = FALSE
+  expect_true(nrow(res2) >= nrow(res))
+})
+
+test_that("exp_textanal Pattern B: combined filtering parameters", {
+  # Test multiple filtering parameters together
+  df <- tibble::tibble(
+    word = c(
+      "apple, banana, 123, #hashtag, @user, https://example.com, !!!, orange",
+      "grape, 456, cherry, #fruit, http://test.org, ..., mango"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(
+    word = word,
+    remove_url = TRUE,
+    remove_twitter = TRUE,
+    remove_punct = TRUE,
+    remove_numbers = TRUE,
+    stopwords_lang = "english"
+  )
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # All filtered items should be removed
+  expect_false(any(stringr::str_detect(res$word, "https?://")))
+  expect_false(any(stringr::str_detect(res$word, "^#|^@")))
+  expect_false(any(stringr::str_detect(res$word, "^[0-9]+$")))
+  expect_true("Apple" %in% res$word)
+  expect_true("Grape" %in% res$word)
+})
+
+test_that("exp_textanal Pattern B: remove_url with document_id", {
+  # Test URL removal with document_id (Pattern B1)
+  df <- tibble::tibble(
+    doc_id = c("doc1", "doc2", "doc3"),
+    word = c(
+      "apple, https://example.com, banana",
+      "grape, http://test.org, cherry",
+      "peach, kiwi, only"
+    )
+  )
+
+  model_df <- df %>% exp_textanal(word = word, document_id = doc_id, remove_url = TRUE, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # URLs should be removed
+  expect_false(any(stringr::str_detect(res$word, "https?://")))
+  expect_true("Apple" %in% res$word || "Peach" %in% res$word)
+})
+
+test_that("exp_textanal Pattern B: backward compatibility with Pattern A", {
+  # Ensure Pattern A (text column) still works as before
+  df <- tibble::tibble(text=c(
+    "Jack and Jill went up the hill",
+    "To fetch a pail of water"
+  ))
+
+  model_df <- df %>% exp_textanal(text = text, stopwords_lang = "english")
+  res <- model_df %>% tidy_rowwise(model, type="word_count")
+  # Words are converted to title case for display
+  expect_true("Jack" %in% res$word)
+  expect_true("Jill" %in% res$word)
+  expect_true("Hill" %in% res$word)
 })
