@@ -251,6 +251,13 @@ gcs_list_objects_fixed <- function(bucket,
     if (is.logical(out_names) && out_names) {
       req
     } else {
+      # Add missing columns as NA to req, then subset in the correct order
+      missing_cols <- setdiff(out_names, colnames(req))
+      if (length(missing_cols) > 0) {
+        for (col in missing_cols) {
+          req[[col]] <- NA
+        }
+      }
       req[, out_names, drop = FALSE]
     }
   }
