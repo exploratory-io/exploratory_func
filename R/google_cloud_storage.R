@@ -54,6 +54,7 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
 #' @param delimiter Use to list objects like a directory listing
 #' @param versions If TRUE, lists all versions of an object
 #' @return A data.frame of the objects
+#' @export
 #' @keywords internal
 gcs_list_objects_fixed <- function(bucket,
                                    detail = c("summary", "more", "full"),
