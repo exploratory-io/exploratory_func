@@ -45,6 +45,337 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
   }
 }
 
+#' Fixed wrapper for gcs_list_objects that handles pagination correctly
+#' This function fixes the http_400 Next page token not valid error by
+#' properly handling pageToken (not sending empty string in first request)
+#' @param bucket bucket containing the objects
+#' @param detail Set level of detail ("summary", "more", or "full")
+#' @param prefix Filter results to objects whose names begin with this prefix
+#' @param delimiter Use to list objects like a directory listing
+#' @param versions If TRUE, lists all versions of an object
+#' @return A data.frame of the objects
+#' @keywords internal
+gcs_list_objects_fixed <- function(bucket,
+                                   detail = c("summary", "more", "full"),
+                                   prefix = NULL,
+                                   delimiter = NULL,
+                                   versions = FALSE) {
+  if (!requireNamespace("googleCloudStorageR", quietly = TRUE)) {
+    stop("package googleCloudStorageR must be installed.")
+  }
+  if (!requireNamespace("googleAuthR", quietly = TRUE)) {
+    stop("package googleAuthR must be installed.")
+  }
+
+  detail <- match.arg(detail)
+
+  # Helper function to safely access internal functions
+  safe_get_internal <- function(pkg, func_name, fallback = NULL) {
+    if (exists(func_name, envir = asNamespace(pkg), mode = "function")) {
+      return(get(func_name, envir = asNamespace(pkg), mode = "function"))
+    } else if (!is.null(fallback)) {
+      return(fallback)
+    } else {
+      return(NULL)
+    }
+  }
+
+  # Get bucket name using internal function from googleCloudStorageR
+  as_bucket_name_func <- safe_get_internal("googleCloudStorageR", "as.bucket_name")
+  if (!is.null(as_bucket_name_func)) {
+    bucket <- as_bucket_name_func(bucket)
+  } else {
+    # Fallback: just use the bucket name as-is
+    bucket <- as.character(bucket)
+  }
+
+  # Get storage host - check environment variable first, then default
+  # This replicates the logic of get_storage_host()
+  storage_host <- Sys.getenv("STORAGE_EMULATOR_HOST", unset = "")
+  if (storage_host == "") {
+    # Default to standard Google Cloud Storage API host
+    storage_host <- "https://storage.googleapis.com"
+  }
+
+  # Build base parameters (without pageToken)
+  base_pars <- list(
+    prefix = prefix,
+    delimiter = delimiter,
+    versions = versions
+  )
+  # Remove NULL values
+  base_pars <- base_pars[!vapply(base_pars, is.null, logical(1))]
+
+  # API endpoint
+  endpoint <- sprintf("%s/storage/v1/b/%s/o", storage_host, bucket)
+
+  # Function to parse response (replicating parse_lo logic)
+  parse_response <- function(x) {
+    nextPageToken <- x$nextPageToken
+    if (is.null(x$items) || length(x$items) == 0) {
+      result <- data.frame()
+      attr(result, "nextPageToken") <- nextPageToken
+      attr(result, "prefixes") <- x$prefixes
+      return(result)
+    }
+    
+    # Convert items list to data.frame
+    # If items is already a data.frame (from jsonlite), use it directly
+    # Otherwise convert list to data.frame
+    if (is.data.frame(x$items)) {
+      items <- x$items
+    } else if (is.list(x$items) && length(x$items) > 0) {
+      # Convert list of lists to data.frame
+      # Use dplyr::bind_rows if available, otherwise use a safer approach
+      if (requireNamespace("dplyr", quietly = TRUE)) {
+        items <- dplyr::bind_rows(lapply(x$items, function(item) {
+          as.data.frame(item, stringsAsFactors = FALSE)
+        }))
+      } else {
+        # Fallback: convert each item to data.frame and combine
+        item_dfs <- lapply(x$items, function(item) {
+          as.data.frame(item, stringsAsFactors = FALSE)
+        })
+        # Get all unique column names
+        all_cols <- unique(unlist(lapply(item_dfs, colnames)))
+        # Add missing columns to each data.frame
+        item_dfs <- lapply(item_dfs, function(df) {
+          missing_cols <- setdiff(all_cols, colnames(df))
+          for (col in missing_cols) {
+            df[[col]] <- NA
+          }
+          df[, all_cols, drop = FALSE]
+        })
+        items <- do.call(rbind, item_dfs)
+      }
+    } else {
+      items <- data.frame()
+    }
+    
+    if (nrow(items) == 0) {
+      result <- data.frame()
+      attr(result, "nextPageToken") <- nextPageToken
+      attr(result, "prefixes") <- x$prefixes
+      return(result)
+    }
+
+    # Convert timestamps if columns exist
+    # Helper function to convert Google timestamp to R POSIXct
+    timestamp_to_r <- function(ts) {
+      if (is.null(ts) || length(ts) == 0) return(NULL)
+      # Google timestamps are in RFC 3339 format: "2023-01-01T12:00:00.000Z"
+      # Try to parse as POSIXct
+      tryCatch({
+        as.POSIXct(ts, format = "%Y-%m-%dT%H:%M:%OS", tz = "UTC")
+      }, error = function(e) {
+        # Fallback: try lubridate if available
+        if (requireNamespace("lubridate", quietly = TRUE)) {
+          lubridate::ymd_hms(ts, tz = "UTC")
+        } else {
+          ts  # Return as-is if parsing fails
+        }
+      })
+    }
+    
+    if ("timeCreated" %in% names(items) && !is.null(items$timeCreated)) {
+      items$timeCreated <- timestamp_to_r(items$timeCreated)
+    }
+    if ("updated" %in% names(items) && !is.null(items$updated)) {
+      items$updated <- timestamp_to_r(items$updated)
+    }
+
+    # Remove kind column if it exists
+    if ("kind" %in% names(items)) {
+      items$kind <- NULL
+    }
+
+    # Add size_bytes column and format size
+    if ("size" %in% names(items)) {
+      items$size_bytes <- as.numeric(items$size)
+      # Helper function to format object size (replicates format_object_size)
+      # This handles a single value (used with vapply)
+      format_object_size <- function(bytes, units = "auto") {
+        if (is.na(bytes) || bytes == 0) return("0 B")
+        if (units == "auto") {
+          unit_names <- c("B", "KB", "MB", "GB", "TB", "PB")
+          k <- 1024
+          sizes <- bytes / (k^(0:(length(unit_names) - 1)))
+          idx <- max(which(sizes >= 1))
+          return(paste(round(sizes[idx], 2), unit_names[idx]))
+        } else {
+          return(paste(bytes, units))
+        }
+      }
+      items$size <- vapply(as.numeric(items$size),
+                          function(sz) format_object_size(sz, "auto"),
+                          character(1))
+    }
+
+    # Add extra columns for composite objects if they don't exist
+    if (!"componentCount" %in% names(items)) {
+      items$componentCount <- NA
+    } else {
+      items$componentCount[is.null(items$componentCount)] <- NA
+    }
+    if (!"contentLanguage" %in% names(items)) {
+      items$contentLanguage <- NA
+    } else {
+      items$contentLanguage[is.null(items$contentLanguage)] <- NA
+    }
+
+    # Store nextPageToken and other attributes
+    attr(items, "nextPageToken") <- nextPageToken
+    attr(items, "prefixes") <- x$prefixes
+    if ("metadata" %in% names(items)) {
+      attr(items, "metadata") <- items$metadata
+    }
+
+    items
+  }
+
+  # Function to limit columns based on detail level
+  limit_columns <- function(req, detail) {
+    if (nrow(req) == 0) {
+      return(data.frame())
+    }
+
+    out_names <- switch(detail,
+      summary = c("name", "size", "updated", "size_bytes"),
+      more = c("name", "size", "bucket", "contentType",
+               "timeCreated", "updated", "storageClass",
+               "size_bytes"),
+      full = TRUE
+    )
+
+    if (is.logical(out_names) && out_names) {
+      req
+    } else {
+      req[, out_names, drop = FALSE]
+    }
+  }
+
+  # Manual pagination loop
+  all_results <- list()
+  page_token <- NULL
+  page_num <- 1
+  pagination_error <- FALSE
+
+  while (TRUE) {
+    # Build parameters for this request
+    pars <- base_pars
+    # Only include pageToken if we have a valid non-empty token
+    # This is the key fix: we NEVER send an empty string, only valid tokens from API responses
+    if (!is.null(page_token) && page_token != "") {
+      pars$pageToken <- page_token
+    }
+
+    # Create API generator for this request
+    lo <- googleAuthR::gar_api_generator(
+      endpoint,
+      pars_args = pars,
+      data_parse_function = parse_response,
+      checkTrailingSlash = FALSE
+    )
+
+    # Make the API call
+    api_error <- NULL
+    tryCatch({
+      response <- lo()
+    }, error = function(e) {
+      # Check if it's the specific pagination error we're trying to fix
+      if (grepl("http_400.*Next page token not valid", e$message, ignore.case = TRUE)) {
+        # If this is not the first page, we got an invalid token from the API
+        # This shouldn't happen with our fix, but if it does, we'll stop gracefully
+        if (page_num > 1) {
+          warning("Received invalid pageToken from API response. This may indicate the token expired or was corrupted. Returning results collected so far.")
+          pagination_error <<- TRUE
+        } else {
+          # First page with invalid token - this is the original bug we're fixing
+          stop("Pagination error on first request. This should not happen with the fixed implementation. Error: ", e$message)
+        }
+      } else {
+        api_error <<- e
+      }
+    })
+    
+    # If we hit a pagination error on a subsequent page, break and return what we have
+    if (pagination_error) {
+      break
+    }
+    
+    # If there was another API error, stop
+    if (!is.null(api_error)) {
+      stop("Error calling Google Cloud Storage API: ", api_error$message)
+    }
+    
+    # If response is NULL (shouldn't happen, but safety check)
+    if (is.null(response)) {
+      break
+    }
+
+    # Check if we got any results and add them
+    if (is.data.frame(response) && nrow(response) > 0) {
+      all_results[[page_num]] <- response
+    } else if (is.data.frame(response) && nrow(response) == 0 && page_num == 1) {
+      # First page returned empty - return empty data.frame
+      return(data.frame())
+    }
+
+    # Get next page token from response
+    next_token <- attr(response, "nextPageToken")
+
+    # If no next token, we're done
+    if (is.null(next_token) || next_token == "") {
+      break
+    }
+
+    # Validate that the token is a non-empty string before using it
+    # This prevents using corrupted or invalid tokens
+    if (!is.character(next_token) || nchar(next_token) == 0) {
+      # Invalid token format - stop pagination to avoid errors
+      break
+    }
+
+    # Set token for next iteration
+    page_token <- next_token
+    page_num <- page_num + 1
+    
+    # Safety check: prevent infinite loops (max 1000 pages)
+    if (page_num > 1000) {
+      warning("Reached maximum page limit (1000). Stopping pagination.")
+      break
+    }
+  }
+
+  # Combine all results
+  if (length(all_results) == 0) {
+    return(data.frame())
+  }
+
+  # Use dplyr::bind_rows to combine - handles different columns gracefully
+  # This is safer than rbind when pages might have different column structures
+  if (requireNamespace("dplyr", quietly = TRUE)) {
+    combined <- dplyr::bind_rows(all_results)
+  } else {
+    # Fallback: try to ensure all data.frames have the same columns
+    # Get all unique column names
+    all_cols <- unique(unlist(lapply(all_results, colnames)))
+    # Add missing columns to each data.frame
+    all_results <- lapply(all_results, function(df) {
+      missing_cols <- setdiff(all_cols, colnames(df))
+      for (col in missing_cols) {
+        df[[col]] <- NA
+      }
+      # Reorder columns to match
+      df[, all_cols, drop = FALSE]
+    })
+    combined <- do.call(rbind, all_results)
+  }
+
+  # Limit columns based on detail level
+  limit_columns(combined, detail = detail)
+}
+
 #' API to list items inside a Google Cloud Storage Bucket.
 #' @param bucket
 #' @param prefix
@@ -55,7 +386,8 @@ listItemsInGoogleCloudStorageBucket <- function(bucket, prefix, delimiter){
   token <- exploratory:::getGoogleTokenForCloudStorage()
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
 
-  googleCloudStorageR::gcs_list_objects(bucket = bucket, detail = "more", prefix = prefix, delimiter = delimiter)
+  # Use the fixed wrapper function instead of the buggy gcs_list_objects
+  gcs_list_objects_fixed(bucket = bucket, detail = "more", prefix = prefix, delimiter = delimiter)
 }
 
 
@@ -179,7 +511,7 @@ searchAndGetCSVFilesFromGoogleCloudStorage <- function(bucket = "", folder = "",
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
-    files <- googleCloudStorageR::gcs_list_objects(bucket = bucket, detail= "more", prefix = folder, delimiter = "/") %>%
+    files <- gcs_list_objects_fixed(bucket = bucket, detail = "more", prefix = folder, delimiter = "/") %>%
       filter(str_detect(name, stringr::str_c("(?i)", search_keyword)))
   }, error = function(e) {
     if (stringr::str_detect(e$message, "http_404 The specified bucket does not exist")) {
@@ -240,7 +572,7 @@ searchAndGetExcelFilesFromGoogleCloudStorage <- function(bucket = '', folder = '
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
-    files <- googleCloudStorageR::gcs_list_objects(bucket = bucket, detail= "more", prefix = folder, delimiter = "/") %>%
+    files <- gcs_list_objects_fixed(bucket = bucket, detail = "more", prefix = folder, delimiter = "/") %>%
       filter(str_detect(name, stringr::str_c("(?i)", search_keyword)))
   }, error = function(e) {
     if (stringr::str_detect(e$message, "http_404 The specified bucket does not exist")) {
@@ -342,7 +674,7 @@ searchAndGetParquetFilesFromGoogleCloudStorage <- function(bucket = '', folder =
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
-    files <- googleCloudStorageR::gcs_list_objects(bucket = bucket, detail= "more", prefix = folder, delimiter = "/") %>%
+    files <- gcs_list_objects_fixed(bucket = bucket, detail = "more", prefix = folder, delimiter = "/") %>%
       filter(str_detect(name, stringr::str_c("(?i)", search_keyword)))
   }, error = function(e) {
     if (stringr::str_detect(e$message, "http_404 The specified bucket does not exist")) {
