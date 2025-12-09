@@ -54,6 +54,7 @@ downloadDataFileFromGoogleCloudStorage <- function(bucket, file){
 #' @param delimiter Use to list objects like a directory listing
 #' @param versions If TRUE, lists all versions of an object
 #' @return A data.frame of the objects
+#' @export
 #' @keywords internal
 gcs_list_objects_fixed <- function(bucket,
                                    detail = c("summary", "more", "full"),
@@ -196,6 +197,8 @@ gcs_list_objects_fixed <- function(bucket,
       # This handles a single value (used with vapply)
       format_object_size <- function(bytes, units = "auto") {
         if (is.na(bytes) || bytes == 0) return("0 B")
+        # Handle very small files (< 1 byte)
+        if (bytes < 1) return("< 1 B")
         if (units == "auto") {
           unit_names <- c("B", "KB", "MB", "GB", "TB", "PB")
           k <- 1024
@@ -206,7 +209,7 @@ gcs_list_objects_fixed <- function(bucket,
           return(paste(bytes, units))
         }
       }
-      items$size <- vapply(as.numeric(items$size),
+      items$size <- vapply(items$size_bytes,
                           function(sz) format_object_size(sz, "auto"),
                           character(1))
     }
@@ -214,13 +217,9 @@ gcs_list_objects_fixed <- function(bucket,
     # Add extra columns for composite objects if they don't exist
     if (!"componentCount" %in% names(items)) {
       items$componentCount <- NA
-    } else {
-      items$componentCount[is.null(items$componentCount)] <- NA
     }
     if (!"contentLanguage" %in% names(items)) {
       items$contentLanguage <- NA
-    } else {
-      items$contentLanguage[is.null(items$contentLanguage)] <- NA
     }
 
     # Store nextPageToken and other attributes
@@ -250,6 +249,13 @@ gcs_list_objects_fixed <- function(bucket,
     if (is.logical(out_names) && out_names) {
       req
     } else {
+      # Add missing columns as NA to req, then subset in the correct order
+      missing_cols <- setdiff(out_names, colnames(req))
+      if (length(missing_cols) > 0) {
+        for (col in missing_cols) {
+          req[[col]] <- NA
+        }
+      }
       req[, out_names, drop = FALSE]
     }
   }
