@@ -207,7 +207,7 @@ gcs_list_objects_fixed <- function(bucket,
           return(paste(bytes, units))
         }
       }
-      items$size <- vapply(as.numeric(items$size),
+      items$size <- vapply(items$size_bytes,
                           function(sz) format_object_size(sz, "auto"),
                           character(1))
     }
