@@ -2309,7 +2309,7 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   objects <- exploratory:::gcs_list_objects_fixed(bucket = bucket)
   # set bucket
   # for each file extracted from Google BigQuery to Google Cloud Storage,
-  # download the file to local temporary direcotry.
+  # download the file to local temporary directory.
   # then delete the extracted files from Google Cloud Storage.
   lapply(objects$name, function(name){
     if(stringr::str_detect(name,stringr::str_c(folder, "/"))){
