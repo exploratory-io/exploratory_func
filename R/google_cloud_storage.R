@@ -215,13 +215,9 @@ gcs_list_objects_fixed <- function(bucket,
     # Add extra columns for composite objects if they don't exist
     if (!"componentCount" %in% names(items)) {
       items$componentCount <- NA
-    } else {
-      items$componentCount[is.null(items$componentCount)] <- NA
     }
     if (!"contentLanguage" %in% names(items)) {
       items$contentLanguage <- NA
-    } else {
-      items$contentLanguage[is.null(items$contentLanguage)] <- NA
     }
 
     # Store nextPageToken and other attributes
