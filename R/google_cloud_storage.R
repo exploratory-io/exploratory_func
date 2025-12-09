@@ -196,6 +196,8 @@ gcs_list_objects_fixed <- function(bucket,
       # This handles a single value (used with vapply)
       format_object_size <- function(bytes, units = "auto") {
         if (is.na(bytes) || bytes == 0) return("0 B")
+        # Handle very small files (< 1 byte)
+        if (bytes < 1) return("< 1 B")
         if (units == "auto") {
           unit_names <- c("B", "KB", "MB", "GB", "TB", "PB")
           k <- 1024
