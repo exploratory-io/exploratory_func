@@ -1,3 +1,51 @@
+# Helper function to check if names have special JSON characters
+# Uses three patterns because escaped characters in character class can be problematic
+has_special_json_chars <- function(names) {
+  if (is.null(names) || length(names) == 0) {
+    return(FALSE)
+  }
+  pattern1 <- "[{}\\[\\]\"'\\\\/`]"
+  pattern2 <- "[,:]"
+  pattern3 <- "[()@+[:space:]]"
+  has_special1 <- grepl(pattern1, names)
+  has_special2 <- grepl(pattern2, names)
+  has_special3 <- grepl(pattern3, names)
+  any(has_special1 | has_special2 | has_special3)
+}
+
+# Helper function to sanitize column names for LightGBM
+# LightGBM doesn't support special JSON characters in feature names
+# Special JSON characters: { } [ ] " ' \ / : , ` and control characters, spaces
+sanitize_lightgbm_colnames <- function(names) {
+  if (is.null(names)) {
+    return(NULL)
+  }
+  # Replace special JSON characters and other problematic characters with underscores
+  # Special JSON characters: { } [ ] " ' \ / : , ` ( ) + @ and control characters, spaces
+  # Note: : and , are also JSON-special characters that can break JSON parsing
+  # Backticks (`) are used in R for non-standard names but can cause issues in JSON
+  # Parentheses (), plus (+), and at-sign (@) are also problematic for JSON
+  # Split into multiple patterns because escaped characters in character class can be problematic
+  # First pattern: basic special chars that need escaping (excluding comma and colon)
+  sanitized <- gsub("[{}\\[\\]\"'\\\\/`]", "_", names)
+  # Second pattern: comma and colon (handle separately as they can cause issues in character classes)
+  sanitized <- gsub("[,:]", "_", sanitized)
+  # Third pattern: additional problematic chars (no escaping needed in char class)
+  sanitized <- gsub("[()@+[:space:]]", "_", sanitized)
+  # Remove any remaining control characters
+  sanitized <- gsub("[[:cntrl:]]", "_", sanitized)
+  # Collapse multiple consecutive underscores into one
+  sanitized <- gsub("_{2,}", "_", sanitized)
+  # Remove leading/trailing underscores
+  sanitized <- gsub("^_+|_+$", "", sanitized)
+  # Handle empty strings (shouldn't happen, but just in case)
+  sanitized[sanitized == ""] <- "feature"
+  # Ensure names are unique (in case sanitization creates duplicates)
+  sanitized <- make.unique(sanitized, sep = "_")
+  
+  sanitized
+}
+
 #' formula version of LightGBM
 #' @param data Dataframe to create model
 #' @param formula Formula for model
@@ -13,6 +61,41 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
   loadNamespace("lightgbm")
 
   lgb_dataset_compat <- function(data, label, weight = NULL, free_raw_data = FALSE) {
+    # Ensure column names are sanitized right before passing to LightGBM
+    # This is a final safety check in case column names were modified elsewhere
+    if (inherits(data, "Matrix")) {
+      current_colnames <- colnames(data)
+      if (is.null(current_colnames)) {
+        current_colnames <- dimnames(data)[[2]]
+      }
+      if (!is.null(current_colnames)) {
+        # Always sanitize to be safe - LightGBM is very strict
+        sanitized <- sanitize_lightgbm_colnames(current_colnames)
+        dimnames(data) <- list(dimnames(data)[[1]], sanitized)
+        tryCatch({ colnames(data) <- sanitized }, error = function(e) {})
+        # Verify one more time
+        final_names <- colnames(data)
+        if (is.null(final_names)) final_names <- dimnames(data)[[2]]
+        if (!is.null(final_names) && (has_special_json_chars(final_names) || any(grepl("[[:cntrl:]]", final_names)))) {
+          # Force sanitization one more time
+          final_sanitized <- sanitize_lightgbm_colnames(final_names)
+          dimnames(data) <- list(dimnames(data)[[1]], final_sanitized)
+        }
+      }
+    } else {
+      current_colnames <- colnames(data)
+      if (!is.null(current_colnames)) {
+        # Always sanitize to be safe
+        sanitized <- sanitize_lightgbm_colnames(current_colnames)
+        colnames(data) <- sanitized
+        # Verify one more time
+        final_names <- colnames(data)
+        if (!is.null(final_names) && (has_special_json_chars(final_names) || any(grepl("[[:cntrl:]]", final_names)))) {
+          colnames(data) <- sanitize_lightgbm_colnames(final_names)
+        }
+      }
+    }
+    
     args <- list(data = data, label = label)
     if (!is.null(weight)) {
       args$weight <- weight
@@ -97,6 +180,73 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
     stop("No valid data to create lightgbm model after removing NA.")
   }
 
+  # Store original column names before sanitization
+  # Handle both regular matrices and sparse matrices (Matrix objects)
+  if (inherits(md_mat, "Matrix")) {
+    original_colnames <- colnames(md_mat)
+    if (is.null(original_colnames)) {
+      original_colnames <- dimnames(md_mat)[[2]]
+    }
+    if (is.null(original_colnames)) {
+      # If still null, create default names
+      original_colnames <- paste0("feature_", seq_len(ncol(md_mat)))
+    }
+  } else {
+    original_colnames <- colnames(md_mat)
+    if (is.null(original_colnames)) {
+      original_colnames <- paste0("feature_", seq_len(ncol(md_mat)))
+    }
+  }
+  
+  # Sanitize column names for LightGBM (removes special JSON characters)
+  sanitized_colnames <- sanitize_lightgbm_colnames(original_colnames)
+  
+  # Create mapping from sanitized to original names
+  colname_mapping <- original_colnames
+  names(colname_mapping) <- sanitized_colnames
+  
+  # Update column names of md_mat for LightGBM
+  # For sparse matrices, we need to set dimnames properly
+  if (inherits(md_mat, "Matrix")) {
+    # For Matrix objects, set both dimnames and colnames to ensure LightGBM reads them correctly
+    current_dimnames <- dimnames(md_mat)
+    dimnames(md_mat) <- list(current_dimnames[[1]], sanitized_colnames)
+    # Also try setting colnames directly (some Matrix types support this)
+    tryCatch({
+      colnames(md_mat) <- sanitized_colnames
+    }, error = function(e) {
+      # If colnames() doesn't work, dimnames() should be enough
+    })
+  } else {
+    colnames(md_mat) <- sanitized_colnames
+  }
+  
+  # Final verification: ensure no special JSON characters remain and names are set correctly
+  final_colnames <- if (inherits(md_mat, "Matrix")) {
+    cn <- colnames(md_mat)
+    if (is.null(cn)) cn <- dimnames(md_mat)[[2]]
+    cn
+  } else {
+    colnames(md_mat)
+  }
+  
+  if (is.null(final_colnames) || has_special_json_chars(final_colnames) || any(grepl("[[:cntrl:]]", final_colnames))) {
+    # If special characters still exist or names are null, sanitize again
+    if (is.null(final_colnames)) {
+      final_colnames <- sanitized_colnames
+    } else {
+      final_colnames <- sanitize_lightgbm_colnames(final_colnames)
+    }
+    if (inherits(md_mat, "Matrix")) {
+      current_dimnames <- dimnames(md_mat)
+      dimnames(md_mat) <- list(current_dimnames[[1]], final_colnames)
+      tryCatch({ colnames(md_mat) <- final_colnames }, error = function(e) {})
+    } else {
+      colnames(md_mat) <- final_colnames
+    }
+    sanitized_colnames <- final_colnames
+  }
+
   # Collect any extra args once so we can be version-tolerant.
   dots <- list(...)
   # Extract params (LightGBM uses params as a named list).
@@ -128,6 +278,15 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
 
     watch_mat <- safe_slice(md_mat, index)
     train_mat <- safe_slice(md_mat, index, remove = TRUE)
+    # Ensure sanitized column names are preserved in sliced matrices
+    # Handle both regular and sparse matrices
+    if (inherits(watch_mat, "Matrix")) {
+      dimnames(watch_mat) <- list(dimnames(watch_mat)[[1]], sanitized_colnames)
+      dimnames(train_mat) <- list(dimnames(train_mat)[[1]], sanitized_colnames)
+    } else {
+      colnames(watch_mat) <- sanitized_colnames
+      colnames(train_mat) <- sanitized_colnames
+    }
 
     watch_y <- y[index]
     train_y <- y[-index]
@@ -168,11 +327,14 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
   }
 
   # Wrap booster because lgb.Booster can be a locked environment (cannot add new bindings).
+  # Store original column names (before sanitization) in x_names for consistency with other code
   ret <- list(
     booster = booster,
     evals_result = evals_result,
     terms = term,
-    x_names = colnames(md_mat),
+    x_names = original_colnames,  # Store original names, not sanitized ones
+    x_names_sanitized = sanitized_colnames,  # Store sanitized names for LightGBM operations
+    colname_mapping = colname_mapping,  # Mapping from sanitized to original
     is_sparse = sparse,
     xlevels = .getXlevels(term, df_for_model_matrix)
   )
@@ -376,6 +538,41 @@ predict_lightgbm <- function(model, df, predraw = FALSE) {
     Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
   } else {
     model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
+  }
+
+  # Sanitize column names for LightGBM if the model was trained with sanitized names
+  # (for backward compatibility, check if x_names_sanitized exists)
+  if (!is.null(model$x_names_sanitized)) {
+    # Model was trained with sanitized names, so we need to match them
+    # The column names from model.matrix should match x_names (original)
+    # We need to map them to sanitized names
+    if (!is.null(model$colname_mapping)) {
+      # colname_mapping has sanitized names as keys and original names as values
+      # We need to reverse lookup: find sanitized name for each original name
+      current_names <- colnames(mat_data)
+      # Reverse the mapping: create a lookup from original to sanitized
+      reverse_mapping <- names(model$colname_mapping)
+      names(reverse_mapping) <- model$colname_mapping
+      sanitized_names <- reverse_mapping[current_names]
+      # If mapping doesn't have an entry, sanitize on the fly
+      missing_idx <- is.na(sanitized_names)
+      if (any(missing_idx)) {
+        sanitized_names[missing_idx] <- sanitize_lightgbm_colnames(current_names[missing_idx])
+      }
+      colnames(mat_data) <- sanitized_names
+    } else {
+      # Fallback: sanitize directly
+      colnames(mat_data) <- sanitize_lightgbm_colnames(colnames(mat_data))
+    }
+  } else {
+    # For backward compatibility: if model doesn't have sanitized names,
+    # check if column names need sanitization (they might if they have special chars)
+    # Only sanitize if we detect special JSON characters
+    current_names <- colnames(mat_data)
+    has_special_chars <- has_special_json_chars(current_names) || any(grepl("[[:cntrl:]]", current_names))
+    if (has_special_chars) {
+      colnames(mat_data) <- sanitize_lightgbm_colnames(current_names)
+    }
   }
 
   # Ensure numeric matrix for dense case
