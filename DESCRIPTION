@@ -67,6 +67,7 @@ Suggests:
     mgcv,
     survival,
     xgboost,
+    lightgbm,
     AnomalyDetection,
     prophet,
     randomForest,
