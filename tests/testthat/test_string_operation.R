@@ -338,12 +338,6 @@ test_that("do_tfidf preserves all document IDs including high numbers", {
   expect_true(all(c(1, 2, 182, 183, 184) %in% result$document_id))
   # Verify that the result has the expected columns
   expect_equal(colnames(result), c("document_id", "token", "count_per_doc", "count_of_docs", "tfidf"))
-  # Verify that document 182 appears in the result
-  expect_true(any(result$document_id == 182))
-  # Verify that document 183 appears in the result
-  expect_true(any(result$document_id == 183))
-  # Verify that document 184 appears in the result
-  expect_true(any(result$document_id == 184))
 })
 
 test_that("do_ngram", {
