@@ -191,5 +191,3 @@ if (Sys.info()["sysname"] != "Windows") {
     expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
   })
 }
-
-
