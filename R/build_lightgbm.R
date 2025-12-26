@@ -1497,5 +1497,3 @@ get_prediction_type.lightgbm_exp <- function(x) {
   }
   if (x$classification_type == "binary") "binary" else "multiclass"
 }
-
-
