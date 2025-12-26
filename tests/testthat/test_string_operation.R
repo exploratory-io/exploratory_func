@@ -325,6 +325,27 @@ test_that("do_tfidf with group_by", {
   expect_equal(colnames(result), c("group", "doc id","colname with space","count_per_doc","count_of_docs","tfidf"))
 })
 
+test_that("do_tfidf preserves all document IDs including high numbers", {
+  loadNamespace("dplyr")
+  # Create test data with document IDs that include high numbers (182, 183, 184)
+  # to test the fix for document ID mapping issue
+  test_df <- data.frame(
+    document_id = c(rep(1, 3), rep(2, 3), rep(182, 2), rep(183, 2), rep(184, 1)),
+    token = c("this", "is", "test", "that", "is", "test", "質", "良い", "企画", "毎年", "料理")
+  )
+  result <- test_df %>% do_tfidf(document_id, token)
+  # Verify that all document IDs are present in the result
+  expect_true(all(c(1, 2, 182, 183, 184) %in% result$document_id))
+  # Verify that the result has the expected columns
+  expect_equal(colnames(result), c("document_id", "token", "count_per_doc", "count_of_docs", "tfidf"))
+  # Verify that document 182 appears in the result
+  expect_true(any(result$document_id == 182))
+  # Verify that document 183 appears in the result
+  expect_true(any(result$document_id == 183))
+  # Verify that document 184 appears in the result
+  expect_true(any(result$document_id == 184))
+})
+
 test_that("do_ngram", {
   loadNamespace("dplyr")
   df <- data.frame(
