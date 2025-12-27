@@ -415,6 +415,8 @@ do_tfidf <- function(df, document, term,
     nested <- df %>% dplyr::nest_by(document_id)
     tokens_list <- purrr::map(nested$data, function(x){x$term})
     names(tokens_list) <- paste0("text", 1:length(tokens_list)) # Add unique names to the list so that it can be passed to quanteda::tokens().
+    # Create a mapping from position (1, 2, 3...) to actual document_id
+    doc_id_map <- tibble::tibble(document = 1:length(nested$document_id), document_id = nested$document_id)
     tokens <- quanteda::tokens(tokens_list)
     dfm_res <- tokens %>% quanteda::dfm()
     dfm_df <- dfm_to_df(dfm_res)
@@ -429,9 +431,13 @@ do_tfidf <- function(df, document, term,
     tfidf_df <- dfm_to_df(dfm_tfidf_res)
     res <- dfm_df %>% dplyr::rename(count_per_doc=value) %>% dplyr::left_join(doc_freq_df, by=c(token_id="token_id"))
     res <- res %>% dplyr::left_join(tfidf_df %>% dplyr::select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
+    # Map document position back to actual document_id using the mapping
+    res <- res %>% dplyr::left_join(doc_id_map, by="document") %>% dplyr::select(-document)
     # Drop token_id we used as the join key, since it is an internal info that is not so useful for the users.
-    res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document)
-    res <- res %>% dplyr::rename(!!rlang::sym(document_col):=document, !!rlang::sym(term_col):=token)
+    res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document_id)
+    res <- res %>% dplyr::rename(!!rlang::sym(document_col):=document_id, !!rlang::sym(term_col):=token)
+    # Reorder columns to ensure document column comes first, then term column, then the rest
+    res <- res %>% dplyr::select(!!rlang::sym(document_col), !!rlang::sym(term_col), dplyr::everything())
     res
   }
   res <- do_on_each_group(df, each_func, with_unnest = TRUE)
