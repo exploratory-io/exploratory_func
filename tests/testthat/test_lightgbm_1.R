@@ -33,17 +33,23 @@ test_that("exp_lightgbm(regression) evaluate training and test with FIRM importa
     )
 
   ret <- model_df %>% prediction(data = "training_and_test", pretty.name = TRUE)
-
+  expect_equal( all(c("Predicted Value", "Test Data") %in% colnames(ret)), c(TRUE, TRUE))
   ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df = model_df)
   ret <- model_df %>% prediction(data = "newdata", data_frame = flight)
 
   ret <- model_df %>% tidy_rowwise(model, type = "evaluation_log")
+  expect_equal(nrow(ret), 20)
+  expect_equal(colnames(ret), c("Iter", "type", "name", "value"))
   ret <- model_df %>% prediction(data = "training_and_test")
   test_ret <- ret %>% filter(is_test_data == TRUE)
+  # Check that test data count is less than 1500 (30% of ~5000 rows, accounting for potential NA filtering)
   expect_lt(nrow(test_ret), 1500)
+  # Check that test data count is greater than 1400 (ensures test_rate = 0.3 is approximately applied)
   expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data == FALSE)
+  # Check that training data count is less than 3500 (70% of ~5000 rows, accounting for potential NA filtering)
   expect_lt(nrow(train_ret), 3500)
+  # Check that training data count is greater than 3300 (ensures remaining data after test split is reasonable)
   expect_gt(nrow(train_ret), 3300)
 
   # Check result of variable importance

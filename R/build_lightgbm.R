@@ -560,6 +560,21 @@ lightgbm_build_evaluation_log <- function(model) {
 }
 
 #' formula version of LightGBM (binary classification)
+#' @param data Dataframe to create model
+#' @param formula Formula for model
+#' @param output_type Type of output. Default is "probability". Other options include "class" for class predictions
+#' @param eval_metric Evaluation metric to use. Default is "auc". Other options include "binary_logloss", "binary_error", "average_precision"
+#' @param params List of additional parameters to pass to LightGBM. These will be merged with the eval_metric parameter.
+#' @param ... Additional arguments passed to fml_lightgbm, such as:
+#'   \itemize{
+#'     \item{nrounds: Maximum number of iteration of training (default: 10)}
+#'     \item{weights: Weight of data for modeling}
+#'     \item{watchlist_rate: Ratio of validation data to watch learning process (default: 0)}
+#'     \item{na.action: How to handle data with NA. Can be na.omit, na.pass, na.fail (default: na.pass)}
+#'     \item{sparse: If matrix should be sparse. As default, it becomes sparse if there is any categorical value}
+#'     \item{early_stopping_rounds: Number of rounds for early stopping}
+#'   }
+#'   Other LightGBM parameters can also be passed through ...
 #' @export
 lightgbm_binary <- function(data, formula, output_type = "probability", eval_metric = "auc", params = list(), ...) {
   loadNamespace("lightgbm")
@@ -611,6 +626,21 @@ lightgbm_binary <- function(data, formula, output_type = "probability", eval_met
 }
 
 #' formula version of LightGBM (multiclass classification)
+#' @param data Dataframe to create model
+#' @param formula Formula for model
+#' @param output_type Type of output. Default is "softprob". Other options include "class" for class predictions
+#' @param eval_metric Evaluation metric to use. Default is "multi_error". Other options include "multi_logloss", "mlogloss", "cross_entropy"
+#' @param params List of additional parameters to pass to LightGBM. These will be merged with the eval_metric parameter.
+#' @param ... Additional arguments passed to fml_lightgbm, such as:
+#'   \itemize{
+#'     \item{nrounds: Maximum number of iteration of training (default: 10)}
+#'     \item{weights: Weight of data for modeling}
+#'     \item{watchlist_rate: Ratio of validation data to watch learning process (default: 0)}
+#'     \item{na.action: How to handle data with NA. Can be na.omit, na.pass, na.fail (default: na.pass)}
+#'     \item{sparse: If matrix should be sparse. As default, it becomes sparse if there is any categorical value}
+#'     \item{early_stopping_rounds: Number of rounds for early stopping}
+#'   }
+#'   Other LightGBM parameters can also be passed through ...
 #' @export
 lightgbm_multi <- function(data, formula, output_type = "softprob", eval_metric = "multi_error", params = list(), ...) {
   loadNamespace("lightgbm")
