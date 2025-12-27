@@ -490,6 +490,21 @@ lightgbm_multi <- function(data, formula, output_type = "softprob", eval_metric 
 }
 
 #' formula version of LightGBM (regression)
+#' @param data Dataframe to create model
+#' @param formula Formula for model
+#' @param output_type Type of output. Default is "regression"
+#' @param eval_metric Evaluation metric to use. Default is "rmse". Other options include "mae", "mape", "huber", "fair", "poisson", "quantile", "gamma", "tweedie"
+#' @param params List of additional parameters to pass to LightGBM. These will be merged with the eval_metric parameter.
+#' @param ... Additional arguments passed to fml_lightgbm, such as:
+#'   \itemize{
+#'     \item{nrounds: Maximum number of iteration of training (default: 10)}
+#'     \item{weights: Weight of data for modeling}
+#'     \item{watchlist_rate: Ratio of validation data to watch learning process (default: 0)}
+#'     \item{na.action: How to handle data with NA. Can be na.omit, na.pass, na.fail (default: na.pass)}
+#'     \item{sparse: If matrix should be sparse. As default, it becomes sparse if there is any categorical value}
+#'     \item{early_stopping_rounds: Number of rounds for early stopping}
+#'   }
+#'   Other LightGBM parameters can also be passed through ...
 #' @export
 lightgbm_reg <- function(data, formula, output_type = "regression", eval_metric = "rmse", params = list(), ...) {
   loadNamespace("lightgbm")
@@ -752,11 +767,11 @@ augment.lightgbm_binary <- function(x, data = NULL, newdata = NULL, data_type = 
 augment.lightgbm_reg <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   loadNamespace("lightgbm")
 
-  predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
   predictor_variables <- all.vars(x$terms)[-1]
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if (!is.null(newdata)) {
+    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
     if (!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
@@ -899,8 +914,13 @@ importance_lightgbm <- function(model) {
   }
   ret <- imp %>% dplyr::rename(variable = feature)
   # Aggregate dummy-expanded features back to original c{n}_ variable.
+  # For variables that don't match the pattern (e.g., numeric features), keep the original name.
   ret <- ret %>%
-    dplyr::mutate(variable = stringr::str_extract(variable, "c\\d+_")) %>%
+    dplyr::mutate(
+      variable_extracted = stringr::str_extract(variable, "c\\d+_"),
+      variable = dplyr::if_else(is.na(variable_extracted), variable, variable_extracted)
+    ) %>%
+    dplyr::select(-variable_extracted) %>%
     dplyr::group_by(variable) %>%
     dplyr::summarize(importance = sum(importance, na.rm = TRUE))
   ret <- ret %>% dplyr::arrange(-importance)
@@ -1053,7 +1073,7 @@ exp_lightgbm <- function(df,
                          max_pd_vars = NULL,
                          pd_sample_size = 500,
                          pd_grid_resolution = 20,
-                         pd_with_bin_means = FALSE,
+                         pd_with_bin_means = TRUE, # Default is TRUE to match XGBoost behavior and show confidence intervals
                          seed = 1,
                          test_rate = 0.0,
                          test_split_type = "random") {
@@ -1241,6 +1261,10 @@ exp_lightgbm <- function(df,
         } else if (importance_measure == "impurity" || importance_measure == "lightgbm") {
           imp_df <- importance_lightgbm(model)
           model$imp_df <- imp_df
+        } else if (importance_measure == "firm") {
+          # For firm importance, imp_df will be computed later from partial dependence
+          # Initialize to NULL to ensure it's defined
+          model$imp_df <- NULL
         }
 
         if (importance_measure == "firm") {
@@ -1289,6 +1313,8 @@ exp_lightgbm <- function(df,
 
       if (length(imp_vars) > 0) {
         if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+          # imp_vars contains processed column names (like "c9_") which match the column names in df
           model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
         }
       }
