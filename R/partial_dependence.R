@@ -175,7 +175,7 @@ handle_partial_dependence <- function(x) {
     ret <- actual_ret %>% dplyr::bind_rows(ret) # So that PDP is drawn over the binning, the bind_row order needs to be this way.
     ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col)) # Rename target column to Predicted to make comparison with Actual.
   }
-  else if (!is.null(x$partial_binning)) { # For ranger/rpart, we calculate binning data at model building. Maybe we should do the same for glm/lm.
+  else if (!is.null(x$partial_binning)) { # For ranger/rpart/xgboost/lightgbm, we calculate binning data at model building. Maybe we should do the same for glm/lm.
     # Note that this case consists of only regression and binary classification, and not multiclass classification.
     actual_ret <- x$partial_binning
     ret <- actual_ret %>% dplyr::bind_rows(ret) # So that PDP is drawn over the binning, the bind_row order needs to be this way.
@@ -190,6 +190,35 @@ handle_partial_dependence <- function(x) {
         ret <- ret %>% dplyr::select(-`FALSE`) # Drop FALSE column, which we will not use.
       }
     }
+  }
+  else { # When partial_binning is not available, still rename target column to "Predicted" for consistency
+    # Handle regression case - target_col should be a single column name
+    if (length(target_col) == 1 && target_col != "TRUE") {
+      # Check if the target column exists in ret, if not, it might be a mapped name issue
+      if (!is.null(ret[[target_col]])) {
+        ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col))
+      } else {
+        # If target_col doesn't match, try to find the target column by checking which columns are not in var_cols
+        # The target column should be the one that's not a predictor variable
+        non_var_cols <- setdiff(colnames(ret), var_cols)
+        if (length(non_var_cols) == 1) {
+          # Only one non-predictor column, that should be the target
+          ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(non_var_cols[1]))
+        } else if (length(non_var_cols) > 1) {
+          # Multiple non-predictor columns - this is multiclass, handle below
+        }
+      }
+    }
+    # Handle binary classification case
+    if (!is.null(ret$`TRUE`)) {
+      ret <- ret %>% dplyr::rename(Predicted=`TRUE`)
+      if (!is.null(ret$`FALSE`)) {
+        ret <- ret %>% dplyr::select(-`FALSE`)
+      }
+    }
+    # Handle multiclass case - target_col contains multiple class names
+    # For multiclass, columns should already be named with class names, no rename needed
+    # But we should ensure they're not using predictor variable names
   }
 
   ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
@@ -234,7 +263,7 @@ handle_partial_dependence <- function(x) {
   else if ("lm" %in% class(x)) { # For lm case
     df <- x$model
   }
-  else { # rpart, xgboost
+  else { # rpart, xgboost, lightgbm
     # use partial_dependence itself for determining chart_type. Maybe this works for other models too?
     df <- x$partial_dependence
   }
