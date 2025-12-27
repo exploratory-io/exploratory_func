@@ -328,6 +328,75 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
 
   # Wrap booster because lgb.Booster can be a locked environment (cannot add new bindings).
   # Store original column names (before sanitization) in x_names for consistency with other code
+  
+  # If evals_result is empty and callback might not have worked, try to get evaluation results directly from booster
+  if ((is.null(evals_result) || length(evals_result) == 0) && inherits(booster, "lgb.Booster")) {
+    loadNamespace("lightgbm")
+    # Try to get evaluation results using lgb.get.eval.result if available
+    tryCatch({
+      if (exists("lgb.get.eval.result", asNamespace("lightgbm"), inherits = FALSE)) {
+        # Determine dataset names based on watchlist_rate
+        dataset_names <- if (watchlist_rate != 0.0) {
+          c("train", "validation")
+        } else {
+          c("train")
+        }
+        
+        # Try to get metric from params
+        metric_names <- NULL
+        if (!is.null(params$metric)) {
+          metric_names <- params$metric
+        }
+        
+        # If no metric specified, try common ones based on objective
+        if (is.null(metric_names) && !is.null(params$objective)) {
+          objective <- params$objective
+          if (objective == "regression" || objective == "mean_squared_error" || objective == "mse") {
+            metric_names <- c("rmse", "l2", "mse", "mae", "l1")
+          } else if (objective == "binary") {
+            metric_names <- c("auc", "binary_logloss", "logloss", "binary_error")
+          } else if (objective == "multiclass") {
+            metric_names <- c("multi_logloss", "mlogloss", "multi_error", "merror")
+          }
+        }
+        
+        # Fallback to common metrics
+        if (is.null(metric_names)) {
+          metric_names <- c("rmse", "mae", "auc", "logloss", "binary_logloss", "error", "merror", "mlogloss", "multi_logloss")
+        }
+        
+        # Ensure metric_names is a vector
+        if (!is.character(metric_names)) {
+          metric_names <- as.character(metric_names)
+        }
+        
+        # Try to get evaluation results for each dataset and metric combination
+        evals_list <- list()
+        for (ds in dataset_names) {
+          for (met in metric_names) {
+            tryCatch({
+              result <- lightgbm::lgb.get.eval.result(booster, data_name = ds, eval_name = met)
+              if (!is.null(result) && length(result) > 0 && !all(is.na(result))) {
+                if (is.null(evals_list[[ds]])) {
+                  evals_list[[ds]] <- list()
+                }
+                evals_list[[ds]][[met]] <- result
+              }
+            }, error = function(e) {
+              # This dataset/metric combination doesn't exist, continue
+            })
+          }
+        }
+        
+        if (length(evals_list) > 0) {
+          evals_result <- evals_list
+        }
+      }
+    }, error = function(e) {
+      # If API access fails, silently continue with empty evals_result
+    })
+  }
+  
   ret <- list(
     booster = booster,
     evals_result = evals_result,
@@ -346,25 +415,132 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
 
 # Build evaluation log data.frame compatible with xgboost_exp.
 lightgbm_build_evaluation_log <- function(model) {
+  loadNamespace("lightgbm")
+  
   # Prefer evals_result if present (passed by reference), fallback to record_evals.
   evals <- NULL
+  
+  # First, check if evals_result is populated (from callback or our fallback in fml_lightgbm)
   if (!is.null(model$evals_result) && length(model$evals_result) > 0) {
     evals <- model$evals_result
   } else {
     booster <- if (!is.null(model$booster)) model$booster else model
+    
+    # Check record_evals in the booster object (some LightGBM versions store it here)
     if (!is.null(booster$record_evals) && length(booster$record_evals) > 0) {
       evals <- booster$record_evals
+    } else {
+      # Try to access record_evals from the booster's environment if it's an R6 object
+      # Some LightGBM versions store evaluation results in the booster's private environment
+      if (inherits(booster, "lgb.Booster") && !is.null(booster$.__enclos_env__)) {
+        tryCatch({
+          private_env <- booster$.__enclos_env__$private
+          if (!is.null(private_env)) {
+            # Try different possible field names for evaluation results
+            if (!is.null(private_env$record_eval) && length(private_env$record_eval) > 0) {
+              evals <- private_env$record_eval
+            } else if (!is.null(private_env$record_evals) && length(private_env$record_evals) > 0) {
+              evals <- private_env$record_evals
+            } else if (!is.null(private_env$evals_result) && length(private_env$evals_result) > 0) {
+              evals <- private_env$evals_result
+            }
+          }
+        }, error = function(e) {
+          # If accessing private members fails, silently continue
+        })
+      }
+      
+      # If still no evals, try to get them using LightGBM API
+      if (is.null(evals) || length(evals) == 0) {
+        if (inherits(booster, "lgb.Booster")) {
+          tryCatch({
+            # Try to get evaluation results using lgb.get.eval.result if available
+            # First, try to determine what datasets were used during training
+            # Check if we can get dataset names from the booster's internal state
+            dataset_names <- c("train", "validation", "valid", "test")
+            
+            # Try to get the metric name from params or infer from model
+            metric_names <- NULL
+            if (!is.null(model$params) && !is.null(model$params$metric)) {
+              metric_names <- model$params$metric
+            } else if (!is.null(booster$params) && !is.null(booster$params$metric)) {
+              metric_names <- booster$params$metric
+            }
+            
+            # If we can't determine metrics, try common ones based on objective
+            if (is.null(metric_names)) {
+              objective <- NULL
+              if (!is.null(model$params) && !is.null(model$params$objective)) {
+                objective <- model$params$objective
+              } else if (!is.null(booster$params) && !is.null(booster$params$objective)) {
+                objective <- booster$params$objective
+              }
+              
+              # Set default metrics based on objective
+              if (!is.null(objective)) {
+                if (objective == "regression" || objective == "mean_squared_error" || objective == "mse") {
+                  metric_names <- c("rmse", "l2", "mse", "mae", "l1", "l2_root")
+                } else if (objective == "binary") {
+                  metric_names <- c("auc", "binary_logloss", "logloss", "binary_error", "binary")
+                } else if (objective == "multiclass") {
+                  metric_names <- c("multi_logloss", "mlogloss", "multi_error", "merror")
+                }
+              }
+              
+              # Fallback to common metrics if still unknown
+              if (is.null(metric_names)) {
+                metric_names <- c("rmse", "l2", "mse", "mae", "l1", "l2_root", "auc", "logloss", "binary_logloss", "error", "merror", "mlogloss", "multi_logloss")
+              }
+            }
+            
+            # Ensure metric_names is a vector
+            if (!is.character(metric_names)) {
+              metric_names <- as.character(metric_names)
+            }
+            
+            # Try to get evaluation results for each dataset and metric combination
+            evals_list <- list()
+            if (exists("lgb.get.eval.result", asNamespace("lightgbm"), inherits = FALSE)) {
+              for (ds in dataset_names) {
+                for (met in metric_names) {
+                  tryCatch({
+                    result <- lightgbm::lgb.get.eval.result(booster, data_name = ds, eval_name = met)
+                    if (!is.null(result) && length(result) > 0 && !all(is.na(result))) {
+                      if (is.null(evals_list[[ds]])) {
+                        evals_list[[ds]] <- list()
+                      }
+                      evals_list[[ds]][[met]] <- result
+                    }
+                  }, error = function(e) {
+                    # This dataset/metric combination doesn't exist, continue
+                  })
+                }
+              }
+            }
+            
+            if (length(evals_list) > 0) {
+              evals <- evals_list
+            }
+          }, error = function(e) {
+            # If API access fails, silently continue
+          })
+        }
+      }
     }
   }
+  
   if (is.null(evals) || length(evals) == 0) {
     return(NULL)
   }
 
   # evals structure: evals[[dataset]][[metric]] is a numeric vector per iteration.
   dataset_names <- names(evals)
+  if (is.null(dataset_names) || length(dataset_names) == 0) {
+    return(NULL)
+  }
   first_ds <- dataset_names[[1]]
   metric_names <- names(evals[[first_ds]])
-  if (length(metric_names) == 0) {
+  if (is.null(metric_names) || length(metric_names) == 0) {
     return(NULL)
   }
   n_iter <- length(evals[[first_ds]][[metric_names[[1]]]])
