@@ -58,6 +58,22 @@ test_that("exp_lightgbm(regression) evaluate training and test with FIRM importa
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2)
+  # Check model accuracy metrics (RMSE / R Squared) for both training and test.
+  expect_true(all(c("RMSE", "R Squared") %in% colnames(ret)))
+  expect_true(all(is.finite(ret$RMSE)))
+  expect_true(all(ret$RMSE > 0))
+  expect_true(all(is.finite(ret$`R Squared`)))
+  expect_true(all(ret$`R Squared` <= 1))
+  # Check expected RMSE / R Squared values (from known stable run output).
+  expect_true("Data Type" %in% colnames(ret))
+  train_eval <- ret %>% dplyr::filter(`Data Type` == "Training")
+  test_eval <- ret %>% dplyr::filter(`Data Type` == "Test")
+  expect_equal(nrow(train_eval), 1)
+  expect_equal(nrow(test_eval), 1)
+  expect_equal(train_eval$RMSE[[1]], 26.5, tolerance = 1.0)
+  expect_equal(test_eval$RMSE[[1]], 13.6, tolerance = 1.0)
+  expect_equal(train_eval$`R Squared`[[1]], 0.538, tolerance = 0.05)
+  expect_equal(test_eval$`R Squared`[[1]], 0.768, tolerance = 0.05)
 
   ret <- model_df %>% rf_partial_dependence()
   expect_equal(class(ret$conf_high), "numeric")
@@ -104,6 +120,22 @@ test_that("exp_lightgbm(regression) evaluate training and test with permutation 
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2)
+  # Check model accuracy metrics (RMSE / R Squared) for both training and test.
+  expect_true(all(c("RMSE", "R Squared") %in% colnames(ret)))
+  expect_true(all(is.finite(ret$RMSE)))
+  expect_true(all(ret$RMSE > 0))
+  expect_true(all(is.finite(ret$`R Squared`)))
+  expect_true(all(ret$`R Squared` <= 1))
+  # Check expected RMSE / R Squared values (from known stable run output).
+  expect_true("Data Type" %in% colnames(ret))
+  train_eval <- ret %>% dplyr::filter(`Data Type` == "Training")
+  test_eval <- ret %>% dplyr::filter(`Data Type` == "Test")
+  expect_equal(nrow(train_eval), 1)
+  expect_equal(nrow(test_eval), 1)
+  expect_equal(train_eval$RMSE[[1]], 26.5, tolerance = 1.0)
+  expect_equal(test_eval$RMSE[[1]], 13.6, tolerance = 1.0)
+  expect_equal(train_eval$`R Squared`[[1]], 0.538, tolerance = 0.05)
+  expect_equal(test_eval$`R Squared`[[1]], 0.768, tolerance = 0.05)
 
   ret <- model_df %>% rf_partial_dependence()
   expect_equal(class(ret$conf_high), "numeric")
@@ -165,6 +197,15 @@ test_that("exp_lightgbm evaluate training and test with FIRM importance - binary
   expect_true(all(c("auc", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall") %in% colnames(ret)))
   expect_equal(nrow(ret), 2)
   expect_gt(ret$auc[[1]], 0.5)
+  # Check model accuracy metrics (AUC) for both training and test.
+  expect_true(all(is.finite(ret$auc)))
+  expect_true(all(ret$auc >= 0 & ret$auc <= 1))
+  train_auc <- ret %>% dplyr::filter(is_test_data == FALSE) %>% dplyr::pull(auc)
+  test_auc <- ret %>% dplyr::filter(is_test_data == TRUE) %>% dplyr::pull(auc)
+  expect_equal(length(train_auc), 1)
+  expect_equal(length(test_auc), 1)
+  expect_equal(train_auc[[1]], 0.651, tolerance = 0.05)
+  expect_equal(test_auc[[1]], 0.521, tolerance = 0.05)
 
   ret <- model_df %>% tidy_rowwise(model, type = "conf_mat")
   ret <- model_df %>% tidy_rowwise(model, type = "partial_dependence")
@@ -211,6 +252,15 @@ test_that("exp_lightgbm evaluate training and test with permutation importance -
   expect_true(all(c("auc", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall") %in% colnames(ret)))
   expect_equal(nrow(ret), 2)
   expect_gt(ret$auc[[1]], 0.5)
+  # Check model accuracy metrics (AUC) for both training and test.
+  expect_true(all(is.finite(ret$auc)))
+  expect_true(all(ret$auc >= 0 & ret$auc <= 1))
+  train_auc <- ret %>% dplyr::filter(is_test_data == FALSE) %>% dplyr::pull(auc)
+  test_auc <- ret %>% dplyr::filter(is_test_data == TRUE) %>% dplyr::pull(auc)
+  expect_equal(length(train_auc), 1)
+  expect_equal(length(test_auc), 1)
+  expect_equal(train_auc[[1]], 0.651, tolerance = 0.05)
+  expect_equal(test_auc[[1]], 0.521, tolerance = 0.05)
 
   ret <- model_df %>% tidy_rowwise(model, type = "conf_mat")
   ret <- model_df %>% tidy_rowwise(model, type = "partial_dependence")
