@@ -38,6 +38,9 @@ expand_lightgbm_metric_aliases <- function(metric_names) {
     l2root = c("l2root", "rmse", "l2_root"),
     logloss = c("logloss", "binary_logloss"),
     binary_logloss = c("binary_logloss", "logloss"),
+    # Some LightGBM versions/configs may expose binary error as "error".
+    binary_error = c("binary_error", "error"),
+    error = c("error", "binary_error"),
     mlogloss = c("mlogloss", "multi_logloss"),
     multi_logloss = c("multi_logloss", "mlogloss"),
     merror = c("merror", "multi_error"),
