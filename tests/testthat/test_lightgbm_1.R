@@ -170,6 +170,40 @@ test_that("exp_lightgbm(regression) evaluation_log works with eval_metric_regres
   expect_true(all(ret$name %in% c("l1", "mae")))
 })
 
+test_that("exp_lightgbm(firm) rf_partial_dependence tolerates numeric target attribute", {
+  set.seed(1)
+  df <- tibble::tibble(
+    y = rnorm(500),
+    x1 = rnorm(500),
+    x2 = runif(500)
+  )
+
+  model_df <- df %>%
+    exp_lightgbm(target = y, x1, x2,
+      importance_measure = "firm",
+      watchlist_rate = 0.1,
+      test_rate = 0,
+      # keep it lightweight
+      max_pd_vars = 2,
+      pd_with_bin_means = FALSE,
+      nrounds = 10
+    )
+
+  # Simulate the problematic case: some callers/versions can store target as a numeric index.
+  # This used to cause "subscript out of bounds" / symbol conversion errors in handle_partial_dependence().
+  m <- model_df$model[[1]]
+  target_name <- attr(m$partial_dependence, "target")
+  target_idx <- which(colnames(m$partial_dependence) == target_name)
+  # Make sure we point to the actual target column.
+  expect_equal(length(target_idx), 1)
+  attr(m$partial_dependence, "target") <- target_idx
+  model_df$model[[1]] <- m
+
+  pd <- model_df %>% rf_partial_dependence()
+  expect_true(is.data.frame(pd))
+  expect_gt(nrow(pd), 0)
+})
+
 test_that("exp_lightgbm - regression - evaluate training and test with locale conversion", {
   set.seed(1)
   orig_locale <- Sys.getlocale("LC_TIME")
