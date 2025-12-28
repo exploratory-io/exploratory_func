@@ -57,7 +57,7 @@ sanitize_lightgbm_colnames <- function(names) {
 #' @param sparse If matrix should be sparse.
 #' As default, it becomes sparse if there is any categorical value.
 #' @export
-fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
+fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, valid_data = NULL, ...) {
   loadNamespace("lightgbm")
 
   lgb_dataset_compat <- function(data, label, weight = NULL, free_raw_data = FALSE) {
@@ -110,6 +110,11 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
 
   lgb_train_compat <- function(args) {
     train_formals <- names(formals(lightgbm::lgb.train))
+    # Ensure evaluation results are recorded when supported.
+    # Some LightGBM versions print evals but don't store them unless `record=TRUE`.
+    if ("record" %in% train_formals && is.null(args$record)) {
+      args$record <- TRUE
+    }
     # Keep only supported named arguments unless lgb.train has ...
     if (!("..." %in% train_formals)) {
       args <- args[names(args) %in% train_formals]
@@ -270,6 +275,122 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
     callbacks <- c(callbacks, list(lightgbm::cb.record.evaluation(evals_result)))
   }
 
+  # Cache xlevels so we can build consistent model matrices for any extra validation datasets.
+  xlevels <- .getXlevels(term, df_for_model_matrix)
+
+  # Helper: safely get column names for Matrix and base matrices.
+  get_colnames_safe <- function(mat) {
+    cn <- colnames(mat)
+    if (is.null(cn) && inherits(mat, "Matrix")) {
+      cn <- dimnames(mat)[[2]]
+    }
+    cn
+  }
+
+  # Helper: align a matrix's columns to training columns (add missing columns as zeros, drop extras, reorder).
+  align_matrix_cols <- function(mat, train_cols) {
+    if (inherits(mat, "Matrix")) {
+      cn <- get_colnames_safe(mat)
+      if (is.null(cn)) {
+        stop("Validation matrix has no column names; cannot align to training features.")
+      }
+      common <- intersect(cn, train_cols)
+      mat2 <- mat[, common, drop = FALSE]
+      missing <- setdiff(train_cols, common)
+      if (length(missing) > 0) {
+        zeros <- Matrix::Matrix(0, nrow = nrow(mat2), ncol = length(missing), sparse = TRUE)
+        colnames(zeros) <- missing
+        mat2 <- cbind(mat2, zeros)
+      }
+      mat2 <- mat2[, train_cols, drop = FALSE]
+      mat2
+    } else {
+      cn <- colnames(mat)
+      if (is.null(cn)) {
+        stop("Validation matrix has no column names; cannot align to training features.")
+      }
+      common <- intersect(cn, train_cols)
+      mat2 <- mat[, common, drop = FALSE]
+      missing <- setdiff(train_cols, common)
+      if (length(missing) > 0) {
+        zeros <- matrix(0, nrow = nrow(mat2), ncol = length(missing))
+        colnames(zeros) <- missing
+        mat2 <- cbind(mat2, zeros)
+      }
+      mat2 <- mat2[, train_cols, drop = FALSE]
+      mat2
+    }
+  }
+
+  # Helper: build a LightGBM Dataset from a validation data.frame using the training term/xlevels.
+  build_valid_dataset <- function(df_valid, train_cols, sanitized_cols) {
+    mf_valid <- tryCatch({
+      model.frame(term, data = df_valid, na.action = na.pass, xlev = xlevels)
+    }, error = function(e) {
+      NULL
+    })
+    if (is.null(mf_valid) || nrow(mf_valid) == 0) {
+      return(NULL)
+    }
+
+    y_valid <- model.response(mf_valid)
+    if (length(y_valid) == 0) {
+      return(NULL)
+    }
+    keep_idx <- !is.na(y_valid)
+    mf_valid <- mf_valid[keep_idx, , drop = FALSE]
+    y_valid <- y_valid[keep_idx]
+    if (nrow(mf_valid) == 0) {
+      return(NULL)
+    }
+
+    mat_valid <- if (isTRUE(sparse)) {
+      Matrix::sparse.model.matrix(term, data = mf_valid)
+    } else {
+      model.matrix(term, data = mf_valid)
+    }
+
+    # Align columns to training columns and apply the same sanitization as training.
+    mat_valid <- align_matrix_cols(mat_valid, train_cols)
+    if (inherits(mat_valid, "Matrix")) {
+      dimnames(mat_valid) <- list(dimnames(mat_valid)[[1]], sanitized_cols)
+      tryCatch({ colnames(mat_valid) <- sanitized_cols }, error = function(e) {})
+    } else {
+      colnames(mat_valid) <- sanitized_cols
+    }
+
+    # Ensure numeric matrix for dense case.
+    if (!inherits(mat_valid, "Matrix")) {
+      if (is.integer(mat_valid) || is.logical(mat_valid)) {
+        mat_valid <- matrix(as.numeric(mat_valid), ncol = ncol(mat_valid))
+      } else {
+        storage.mode(mat_valid) <- "double"
+      }
+    }
+
+    lgb_dataset_compat(data = mat_valid, label = y_valid, free_raw_data = FALSE)
+  }
+
+  # Normalize valid_data to a named list of data.frames (or NULL).
+  normalize_valid_data <- function(valid_data) {
+    if (is.null(valid_data)) {
+      return(NULL)
+    }
+    if (is.data.frame(valid_data)) {
+      out <- list(validation = valid_data)
+      return(out)
+    }
+    if (is.list(valid_data)) {
+      if (is.null(names(valid_data)) || any(names(valid_data) == "")) {
+        # Allow unnamed list; auto-name as validation_1, validation_2, ...
+        names(valid_data) <- paste0("validation_", seq_along(valid_data))
+      }
+      return(valid_data)
+    }
+    stop("valid_data must be NULL, a data.frame, or a named list of data.frames.")
+  }
+  valid_data <- normalize_valid_data(valid_data)
+
   booster <- if (watchlist_rate != 0.0) {
     if (watchlist_rate < 0 || 1 <= watchlist_rate) {
       stop("watchlist_rate must be between 0 and 1")
@@ -297,12 +418,24 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
     dtrain <- lgb_dataset_compat(data = train_mat, label = train_y, weight = train_w, free_raw_data = FALSE)
     dvalid <- lgb_dataset_compat(data = watch_mat, label = watch_y, weight = watch_w, free_raw_data = FALSE)
 
+    valids_list <- list(train = dtrain, validation = dvalid)
+    if (!is.null(valid_data) && length(valid_data) > 0) {
+      for (nm in names(valid_data)) {
+        ds <- build_valid_dataset(valid_data[[nm]], train_cols = original_colnames, sanitized_cols = sanitized_colnames)
+        if (!is.null(ds)) {
+          # Avoid clobbering existing names ("train"/"validation").
+          nm_safe <- make.unique(c(names(valids_list), nm))[[length(valids_list) + 1]]
+          valids_list[[nm_safe]] <- ds
+        }
+      }
+    }
+
     train_args <- c(
       list(
         params = params,
         data = dtrain,
         nrounds = nrounds,
-        valids = list(train = dtrain, validation = dvalid)
+        valids = valids_list
       ),
       if (length(callbacks) > 0) list(callbacks = callbacks) else list(),
       dots
@@ -312,12 +445,23 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
   } else {
     dtrain <- lgb_dataset_compat(data = md_mat, label = y, weight = weight, free_raw_data = FALSE)
 
+    valids_list <- list(train = dtrain)
+    if (!is.null(valid_data) && length(valid_data) > 0) {
+      for (nm in names(valid_data)) {
+        ds <- build_valid_dataset(valid_data[[nm]], train_cols = original_colnames, sanitized_cols = sanitized_colnames)
+        if (!is.null(ds)) {
+          nm_safe <- make.unique(c(names(valids_list), nm))[[length(valids_list) + 1]]
+          valids_list[[nm_safe]] <- ds
+        }
+      }
+    }
+
     train_args <- c(
       list(
         params = params,
         data = dtrain,
         nrounds = nrounds,
-        valids = list(train = dtrain)
+        valids = valids_list
       ),
       if (length(callbacks) > 0) list(callbacks = callbacks) else list(),
       dots
@@ -419,6 +563,72 @@ lightgbm_build_evaluation_log <- function(model) {
   
   # Prefer evals_result if present (passed by reference), fallback to record_evals.
   evals <- NULL
+
+  # LightGBM versions differ in how they store evaluation history.
+  # We normalize any supported structure into:
+  #   evals[[dataset]][[metric]] -> numeric vector per iteration
+  extract_eval_vector <- function(x) {
+    if (is.null(x)) return(NULL)
+    if (is.numeric(x)) return(x)
+    if (is.list(x)) {
+      # Common named fields used across versions.
+      for (k in c("eval", "value", "values", "data")) {
+        if (!is.null(x[[k]]) && is.numeric(x[[k]])) {
+          return(x[[k]])
+        }
+      }
+      # Sometimes it's a list like list(<numeric>, <iter/int>) (your case shows List of 2).
+      numeric_elems <- x[vapply(x, is.numeric, logical(1))]
+      if (length(numeric_elems) > 0) {
+        lens <- vapply(numeric_elems, length, integer(1))
+        return(numeric_elems[[which.max(lens)]])
+      }
+      # One more level of nesting, best-effort.
+      nested <- lapply(x, extract_eval_vector)
+      nested <- nested[!vapply(nested, is.null, logical(1))]
+      if (length(nested) > 0) {
+        lens <- vapply(nested, length, integer(1))
+        return(nested[[which.max(lens)]])
+      }
+    }
+    NULL
+  }
+
+  normalize_evals <- function(evals) {
+    if (is.null(evals) || length(evals) == 0) return(NULL)
+    ds_names <- names(evals)
+    if (is.null(ds_names) || length(ds_names) == 0) return(NULL)
+    out <- list()
+    for (ds in ds_names) {
+      met_names <- names(evals[[ds]])
+      if (is.null(met_names) || length(met_names) == 0) next
+      for (met in met_names) {
+        v <- extract_eval_vector(evals[[ds]][[met]])
+        if (!is.null(v) && length(v) > 0 && !all(is.na(v))) {
+          if (is.null(out[[ds]])) out[[ds]] <- list()
+          out[[ds]][[met]] <- v
+        }
+      }
+    }
+    if (length(out) == 0) return(NULL)
+    out
+  }
+
+  merge_evals <- function(primary, secondary) {
+    # Fill missing dataset/metric combos in primary from secondary.
+    if (is.null(primary) || length(primary) == 0) return(secondary)
+    if (is.null(secondary) || length(secondary) == 0) return(primary)
+    out <- primary
+    for (ds in names(secondary)) {
+      if (is.null(out[[ds]])) out[[ds]] <- list()
+      for (met in names(secondary[[ds]])) {
+        if (is.null(out[[ds]][[met]]) || length(out[[ds]][[met]]) == 0) {
+          out[[ds]][[met]] <- secondary[[ds]][[met]]
+        }
+      }
+    }
+    out
+  }
   
   # First, check if evals_result is populated (from callback or our fallback in fml_lightgbm)
   if (!is.null(model$evals_result) && length(model$evals_result) > 0) {
@@ -529,6 +739,19 @@ lightgbm_build_evaluation_log <- function(model) {
     }
   }
   
+  if (is.null(evals) || length(evals) == 0) {
+    return(NULL)
+  }
+
+  # Normalize/merge evaluation logs across sources (some versions populate both).
+  booster <- if (!is.null(model$booster)) model$booster else model
+  evals_norm <- normalize_evals(evals)
+  if (!is.null(booster$record_evals) && length(booster$record_evals) > 0) {
+    rec_norm <- normalize_evals(booster$record_evals)
+    # Prefer the callback evals (if any) but fill any missing dataset/metric from record_evals.
+    evals_norm <- merge_evals(evals_norm, rec_norm)
+  }
+  evals <- evals_norm
   if (is.null(evals) || length(evals) == 0) {
     return(NULL)
   }
@@ -1370,8 +1593,23 @@ exp_lightgbm <- function(df,
       source_data <- df
       test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
+
+      # If we are in "test mode" (test_rate > 0) but there is no explicit watchlist_rate,
+      # we pass the cleaned test split to LightGBM as an extra validation dataset so that
+      # per-iteration evaluation metrics (evaluation_log) include both train and test.
+      df_test <- NULL
+      df_test_clean <- NULL
+      na_row_numbers_test <- NULL
+      unknown_category_rows_index <- NULL
+      valid_data <- NULL
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+        if (watchlist_rate == 0 && !is.null(df_test_clean) && nrow(df_test_clean) > 0) {
+          valid_data <- list(test = df_test_clean)
+        }
       }
 
       # Restore source_data column name to original column name
@@ -1404,7 +1642,8 @@ exp_lightgbm <- function(df,
           early_stopping_rounds = early_stopping_rounds,
           output_type = output_type_binary,
           eval_metric = eval_metric_binary,
-          params = common_params
+          params = common_params,
+          valid_data = valid_data
         )
       } else if (is_target_numeric) {
         model <- lightgbm_reg(
@@ -1415,7 +1654,8 @@ exp_lightgbm <- function(df,
           early_stopping_rounds = early_stopping_rounds,
           output_type = output_type_regression,
           eval_metric = eval_metric_regression,
-          params = common_params
+          params = common_params,
+          valid_data = valid_data
         )
       } else {
         model <- lightgbm_multi(
@@ -1426,7 +1666,8 @@ exp_lightgbm <- function(df,
           early_stopping_rounds = early_stopping_rounds,
           output_type = output_type_multiclass,
           eval_metric = eval_metric_multiclass,
-          params = common_params
+          params = common_params,
+          valid_data = valid_data
         )
       }
 
@@ -1438,10 +1679,15 @@ exp_lightgbm <- function(df,
       model$prediction_training <- predict_lightgbm(model, df)
 
       if (test_rate > 0) {
-        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
-        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
-        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
-
+        # Reuse the cleaned test data prepared above.
+        if (is.null(df_test_clean) || nrow(df_test_clean) == 0) {
+          # Keep consistent behavior: if no valid test rows remain, skip test prediction.
+          if (!is.null(df_test) && is.data.frame(df_test)) {
+            df_test_clean <- df_test[0, , drop = FALSE]
+          } else {
+            df_test_clean <- data.frame()
+          }
+        }
         prediction_test <- predict_lightgbm(model, df_test_clean)
 
         attr(prediction_test, "na.action") <- na_row_numbers_test
