@@ -13,6 +13,45 @@ has_special_json_chars <- function(names) {
   any(has_special1 | has_special2 | has_special3)
 }
 
+# Helper: expand metric names to include common LightGBM aliases across versions.
+# This matters because `lgb.get.eval.result(..., eval_name=)` expects the internal
+# evaluation name (e.g. MAE is often exposed as "l1").
+expand_lightgbm_metric_aliases <- function(metric_names) {
+  if (is.null(metric_names) || length(metric_names) == 0) {
+    return(metric_names)
+  }
+  metric_names <- as.character(metric_names)
+  metric_names <- metric_names[!is.na(metric_names)]
+  metric_names <- trimws(metric_names)
+  metric_names <- metric_names[metric_names != ""]
+  if (length(metric_names) == 0) {
+    return(metric_names)
+  }
+
+  alias_map <- list(
+    mae = c("mae", "l1"),
+    l1 = c("l1", "mae"),
+    mse = c("mse", "l2"),
+    l2 = c("l2", "mse"),
+    rmse = c("rmse", "l2_root", "l2root"),
+    l2_root = c("l2_root", "rmse", "l2root"),
+    l2root = c("l2root", "rmse", "l2_root"),
+    logloss = c("logloss", "binary_logloss"),
+    binary_logloss = c("binary_logloss", "logloss"),
+    mlogloss = c("mlogloss", "multi_logloss"),
+    multi_logloss = c("multi_logloss", "mlogloss"),
+    merror = c("merror", "multi_error"),
+    multi_error = c("multi_error", "merror")
+  )
+
+  expanded <- unique(unlist(lapply(metric_names, function(m) {
+    key <- tolower(m)
+    if (!is.null(alias_map[[key]])) alias_map[[key]] else m
+  }), use.names = FALSE))
+
+  expanded
+}
+
 # Helper function to sanitize column names for LightGBM
 # LightGBM doesn't support special JSON characters in feature names
 # Special JSON characters: { } [ ] " ' \ / : , ` and control characters, spaces
@@ -347,6 +386,7 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
         if (!is.null(params$metric)) {
           metric_names <- params$metric
         }
+        metric_names <- expand_lightgbm_metric_aliases(metric_names)
         
         # If no metric specified, try common ones based on objective
         if (is.null(metric_names) && !is.null(params$objective)) {
@@ -364,6 +404,7 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
         if (is.null(metric_names)) {
           metric_names <- c("rmse", "mae", "auc", "logloss", "binary_logloss", "error", "merror", "mlogloss", "multi_logloss")
         }
+        metric_names <- expand_lightgbm_metric_aliases(metric_names)
         
         # Ensure metric_names is a vector
         if (!is.character(metric_names)) {
@@ -466,6 +507,7 @@ lightgbm_build_evaluation_log <- function(model) {
             } else if (!is.null(booster$params) && !is.null(booster$params$metric)) {
               metric_names <- booster$params$metric
             }
+            metric_names <- expand_lightgbm_metric_aliases(metric_names)
             
             # If we can't determine metrics, try common ones based on objective
             if (is.null(metric_names)) {
@@ -492,6 +534,7 @@ lightgbm_build_evaluation_log <- function(model) {
                 metric_names <- c("rmse", "l2", "mse", "mae", "l1", "l2_root", "auc", "logloss", "binary_logloss", "error", "merror", "mlogloss", "multi_logloss")
               }
             }
+            metric_names <- expand_lightgbm_metric_aliases(metric_names)
             
             # Ensure metric_names is a vector
             if (!is.character(metric_names)) {
@@ -1453,6 +1496,12 @@ exp_lightgbm <- function(df,
       if (is.null(max_pd_vars)) {
         max_pd_vars <- 20
       }
+      # Guard against the surprising behavior of 1:0 (which yields c(1, 0)).
+      # Treat non-positive values as "no partial dependence vars".
+      max_pd_vars <- suppressWarnings(as.integer(max_pd_vars))
+      if (is.na(max_pd_vars) || max_pd_vars < 0) {
+        max_pd_vars <- 0
+      }
 
       if (length(c_cols) > 1) {
         if (importance_measure == "permutation") {
@@ -1477,10 +1526,10 @@ exp_lightgbm <- function(df,
           imp_vars <- c_cols
         } else if ("error" %in% class(model$imp_df)) {
           imp_vars <- c_cols
-          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)]
+          imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
         } else {
           imp_vars <- model$imp_df$variable
-          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)]
+          imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
         }
       } else {
         error <- simpleError("Variable importance requires two or more variables.")
@@ -1512,7 +1561,7 @@ exp_lightgbm <- function(df,
           imp_vars <- c_cols
         }
 
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)]
+        imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
         model$imp_vars <- imp_vars
         model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
@@ -1686,7 +1735,11 @@ tidy.lightgbm_exp <- function(x, type = "importance", pretty.name = FALSE, binar
       }
       ret <- x$evaluation_log %>% as.data.frame()
       ret <- ret %>% tidyr::pivot_longer(cols = c(-iter))
-      ret <- ret %>% tidyr::separate(col = "name", into = c("type", "name"))
+      # Columns are like "train_rmse", "validation_binary_logloss", etc.
+      # Some metrics contain underscores; split only on the first "_" so we keep the full metric name.
+      ret <- ret %>% tidyr::separate(col = "name", into = c("type", "name"), sep = "_", extra = "merge", fill = "right")
+      # Keep legacy column name used by existing tests and downstream code.
+      colnames(ret)[colnames(ret) == "iter"] <- "Iter"
       ret
     },
     {
