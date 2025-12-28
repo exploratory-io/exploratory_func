@@ -150,6 +150,16 @@ handle_partial_dependence <- function(x) {
   ret <- x$partial_dependence
   var_cols <- attr(x$partial_dependence, "vars")
   target_col <- attr(x$partial_dependence, "target")
+  # Be defensive: some model implementations/callers may store target as a numeric index or other types.
+  # Avoid `ret[[target_col]]` and `df[[target_col]]` throwing "subscript out of bounds".
+  if (is.numeric(target_col) && length(target_col) == 1) {
+    if (!is.null(colnames(ret)) && target_col >= 1 && target_col <= ncol(ret)) {
+      target_col <- colnames(ret)[[target_col]]
+    }
+  }
+  if (!is.null(target_col) && !is.character(target_col)) {
+    target_col <- as.character(target_col)
+  }
   # We used to do the following, probably for better formatting of numbers, but this had side-effect of
   # turning close numbers into a same number, when differences among numbers are small compared to their
   # absolute values. It happened with Date data turned into numeric.
@@ -180,7 +190,7 @@ handle_partial_dependence <- function(x) {
     actual_ret <- x$partial_binning
     ret <- actual_ret %>% dplyr::bind_rows(ret) # So that PDP is drawn over the binning, the bind_row order needs to be this way.
     # Separate regression case and binary classification case, and adjust column names accordingly.
-    if (length(target_col) == 1 && target_col != "TRUE" && !is.null(ret[[target_col]])) { # "TRUE" target_column means it's binary classification.
+    if (is.character(target_col) && length(target_col) == 1 && target_col != "TRUE" && target_col %in% colnames(ret)) { # "TRUE" target_column means it's binary classification.
       # Regression case.
       ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col)) # Rename target column to Predicted to make comparison with Actual.
     }
@@ -193,9 +203,9 @@ handle_partial_dependence <- function(x) {
   }
   else { # When partial_binning is not available, still rename target column to "Predicted" for consistency
     # Handle regression case - target_col should be a single column name
-    if (length(target_col) == 1 && target_col != "TRUE") {
+    if (is.character(target_col) && length(target_col) == 1 && target_col != "TRUE") {
       # Check if the target column exists in ret, if not, it might be a mapped name issue
-      if (!is.null(ret[[target_col]])) {
+      if (target_col %in% colnames(ret)) {
         ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col))
       } else {
         # If target_col doesn't match, try to find the target column by checking which columns are not in var_cols
