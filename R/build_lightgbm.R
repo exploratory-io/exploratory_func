@@ -98,6 +98,7 @@ sanitize_lightgbm_colnames <- function(names) {
 #' Can be na.omit, na.pass, na.fail
 #' @param sparse If matrix should be sparse.
 #' As default, it becomes sparse if there is any categorical value.
+#' @param valid_data Extra validation data to evaluate during training; can be NULL, a data.frame, or a named list of data.frames.
 #' @export
 fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, valid_data = NULL, ...) {
   loadNamespace("lightgbm")
