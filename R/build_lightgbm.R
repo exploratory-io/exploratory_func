@@ -405,6 +405,8 @@ fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_
     if (!inherits(mat_valid, "Matrix")) {
       if (is.integer(mat_valid) || is.logical(mat_valid)) {
         mat_valid <- matrix(as.numeric(mat_valid), ncol = ncol(mat_valid))
+        # Re-apply sanitized column names, which are lost by matrix()
+        colnames(mat_valid) <- sanitized_cols
       } else {
         storage.mode(mat_valid) <- "double"
       }
