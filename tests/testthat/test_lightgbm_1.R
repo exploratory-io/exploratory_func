@@ -170,6 +170,26 @@ test_that("exp_lightgbm(regression) evaluation_log works with eval_metric_regres
   expect_true(all(ret$name %in% c("l1", "mae")))
 })
 
+test_that("exp_lightgbm(regression) evaluation_log includes test when test_rate>0 and watchlist_rate=0", {
+  set.seed(1)
+  # Keep this test minimal to avoid long permutation importance / PD calculations.
+  model_df <- flight %>%
+    exp_lightgbm(`ARR DELAY`, `DEP DELAY`, `AIR TIME`, `DIS TANCE`,
+      test_rate = 0.3,
+      watchlist_rate = 0,
+      importance_measure = "lightgbm",
+      max_pd_vars = 0,
+      pd_with_bin_means = FALSE,
+      nrounds = 10
+    )
+
+  ret <- model_df %>% tidy_rowwise(model, type = "evaluation_log")
+  # 10 iterations * 2 datasets (train/test)
+  expect_equal(nrow(ret), 20)
+  expect_equal(colnames(ret), c("Iter", "type", "name", "value"))
+  expect_true(all(c("train", "test") %in% unique(ret$type)))
+})
+
 test_that("exp_lightgbm(firm) rf_partial_dependence tolerates numeric target attribute", {
   set.seed(1)
   df <- tibble::tibble(
