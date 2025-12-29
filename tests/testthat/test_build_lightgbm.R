@@ -1,6 +1,7 @@
 context("test build_lightgbm")
 
 testthat::skip_if_not_installed("lightgbm")
+testthat::skip_if_not_installed("Matrix")
 
 test_that("test build_lightgbm with na.omit", {
   test_data <- structure(
@@ -17,6 +18,37 @@ test_that("test build_lightgbm with na.omit", {
   prediction_ret <- prediction_binary(model_ret)
   expect_true(any(prediction_ret$predicted_label))
   expect_true(any(!prediction_ret$predicted_label))
+})
+
+test_that("test build_lightgbm with sparse=TRUE and valid_data", {
+  set.seed(1)
+  df <- data.frame(
+    y = sample(c(TRUE, FALSE), 120, replace = TRUE),
+    x1 = rnorm(120),
+    x2 = factor(sample(letters[1:3], 120, replace = TRUE))
+  )
+
+  train_df <- df[21:120, , drop = FALSE]
+  valid_df <- df[1:20, , drop = FALSE]
+
+  model_ret <- build_model(
+    train_df,
+    model_func = lightgbm_binary,
+    formula = y ~ x1 + x2,
+    nrounds = 5,
+    eval_metric = "auc",
+    na.action = na.pass,
+    sparse = TRUE,
+    valid_data = valid_df
+  )
+
+  # Assert the sparse flag is propagated into the fitted model wrapper.
+  expect_true(isTRUE(model_ret$model[[1]]$is_sparse))
+
+  # And that we can still generate predictions successfully.
+  prediction_ret <- prediction_binary(model_ret)
+  expect_true(is.numeric(prediction_ret$predicted_probability))
+  expect_true(all(prediction_ret$predicted_probability >= 0 & prediction_ret$predicted_probability <= 1, na.rm = TRUE))
 })
 
 test_that("test build_lightgbm prediction with optimized threshold", {
