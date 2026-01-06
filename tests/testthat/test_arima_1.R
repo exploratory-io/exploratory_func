@@ -128,7 +128,7 @@ test_that("exp_arima with short data", {
   model_df <- raw_data %>%
     exp_arima(`time stamp`, `da ta`, 10, time_unit = "day", funs.aggregate.regressors = c(mean), yearly.seasonality = "auto", weekly.seasonality = "auto", output="model")
 
-  expect_equal(last(model_df$data[[1]]$`time stamp`), as.Date("2010-01-23")) 
+  expect_equal(last(model_df$data[[1]]$`time stamp`), as.Date("2010-01-23"))
   # test for glance.
   ret <- model_df %>% glance_with_ts_metric()
   expect_true(all(c("RMSE","MAE","MAPE (Ratio)") %in% names(ret)))
@@ -148,7 +148,7 @@ test_that("exp_arima with extra regressors", {
   expect_equal(names(coef_df), c("Variable","Importance"))
   ret <- model_df %>% tidy_rowwise(model)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11"))
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
@@ -166,7 +166,7 @@ test_that("exp_arima with extra regressor with holiday column", {
   expect_equal(names(coef_df), c("Variable","Importance"))
   ret <- model_df %>% tidy_rowwise(model)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11"))
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
@@ -183,7 +183,7 @@ test_that("exp_arima with holiday column", {
   ret <- combined_data %>%
     exp_arima(timestamp, data, 10, time_unit = "day", holiday=`holi day`)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11"))
 })
 
 test_that("exp_arima with factor holiday column", {
@@ -198,7 +198,7 @@ test_that("exp_arima with factor holiday column", {
   ret <- combined_data %>%
     exp_arima(timestamp, data, 10, time_unit = "day", holiday=`holi day`)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11"))
 })
 
 test_that("exp_arima with logical holiday column", {
@@ -212,7 +212,7 @@ test_that("exp_arima with logical holiday column", {
   ret <- combined_data %>%
     exp_arima(timestamp, data, 10, time_unit = "day", holiday=`holi day`)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11"))
 })
 
 test_that("exp_arima with numeric holiday column", {
@@ -227,7 +227,7 @@ test_that("exp_arima with numeric holiday column", {
   ret <- combined_data %>%
     exp_arima(timestamp, data, 10, time_unit = "day", holiday=`holi day`)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11"))
 })
 
 test_that("exp_arima with regressor with holiday column with monthly data", {
@@ -242,7 +242,7 @@ test_that("exp_arima with regressor with holiday column with monthly data", {
   ret <- combined_data %>%
     exp_arima(timestamp, data, 10, time_unit = "month", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=`holi day`)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-11-01")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-11-01"))
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
@@ -259,7 +259,7 @@ test_that("exp_arima with holiday column with hourly data", {
   ret <- combined_data %>%
     exp_arima(timestamp, data, 10, time_unit = "hour", holiday=holiday)
   # verify the last date with forecasted_value
-  # Comparing between POSIXct is prone to false positive. 
+  # Comparing between POSIXct is prone to false positive.
   # Comparing between characters is more stable with added bonus of printed evaluation result for easier debugging.
   expect_equal(as.character(last((ret %>% filter(!is.na(forecasted_value)))$timestamp)), "2010-01-15 10:00:00")
 })
@@ -274,7 +274,7 @@ test_that("exp_arima with extra regressor with cap/floor", {
   ret <- combined_data %>%
     exp_arima(timestamp, data, 10, time_unit = "day", cap = 2, floor = -2, regressors = c("regressor"), funs.aggregate.regressors = c(mean))
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11"))
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
@@ -353,4 +353,46 @@ test_that("exp_arima with all-NA value col", {
     exp_arima(timestamp, count, 10)
   # verify that the last forecasted_value is at least not NA.
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
+})
+
+test_that("exp_arima test_mode with periods longer than series errors cleanly (regression for subscript OOB)", {
+  # This reproduces the failure path:
+  # - test_mode=TRUE
+  # - periods >= number of rows in a group
+  # -> training_data becomes empty after head(-periods)
+  # Old code would later hit model_df$arima[[1]] and throw "subscript out of bounds".
+  # We now expect a clear, user-facing error instead.
+  ts <- seq.Date(as.Date("2020-01-01"), as.Date("2020-06-01"), by="month") # 6 rows
+  raw_data <- data.frame(timestamp=ts, value=runif(length(ts))) %>%
+    dplyr::rename(`time stamp`=timestamp, `va lue`=value)
+
+  err <- tryCatch({
+    raw_data %>% exp_arima(`time stamp`, `va lue`, periods=12, time_unit="month", test_mode=TRUE, seasonal=FALSE)
+    NULL
+  }, error = function(e) e$message)
+
+  expect_true(!is.null(err))
+  expect_true(grepl("Not enough training data to fit ARIMA in test_mode", err, fixed=TRUE))
+  expect_false(grepl("subscript out of bounds", err, fixed=TRUE))
+})
+
+test_that("exp_arima test_mode with grouped short series errors cleanly per-group (regression for subscript OOB)", {
+  # Grouped version of the regression: one group is too short for periods in test_mode.
+  ts_short <- seq.Date(as.Date("2020-01-01"), as.Date("2020-06-01"), by="month") # 6 rows
+  ts_long <- seq.Date(as.Date("2019-01-01"), as.Date("2020-06-01"), by="month")  # 18 rows
+  df_short <- data.frame(timestamp=ts_short, value=runif(length(ts_short)), group="short")
+  df_long <- data.frame(timestamp=ts_long, value=runif(length(ts_long)), group="long")
+
+  raw_data <- dplyr::bind_rows(df_short, df_long) %>%
+    dplyr::rename(`time stamp`=timestamp, `va lue`=value) %>%
+    dplyr::group_by(group)
+
+  err <- tryCatch({
+    raw_data %>% exp_arima(`time stamp`, `va lue`, periods=12, time_unit="month", test_mode=TRUE, seasonal=FALSE)
+    NULL
+  }, error = function(e) e$message)
+
+  expect_true(!is.null(err))
+  expect_true(grepl("Not enough training data to fit ARIMA in test_mode", err, fixed=TRUE))
+  expect_false(grepl("subscript out of bounds", err, fixed=TRUE))
 })
