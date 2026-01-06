@@ -2342,6 +2342,13 @@ pivot_longer <- function(data,
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
 #'@export
 case_when <- function(x, ..., type_convert = FALSE) {
+  # Ensure we're not in a grouped context that might interfere
+  # Ungroup at the beginning to ensure grouping doesn't interfere with the evaluation
+  # This is a safeguard for when case_when is called within grouped mutate operations
+  # Check if x is a grouped data frame and ungroup it
+  if (inherits(x, "grouped_df")) {
+    x <- dplyr::ungroup(x)
+  }
   ret <- dplyr::case_when(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,

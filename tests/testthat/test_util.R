@@ -812,6 +812,26 @@ test_that("case_when", {
     )
   )
   expect_true(class(df$calc1) == "character")
+  
+  # Test case_when with grouped data frame
+  test_df_grouped <- data.frame(
+    group = c("A", "A", "B", "B", "C", "C"),
+    value = c(1, 2, 3, 4, 5, 6),
+    category = c("low", "high", "low", "high", "low", "high")
+  )
+  df_grouped <- test_df_grouped %>%
+    dplyr::group_by(group) %>%
+    dplyr::mutate(
+      result = exploratory::case_when(
+        value > 3 ~ "high_value",
+        value > 1 ~ "medium_value",
+        TRUE ~ "low_value"
+      )
+    ) %>%
+    dplyr::ungroup()
+  expect_equal(nrow(df_grouped), 6)
+  expect_true("result" %in% colnames(df_grouped))
+  expect_equal(df_grouped$result, c("low_value", "medium_value", "low_value", "high_value", "high_value", "high_value"))
 })
 
 test_that("pivot_longer", {
