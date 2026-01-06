@@ -445,7 +445,7 @@ exp_arima <- function(df, time, valueColumn,
         stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods)
       } else if (nrow(stl_df) > 0) {
         # If seasonal_periods is invalid, just take the first row
-        stl_seasonal_df <- stl_df %>% dplyr::slice(1:min(1, nrow(stl_df)))
+        stl_seasonal_df <- stl_df %>% dplyr::slice(1)
       } else {
         stl_seasonal_df <- stl_df
       }
