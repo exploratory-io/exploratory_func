@@ -2,6 +2,24 @@
 #' @export
 build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
   .dots <- lazyeval::dots_capture(...)
+  
+  # Extract valid_data from .dots before passing to build_model_
+  # valid_data is a data frame and can't be converted to a lazy object by lazyeval
+  # This causes "is.call(expr) || is.name(expr) || is.atomic(expr) is not TRUE" errors
+  # on Linux CI when lazyeval::all_dots() tries to process it
+  valid_data <- NULL
+  if ("valid_data" %in% names(.dots)) {
+    valid_data <- tryCatch({
+      lazyeval::lazy_eval(.dots[["valid_data"]])
+    }, error = function(e) {
+      # If evaluation fails, try to get it from the parent environment
+      dots_list <- list(...)
+      dots_list[["valid_data"]]
+    })
+    # Remove valid_data from .dots to prevent lazyeval issues in build_model_
+    .dots[["valid_data"]] <- NULL
+  }
+  
   build_model_(
     data = data,
     model_func = model_func,
@@ -9,7 +27,8 @@ build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = 
     test_rate = test_rate,
     group_cols = group_cols,
     reserved_colnames = reserved_colnames,
-    .dots = .dots)
+    .dots = .dots,
+    valid_data = valid_data)  # Pass valid_data separately to avoid lazyeval processing
 }
 
 #' Generic function for model functions
@@ -21,8 +40,9 @@ build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = 
 #' @param reserved_colnames Column names that should be avoided for information extraction like tidy, glance later
 #' @param .dots Additional parameters to work around error of non standard evaluation.
 #' @param ... Parameters for model_func
+#' @param valid_data Optional validation data frame to pass to model_func. This parameter is extracted from ... before lazyeval processing to avoid errors on some platforms (e.g., Linux CI) where data frames cannot be converted to lazy objects. If provided, it will be passed through to the model function (e.g., lightgbm_binary) which can use it for early stopping or evaluation during training.
 #' @export
-build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ...) {
+build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ..., valid_data = NULL) {
   validate_empty_data(data)
 
   if(!is.null(seed)){
@@ -64,8 +84,53 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
 
   group_col_names <- grouped_by(processed)
 
+  # Extract valid_data from ... if not already provided as a parameter
+  # (handles case where build_model_ is called directly)
+  if (is.null(valid_data)) {
+    dots_list <- list(...)
+    if ("valid_data" %in% names(dots_list)) {
+      valid_data <- dots_list[["valid_data"]]
+      # Remove from ... to prevent lazyeval from processing it
+      dots_list <- dots_list[names(dots_list) != "valid_data"]
+      # Reconstruct ... without valid_data
+      # Since we can't easily exclude from ..., we'll handle it in the error case
+    }
+  }
+
   # integrate all additional parameters
-  dots <- lazyeval::all_dots(.dots, ...)
+  # Wrap in tryCatch to handle lazyeval errors gracefully on some platforms
+  dots <- tryCatch({
+    lazyeval::all_dots(.dots, ...)
+  }, error = function(e) {
+    # If error occurs and valid_data is in ..., extract it and retry
+    if (grepl("is.call\\(expr\\) || is.name\\(expr\\) || is.atomic\\(expr\\)", e$message)) {
+      # Try to extract valid_data from ... if not already extracted
+      if (is.null(valid_data)) {
+        dots_list <- list(...)
+        if ("valid_data" %in% names(dots_list)) {
+          valid_data <<- dots_list[["valid_data"]]
+        }
+      }
+      # If valid_data was in .dots, it should already be removed
+      # Retry all_dots (should work now if valid_data was the issue)
+      if (!is.null(valid_data) && "valid_data" %in% names(.dots)) {
+        .dots_clean <- .dots
+        .dots_clean[["valid_data"]] <- NULL
+        lazyeval::all_dots(.dots_clean, ...)
+      } else {
+        # If valid_data is in ..., we can't easily exclude it
+        # Try the original call - it might work if valid_data wasn't the issue
+        lazyeval::all_dots(.dots, ...)
+      }
+    } else {
+      stop(e)
+    }
+  })
+  
+  # Add valid_data back to dots if it was provided
+  if (!is.null(valid_data)) {
+    dots[["valid_data"]] <- valid_data
+  }
 
   # check if variables in grouped_col_names are not used
   formula <- dots$formula
