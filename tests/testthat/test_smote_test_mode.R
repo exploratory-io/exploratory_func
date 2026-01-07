@@ -239,3 +239,134 @@ test_that("No SMOTE with test mode should not alter data sizes", {
   expect_lte(nrow(train_data), expected_train_size + 20)
 })
 
+test_that("Train/test split works correctly with very few rows (3 rows: 1 test, 2 training)", {
+  # Test edge case: minimal dataset with only 3 rows
+  # This verifies that the split logic works even with very small datasets
+  # Using 3 rows with rate 0.34 ensures nrow(df) * rate = 1.02, which truncates to 1 test row
+  # (sample() truncates fractional sizes, so 1.02 becomes 1)
+  set.seed(555)
+  n <- 3
+  test_data <- data.frame(
+    x1 = c(1, 2, 3),
+    x2 = c(10, 20, 30),
+    # Create binary target with both classes present
+    target = c(FALSE, TRUE, FALSE)
+  )
+
+  # Test with SMOTE disabled first (SMOTE might not work with only 2 training rows)
+  model_df <- test_data %>%
+    build_lm.fast(target, x1, x2,
+                  model_type = "glm",
+                  test_rate = 0.34,  # Should result in 1 test row (3 * 0.34 = 1.02, truncates to 1), 2 training rows
+                  smote = FALSE,  # Disable SMOTE for this minimal case
+                  seed = 555)
+
+  source_data <- model_df$source.data[[1]]
+  test_index <- model_df$.test_index[[1]]
+
+  # Verify source.data has all 3 rows
+  expect_equal(nrow(source_data), n)
+
+  # Verify test_index is not empty and has exactly 1 row
+  expect_true(length(test_index) >= 1)
+
+  # Verify test data has exactly 1 row
+  test_data_actual <- source_data[test_index, , drop = FALSE]
+  expect_equal(nrow(test_data_actual), 1)
+
+  # Verify training data has exactly 2 rows
+  train_data <- source_data[-test_index, , drop = FALSE]
+  expect_equal(nrow(train_data), 2)
+
+  # Verify no row overlap between test and training
+  expect_equal(length(intersect(test_index, seq_len(n)[-test_index])), 0)
+
+  # Verify all rows are accounted for
+  expect_equal(nrow(test_data_actual) + nrow(train_data), n)
+
+  # Verify test_index is valid (between 1 and n)
+  expect_true(all(test_index >= 1 & test_index <= n))
+  expect_true(length(test_index) == 1)  # Exactly 1 test row
+})
+
+test_that("Train/test split works with very few rows using XGBoost", {
+  # Test the same minimal case with a different model function
+  # Using 3 rows with rate 0.34 ensures 1 test row (3 * 0.34 = 1.02, truncates to 1)
+  set.seed(666)
+  n <- 3
+  test_data <- data.frame(
+    x1 = c(1, 2, 3),
+    x2 = c(10, 20, 30),
+    target = c(FALSE, TRUE, FALSE)
+  )
+
+  model_df <- test_data %>%
+    exp_xgboost(target, x1, x2,
+                test_rate = 0.34,  # 3 * 0.34 = 1.02, truncates to 1 test row
+                smote = FALSE,  # Disable SMOTE for minimal case
+                seed = 666)
+
+  source_data <- model_df$source.data[[1]]
+  test_index <- model_df$.test_index[[1]]
+
+  # Verify split works correctly
+  expect_equal(nrow(source_data), n)
+
+  # Verify test_index is not empty
+  expect_true(length(test_index) >= 1)
+
+  test_data_actual <- source_data[test_index, , drop = FALSE]
+  train_data <- source_data[-test_index, , drop = FALSE]
+
+  # Verify exact split: 1 test, 2 training
+  expect_equal(nrow(test_data_actual), 1)
+  expect_equal(nrow(train_data), 2)
+  expect_equal(nrow(test_data_actual) + nrow(train_data), n)
+
+  # Verify test_index is valid
+  expect_true(all(test_index >= 1 & test_index <= n))
+  expect_true(length(test_index) == 1)
+})
+
+test_that("Train/test split with very few rows and SMOTE (should handle gracefully)", {
+  # Test that SMOTE is handled gracefully when training data is too small
+  # SMOTE might not apply with only 2 training rows, but split should still work
+  # Using 3 rows with rate 0.34 ensures 1 test row (3 * 0.34 = 1.02, truncates to 1)
+  set.seed(777)
+  n <- 3
+  test_data <- data.frame(
+    x1 = c(1, 2, 3),
+    x2 = c(10, 20, 30),
+    target = c(FALSE, TRUE, FALSE)
+  )
+
+  # Try with SMOTE enabled - it might not apply due to small size, but should not error
+  model_df <- test_data %>%
+    build_lm.fast(target, x1, x2,
+                  model_type = "glm",
+                  test_rate = 0.34,  # 3 * 0.34 = 1.02, truncates to 1 test row
+                  smote = TRUE,
+                  smote_keep_synthetic = FALSE,
+                  seed = 777)
+
+  source_data <- model_df$source.data[[1]]
+  test_index <- model_df$.test_index[[1]]
+
+  # Verify split still works (SMOTE might not have applied due to small size)
+  expect_equal(nrow(source_data), n)
+
+  # Verify test_index is not empty
+  expect_true(length(test_index) >= 1)
+
+  test_data_actual <- source_data[test_index, , drop = FALSE]
+  train_data <- source_data[-test_index, , drop = FALSE]
+
+  # Verify exact split: 1 test, 2 training
+  expect_equal(nrow(test_data_actual), 1)
+  expect_equal(nrow(train_data), 2)
+
+  # With smote_keep_synthetic = FALSE, no synthesized column should exist
+  # (SMOTE likely didn't apply due to small training size)
+  expect_false("synthesized" %in% colnames(source_data))
+})
+
