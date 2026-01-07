@@ -960,12 +960,6 @@ build_lm.fast <- function(df,
             # We do not remove imbalance here to keep close distribution to the original data.
             df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
           }
-        } else {
-          # No SMOTE applied, synthesized column doesn't exist
-          if (smote_keep_synthetic && test_rate > 0) {
-            # Even without SMOTE, if user wants synthesized column, add it (all FALSE)
-            source_data$synthesized <- FALSE
-          }
         }
 
         # When link is not specified, use default link function for each family,

@@ -1639,6 +1639,12 @@ exp_lightgbm <- function(df,
       source_data <- df
       test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
+      
+      # Extract test data if test_rate > 0 (needed for smote_keep_synthetic logic)
+      df_test_temp <- NULL
+      if (test_rate > 0) {
+        df_test_temp <- safe_slice(source_data, test_index, remove = FALSE)
+      }
 
       # Store original training data before SMOTE for later prediction
       df_train_original <- df
@@ -1655,9 +1661,9 @@ exp_lightgbm <- function(df,
           # Combine SMOTE-enhanced training data with test data
           if (test_rate > 0) {
             # Add synthesized column to test data (all FALSE since they're real)
-            df_test$synthesized <- FALSE
+            df_test_temp$synthesized <- FALSE
             # Update source_data to be the combined SMOTE-enhanced train + original test
-            source_data <- bind_rows(df, df_test)
+            source_data <- bind_rows(df, df_test_temp)
             # Update test_index to point to the test rows in the new source_data
             # Test data is now at the end, starting from nrow(df) + 1
             test_index <- (nrow(df) + 1):nrow(source_data)
@@ -1670,12 +1676,6 @@ exp_lightgbm <- function(df,
           df <- df %>% dplyr::select(-synthesized)
         }
         smote_applied <- TRUE
-      } else {
-        # No SMOTE applied, synthesized column doesn't exist
-        if (smote_keep_synthetic && test_rate > 0) {
-          # Even without SMOTE, if user wants synthesized column, add it (all FALSE)
-          source_data$synthesized <- FALSE
-        }
       }
 
       # If we are in "test mode" (test_rate > 0) but there is no explicit watchlist_rate,

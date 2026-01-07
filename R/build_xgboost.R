@@ -1191,12 +1191,6 @@ exp_xgboost <- function(df,
           df <- df %>% dplyr::select(-synthesized)
         }
         smote_applied <- TRUE
-      } else {
-        # No SMOTE applied, synthesized column doesn't exist
-        if (smote_keep_synthetic && test_rate > 0) {
-          # Even without SMOTE, if user wants synthesized column, add it (all FALSE)
-          source_data$synthesized <- FALSE
-        }
       }
 
       # Restore source_data column name to original column name
