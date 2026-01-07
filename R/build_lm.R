@@ -663,6 +663,7 @@ build_lm.fast <- function(df,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
                     smote_k = 5,
+                    smote_keep_synthetic = TRUE,
                     importance_measure = "permutation", # "firm", or "permutation" if available. Defaulting to permutation for backward compatibility for pre-6.5.
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
@@ -897,16 +898,56 @@ build_lm.fast <- function(df,
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (model_type == "glm") {
+        # Split training and test data BEFORE applying SMOTE
+        # This ensures test data remains pure and doesn't contain synthetic samples
+        source_data <- df
+        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        }
+
+        # Store original training data before SMOTE for later prediction
+        df_train_original <- df
+        
+        # Apply SMOTE only to training data after split
         if (smote) {
           if (with_marginal_effects) {
-            # Keep the version of data before SMOTE,
+            # Keep the version of training data before SMOTE,
             # since we want to know average marginal effect on a data that has
             # close distribution to the original data.
             df_before_smote <- df
           }
           # Note: If there is weight column, we synthesize weight column as well.
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
-          df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
+          
+          # Check if SMOTE was actually applied by checking for synthesized column
+          smote_applied <- "synthesized" %in% colnames(df)
+          
+          # If smote_keep_synthetic is TRUE and SMOTE was applied, update source_data
+          if (smote_keep_synthetic && smote_applied) {
+            # Keep the synthesized column to mark synthetic samples
+            # Combine SMOTE-enhanced training data with test data
+            if (test_rate > 0) {
+              # Add synthesized column to test data (all FALSE since they're real)
+              df_test$synthesized <- FALSE
+              # Update source_data to be the combined SMOTE-enhanced train + original test
+              source_data <- bind_rows(df, df_test)
+              # Update test_index to point to the test rows in the new source_data
+              # Test data is now at the end, starting from nrow(df) + 1
+              test_index <- (nrow(df) + 1):nrow(source_data)
+            } else {
+              # No test data, just use SMOTE-enhanced training data
+              source_data <- df
+            }
+          } else if (smote_applied) {
+            # SMOTE was applied but not keeping synthetic samples in output
+            # Remove synthesized column
+            df <- df %>% dplyr::select(-dplyr::any_of("synthesized"))
+          }
+          
+          # Factor level cleanup after SMOTE
           for(col in names(df)){
             if(is.factor(df[[col]])) {
               # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
@@ -923,15 +964,6 @@ build_lm.fast <- function(df,
             # We do not remove imbalance here to keep close distribution to the original data.
             df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
           }
-        }
-
-        # split training and test data
-        source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
-        df <- safe_slice(source_data, test_index, remove = TRUE)
-        if (test_rate > 0) {
-          # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
-          df_test <- safe_slice(source_data, test_index, remove = FALSE)
         }
 
         # When link is not specified, use default link function for each family,
@@ -1077,6 +1109,19 @@ build_lm.fast <- function(df,
         model$vif <<- e
       })
 
+      # When SMOTE is used, generate predictions on appropriate training data
+      if (smote && smote_applied) {
+        if (smote_keep_synthetic) {
+          # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
+          model$prediction_training <- predict(model, df, se.fit = TRUE)
+        } else {
+          # If not keeping synthetic samples, predict on original training data (matches source.data)
+          model$prediction_training <- predict(model, df_train_original, se.fit = TRUE)
+        }
+        model$smote_applied <- TRUE
+        model$smote_keep_synthetic <- smote_keep_synthetic
+      }
+      
       if (test_rate > 0) {
         # Remove rows with categorical values which does not appear in training data and unknown to the model.
         # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
@@ -1852,11 +1897,18 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     data <- data %>% dplyr::relocate(!!rlang::sym(x$target_col), .after = last_col())
     ret <- switch(data_type,
       training = {
-        tryCatch({
-          broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
-        }, error = function(e){
-          broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
-        })
+        # If SMOTE was applied, use stored predictions on original training data
+        if (!is.null(x$smote_applied) && x$smote_applied && !is.null(x$prediction_training)) {
+          data$.fitted <- x$prediction_training$fit
+          data$.se.fit <- x$prediction_training$se.fit
+          data
+        } else {
+          tryCatch({
+            broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+          }, error = function(e){
+            broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+          })
+        }
       },
       test = {
         # Augment data with already predicted result in the model.
