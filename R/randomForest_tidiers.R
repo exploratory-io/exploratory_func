@@ -1128,11 +1128,24 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
-        predicted_value_nona <- x$predicted_class
-        predicted_value <- restore_na(predicted_value_nona, x$na.action)
-        # binary case and multiclass case are both handled inside this func.
-        predicted_probability_nona <- get_predicted_probability_rpart(x)
-        predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
+        # If SMOTE was applied, use stored predictions on original training data
+        if (!is.null(x$smote_applied) && x$smote_applied && !is.null(x$predicted_class_original)) {
+          predicted_value_nona <- x$predicted_class_original
+          # Get predicted probability from stored predictions
+          if (x$classification_type == "binary") {
+            predicted_probability_nona <- x$predicted_prob_original[, "TRUE"]
+          } else {
+            predicted_probability_nona <- apply(x$predicted_prob_original, 1, max)
+          }
+          predicted_value <- restore_na(predicted_value_nona, x$na.action)
+          predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
+        } else {
+          predicted_value_nona <- x$predicted_class
+          predicted_value <- restore_na(predicted_value_nona, x$na.action)
+          # binary case and multiclass case are both handled inside this func.
+          predicted_probability_nona <- get_predicted_probability_rpart(x)
+          predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
+        }
       },
       test = {
         predicted_value_nona <- x$predicted_class_test
@@ -2104,6 +2117,7 @@ calc_feature_imp <- function(df,
                              smote_target_minority_perc = 40,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
+                             smote_keep_synthetic = TRUE,
                              importance_measure = "permutation", # "permutation", "firm", or "impurity".
                              max_pd_vars = NULL,
                              # Number of most important variables to calculate partial dependences on.
@@ -2226,11 +2240,42 @@ calc_feature_imp <- function(df,
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
       }
 
+      # Store original training data before SMOTE for later prediction
+      df_train_original <- df
+      
       # Apply SMOTE only to training data after split
       unique_val <- unique(df[[clean_target_col]])
+      smote_applied <- FALSE
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
-        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
+        
+        # If smote_keep_synthetic is TRUE, update source_data to include SMOTE-enhanced training data
+        if (smote_keep_synthetic) {
+          # Keep the synthesized column to mark synthetic samples
+          # Combine SMOTE-enhanced training data with test data
+          if (test_rate > 0) {
+            # Add synthesized column to test data (all FALSE since they're real)
+            df_test$synthesized <- FALSE
+            # Update source_data to be the combined SMOTE-enhanced train + original test
+            source_data <- bind_rows(df, df_test)
+            # Update test_index to point to the test rows in the new source_data
+            # Test data is now at the end, starting from nrow(df) + 1
+            test_index <- (nrow(df) + 1):nrow(source_data)
+          } else {
+            # No test data, just use SMOTE-enhanced training data
+            source_data <- df
+          }
+        } else {
+          # Remove synthesized column if not keeping synthetic samples in output
+          df <- df %>% dplyr::select(-synthesized)
+        }
+        smote_applied <- TRUE
+      } else {
+        # No SMOTE applied, synthesized column doesn't exist
+        if (smote_keep_synthetic && test_rate > 0) {
+          # Even without SMOTE, if user wants synthesized column, add it (all FALSE)
+          source_data$synthesized <- FALSE
+        }
       }
 
       # Restore source_data column name to original column name
@@ -2242,6 +2287,11 @@ calc_feature_imp <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
       model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
+      
+      # Create model_df from original training data for prediction when SMOTE was applied (and not keeping synthetic)
+      if (smote_applied && !smote_keep_synthetic) {
+        model_df_original <- model.frame(fml, data = df_train_original, na.action = randomForest::na.roughfix)
+      }
 
       # all or max_sample_size data will be used for randomForest
       # to grow a tree
@@ -2272,7 +2322,18 @@ calc_feature_imp <- function(df,
       # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
       # the prediction separately done with the same training data.
       # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
-      model$prediction_training <- predict(model, model_df)
+      # When SMOTE is used, predict on appropriate training data
+      if (smote_applied) {
+        if (smote_keep_synthetic) {
+          # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
+          model$prediction_training <- predict(model, model_df)
+        } else {
+          # If not keeping synthetic samples, predict on original training data (matches source.data)
+          model$prediction_training <- predict(model, model_df_original)
+        }
+      } else {
+        model$prediction_training <- predict(model, model_df)
+      }
 
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
@@ -3045,6 +3106,7 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
+                      smote_keep_synthetic = TRUE,
                       importance_measure = "impurity", # "firm", or "impurity". Defaulting to impurity for backward compatibility for pre-6.5.
                       max_pd_vars = 20,
                       pd_sample_size = 500,
@@ -3151,11 +3213,42 @@ exp_rpart <- function(df,
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
       }
 
+      # Store original training data before SMOTE for later prediction
+      df_train_original <- df
+      
       # Apply SMOTE only to training data after split
       unique_val <- unique(df[[clean_target_col]])
+      smote_applied <- FALSE
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
-        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
+        
+        # If smote_keep_synthetic is TRUE, update source_data to include SMOTE-enhanced training data
+        if (smote_keep_synthetic) {
+          # Keep the synthesized column to mark synthetic samples
+          # Combine SMOTE-enhanced training data with test data
+          if (test_rate > 0) {
+            # Add synthesized column to test data (all FALSE since they're real)
+            df_test$synthesized <- FALSE
+            # Update source_data to be the combined SMOTE-enhanced train + original test
+            source_data <- bind_rows(df, df_test)
+            # Update test_index to point to the test rows in the new source_data
+            # Test data is now at the end, starting from nrow(df) + 1
+            test_index <- (nrow(df) + 1):nrow(source_data)
+          } else {
+            # No test data, just use SMOTE-enhanced training data
+            source_data <- df
+          }
+        } else {
+          # Remove synthesized column if not keeping synthetic samples in output
+          df <- df %>% dplyr::select(-synthesized)
+        }
+        smote_applied <- TRUE
+      } else {
+        # No SMOTE applied, synthesized column doesn't exist
+        if (smote_keep_synthetic && test_rate > 0) {
+          # Even without SMOTE, if user wants synthesized column, add it (all FALSE)
+          source_data$synthesized <- FALSE
+        }
       }
       # if target is categorical (not numeric) and only 1 unique value (or all NA), throw error.
       if ("numeric" %nin% class(clean_target_col) &&
@@ -3176,6 +3269,26 @@ exp_rpart <- function(df,
         # of multiclass classification.
         model$predicted_class <- get_predicted_class_rpart(model,
                                                            binary_classification_threshold = binary_classification_threshold)
+        
+        # When SMOTE is used, handle predictions based on smote_keep_synthetic
+        if (smote_applied) {
+          model$smote_applied <- TRUE
+          if (!smote_keep_synthetic) {
+            # If not keeping synthetic samples, also generate predictions on original training data (before SMOTE)
+            # to match source.data which contains original data, not SMOTE-enhanced data
+            pred_original <- predict(model, df_train_original)
+            ylevels <- attr(model, "ylevels")
+            if (classification_type == "binary") {
+              model$predicted_class_original <- predict_value_from_prob(ylevels,
+                                                                        pred_original,
+                                                                        NULL, threshold = binary_classification_threshold)
+            } else {
+              # For multiclass, get predicted class from max probability
+              model$predicted_class_original <- ylevels[apply(pred_original, 1, which.max)]
+            }
+            model$predicted_prob_original <- pred_original
+          }
+        }
       }
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map

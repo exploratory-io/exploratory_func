@@ -1045,6 +1045,7 @@ exp_xgboost <- function(df,
                         smote_target_minority_perc = 40,
                         smote_max_synth_perc = 200,
                         smote_k = 5,
+                        smote_keep_synthetic = TRUE,
                         importance_measure = "permutation", # "permutation", "impurity", or "firm".
                         max_pd_vars = NULL,
                         # Number of most important variables to calculate partial dependences on. 
@@ -1160,11 +1161,42 @@ exp_xgboost <- function(df,
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
       }
 
+      # Store original training data before SMOTE for later prediction
+      df_train_original <- df
+      
       # Apply SMOTE only to training data after split
       unique_val <- unique(df[[clean_target_col]])
+      smote_applied <- FALSE
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
-        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
+        
+        # If smote_keep_synthetic is TRUE, update source_data to include SMOTE-enhanced training data
+        if (smote_keep_synthetic) {
+          # Keep the synthesized column to mark synthetic samples
+          # Combine SMOTE-enhanced training data with test data
+          if (test_rate > 0) {
+            # Add synthesized column to test data (all FALSE since they're real)
+            df_test$synthesized <- FALSE
+            # Update source_data to be the combined SMOTE-enhanced train + original test
+            source_data <- bind_rows(df, df_test)
+            # Update test_index to point to the test rows in the new source_data
+            # Test data is now at the end, starting from nrow(df) + 1
+            test_index <- (nrow(df) + 1):nrow(source_data)
+          } else {
+            # No test data, just use SMOTE-enhanced training data
+            source_data <- df
+          }
+        } else {
+          # Remove synthesized column if not keeping synthetic samples in output
+          df <- df %>% dplyr::select(-synthesized)
+        }
+        smote_applied <- TRUE
+      } else {
+        # No SMOTE applied, synthesized column doesn't exist
+        if (smote_keep_synthetic && test_rate > 0) {
+          # Even without SMOTE, if user wants synthesized column, add it (all FALSE)
+          source_data$synthesized <- FALSE
+        }
       }
 
       # Restore source_data column name to original column name
@@ -1226,7 +1258,18 @@ exp_xgboost <- function(df,
       }
       class(model) <- c("xgboost_exp", class(model))
 
-      model$prediction_training <- predict_xgboost(model, df)
+      # When SMOTE is used, predict on appropriate training data
+      if (smote_applied) {
+        if (smote_keep_synthetic) {
+          # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
+          model$prediction_training <- predict_xgboost(model, df)
+        } else {
+          # If not keeping synthetic samples, predict on original training data (matches source.data)
+          model$prediction_training <- predict_xgboost(model, df_train_original)
+        }
+      } else {
+        model$prediction_training <- predict_xgboost(model, df)
+      }
 
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)

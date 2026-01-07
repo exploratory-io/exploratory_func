@@ -1547,6 +1547,7 @@ exp_lightgbm <- function(df,
                          smote_target_minority_perc = 40,
                          smote_max_synth_perc = 200,
                          smote_k = 5,
+                         smote_keep_synthetic = TRUE,
                          importance_measure = "permutation",
                          max_pd_vars = NULL,
                          pd_sample_size = 500,
@@ -1639,11 +1640,42 @@ exp_lightgbm <- function(df,
       test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
 
+      # Store original training data before SMOTE for later prediction
+      df_train_original <- df
+      
       # Apply SMOTE only to training data after split
       unique_val <- unique(df[[clean_target_col]])
+      smote_applied <- FALSE
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
-        df <- df %>% dplyr::select(-synthesized)
+        
+        # If smote_keep_synthetic is TRUE, update source_data to include SMOTE-enhanced training data
+        if (smote_keep_synthetic) {
+          # Keep the synthesized column to mark synthetic samples
+          # Combine SMOTE-enhanced training data with test data
+          if (test_rate > 0) {
+            # Add synthesized column to test data (all FALSE since they're real)
+            df_test$synthesized <- FALSE
+            # Update source_data to be the combined SMOTE-enhanced train + original test
+            source_data <- bind_rows(df, df_test)
+            # Update test_index to point to the test rows in the new source_data
+            # Test data is now at the end, starting from nrow(df) + 1
+            test_index <- (nrow(df) + 1):nrow(source_data)
+          } else {
+            # No test data, just use SMOTE-enhanced training data
+            source_data <- df
+          }
+        } else {
+          # Remove synthesized column if not keeping synthetic samples in output
+          df <- df %>% dplyr::select(-synthesized)
+        }
+        smote_applied <- TRUE
+      } else {
+        # No SMOTE applied, synthesized column doesn't exist
+        if (smote_keep_synthetic && test_rate > 0) {
+          # Even without SMOTE, if user wants synthesized column, add it (all FALSE)
+          source_data$synthesized <- FALSE
+        }
       }
 
       # If we are in "test mode" (test_rate > 0) but there is no explicit watchlist_rate,
@@ -1728,7 +1760,18 @@ exp_lightgbm <- function(df,
       # Store evaluation log in XGBoost-compatible shape (wide, with iter).
       model$evaluation_log <- lightgbm_build_evaluation_log(model)
 
-      model$prediction_training <- predict_lightgbm(model, df)
+      # When SMOTE is used, predict on appropriate training data
+      if (smote_applied) {
+        if (smote_keep_synthetic) {
+          # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
+          model$prediction_training <- predict_lightgbm(model, df)
+        } else {
+          # If not keeping synthetic samples, predict on original training data (matches source.data)
+          model$prediction_training <- predict_lightgbm(model, df_train_original)
+        }
+      } else {
+        model$prediction_training <- predict_lightgbm(model, df)
+      }
 
       if (test_rate > 0) {
         # Reuse the cleaned test data prepared above.
