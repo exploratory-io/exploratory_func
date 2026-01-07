@@ -366,21 +366,20 @@ exp_arima <- function(df, time, valueColumn,
 
     if (test_mode){
       fitted_training_df$is_test_data <- FALSE
-      # Safely extract y values from filled_aggregated_data
-      # Handle cases where filled_aggregated_data might have fewer rows than periods
-      # or where the y column might not exist
-      if ("y" %in% colnames(filled_aggregated_data) && nrow(filled_aggregated_data) >= periods) {
-        forecast_rows$y <- tail(filled_aggregated_data, periods)[["y"]]
-      } else if ("y" %in% colnames(filled_aggregated_data) && nrow(filled_aggregated_data) > 0) {
-        # If we have fewer rows than periods, pad with NAs at the beginning
-        y_values <- tail(filled_aggregated_data, nrow(filled_aggregated_data))[["y"]]
-        if (length(y_values) > 0) {
-          forecast_rows$y <- c(rep(NA, periods - length(y_values)), y_values)
-        } else {
-          forecast_rows$y <- rep(NA, periods)
+      # Safely extract y values from filled_aggregated_data.
+      # Keep the resulting vector length exactly equal to `periods` to match forecast_rows.
+      if ("y" %in% colnames(filled_aggregated_data) && nrow(filled_aggregated_data) > 0) {
+        y_values <- filled_aggregated_data[["y"]]
+        if (length(y_values) >= periods) {
+          forecast_rows$y <- tail(y_values, periods)
         }
-      } else {
-        # If y column doesn't exist or data is empty, fill with NAs
+        else {
+          # If we have fewer rows than periods, pad with NAs at the beginning.
+          forecast_rows$y <- c(rep(NA, periods - length(y_values)), y_values)
+        }
+      }
+      else {
+        # If y column doesn't exist or data is empty, fill with NAs.
         forecast_rows$y <- rep(NA, periods)
       }
       forecast_rows$is_test_data <- TRUE 
