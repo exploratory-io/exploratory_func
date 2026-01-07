@@ -1170,8 +1170,11 @@ exp_xgboost <- function(df,
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
         
-        # If smote_keep_synthetic is TRUE, update source_data to include SMOTE-enhanced training data
-        if (smote_keep_synthetic) {
+        # Check if SMOTE was actually applied by checking for synthesized column
+        smote_applied <- "synthesized" %in% colnames(df)
+        
+        # If smote_keep_synthetic is TRUE and SMOTE was applied, update source_data
+        if (smote_keep_synthetic && smote_applied) {
           # Keep the synthesized column to mark synthetic samples
           # Combine SMOTE-enhanced training data with test data
           if (test_rate > 0) {
@@ -1186,17 +1189,19 @@ exp_xgboost <- function(df,
             # No test data, just use SMOTE-enhanced training data
             source_data <- df
           }
-        } else {
-          # Remove synthesized column if not keeping synthetic samples in output
+        } else if (smote_applied) {
+          # SMOTE was applied but not keeping synthetic samples in output
+          # Remove synthesized column
           df <- df %>% dplyr::select(-synthesized)
         }
-        smote_applied <- TRUE
       }
 
       # Restore source_data column name to original column name
       rev_name_map <- names(name_map)
       names(rev_name_map) <- name_map
-      colnames(source_data) <- rev_name_map[colnames(source_data)]
+      # Preserve column names that don't have mappings (like 'synthesized')
+      new_names <- rev_name_map[colnames(source_data)]
+      colnames(source_data) <- ifelse(is.na(new_names), colnames(source_data), new_names)
 
       # build formula for randomForest
       rhs <- paste0("`", c_cols, "`", collapse = " + ")

@@ -922,8 +922,11 @@ build_lm.fast <- function(df,
           # Note: If there is weight column, we synthesize weight column as well.
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           
-          # If smote_keep_synthetic is TRUE, update source_data to include SMOTE-enhanced training data
-          if (smote_keep_synthetic) {
+          # Check if SMOTE was actually applied by checking for synthesized column
+          smote_applied <- "synthesized" %in% colnames(df)
+          
+          # If smote_keep_synthetic is TRUE and SMOTE was applied, update source_data
+          if (smote_keep_synthetic && smote_applied) {
             # Keep the synthesized column to mark synthetic samples
             # Combine SMOTE-enhanced training data with test data
             if (test_rate > 0) {
@@ -938,8 +941,9 @@ build_lm.fast <- function(df,
               # No test data, just use SMOTE-enhanced training data
               source_data <- df
             }
-          } else {
-            # Remove synthesized column if not keeping synthetic samples in output
+          } else if (smote_applied) {
+            # SMOTE was applied but not keeping synthetic samples in output
+            # Remove synthesized column
             df <- df %>% dplyr::select(-synthesized)
           }
           
@@ -1106,7 +1110,7 @@ build_lm.fast <- function(df,
       })
 
       # When SMOTE is used, generate predictions on appropriate training data
-      if (smote) {
+      if (smote && smote_applied) {
         if (smote_keep_synthetic) {
           # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
           model$prediction_training <- predict(model, df, se.fit = TRUE)
