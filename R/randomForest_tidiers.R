@@ -3261,7 +3261,7 @@ exp_rpart <- function(df,
         } else if (smote_applied) {
           # SMOTE was applied but not keeping synthetic samples in output
           # Remove synthesized column
-          df <- df %>% dplyr::select(-synthesized)
+          df <- df %>% dplyr::select(-dplyr::any_of("synthesized"))
         }
       }
       # if target is categorical (not numeric) and only 1 unique value (or all NA), throw error.
