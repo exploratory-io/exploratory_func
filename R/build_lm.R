@@ -897,9 +897,20 @@ build_lm.fast <- function(df,
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (model_type == "glm") {
+        # Split training and test data BEFORE applying SMOTE
+        # This ensures test data remains pure and doesn't contain synthetic samples
+        source_data <- df
+        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        }
+
+        # Apply SMOTE only to training data after split
         if (smote) {
           if (with_marginal_effects) {
-            # Keep the version of data before SMOTE,
+            # Keep the version of training data before SMOTE,
             # since we want to know average marginal effect on a data that has
             # close distribution to the original data.
             df_before_smote <- df
@@ -923,15 +934,6 @@ build_lm.fast <- function(df,
             # We do not remove imbalance here to keep close distribution to the original data.
             df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
           }
-        }
-
-        # split training and test data
-        source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
-        df <- safe_slice(source_data, test_index, remove = TRUE)
-        if (test_rate > 0) {
-          # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
-          df_test <- safe_slice(source_data, test_index, remove = FALSE)
         }
 
         # When link is not specified, use default link function for each family,

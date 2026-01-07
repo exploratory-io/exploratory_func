@@ -2217,19 +2217,20 @@ calc_feature_imp <- function(df,
       }
       name_map <- clean_df_ret$name_map
 
-      # apply smote if this is binary classification
-      unique_val <- unique(df[[clean_target_col]])
-      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
-        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
-      }
-
-      # split training and test data
+      # Split training and test data BEFORE applying SMOTE
+      # This ensures test data remains pure and doesn't contain synthetic samples
       source_data <- df
       test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
+      }
+
+      # Apply SMOTE only to training data after split
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
       }
 
       # Restore source_data column name to original column name
@@ -3141,7 +3142,16 @@ exp_rpart <- function(df,
       }
       name_map <- clean_df_ret$name_map
 
-      # apply smote if this is binary classification
+      # Split training and test data BEFORE applying SMOTE
+      # This ensures test data remains pure and doesn't contain synthetic samples
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+      }
+
+      # Apply SMOTE only to training data after split
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
@@ -3154,14 +3164,6 @@ exp_rpart <- function(df,
         # We might want to skip and show the status in Summary when we support Repeat By,
         # but for now just throw error to show.
         stop("Categorical Target Variable must have 2 or more unique values.")
-      }
-
-      # split training and test data
-      source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
-      df <- safe_slice(source_data, test_index, remove = TRUE)
-      if (test_rate > 0) {
-        df_test <- safe_slice(source_data, test_index, remove = FALSE)
       }
 
       rhs <- paste0("`", c_cols, "`", collapse = " + ")

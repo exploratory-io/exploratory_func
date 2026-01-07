@@ -1633,15 +1633,18 @@ exp_lightgbm <- function(df,
       }
       name_map <- clean_df_ret$name_map
 
+      # Split data into train/test BEFORE applying SMOTE
+      # This ensures test data remains pure and doesn't contain synthetic samples
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+
+      # Apply SMOTE only to training data after split
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
         df <- df %>% dplyr::select(-synthesized)
       }
-
-      source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
-      df <- safe_slice(source_data, test_index, remove = TRUE)
 
       # If we are in "test mode" (test_rate > 0) but there is no explicit watchlist_rate,
       # we pass the cleaned test split to LightGBM as an extra validation dataset so that
