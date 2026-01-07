@@ -1133,7 +1133,25 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
           predicted_value_nona <- x$predicted_class_original
           # Get predicted probability from stored predictions
           if (x$classification_type == "binary") {
-            predicted_probability_nona <- x$predicted_prob_original[, "TRUE"]
+            probs <- x$predicted_prob_original
+            if (is.null(dim(probs))) {
+              # probs is already a numeric vector of positive-class probabilities
+              predicted_probability_nona <- probs
+            } else {
+              ylevels <- attr(x, "ylevels")
+              positive_class_col <- NULL
+              if (!is.null(ylevels) && length(ylevels) >= 2) {
+                positive_class <- ylevels[2L]
+                if (!is.null(colnames(probs)) && positive_class %in% colnames(probs)) {
+                  positive_class_col <- positive_class
+                }
+              }
+              if (is.null(positive_class_col)) {
+                # Fallback: use the last column if we cannot match by ylevels
+                positive_class_col <- ncol(probs)
+              }
+              predicted_probability_nona <- probs[, positive_class_col]
+            }
           } else {
             predicted_probability_nona <- apply(x$predicted_prob_original, 1, max)
           }
