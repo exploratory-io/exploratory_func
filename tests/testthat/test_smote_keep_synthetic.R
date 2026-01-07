@@ -22,7 +22,7 @@ cat("Original data size:", nrow(test_data), "\n")
 cat("Target distribution:", table(test_data$target), "\n\n")
 
 # Test 1: GLM with smote_keep_synthetic = TRUE (default)
-cat("=" %R>% rep(70) %>% paste(collapse=""), "\n")
+cat("=" %>% rep(70) %>% paste(collapse=""), "\n")
 cat("Test 1: build_lm.fast (GLM) with smote_keep_synthetic = TRUE (default)\n")
 cat("=" %>% rep(70) %>% paste(collapse=""), "\n")
 tryCatch({
