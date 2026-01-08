@@ -202,6 +202,19 @@ exp_arima <- function(df, time, valueColumn,
       # for all missing date/time, which could be expensive if the training data is sparse.
       # keep the last row even if it does not have training data, to mark the end of training period, which is the start of test period.
       training_data <- training_data %>% dplyr::filter(!is.na(y) | row_number() == n())
+
+      # Guard: if periods is too large (or data is too sparse), training_data can become empty.
+      # Downstream code assumes we can fit at least one model and will otherwise throw
+      # "subscript out of bounds" when accessing model objects with [[1]].
+      non_na_y <- sum(!is.na(training_data$y))
+      if (nrow(training_data) < 2 || non_na_y < 2) {
+        stop(paste0(
+          "Not enough training data to fit ARIMA in test_mode. ",
+          "After reserving periods=", periods, " as test data, ",
+          "training rows=", nrow(training_data), ", non-NA y rows=", non_na_y, ". ",
+          "Reduce periods or set test_mode=FALSE."
+        ))
+      }
     }
     else {
       training_data <- aggregated_data
@@ -270,6 +283,11 @@ exp_arima <- function(df, time, valueColumn,
                                            ic = ic,
                                            stepwise=stepwise,
                                            ))
+    # Guard: model fitting can return an empty mable (e.g. if training data is too short),
+    # which would cause "subscript out of bounds" on model_df$arima[[1]] below.
+    if (nrow(model_df) < 1 || length(model_df$arima) < 1) {
+      stop("ARIMA model fitting returned an empty result. Check that training data has enough observations.")
+    }
     if (class(model_df$arima[[1]]$fit) == "null_mdl") {
       stop("Null model was selected.") # Error, because it cannot produce forecast. https://github.com/tidyverts/fable/issues/304
     }
@@ -348,7 +366,22 @@ exp_arima <- function(df, time, valueColumn,
 
     if (test_mode){
       fitted_training_df$is_test_data <- FALSE
-      forecast_rows$y <- tail(filled_aggregated_data, periods)[["y"]] #TODO: consider if this is always correct.
+      # Safely extract y values from filled_aggregated_data.
+      # Keep the resulting vector length exactly equal to `periods` to match forecast_rows.
+      if ("y" %in% colnames(filled_aggregated_data) && nrow(filled_aggregated_data) > 0) {
+        y_values <- filled_aggregated_data[["y"]]
+        if (length(y_values) >= periods) {
+          forecast_rows$y <- tail(y_values, periods)
+        }
+        else {
+          # If we have fewer rows than periods, pad with NAs at the beginning.
+          forecast_rows$y <- c(rep(NA, periods - length(y_values)), y_values)
+        }
+      }
+      else {
+        # If y column doesn't exist or data is empty, fill with NAs.
+        forecast_rows$y <- rep(NA, periods)
+      }
       forecast_rows$is_test_data <- TRUE 
     }
 
@@ -406,7 +439,15 @@ exp_arima <- function(df, time, valueColumn,
       stl_df$change_point <- cpt_vec
       stl_df$y <- training_data$y
 
-      stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods) # To display only one seasonal cycle
+      # Safely slice for seasonal display - handle cases where seasonal_periods might be NULL or larger than data
+      if (!is.null(seasonal_periods) && seasonal_periods > 0 && nrow(stl_df) >= seasonal_periods) {
+        stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods)
+      } else if (nrow(stl_df) > 0) {
+        # If seasonal_periods is invalid, just take the first row
+        stl_seasonal_df <- stl_df %>% dplyr::slice(1)
+      } else {
+        stl_seasonal_df <- stl_df
+      }
       ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
     }, error = function(e) { # This can fail depending on the data.
       # At least, create stl, stl_seasonal columns to avoid error.
@@ -724,7 +765,7 @@ glance_with_ts_metric <- function(df) {
   ret1 <- df %>% glance_rowwise(model)
   ret2 <- df %>% unnest_safe("data")
   value_col <- attr(df$data[[1]], "value_col")
-  if (any(ret2$is_test_data)) {
+  if ("is_test_data" %in% colnames(ret2) && any(ret2$is_test_data)) {
     ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, is_test_data), `MAPE (Ratio)`=exploratory::mape(!!rlang::sym(value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(value_col), forecasted_value, is_test_data), `R Squared`=r_squared(!!rlang::sym(value_col), forecasted_value, is_test_data=is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))
   }
   else {
