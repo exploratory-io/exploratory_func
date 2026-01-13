@@ -101,7 +101,7 @@ exp_arima <- function(df, time, valueColumn,
     }
   }
 
-  # Warning for grouped data with potentially sparse groups in test_mode (issue #33699)
+  # Warning for grouped data with potentially sparse groups in test_mode
   if (test_mode && length(grouped_col) > 0) {
     # Check approximate rows per group to warn about potential sparse data issues
     tryCatch({
