@@ -101,6 +101,25 @@ exp_arima <- function(df, time, valueColumn,
     }
   }
 
+  # Warning for grouped data with potentially sparse groups in test_mode (issue #33699)
+  if (test_mode && length(grouped_col) > 0) {
+    # Check approximate rows per group to warn about potential sparse data issues
+    tryCatch({
+      group_sizes <- df %>% dplyr::count(!!!rlang::syms(grouped_col)) %>% dplyr::pull(n)
+      min_group_size <- min(group_sizes, na.rm = TRUE)
+      if (min_group_size < periods + 2) {
+        warning(paste0(
+          "Some groups have fewer observations (", min_group_size, ") ",
+          "than periods + 2 (", periods + 2, "). ",
+          "These groups may fail or produce unreliable results in test_mode. ",
+          "Consider reducing periods or aggregating to fewer groups."
+        ))
+      }
+    }, error = function(e) {
+      # Silently ignore errors in warning calculation - the main function will handle actual errors
+    })
+  }
+
   if (is.null(seasonal_periods)) {
     seasonal_periods <- switch(time_unit,
                                year = NULL,
@@ -148,7 +167,18 @@ exp_arima <- function(df, time, valueColumn,
       lubridate::floor_date(df[[time_col]], unit = time_unit)
     }
 
-    if(!is.null(grouped_col)){
+    # Capture current group values for error messages before dropping grouping columns (issue #33699)
+    current_group_info <- ""
+    if(!is.null(grouped_col) && length(grouped_col) > 0){
+      tryCatch({
+        group_values <- sapply(grouped_col, function(col) {
+          val <- unique(df[[col]])
+          if (length(val) == 1) as.character(val) else paste(as.character(val), collapse=", ")
+        })
+        current_group_info <- paste0(" (Group: ", paste(grouped_col, "=", group_values, collapse = ", "), ")")
+      }, error = function(e) {
+        # Silently ignore errors in group info extraction
+      })
       # drop grouping columns
       df <- df[, !colnames(df) %in% grouped_col]
     }
@@ -209,10 +239,10 @@ exp_arima <- function(df, time, valueColumn,
       non_na_y <- sum(!is.na(training_data$y))
       if (nrow(training_data) < 2 || non_na_y < 2) {
         stop(paste0(
-          "Not enough training data to fit ARIMA in test_mode. ",
+          "Not enough training data to fit ARIMA in test_mode", current_group_info, ". ",
           "After reserving periods=", periods, " as test data, ",
           "training rows=", nrow(training_data), ", non-NA y rows=", non_na_y, ". ",
-          "Reduce periods or set test_mode=FALSE."
+          "Reduce periods, set test_mode=FALSE, or check this group's data."
         ))
       }
     }
