@@ -355,7 +355,7 @@ test_that("exp_arima with all-NA value col", {
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
 
-test_that("exp_arima test_mode with periods longer than series errors cleanly (regression for subscript OOB)", {
+test_that("exp_arima test_mode with periods longer than series errors cleanly", {
   # This reproduces the failure path:
   # - test_mode=TRUE
   # - periods >= number of rows in a group
@@ -376,7 +376,7 @@ test_that("exp_arima test_mode with periods longer than series errors cleanly (r
   expect_false(grepl("subscript out of bounds", err, fixed=TRUE))
 })
 
-test_that("exp_arima test_mode with grouped short series errors cleanly per-group (regression for subscript OOB)", {
+test_that("exp_arima test_mode with grouped short series errors cleanly per-group", {
   # Grouped version of the regression: one group is too short for periods in test_mode.
   ts_short <- seq.Date(as.Date("2020-01-01"), as.Date("2020-06-01"), by="month") # 6 rows
   ts_long <- seq.Date(as.Date("2019-01-01"), as.Date("2020-06-01"), by="month")  # 18 rows
@@ -395,4 +395,147 @@ test_that("exp_arima test_mode with grouped short series errors cleanly per-grou
   expect_true(!is.null(err))
   expect_true(grepl("Not enough training data to fit ARIMA in test_mode", err, fixed=TRUE))
   expect_false(grepl("subscript out of bounds", err, fixed=TRUE))
+})
+
+test_that("exp_arima handles binned grouped data in test_mode gracefully", {
+  # This test simulates a scenario where:
+  # - Data is binned/grouped (e.g., CPI index with 5 breaks)
+  # - Some bins have sparse data (fewer observations than periods + 2)
+  # - test_mode = TRUE with periods = 12
+  #
+  # The old code would throw "subscript out of bounds" in this scenario.
+  # The fix should throw a clear, user-friendly error message instead.
+  
+  # Create test data similar to a binned scenario
+  set.seed(42)
+  ts <- seq.Date(as.Date("2020-01-01"), as.Date("2022-12-01"), by = "month")  # 36 months
+  df <- data.frame(
+    date = ts,
+    cash_rate = runif(length(ts), 0.1, 5.0),
+    cpi_value = runif(length(ts), 100, 150)
+  )
+  
+  # Create CPI bins (5 breaks)
+  df$cpi_bin <- cut(df$cpi_value, breaks = 5, labels = c("Very Low", "Low", "Medium", "High", "Very High"))
+  
+  # Force one group to have very few observations (sparse data)
+  df_sparse <- df %>%
+    dplyr::group_by(cpi_bin) %>%
+    dplyr::mutate(n = dplyr::n()) %>%
+    dplyr::ungroup()
+  
+  # Manually create a sparse group by keeping only a few rows for one group
+  sparse_df <- dplyr::bind_rows(
+    df_sparse %>% dplyr::filter(cpi_bin != "Very High"),
+    df_sparse %>% dplyr::filter(cpi_bin == "Very High") %>% head(5)  # Only 5 observations
+  )
+  
+  # Group by the binned column
+  sparse_df <- sparse_df %>%
+    dplyr::select(date, cash_rate, cpi_bin) %>%
+    dplyr::group_by(cpi_bin)
+  
+  # This should fail with a helpful error, not "subscript out of bounds"
+  err <- tryCatch({
+    sparse_df %>%
+      exp_arima(date, cash_rate, periods = 12, time_unit = "month",
+                fun.aggregate = sum, na_fill_type = "previous",
+                auto = TRUE, seasonal = FALSE, seasonal_auto = TRUE,
+                ic = "aic", unit_root_test = "kpss", test_mode = TRUE)
+    NULL
+  }, error = function(e) e$message)
+  
+  # Verify we get a helpful error, not "subscript out of bounds"
+  expect_true(!is.null(err))
+  expect_true(grepl("Not enough training data to fit ARIMA in test_mode", err, fixed = TRUE))
+  expect_false(grepl("subscript out of bounds", err, fixed = TRUE))
+})
+
+test_that("exp_arima works correctly with binned grouped data when all groups have sufficient data", {
+  # This test verifies that the fix doesn't break the normal case
+  # where all groups have enough data.
+  
+  set.seed(42)
+  # Create data with 48 months to ensure enough data per group
+  ts <- seq.Date(as.Date("2018-01-01"), as.Date("2021-12-01"), by = "month")  # 48 months
+  df <- data.frame(
+    date = ts,
+    cash_rate = runif(length(ts), 0.1, 5.0),
+    group = rep(c("A", "B"), each = length(ts) / 2)  # Two groups with 24 rows each
+  )
+  
+  df <- df %>% dplyr::group_by(group)
+  
+  # With periods = 6 and 24 rows per group, this should work fine
+  result <- tryCatch({
+    df %>%
+      exp_arima(date, cash_rate, periods = 6, time_unit = "month",
+                auto = TRUE, seasonal = FALSE,
+                test_mode = TRUE)
+  }, error = function(e) e)
+  
+  # Should not throw an error
+  expect_false(inherits(result, "error"))
+  
+  # Verify the result structure
+  expect_true("data" %in% names(result))
+  expect_true("model" %in% names(result))
+})
+
+test_that("exp_arima error message includes group context when grouped data has insufficient rows", {
+  # This test ensures the error message is actionable and includes group info
+  
+  ts <- seq.Date(as.Date("2020-01-01"), as.Date("2020-10-01"), by = "month")  # 10 months
+  df <- data.frame(
+    date = ts,
+    value = runif(length(ts)),
+    group = c(rep("A", 5), rep("B", 5))  # Two groups with 5 rows each
+  ) %>%
+    dplyr::group_by(group)
+  
+  # With periods = 12 and only 5 rows per group, this should fail with helpful message
+  err <- tryCatch({
+    df %>%
+      exp_arima(date, value, periods = 12, time_unit = "month",
+                seasonal = FALSE, test_mode = TRUE)
+    NULL
+  }, error = function(e) e$message)
+  
+  expect_true(!is.null(err))
+  
+  # Check error message contains useful information
+  expect_true(grepl("Not enough training data", err, fixed = TRUE))
+  expect_true(grepl("test_mode", err, fixed = TRUE))
+  expect_true(grepl("periods", err, fixed = TRUE))
+  
+  # Check error message includes group context
+  expect_true(grepl("Group:", err, fixed = TRUE))
+  
+  # Should NOT contain cryptic error
+  expect_false(grepl("subscript out of bounds", err, fixed = TRUE))
+})
+
+test_that("exp_arima emits warning for sparse grouped data in test_mode", {
+  # This test verifies that a warning is emitted when groups have sparse data
+  
+  set.seed(42)
+  ts <- seq.Date(as.Date("2020-01-01"), as.Date("2021-06-01"), by = "month")  # 18 months
+  df <- data.frame(
+    date = ts,
+    value = runif(length(ts)),
+    group = c(rep("A", 12), rep("B", 6))  # Group A has 12 rows, Group B has only 6 rows
+  ) %>%
+    dplyr::group_by(group)
+  
+  # With periods = 8, Group B has only 6 rows which is less than periods + 2 = 10
+  # This should emit a warning before failing
+  expect_warning(
+    tryCatch(
+      df %>%
+        exp_arima(date, value, periods = 8, time_unit = "month",
+                  seasonal = FALSE, test_mode = TRUE),
+      error = function(e) NULL
+    ),
+    regexp = "Some groups have fewer observations"
+  )
 })
