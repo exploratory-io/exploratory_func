@@ -1623,7 +1623,8 @@ exp_lightgbm <- function(df,
       # filters Inf values, so we need to count them before they're removed
       numeric_pred_cols <- clean_cols[sapply(clean_cols, function(col) is.numeric(df[[col]]))]
       if (length(numeric_pred_cols) > 0) {
-        rows_with_inf <- rowSums(sapply(numeric_pred_cols, function(col) is.infinite(df[[col]]))) > 0
+        inf_flags <- lapply(numeric_pred_cols, function(col) is.infinite(df[[col]]))
+        rows_with_inf <- rowSums(do.call(cbind, inf_flags)) > 0
         inf_removed_rows <- sum(rows_with_inf)
       } else {
         inf_removed_rows <- 0
