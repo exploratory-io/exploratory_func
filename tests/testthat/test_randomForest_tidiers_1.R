@@ -4,7 +4,7 @@
 context("test tidiers for randomForest")
 
 testdata_dir <- tempdir()
-testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv"
 testdata_file_path <- paste0(testdata_dir, '/', testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
@@ -110,7 +110,7 @@ test_that("test calc_feature_imp predicting multi-class", {
                                                         # because, with boruta, there will be no significant variable,
                                                         # and no partial dependence data will be returned.
                       test_rate = 0.3)
-  
+
   ret <- model_df %>% prediction(data="training_and_test")
   conf_mat <- tidy_rowwise(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
   conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
@@ -130,7 +130,7 @@ test_that("test calc_feature_imp predicting multi-class", {
                       num_2,
                       with_boruta=TRUE, max_pd_vars=3,
                       test_rate = 0.3)
-  
+
   ret <- model_df %>% prediction(data="training_and_test")
   conf_mat <- tidy_rowwise(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
   conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
@@ -446,4 +446,82 @@ test_that("calc_feature_map() error handling for predictor with single unique va
     model_df <- flight %>% mutate(Const=1) %>%
       calc_feature_imp(`FL NUM`, Const, test_rate = 0.3)
   }, "Invalid Predictors: Only one unique value.")
+})
+
+test_that("calc_feature_imp filters Inf values from predictors", {
+  # Create test data with Inf values in predictors
+  test_data <- data.frame(
+    x = c(1, 2, Inf, 4, 5),
+    y = c(1, 2, 3, 4, 5)
+  )
+
+  # Model should train successfully with Inf values filtered
+  result <- test_data %>% calc_feature_imp(y, x, ntree = 5)
+  expect_false("error" %in% class(result$model[[1]]))
+
+  # Verify that Inf values were filtered (model should have fewer rows than original)
+  # The model should train on 4 rows (one Inf row removed)
+  expect_true(nrow(result$source.data[[1]]) == 4)
+})
+
+test_that("glance.ranger shows Inf removal message for regression", {
+  # Create test data with Inf values in predictors
+  test_data <- data.frame(
+    x = c(1, 2, Inf, 4, 5),
+    y = c(1, 2, 3, 4, 5)
+  )
+
+  result <- test_data %>% calc_feature_imp(y, x, ntree = 5)
+  glance_result <- glance(result$model[[1]])
+
+  # Should have Note column with Inf removal message
+  expect_true("Note" %in% colnames(glance_result))
+  expect_true(stringr::str_detect(glance_result$Note, "Inf values"))
+  expect_true(stringr::str_detect(glance_result$Note, "automatically removed"))
+})
+
+test_that("glance.ranger shows no note when no Inf values", {
+  # Create test data without Inf values
+  test_data <- data.frame(
+    x = c(1, 2, 3, 4, 5),
+    y = c(1, 2, 3, 4, 5)
+  )
+
+  result <- test_data %>% calc_feature_imp(y, x, ntree = 5)
+  glance_result <- glance(result$model[[1]])
+
+  # Should not have Note column or Note should be empty/NA
+  if ("Note" %in% colnames(glance_result)) {
+    expect_true(is.na(glance_result$Note) || glance_result$Note == "" || !stringr::str_detect(glance_result$Note, "Inf values"))
+  }
+})
+
+test_that("tidy.ranger shows Inf removal message for classification", {
+  # Create test data with Inf values in predictors for binary classification
+  test_data <- data.frame(
+    x = c(1, 2, Inf, 4, 5, 6),
+    y = c(TRUE, TRUE, FALSE, FALSE, TRUE, FALSE)
+  )
+
+  result <- test_data %>% calc_feature_imp(y, x, ntree = 5)
+  tidy_result <- tidy(result$model[[1]], type = "evaluation")
+
+  # Should have Note column with Inf removal message
+  expect_true("Note" %in% colnames(tidy_result))
+  expect_true(stringr::str_detect(tidy_result$Note, "Inf values"))
+  expect_true(stringr::str_detect(tidy_result$Note, "automatically removed"))
+})
+
+test_that("calc_feature_imp handles all rows removed due to Inf values", {
+  # Create test data where all rows have Inf in predictors
+  test_data <- data.frame(
+    x = c(Inf, Inf, Inf),
+    y = c(1, 2, 3)
+  )
+
+  # Should fail gracefully with clear error message
+  expect_error(
+    test_data %>% calc_feature_imp(y, x, ntree = 5),
+    "All rows were removed due to Inf values"
+  )
 })

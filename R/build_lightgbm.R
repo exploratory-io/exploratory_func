@@ -1618,6 +1618,23 @@ exp_lightgbm <- function(df,
 
       orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
 
+      # Count rows with Inf in numeric predictor columns BEFORE cleanup_df_per_group filters them
+      # This is needed because preprocess_regression_data_before_sample (called inside cleanup_df_per_group)
+      # filters Inf values, so we need to count them before they're removed
+      numeric_pred_cols <- clean_cols[sapply(clean_cols, function(col) is.numeric(df[[col]]))]
+      if (length(numeric_pred_cols) > 0) {
+        inf_flags <- lapply(numeric_pred_cols, function(col) is.infinite(df[[col]]))
+        rows_with_inf <- rowSums(do.call(cbind, inf_flags)) > 0
+        inf_removed_rows <- sum(rows_with_inf)
+      } else {
+        inf_removed_rows <- 0
+      }
+
+      # Handle edge case: all rows would be removed due to Inf values
+      if (inf_removed_rows == nrow(df)) {
+        stop("All rows were removed due to Inf values in predictors. Please check your data.")
+      }
+
       # LightGBM can handle NAs in numeric predictors; keep NA filtering off (match xgboost).
       clean_df_ret <- cleanup_df_per_group(
         df, clean_target_col, sample_size, clean_cols, name_map, predictor_n,
@@ -1633,6 +1650,15 @@ exp_lightgbm <- function(df,
         stop("Invalid Predictors: Only one unique value.")
       }
       name_map <- clean_df_ret$name_map
+
+      # Create message if Inf values were removed (they were filtered inside cleanup_df_per_group)
+      if (inf_removed_rows > 0) {
+        inf_removed_message <- paste0(
+          "Note: ", inf_removed_rows, " row(s) with Inf values in predictors were automatically removed."
+        )
+      } else {
+        inf_removed_message <- NULL
+      }
 
       # Split data into train/test BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
@@ -1900,6 +1926,12 @@ exp_lightgbm <- function(df,
         model$predictor_funs <- predictor_funs
       }
       model$orig_predictor_classes <- orig_predictor_classes
+      
+      # Store Inf removal information for display in Analytics Guide
+      if (!is.null(inf_removed_message)) {
+        model$inf_removed_rows <- inf_removed_rows
+        model$inf_removed_message <- inf_removed_message
+      }
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e) {
@@ -1960,7 +1992,18 @@ glance.lightgbm_exp <- function(x, pretty.name = FALSE, ...) {
   } else {
     stop("glance.lightgbm_exp should not be called for classification")
   }
-  glance.method(x, pretty.name = pretty.name, ...)
+  ret <- glance.method(x, pretty.name = pretty.name, ...)
+  
+  # Add note about Inf removal if applicable
+  if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
+    if ("Note" %in% colnames(ret)) {
+      ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
+    } else {
+      ret$Note <- x$inf_removed_message
+    }
+  }
+  
+  ret
 }
 
 #' @export
@@ -2004,11 +2047,20 @@ tidy.lightgbm_exp <- function(x, type = "importance", pretty.name = FALSE, binar
         if (x$classification_type == "binary") {
           predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
           predicted_probability <- extract_predicted(x)
-          evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         } else {
           predicted <- extract_predicted_multiclass_labels(x)
-          evaluate_multi_(data.frame(predicted = predicted, actual = actual), "predicted", "actual", pretty.name = pretty.name)
+          ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual), "predicted", "actual", pretty.name = pretty.name)
         }
+        # Add note about Inf removal if applicable
+        if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
+          if ("Note" %in% colnames(ret)) {
+            ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
+          } else {
+            ret$Note <- x$inf_removed_message
+          }
+        }
+        ret
       }
     },
     evaluation_by_class = {

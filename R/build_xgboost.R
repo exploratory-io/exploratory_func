@@ -1138,6 +1138,23 @@ exp_xgboost <- function(df,
       # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
       # that should not happen, since the extraction is already done by mutate_predictors.
       orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
+
+      # Count rows with Inf in numeric predictor columns BEFORE cleanup_df_per_group filters them
+      # This is needed because preprocess_regression_data_before_sample (called inside cleanup_df_per_group)
+      # filters Inf values, so we need to count them before they're removed
+      numeric_pred_cols <- clean_cols[sapply(clean_cols, function(col) is.numeric(df[[col]]))]
+      if (length(numeric_pred_cols) > 0) {
+        rows_with_inf <- rowSums(do.call(cbind, lapply(numeric_pred_cols, function(col) is.infinite(df[[col]])))) > 0
+        inf_removed_rows <- sum(rows_with_inf)
+      } else {
+        inf_removed_rows <- 0
+      }
+
+      # Handle edge case: all rows would be removed due to Inf values
+      if (inf_removed_rows == nrow(df)) {
+        stop("All rows were removed due to Inf values in predictors. Please check your data.")
+      }
+
       # XGBoost can work with NAs in numeric predictors. TODO: verify it.
       # Also, no need to convert logical to factor unlike ranger.
       clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE, convert_logical=FALSE)
@@ -1151,6 +1168,15 @@ exp_xgboost <- function(df,
         stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
       name_map <- clean_df_ret$name_map
+
+      # Create message if Inf values were removed (they were filtered inside cleanup_df_per_group)
+      if (inf_removed_rows > 0) {
+        inf_removed_message <- paste0(
+          "Note: ", inf_removed_rows, " row(s) with Inf values in predictors were automatically removed."
+        )
+      } else {
+        inf_removed_message <- NULL
+      }
 
       # Split training and test data BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
@@ -1387,6 +1413,12 @@ exp_xgboost <- function(df,
         model$predictor_funs <- predictor_funs
       }
       model$orig_predictor_classes <- orig_predictor_classes
+      
+      # Store Inf removal information for display in Analytics Guide
+      if (!is.null(inf_removed_message)) {
+        model$inf_removed_rows <- inf_removed_rows
+        model$inf_removed_message <- inf_removed_message
+      }
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
@@ -1461,6 +1493,16 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
     stop("glance.xgboost_exp should not be called for classification")
   }
   ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
+  
+  # Add note about Inf removal if applicable
+  if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
+    if ("Note" %in% colnames(ret)) {
+      ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
+    } else {
+      ret$Note <- x$inf_removed_message
+    }
+  }
+  
   ret
 }
 
@@ -1529,6 +1571,14 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         else {
           predicted <- extract_predicted_multiclass_labels(x)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        }
+        # Add note about Inf removal if applicable
+        if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
+          if ("Note" %in% colnames(ret)) {
+            ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
+          } else {
+            ret$Note <- x$inf_removed_message
+          }
         }
         ret
       }

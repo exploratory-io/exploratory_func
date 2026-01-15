@@ -459,12 +459,13 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
         df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)) & !is.infinite(!!rlang::sym(col)))
       }
       else {
-        # For ranger, removing numeric NA is not necessary.
-        # But even for ranger, filter Inf/-Inf to avoid following error from ranger.
+        # For ranger/XGBoost, removing numeric NA is not necessary.
+        # But filter Inf/-Inf to avoid errors from XGBoost and ranger.
         # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+        # XGBoost error: "Input data contains `inf` or `nan`"
         # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
         # if we filter NA rows here.
-        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)) & !is.infinite(!!rlang::sym(col)))
       }
     }
   }

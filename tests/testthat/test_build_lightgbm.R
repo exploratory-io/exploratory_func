@@ -223,3 +223,86 @@ if (Sys.info()["sysname"] != "Windows") {
     expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
   })
 }
+
+test_that("exp_lightgbm filters Inf values from predictors", {
+  testthat::skip_if_not_installed("lightgbm")
+  # Create test data with Inf values in predictors
+  test_data <- data.frame(
+    x = c(1, 2, Inf, 4, 5),
+    y = c(1, 2, 3, 4, 5)
+  )
+
+  # Model should train successfully with Inf values filtered
+  result <- test_data %>% exp_lightgbm(y, x, nrounds = 5)
+  expect_false("error" %in% class(result$model[[1]]))
+
+  # Verify that Inf values were filtered (model should have fewer rows than original)
+  # The model should train on 4 rows (one Inf row removed)
+  expect_true(nrow(result$source.data[[1]]) == 4)
+})
+
+test_that("glance.lightgbm_exp shows Inf removal message for regression", {
+  testthat::skip_if_not_installed("lightgbm")
+  # Create test data with Inf values in predictors
+  test_data <- data.frame(
+    x = c(1, 2, Inf, 4, 5),
+    y = c(1, 2, 3, 4, 5)
+  )
+
+  result <- test_data %>% exp_lightgbm(y, x, nrounds = 5)
+  glance_result <- glance(result$model[[1]])
+
+  # Should have Note column with Inf removal message
+  expect_true("Note" %in% colnames(glance_result))
+  expect_true(stringr::str_detect(glance_result$Note, "Inf values"))
+  expect_true(stringr::str_detect(glance_result$Note, "automatically removed"))
+})
+
+test_that("glance.lightgbm_exp shows no note when no Inf values", {
+  testthat::skip_if_not_installed("lightgbm")
+  # Create test data without Inf values
+  test_data <- data.frame(
+    x = c(1, 2, 3, 4, 5),
+    y = c(1, 2, 3, 4, 5)
+  )
+
+  result <- test_data %>% exp_lightgbm(y, x, nrounds = 5)
+  glance_result <- glance(result$model[[1]])
+
+  # Should not have Note column or Note should be empty/NA
+  if ("Note" %in% colnames(glance_result)) {
+    expect_true(is.na(glance_result$Note) || glance_result$Note == "" || !stringr::str_detect(glance_result$Note, "Inf values"))
+  }
+})
+
+test_that("tidy.lightgbm_exp shows Inf removal message for classification", {
+  testthat::skip_if_not_installed("lightgbm")
+  # Create test data with Inf values in predictors for binary classification
+  test_data <- data.frame(
+    x = c(1, 2, Inf, 4, 5, 6),
+    y = c(TRUE, TRUE, FALSE, FALSE, TRUE, FALSE)
+  )
+
+  result <- test_data %>% exp_lightgbm(y, x, nrounds = 5)
+  tidy_result <- tidy(result$model[[1]], type = "evaluation")
+
+  # Should have Note column with Inf removal message
+  expect_true("Note" %in% colnames(tidy_result))
+  expect_true(stringr::str_detect(tidy_result$Note, "Inf values"))
+  expect_true(stringr::str_detect(tidy_result$Note, "automatically removed"))
+})
+
+test_that("exp_lightgbm handles all rows removed due to Inf values", {
+  testthat::skip_if_not_installed("lightgbm")
+  # Create test data where all rows have Inf in predictors
+  test_data <- data.frame(
+    x = c(Inf, Inf, Inf),
+    y = c(1, 2, 3)
+  )
+
+  # Should fail gracefully with clear error message
+  expect_error(
+    test_data %>% exp_lightgbm(y, x, nrounds = 5),
+    "All rows were removed due to Inf values"
+  )
+})
