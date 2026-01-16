@@ -3671,6 +3671,14 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
 
   names_from_cols <- tidyselect::eval_select(names_from_quo, data)
 
+  # Convert empty strings to NA in names_from columns
+  # This prevents tidyr error: "Subscript can't contain the empty string"
+  for (col_name in names(names_from_cols)) {
+    if (is.character(data[[col_name]])) {
+      data[[col_name]] <- ifelse(data[[col_name]] == "", NA_character_, data[[col_name]])
+    }
+  }
+
   if (is_onehot_mode) {
     # One-hot encoding mode
 
