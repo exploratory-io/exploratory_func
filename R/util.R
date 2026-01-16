@@ -3692,7 +3692,7 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
       data,
       names_from = !!names_from_quo,
       values_from = !!names_from_quo,
-      values_fn = function(x) 1,
+      values_fn = ~ 1,
       values_fill = 0,
       ...
     )
