@@ -1,5 +1,3 @@
-context("test pivot_wider")
-
 test_that("pivot_wider creates one-hot encoding when values_from is NULL", {
   df <- data.frame(
     id = c(1, 1, 2, 3),
