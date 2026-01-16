@@ -139,3 +139,57 @@ test_that("pivot_wider handles mixed empty strings and NA values", {
   expect_equal(result$A, c(1, 0, 0, 0))
   expect_equal(result$B, c(0, 0, 0, 1))
 })
+
+test_that("pivot_wider one-hot mode ignores values_fn from user with warning", {
+  df <- data.frame(
+    id = c(1, 1, 2, 2),
+    category = c("A", "B", "A", "C")
+  )
+
+  # Should warn but not error when values_fn is passed without values_from
+  expect_warning(
+    result <- df %>% pivot_wider(names_from = category, values_fn = mean),
+    "values_fn.*ignored.*one-hot"
+  )
+
+  # Result should still be correct one-hot encoding
+  expect_equal(nrow(result), 2)
+  expect_equal(result$A, c(1, 1))
+  expect_equal(result$B, c(1, 0))
+  expect_equal(result$C, c(0, 1))
+})
+
+test_that("pivot_wider one-hot mode ignores values_fill from user with warning", {
+  df <- data.frame(
+    id = c(1, 2),
+    category = c("A", "B")
+  )
+
+  # Should warn when values_fill is passed without values_from
+  expect_warning(
+    result <- df %>% pivot_wider(names_from = category, values_fill = 999),
+    "values_fill.*ignored.*one-hot"
+  )
+
+  # Result should still use 0 for missing values (not 999)
+  expect_equal(result$A, c(1, 0))
+  expect_equal(result$B, c(0, 1))
+})
+
+test_that("pivot_wider handles Japanese column names with values_fn", {
+  df <- data.frame(
+    id = c(1, 1, 2),
+    `サービスの改善点` = c("速度", "価格", "速度"),
+    check.names = FALSE
+  )
+
+  # Should work with warning (values_fn ignored in one-hot mode)
+  expect_warning(
+    result <- df %>% pivot_wider(names_from = `サービスの改善点`, values_fn = mean),
+    "values_fn.*ignored"
+  )
+
+  expect_equal(nrow(result), 2)
+  expect_true("速度" %in% names(result))
+  expect_true("価格" %in% names(result))
+})

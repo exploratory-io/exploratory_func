@@ -3679,6 +3679,18 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
     }
   }
 
+  # Helper function to strip specified arguments from ... and warn
+  strip_onehot_conflicting_args <- function(dots, arg_names) {
+    stripped <- list()
+    for (name in arg_names) {
+      if (name %in% names(dots)) {
+        stripped[[name]] <- dots[[name]]
+        dots[[name]] <- NULL
+      }
+    }
+    list(dots = dots, stripped = stripped)
+  }
+
   if (is_onehot_mode) {
     # One-hot encoding mode
 
@@ -3687,14 +3699,33 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
       stop("One-hot encoding mode (values_from not specified) requires exactly one column in names_from") # nolint
     }
 
+    # Capture ... arguments and strip conflicting ones
+    dots <- rlang::list2(...)
+    conflicting_args <- c("values_fn", "values_fill")
+    result <- strip_onehot_conflicting_args(dots, conflicting_args)
+    dots <- result$dots
+    stripped <- result$stripped
+
+    # Warn if user passed conflicting arguments
+    if (length(stripped) > 0) {
+      stripped_names <- paste(names(stripped), collapse = ", ")
+      warning(paste0(
+        stripped_names,
+        " argument(s) ignored in one-hot encoding mode (when values_from is not specified). ",
+        "These are automatically set to values_fn = ~ 1 and values_fill = 0."
+      ))
+    }
+
     # Use names_from as values_from, with values_fn returning 1 (numeric)
-    tidyr::pivot_wider(
-      data,
-      names_from = !!names_from_quo,
-      values_from = !!names_from_quo,
-      values_fn = ~ 1,
-      values_fill = 0,
-      ...
+    rlang::inject(
+      tidyr::pivot_wider(
+        data,
+        names_from = !!names_from_quo,
+        values_from = !!names_from_quo,
+        values_fn = ~ 1,
+        values_fill = 0,
+        !!!dots
+      )
     )
   } else {
     # Normal mode - pass through to tidyr::pivot_wider
