@@ -3637,5 +3637,56 @@ cumany <- function(x, skip.na = TRUE) {
 #' @param x vector
 #' @return numeric vector
 extract_numeric <- function(x) {
-  exploratory::parse_number(x)  
+  exploratory::parse_number(x)
+}
+
+#' Wrapper for tidyr::pivot_wider with one-hot encoding support
+#'
+#' When values_from is NULL or not specified, enables one-hot encoding mode
+#' where the names_from column is used as values_from with values of 1 for
+#' present values and 0 for missing values.
+#'
+#' @param data A data frame
+#' @param names_from Column(s) to get the name of the output columns
+#' @param values_from Column to get the values from. If NULL or missing,
+#'        enables one-hot encoding mode using names_from column with 1/0 values.
+#' @param ... Additional arguments passed to tidyr::pivot_wider
+#' @return A data frame with pivoted columns
+#' @export
+pivot_wider <- function(data, names_from, values_from = NULL, ...) {
+  # Capture arguments as quosures immediately
+  names_from_quo <- rlang::enquo(names_from)
+  values_from_quo <- rlang::enquo(values_from)
+
+  # Check if values_from is NULL (one-hot encoding mode)
+  is_onehot_mode <- rlang::quo_is_null(values_from_quo)
+
+  names_from_cols <- tidyselect::eval_select(names_from_quo, data)
+
+  if (is_onehot_mode) {
+    # One-hot encoding mode
+
+    # Validate: only single column allowed in one-hot encoding mode
+    if (length(names_from_cols) > 1) {
+      stop("One-hot encoding mode (values_from not specified) requires exactly one column in names_from") # nolint
+    }
+
+    # Use names_from as values_from, with values_fn returning 1 (numeric)
+    tidyr::pivot_wider(
+      data,
+      names_from = !!names_from_quo,
+      values_from = !!names_from_quo,
+      values_fn = function(x) 1,
+      values_fill = 0,
+      ...
+    )
+  } else {
+    # Normal mode - pass through to tidyr::pivot_wider
+    tidyr::pivot_wider(
+      data,
+      names_from = !!names_from_quo,
+      values_from = !!values_from_quo,
+      ...
+    )
+  }
 }
