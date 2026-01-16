@@ -1967,14 +1967,22 @@ excel_numeric_to_datetime <- function(datetime_num, tz = "", ...) {
 #' A utility function for One-hot encoding
 #' @export
 one_hot <- function(df, key) {
+  key_quo <- rlang::enquo(key)
+  key_name <- rlang::as_name(key_quo)
+
   # Avoid conflict with names for temporary columns.
-  tmp_value_col <- avoid_conflict(colnames(df), ".tmp_value")
   tmp_id_col <- avoid_conflict(colnames(df), ".tmp_id")
 
-  # Add unique .id column so that spread will not coalesce multiple rows into one row.
-  df <- df %>% mutate(!!rlang::sym(tmp_value_col) := 1, !!rlang::sym(tmp_id_col) := seq(n()))
-  # Spread the column into multiple columns with name <original column name>_<original value> and value of 1 or 0.
-  df %>% tidyr::spread(!!rlang::enquo(key), !!rlang::sym(tmp_value_col), fill = 0, sep = "_") %>% select(-!!rlang::sym(tmp_id_col))
+  # Add unique .id column so that pivot_wider will not coalesce multiple rows.
+  df <- df %>% mutate(!!rlang::sym(tmp_id_col) := seq(n()))
+
+  # Use pivot_wider in one-hot encoding mode with column name prefix.
+  df %>%
+    pivot_wider(
+      names_from = !!key_quo,
+      names_prefix = paste0(key_name, "_")
+    ) %>%
+    select(-!!rlang::sym(tmp_id_col))
 }
 
 # API to get a list of argument names
