@@ -1967,14 +1967,22 @@ excel_numeric_to_datetime <- function(datetime_num, tz = "", ...) {
 #' A utility function for One-hot encoding
 #' @export
 one_hot <- function(df, key) {
+  key_quo <- rlang::enquo(key)
+  key_name <- rlang::as_name(key_quo)
+
   # Avoid conflict with names for temporary columns.
-  tmp_value_col <- avoid_conflict(colnames(df), ".tmp_value")
   tmp_id_col <- avoid_conflict(colnames(df), ".tmp_id")
 
-  # Add unique .id column so that spread will not coalesce multiple rows into one row.
-  df <- df %>% mutate(!!rlang::sym(tmp_value_col) := 1, !!rlang::sym(tmp_id_col) := seq(n()))
-  # Spread the column into multiple columns with name <original column name>_<original value> and value of 1 or 0.
-  df %>% tidyr::spread(!!rlang::enquo(key), !!rlang::sym(tmp_value_col), fill = 0, sep = "_") %>% select(-!!rlang::sym(tmp_id_col))
+  # Add unique .id column so that pivot_wider will not coalesce multiple rows.
+  df <- df %>% mutate(!!rlang::sym(tmp_id_col) := seq(n()))
+
+  # Use pivot_wider in one-hot encoding mode with column name prefix.
+  df %>%
+    pivot_wider(
+      names_from = !!key_quo,
+      names_prefix = paste0(key_name, "_")
+    ) %>%
+    select(-!!rlang::sym(tmp_id_col))
 }
 
 # API to get a list of argument names
@@ -3637,5 +3645,95 @@ cumany <- function(x, skip.na = TRUE) {
 #' @param x vector
 #' @return numeric vector
 extract_numeric <- function(x) {
-  exploratory::parse_number(x)  
+  exploratory::parse_number(x)
+}
+
+#' Wrapper for tidyr::pivot_wider with one-hot encoding support
+#'
+#' When values_from is NULL or not specified, enables one-hot encoding mode
+#' where the names_from column is used as values_from with values of 1 for
+#' present values and 0 for missing values.
+#'
+#' @param data A data frame
+#' @param names_from Column(s) to get the name of the output columns
+#' @param values_from Column to get the values from. If NULL or missing,
+#'        enables one-hot encoding mode using names_from column with 1/0 values.
+#' @param ... Additional arguments passed to tidyr::pivot_wider
+#' @return A data frame with pivoted columns
+#' @export
+pivot_wider <- function(data, names_from, values_from = NULL, ...) {
+  # Capture arguments as quosures immediately
+  names_from_quo <- rlang::enquo(names_from)
+  values_from_quo <- rlang::enquo(values_from)
+
+  # Check if values_from is NULL (one-hot encoding mode)
+  is_onehot_mode <- rlang::quo_is_null(values_from_quo)
+
+  names_from_cols <- tidyselect::eval_select(names_from_quo, data)
+
+  # Convert empty strings to NA in names_from columns
+  # This prevents tidyr error: "Subscript can't contain the empty string"
+  for (col_name in names(names_from_cols)) {
+    if (is.character(data[[col_name]])) {
+      data[[col_name]] <- ifelse(data[[col_name]] == "", NA_character_, data[[col_name]])
+    }
+  }
+
+  # Helper function to strip specified arguments from ... and warn
+  strip_onehot_conflicting_args <- function(dots, arg_names) {
+    stripped <- list()
+    for (name in arg_names) {
+      if (name %in% names(dots)) {
+        stripped[[name]] <- dots[[name]]
+        dots[[name]] <- NULL
+      }
+    }
+    list(dots = dots, stripped = stripped)
+  }
+
+  if (is_onehot_mode) {
+    # One-hot encoding mode
+
+    # Validate: only single column allowed in one-hot encoding mode
+    if (length(names_from_cols) > 1) {
+      stop("One-hot encoding mode (values_from not specified) requires exactly one column in names_from") # nolint
+    }
+
+    # Capture ... arguments and strip conflicting ones
+    dots <- rlang::list2(...)
+    conflicting_args <- c("values_fn", "values_fill")
+    result <- strip_onehot_conflicting_args(dots, conflicting_args)
+    dots <- result$dots
+    stripped <- result$stripped
+
+    # Warn if user passed conflicting arguments
+    if (length(stripped) > 0) {
+      stripped_names <- paste(names(stripped), collapse = ", ")
+      warning(paste0(
+        stripped_names,
+        " argument(s) ignored in one-hot encoding mode (when values_from is not specified). ",
+        "These are automatically set to values_fn = ~ 1 and values_fill = 0."
+      ))
+    }
+
+    # Use names_from as values_from, with values_fn returning 1 (numeric)
+    rlang::inject(
+      tidyr::pivot_wider(
+        data,
+        names_from = !!names_from_quo,
+        values_from = !!names_from_quo,
+        values_fn = ~ 1,
+        values_fill = 0,
+        !!!dots
+      )
+    )
+  } else {
+    # Normal mode - pass through to tidyr::pivot_wider
+    tidyr::pivot_wider(
+      data,
+      names_from = !!names_from_quo,
+      values_from = !!values_from_quo,
+      ...
+    )
+  }
 }
