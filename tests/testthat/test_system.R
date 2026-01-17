@@ -642,3 +642,71 @@ test_that("unnest_safe handles group columns with and without '|' and other edge
   res5 <- df5 %>% unnest_safe("val")
   expect_equal(res5$val, c(1,2,3,4))
 })
+
+test_that("searchAndReadDelimFiles supports Perl regex patterns including negative lookahead", {
+  # Create a temporary directory with test CSV files
+  test_dir <- tempfile("test_perl_regex_")
+  dir.create(test_dir)
+  on.exit(unlink(test_dir, recursive = TRUE))
+
+  # Create test CSV files
+  write.csv(data.frame(a = 1:3, b = 4:6), file.path(test_dir, "data1.csv"), row.names = FALSE)
+  write.csv(data.frame(a = 7:9, b = 10:12), file.path(test_dir, "data2.csv"), row.names = FALSE)
+  write.csv(data.frame(a = 13:15, b = 16:18), file.path(test_dir, "Chart_data.csv"), row.names = FALSE)
+  write.csv(data.frame(a = 19:21, b = 22:24), file.path(test_dir, "report.txt"), row.names = FALSE)
+
+  # Test 1: Perl regex with negative lookahead - exclude files starting with "Chart"
+  result <- exploratory::searchAndReadDelimFiles(
+    folder = test_dir,
+    pattern = paste0("^", test_dir, "/(?!Chart).*\\.csv$"),
+    delim = ",",
+    col_names = TRUE
+  )
+  # Should include data1.csv and data2.csv but NOT Chart_data.csv
+  expect_equal(nrow(result), 6)  # 3 rows from each of 2 files
+
+  # Test 2: Standard regex pattern still works (no regression)
+  result2 <- exploratory::searchAndReadDelimFiles(
+    folder = test_dir,
+    pattern = paste0("^", test_dir, "/.*\\.csv$"),
+    delim = ",",
+    col_names = TRUE
+  )
+  # Should include all 3 CSV files
+  expect_equal(nrow(result2), 9)  # 3 rows from each of 3 files
+
+  # Test 3: Case insensitivity works
+  write.csv(data.frame(a = 25:27, b = 28:30), file.path(test_dir, "DATA3.CSV"), row.names = FALSE)
+  result3 <- exploratory::searchAndReadDelimFiles(
+    folder = test_dir,
+    pattern = paste0("^", test_dir, "/data.*\\.csv$"),
+    delim = ",",
+    col_names = TRUE
+  )
+  # Should include data1.csv, data2.csv, and DATA3.CSV (case insensitive)
+  expect_equal(nrow(result3), 9)  # 3 rows from each of 3 files
+})
+
+test_that("searchAndReadExcelFiles supports Perl regex patterns including negative lookahead", {
+  # Create a temporary directory with test Excel files
+  test_dir <- tempfile("test_perl_regex_excel_")
+  dir.create(test_dir)
+  on.exit(unlink(test_dir, recursive = TRUE))
+
+  # Create test Excel files
+  df1 <- data.frame(a = 1:3, b = 4:6)
+  df2 <- data.frame(a = 7:9, b = 10:12)
+  df3 <- data.frame(a = 13:15, b = 16:18)
+
+  writexl::write_xlsx(df1, file.path(test_dir, "data1.xlsx"))
+  writexl::write_xlsx(df2, file.path(test_dir, "data2.xlsx"))
+  writexl::write_xlsx(df3, file.path(test_dir, "Chart_data.xlsx"))
+
+  # Test: Perl regex with negative lookahead - exclude files starting with "Chart"
+  result <- exploratory::searchAndReadExcelFiles(
+    folder = test_dir,
+    pattern = paste0("^", test_dir, "/(?!Chart).*\\.xlsx$")
+  )
+  # Should include data1.xlsx and data2.xlsx but NOT Chart_data.xlsx
+  expect_equal(nrow(result), 6)  # 3 rows from each of 2 files
+})

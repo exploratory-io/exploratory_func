@@ -3302,7 +3302,10 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
+  files <- fs::dir_ls(path = folder)
+  if (pattern != "") {
+    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
+  }
   if (length(files) > 0) {
     # Exclude Excel temporary files whose name starts with ~$ (e.g. ~$test.xlsx)
     files <- files[!grepl("/\\~\\$", files)]
@@ -3553,7 +3556,10 @@ searchAndReadDelimFiles <- function(folder, pattern = "", forPreview = FALSE, de
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
+  files <- fs::dir_ls(path = folder)
+  if (pattern != "") {
+    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
+  }
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
@@ -3845,7 +3851,10 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
+  files <- fs::dir_ls(path = folder)
+  if (pattern != "") {
+    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
+  }
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
