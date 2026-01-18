@@ -658,7 +658,7 @@ test_that("searchAndReadDelimFiles supports Perl regex patterns including negati
   # Test 1: Perl regex with negative lookahead - exclude files starting with "Chart"
   result <- exploratory::searchAndReadDelimFiles(
     folder = test_dir,
-    pattern = paste0("^", test_dir, "/(?!Chart).*\\.csv$"),
+    pattern = "^(?!Chart).*\\.csv$",
     delim = ",",
     col_names = TRUE
   )
@@ -668,7 +668,7 @@ test_that("searchAndReadDelimFiles supports Perl regex patterns including negati
   # Test 2: Standard regex pattern still works (no regression)
   result2 <- exploratory::searchAndReadDelimFiles(
     folder = test_dir,
-    pattern = paste0("^", test_dir, "/.*\\.csv$"),
+    pattern = "^.*\\.csv$",
     delim = ",",
     col_names = TRUE
   )
@@ -679,7 +679,7 @@ test_that("searchAndReadDelimFiles supports Perl regex patterns including negati
   write.csv(data.frame(a = 25:27, b = 28:30), file.path(test_dir, "DATA3.CSV"), row.names = FALSE)
   result3 <- exploratory::searchAndReadDelimFiles(
     folder = test_dir,
-    pattern = paste0("^", test_dir, "/data.*\\.csv$"),
+    pattern = "^data.*\\.csv$",
     delim = ",",
     col_names = TRUE
   )
@@ -698,14 +698,14 @@ test_that("searchAndReadExcelFiles supports Perl regex patterns including negati
   df2 <- data.frame(a = 7:9, b = 10:12)
   df3 <- data.frame(a = 13:15, b = 16:18)
 
-  writexl::write_xlsx(df1, file.path(test_dir, "data1.xlsx"))
-  writexl::write_xlsx(df2, file.path(test_dir, "data2.xlsx"))
-  writexl::write_xlsx(df3, file.path(test_dir, "Chart_data.xlsx"))
+  openxlsx::write.xlsx(df1, file.path(test_dir, "data1.xlsx"))
+  openxlsx::write.xlsx(df2, file.path(test_dir, "data2.xlsx"))
+  openxlsx::write.xlsx(df3, file.path(test_dir, "Chart_data.xlsx"))
 
   # Test: Perl regex with negative lookahead - exclude files starting with "Chart"
   result <- exploratory::searchAndReadExcelFiles(
     folder = test_dir,
-    pattern = paste0("^", test_dir, "/(?!Chart).*\\.xlsx$")
+    pattern = "^(?!Chart).*\\.xlsx$"
   )
   # Should include data1.xlsx and data2.xlsx but NOT Chart_data.xlsx
   expect_equal(nrow(result), 6)  # 3 rows from each of 2 files
