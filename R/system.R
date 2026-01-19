@@ -151,9 +151,39 @@ readPasswordRDS = function(sourceName, userName){
   password
 }
 
-#' github issues plugin script
+#' Get GitHub Issues
+#'
+#' Fetches issues from a GitHub repository with optional filtering.
+#'
+#' @param username GitHub username for authentication
+#' @param password GitHub personal access token
+#' @param owner Repository owner (user or organization)
+#' @param repository Repository name
+#' @param state Issue state: "open", "closed", or "all" (default: "all")
+#' @param milestone Filter by milestone number, "*" (any), or "none"
+#' @param assignee Filter by assignee username, "*" (any), or "none"
+#' @param creator Filter by issue creator username
+#' @param mentioned Filter by mentioned username
+#' @param labels Comma-separated label names (e.g., "bug,ui")
+#' @param sort Sort by: "created", "updated", or "comments"
+#' @param direction Sort direction: "asc" or "desc"
+#' @param since Only issues updated after this time (ISO 8601 format)
+#' @param type Filter by issue type, "*" (any), or "none"
+#' @param ... Reserved for future use
+#' @return A data frame of GitHub issues
 #' @export
-getGithubIssues <- function(username, password, owner, repository, ...){
+getGithubIssues <- function(username, password, owner, repository,
+                            state = "all",
+                            milestone = NULL,
+                            assignee = NULL,
+                            creator = NULL,
+                            mentioned = NULL,
+                            labels = NULL,
+                            sort = NULL,
+                            direction = NULL,
+                            since = NULL,
+                            type = NULL,
+                            ...){
   # read stored password
   loadNamespace("stringr")
   loadNamespace("httr")
@@ -165,8 +195,21 @@ getGithubIssues <- function(username, password, owner, repository, ...){
   is_next <- TRUE
   i <- 1
   while(is_next){
+    # Build query list - only include non-NULL parameters
+    query_params <- list(per_page = 100, page = i)
+    query_params$state <- state
+    if (!is.null(milestone)) query_params$milestone <- milestone
+    if (!is.null(assignee)) query_params$assignee <- assignee
+    if (!is.null(creator)) query_params$creator <- creator
+    if (!is.null(mentioned)) query_params$mentioned <- mentioned
+    if (!is.null(labels)) query_params$labels <- labels
+    if (!is.null(sort)) query_params$sort <- sort
+    if (!is.null(direction)) query_params$direction <- direction
+    if (!is.null(since)) query_params$since <- since
+    if (!is.null(type)) query_params$type <- type
+
     res <- httr::GET(endpoint,
-               query = list(state = "all", per_page = 100, page = i),
+               query = query_params,
                httr::authenticate(username, password))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
