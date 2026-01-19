@@ -3288,6 +3288,23 @@ searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern 
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
 }
+
+#' Convert glob-style pattern to regex
+#' @param pattern A glob-style pattern (e.g., "*.xls|*.xlsx|*.xlsm")
+#' @return A regex pattern (e.g., ".*\\.xls$|.*\\.xlsx$|.*\\.xlsm$")
+#' @noRd
+glob_to_regex <- function(pattern) {
+  parts <- strsplit(pattern, "\\|")[[1]]
+  regex_parts <- sapply(parts, function(p) {
+    p <- trimws(p)
+    # Escape dots, then convert * to .*
+    p <- gsub("\\.", "\\\\.", p)
+    p <- gsub("\\*", ".*", p)
+    paste0(p, "$")
+  }, USE.NAMES = FALSE)
+  paste(regex_parts, collapse = "|")
+}
+
 #'API that searches and imports multiple same structure Excel files and merge them to a single data frame
 #'@export
 searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
@@ -3298,7 +3315,11 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
+  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
+    # Glob-style pattern (e.g., "*.xls|*.xlsx|*.xlsm") - convert to regex
+    pattern <- glob_to_regex(pattern)
+    pattern <- paste0(fs::fs_path(folder), "/", pattern)
+  } else if (pattern != "") {
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
@@ -3552,7 +3573,11 @@ searchAndReadDelimFiles <- function(folder, pattern = "", forPreview = FALSE, de
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
+  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
+    # Glob-style pattern (e.g., "*.csv|*.tsv") - convert to regex
+    pattern <- glob_to_regex(pattern)
+    pattern <- paste0(fs::fs_path(folder), "/", pattern)
+  } else if (pattern != "") {
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
@@ -3847,7 +3872,11 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
+  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
+    # Glob-style pattern (e.g., "*.parquet") - convert to regex
+    pattern <- glob_to_regex(pattern)
+    pattern <- paste0(fs::fs_path(folder), "/", pattern)
+  } else if (pattern != "") {
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
