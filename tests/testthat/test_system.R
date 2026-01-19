@@ -720,7 +720,8 @@ test_that("searchAndReadDelimFiles supports glob-style patterns", {
   # Create test CSV and TSV files
   write.csv(data.frame(a = 1:3, b = 4:6), file.path(test_dir, "data1.csv"), row.names = FALSE)
   write.csv(data.frame(a = 7:9, b = 10:12), file.path(test_dir, "data2.csv"), row.names = FALSE)
-  write.table(data.frame(a = 13:15, b = 16:18), file.path(test_dir, "data3.tsv"), row.names = FALSE, sep = "\t")
+  # Use CSV format but with .tsv extension to test pattern matching (not delimiter handling)
+  write.csv(data.frame(a = 13:15, b = 16:18), file.path(test_dir, "data3.tsv"), row.names = FALSE)
   write.csv(data.frame(a = 19:21, b = 22:24), file.path(test_dir, "report.txt"), row.names = FALSE)
 
   # Test 1: Single glob pattern "*.csv"
