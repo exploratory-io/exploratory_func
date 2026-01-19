@@ -1417,14 +1417,37 @@ test_that("excel_numeric_to_datetime", {
 
 test_that("one_hot", {
   # numeric column case
-  df <- data.frame(x=c(1,1,2,3))
+  df <- data.frame(id = 1:4, x = c(1, 1, 2, 3))
   res <- df %>% one_hot(x)
-  expect_equal(res$x_1, c(1,1,0,0))
+  expect_equal(nrow(res), 4)
+  expect_equal(res$x_1, c(1, 1, 0, 0))
+  expect_equal(res$x_2, c(0, 0, 1, 0))
+  expect_equal(res$x_3, c(0, 0, 0, 1))
 
   # character column case
-  df <- data.frame(x=c("A", "A", "B", "C"))
+  df <- data.frame(id = 1:4, x = c("A", "A", "B", "C"))
   res <- df %>% one_hot(x)
-  expect_equal(res$x_A, c(1,1,0,0))
+  expect_equal(nrow(res), 4)
+  expect_equal(res$x_A, c(1, 1, 0, 0))
+  expect_equal(res$x_B, c(0, 0, 1, 0))
+  expect_equal(res$x_C, c(0, 0, 0, 1))
+
+  # long data case: same ID with multiple values should be consolidated into one row
+  # For example, ID-0005 has two rows with different values ("B" and "C")
+  # After one-hot encoding, ID-0005 should be one row with 1s in both columns
+  df <- data.frame(
+    id = c("ID-0001", "ID-0002", "ID-0003", "ID-0004", "ID-0005", "ID-0005", "ID-0006"),
+    category = c("A", "A", "B", "B", "B", "C", "D")
+  )
+  res <- df %>% one_hot(category)
+  # ID-0005 should appear only once with 1s in both category_B and category_C
+  expect_equal(nrow(res), 6)  # 7 rows consolidated to 6 (ID-0005 appears once)
+  # Check that ID-0005 has 1 in both category_B and category_C
+  id_0005_row <- res[res$id == "ID-0005", ]
+  expect_equal(id_0005_row$category_B, 1)
+  expect_equal(id_0005_row$category_C, 1)
+  expect_equal(id_0005_row$category_A, 0)
+  expect_equal(id_0005_row$category_D, 0)
 })
 
 test_that("get_mode", {
