@@ -170,17 +170,28 @@ resolve_milestone <- function(owner, repository, milestone, username, password) 
   endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/milestones")
 
   # Fetch all milestones (open and closed) to find the title
+  # Use pagination to retrieve all milestones, not just the first 100
   all_milestones <- list()
   for (state in c("open", "closed")) {
-    res <- httr::GET(endpoint,
-                     query = list(state = state, per_page = 100),
-                     httr::authenticate(username, password))
-    if (httr::status_code(res) == 200) {
+    page <- 1
+    repeat {
+      res <- httr::GET(endpoint,
+                       query = list(state = state, per_page = 100, page = page),
+                       httr::authenticate(username, password))
+      if (httr::status_code(res) != 200) {
+        break
+      }
       jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
       milestones <- jsonlite::fromJSON(jsondata, flatten = TRUE)
-      if (length(milestones) > 0 && nrow(milestones) > 0) {
-        all_milestones <- c(all_milestones, list(milestones))
+      if (length(milestones) == 0 || nrow(milestones) == 0) {
+        break
       }
+      all_milestones <- c(all_milestones, list(milestones))
+      # If we got fewer than 100, we've reached the last page
+      if (nrow(milestones) < 100) {
+        break
+      }
+      page <- page + 1
     }
   }
 
