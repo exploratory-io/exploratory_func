@@ -151,13 +151,104 @@ readPasswordRDS = function(sourceName, userName){
   password
 }
 
-#' github issues plugin script
+# Helper function to resolve milestone title to number
+# The GitHub API requires milestone number, not title.
+# This function allows users to pass either.
+resolve_milestone <- function(owner, repository, milestone, username, password) {
+  # Special values pass through unchanged
+  if (milestone %in% c("*", "none")) {
+    return(milestone)
+  }
+
+  # If it's already a whole integer (no decimal), pass through
+  # Note: as.integer("14.5") returns 14, so we need to check for exact match
+  if (grepl("^[0-9]+$", milestone)) {
+    return(milestone)
+  }
+
+  # Otherwise, look up by title
+  endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/milestones")
+
+  # Fetch all milestones (open and closed) to find the title
+  # Use pagination to retrieve all milestones, not just the first 100
+  all_milestones <- list()
+  for (state in c("open", "closed")) {
+    page <- 1
+    repeat {
+      res <- httr::GET(endpoint,
+                       query = list(state = state, per_page = 100, page = page),
+                       httr::authenticate(username, password))
+      if (httr::status_code(res) != 200) {
+        break
+      }
+      jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
+      milestones <- jsonlite::fromJSON(jsondata, flatten = TRUE)
+      if (length(milestones) == 0 || nrow(milestones) == 0) {
+        break
+      }
+      all_milestones <- c(all_milestones, list(milestones))
+      # If we got fewer than 100, we've reached the last page
+      if (nrow(milestones) < 100) {
+        break
+      }
+      page <- page + 1
+    }
+  }
+
+  if (length(all_milestones) > 0) {
+    milestones_df <- dplyr::bind_rows(all_milestones)
+    match <- milestones_df[milestones_df$title == milestone, ]
+    if (nrow(match) > 0) {
+      return(as.character(match$number[1]))
+    }
+  }
+
+  # If not found, return original (API will handle the error)
+  warning(paste0("Milestone '", milestone, "' not found. Using as-is."))
+  return(milestone)
+}
+
+#' Get GitHub Issues
+#'
+#' Fetches issues from a GitHub repository with optional filtering.
+#'
+#' @param username GitHub username for authentication
+#' @param password GitHub personal access token
+#' @param owner Repository owner (user or organization)
+#' @param repository Repository name
+#' @param state Issue state: "open", "closed", or "all" (default: "all")
+#' @param milestone Filter by milestone number or title, "*" (any), or "none"
+#' @param assignee Filter by assignee username, "*" (any), or "none"
+#' @param creator Filter by issue creator username
+#' @param mentioned Filter by mentioned username
+#' @param labels Comma-separated label names (e.g., "bug,ui")
+#' @param sort Sort by: "created", "updated", or "comments"
+#' @param direction Sort direction: "asc" or "desc"
+#' @param since Only issues updated after this time (ISO 8601 format)
+#' @param type Filter by issue type, "*" (any), or "none"
+#' @param ... Reserved for future use
+#' @return A data frame of GitHub issues
 #' @export
-getGithubIssues <- function(username, password, owner, repository, ...){
-  # read stored password
+getGithubIssues <- function(username, password, owner, repository,
+                            state = "all",
+                            milestone = NULL,
+                            assignee = NULL,
+                            creator = NULL,
+                            mentioned = NULL,
+                            labels = NULL,
+                            sort = NULL,
+                            direction = NULL,
+                            since = NULL,
+                            type = NULL,
+                            ...){
   loadNamespace("stringr")
   loadNamespace("httr")
   loadNamespace("dplyr")
+
+  # Resolve milestone title to number if needed
+  if (!is.null(milestone)) {
+    milestone <- resolve_milestone(owner, repository, milestone, username, password)
+  }
 
   # Body
   endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/issues")
@@ -165,8 +256,21 @@ getGithubIssues <- function(username, password, owner, repository, ...){
   is_next <- TRUE
   i <- 1
   while(is_next){
+    # Build query list - only include non-NULL parameters
+    query_params <- list(per_page = 100, page = i)
+    query_params$state <- state
+    if (!is.null(milestone)) query_params$milestone <- milestone
+    if (!is.null(assignee)) query_params$assignee <- assignee
+    if (!is.null(creator)) query_params$creator <- creator
+    if (!is.null(mentioned)) query_params$mentioned <- mentioned
+    if (!is.null(labels)) query_params$labels <- labels
+    if (!is.null(sort)) query_params$sort <- sort
+    if (!is.null(direction)) query_params$direction <- direction
+    if (!is.null(since)) query_params$since <- since
+    if (!is.null(type)) query_params$type <- type
+
     res <- httr::GET(endpoint,
-               query = list(state = "all", per_page = 100, page = i),
+               query = query_params,
                httr::authenticate(username, password))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
