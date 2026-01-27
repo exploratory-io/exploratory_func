@@ -786,10 +786,15 @@ predict_xgboost <- function(model, df) {
 calc_permutation_importance_xgboost_regression <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
-                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
-                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+    tryCatch({
+      mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                  predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                  # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                  loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
@@ -800,11 +805,16 @@ calc_permutation_importance_xgboost_regression <- function(fit, target, vars, da
 calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
-                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])), na.rm = TRUE)} # Negative-log-likelihood-based loss function.
-                                # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
-                                )
+    tryCatch({
+      mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                  predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                  loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])), na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                  # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                  )
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
@@ -815,11 +825,16 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
 calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
-                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
-                                loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
-                                )
+    tryCatch({
+      mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                  predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                  # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                  loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
+                                  )
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
@@ -1446,19 +1461,34 @@ exp_xgboost <- function(df,
 
   ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
   # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
-  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
-            df[[model_and_data_col]][[1]]$model
+  ret <- ret %>% dplyr::mutate(model = purrr::imap(data, function(df, idx){
+            tryCatch({
+              df[[model_and_data_col]][[1]]$model
+            }, error = function(e) {
+              stop(paste0(e$message, " (while extracting model from group ", idx, ")"),
+                   call. = FALSE)
+            })
           })) %>%
-          dplyr::mutate(.test_index = purrr::map(data, function(df){
-            df[[model_and_data_col]][[1]]$test_index
+          dplyr::mutate(.test_index = purrr::imap(data, function(df, idx){
+            tryCatch({
+              df[[model_and_data_col]][[1]]$test_index
+            }, error = function(e) {
+              stop(paste0(e$message, " (while extracting test_index from group ", idx, ")"),
+                   call. = FALSE)
+            })
           })) %>%
-          dplyr::mutate(source.data = purrr::map(data, function(df){
-            data <- df[[model_and_data_col]][[1]]$source_data
-            if (length(grouped_cols) > 0 && !is.null(data)) {
-              data %>% dplyr::select(-grouped_cols)
-            } else {
-              data
-            }
+          dplyr::mutate(source.data = purrr::imap(data, function(df, idx){
+            tryCatch({
+              data <- df[[model_and_data_col]][[1]]$source_data
+              if (length(grouped_cols) > 0 && !is.null(data)) {
+                data %>% dplyr::select(-grouped_cols)
+              } else {
+                data
+              }
+            }, error = function(e) {
+              stop(paste0(e$message, " (while extracting source.data from group ", idx, ")"),
+                   call. = FALSE)
+            })
           })) %>%
           dplyr::select(-data)
 

@@ -12,19 +12,23 @@ iterate_kmeans <- function(df, max_centers = 10,
   n_centers <- seq(min(max_centers, nrow(df) - 1))
   ret <- data.frame(center = n_centers)
   ret <- ret %>% dplyr::mutate(model = purrr::map(center, function(x) {
-    model_df <- df %>% build_kmeans.cols(everything(),
-                                         centers=x,
-                                         iter.max = iter.max,
-                                         nstart = nstart,
-                                         algorithm = algorithm,
-                                         trace = trace,
-                                         normalize_data = normalize_data,
-                                         seed=seed,
-                                         keep.source=FALSE,
-                                         augment=FALSE,
-                                         na.rm = FALSE) # NA filtering is already done. Skip it to save time. 
-    ret <- model_df$model[[1]]
-    ret
+    tryCatch({
+      model_df <- df %>% build_kmeans.cols(everything(),
+                                           centers=x,
+                                           iter.max = iter.max,
+                                           nstart = nstart,
+                                           algorithm = algorithm,
+                                           trace = trace,
+                                           normalize_data = normalize_data,
+                                           seed=seed,
+                                           keep.source=FALSE,
+                                           augment=FALSE,
+                                           na.rm = FALSE) # NA filtering is already done. Skip it to save time.
+      model_df$model[[1]]
+    }, error = function(e) {
+      stop(paste0(e$message, " (while building k-means model with centers=", x, ")"),
+           call. = FALSE)
+    })
   }))
   ret %>% rowwise(center) %>% glance_rowwise(model)
 }
@@ -112,14 +116,20 @@ exp_kmeans <- function(df, ...,
                                    seed=NULL) # Seed is already done in do_prcomp. Skip it.
   }
 
-  ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
-    x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
-    x$sampled_nrow <- sampled_nrow
-    x$excluded_nrow <- excluded_nrow
-    if (!is.null(elbow_result)) {
-      x$elbow_result <- elbow_result
-    }
-    x
+  ret <- ret %>% dplyr::mutate(model = purrr::imap(model, function(x, idx) {
+    tryCatch({
+      y <- kmeans_model_df$model[[idx]]
+      x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
+      x$sampled_nrow <- sampled_nrow
+      x$excluded_nrow <- excluded_nrow
+      if (!is.null(elbow_result)) {
+        x$elbow_result <- elbow_result
+      }
+      x
+    }, error = function(e) {
+      stop(paste0(e$message, " (while merging PCA and k-means models at index ", idx, ")"),
+           call. = FALSE)
+    })
   }))
 
   # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
