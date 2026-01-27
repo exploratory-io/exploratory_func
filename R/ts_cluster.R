@@ -181,7 +181,12 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       }
 
       # Always run for the specified number of centers.
-      single_model <- run_tsclust(centers)
+      single_model <- tryCatch({
+        run_tsclust(centers)
+      }, error = function(e) {
+        stop(paste0(e$message, " (while building time series cluster model with centers=", centers, ")"),
+             call. = FALSE)
+      })
       model <- list(model = single_model) # Since the original model is S4 object, we create an S3 object that wraps it.
 
       if (elbow_method_mode) {
@@ -194,7 +199,12 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
           n_centers <- 2:max_centers
           # Note: this part can be slow.
           models <- n_centers %>% purrr::map(function(n_center) {
-            run_tsclust(n_center)
+            tryCatch({
+              run_tsclust(n_center)
+            }, error = function(e) {
+              stop(paste0(e$message, " (while building time series cluster model with centers=", n_center, ")"),
+                   call. = FALSE)
+            })
           })
           model$models <- models # Add models for elbow method.
           model$n_centers <- n_centers
