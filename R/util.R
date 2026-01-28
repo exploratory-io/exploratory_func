@@ -3422,7 +3422,7 @@ construct_new_labels <- function(base.labels, new.labels) {
 # Example
 # Input: "(0.996,2.33]", "(2.33,3.67]", "(3.67,5]"
 # Output: "0.996 - 2.33", "2.33 - 3.67", "3.67 - 5"
-format_cut_output <- function(x, decimal.digits=2, big.mark=",", small.mark=".", new.labels=NULL, prefix="", suffix="", right=TRUE) {
+format_cut_output <- function(x, decimal.digits=2, big.mark=",", small.mark="", new.labels=NULL, prefix="", suffix="", right=TRUE) {
   # Exit if the length is 0.
   if (length(x) == 0 || all(is.na(x))) {
     return (x)
@@ -3450,7 +3450,7 @@ format_cut_output <- function(x, decimal.digits=2, big.mark=",", small.mark=".",
 # Input: [1] "(0.996,2.333333333]"       "(2.333333333,3.666666667]" "(3.666666667,5.004]"
 # Output: [1] "1.00 - 2.33" "2.33 - 3.67" "3.67 - 5.00"
 #
-format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.mark=".", prefix="", suffix="", right=TRUE) {
+format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.mark="", prefix="", suffix="", right=TRUE) {
   # Split the text by ",". It will breaks the vector like this.
   # [[1]]
   # [1] "(0.996"       "2.333333333]"

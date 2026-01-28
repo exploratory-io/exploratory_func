@@ -2100,6 +2100,12 @@ test_that("format_cut_output function", {
   formatted <- format_cut_output(x)
   expect_equal(formatted, factor(c("1.00 - 2.33","1.00 - 2.33","2.33 - 3.67","3.67 - 5.00","3.67 - 5.00")))
 
+  # decimal.digits is more than 6 case. 
+  # It shouldn't show the small mark "." between 6th and 7th decimal digit
+  # like "0.996000.00". #27137.
+  formatted <- `_tam_format_cut_output`(x, decimal.digits=8)
+  expect_equal(formatted, factor(c("0.99600000 - 2.33333333", "0.99600000 - 2.33333333", "2.33333333 - 3.66666667", "3.66666667 - 5.00400000","3.66666667 - 5.00400000")))
+
   # Negative test
   expect_equal(c(NA,NA,NA), format_cut_output(c(NA,NA,NA), decimal.digits=2))
   expect_equal(NULL, format_cut_output(c(), decimal.digits=2))
