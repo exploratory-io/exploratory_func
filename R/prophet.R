@@ -783,7 +783,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       else {
         regressor_name_map <- regressor_final_output_cols
         names(regressor_name_map) <- regressor_output_cols
-        model <- list(result=ret, model=m, test_mode=test_mode, value_col=value_col, regressor_name_map=regressor_name_map)
+        model <- list(result=ret, model=m, test_mode=test_mode, time_col=time_col, value_col=value_col, regressor_name_map=regressor_name_map)
         class(model) <- c("prophet_exploratory", class(model))
         model
       }
@@ -883,4 +883,65 @@ tidy.prophet_exploratory <- function(x, type="result") {
     }
     res
   }
+}
+
+#' @export
+augment.prophet_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
+
+  time_col <- x$time_col
+  value_col <- x$value_col
+  # TODO: Avoid column name conflict with the original data.
+  predicted_value_col <- "forecasted_value"
+  predicted_value_high_col <- "forecasted_value_high"
+  predicted_value_low_col <- "forecasted_value_low"
+
+  if (!is.null(newdata)) { 
+
+    # create clean name data frame because the model learned by those names
+    original_data <- newdata
+
+    # Drop unnecessary columns.
+    cleaned_data <- original_data %>% dplyr::select(!!rlang::sym(time_col))
+
+    # Remove NA rows.
+    na_row_numbers <- ranger.find_na(time_col, cleaned_data)
+
+    if (length(na_row_numbers) > 0) {
+      # Remove NA rows. drop=FALSE is necessary to keep the data frame structure.
+      cleaned_data <-  cleaned_data[-na_row_numbers, , drop=FALSE]
+    }
+    
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
+    }
+
+    # The model requires the time column to be named "ds".
+    if (time_col != "ds") {
+      cleaned_data <- cleaned_data %>% dplyr::rename(ds = !!rlang::sym(time_col))
+    }
+
+    # Run prediction.
+    predicted_data <- stats::predict(x$model, cleaned_data)
+
+    # Inserting once removed NA rows
+    original_data[[predicted_value_col]] <- restore_na(predicted_data$yhat, na_row_numbers)
+    original_data[[predicted_value_high_col]] <- restore_na(predicted_data$yhat_lower, na_row_numbers)
+    original_data[[predicted_value_low_col]] <- restore_na(predicted_data$yhat_upper, na_row_numbers)
+
+    original_data
+
+  } else if (!is.null(data)) { 
+    # Return the original data with the forecasted values.
+    # Use the result in the model object.
+    return(x$result)
+  } else {
+    # Return the original data with the forecasted values.
+    # Use the result in the model object.
+    return(x$result)
+  }
+
 }
