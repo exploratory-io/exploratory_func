@@ -47,7 +47,7 @@ test_that("iterate_kmeans reports error with centers context", {
   # The error message should contain "centers=" to indicate which center value failed
   # Note: iterate_kmeans is an internal function, accessed via :::
   expect_error_with_context(
-    iterate_kmeans(df, max_centers = 5),
+    exploratory:::iterate_kmeans(df, max_centers = 5),
     "centers="
   )
 })
@@ -60,7 +60,7 @@ test_that("exp_kmeans elbow method reports error with centers context", {
   # Use centers=1 for the main k-means (which will succeed)
   # but max_centers=5 for elbow method (which will fail at centers=3)
   expect_error_with_context(
-    exp_kmeans(df, x, y, centers = 1, elbow_method_mode = TRUE, max_centers = 5),
+    exploratory:::exp_kmeans(df, x, y, centers = 1, elbow_method_mode = TRUE, max_centers = 5),
     "centers="
   )
 })
@@ -68,7 +68,7 @@ test_that("exp_kmeans elbow method reports error with centers context", {
 test_that("exp_kmeans normal operation works correctly", {
   # Verify that normal operation still works after adding error handling
   df <- mtcars[1:15, ]
-  result <- exp_kmeans(df, mpg, hp, centers = 2)
+  result <- exploratory:::exp_kmeans(df, mpg, hp, centers = 2)
   expect_s3_class(result, "data.frame")
   expect_true("model" %in% colnames(result))
 })
@@ -76,7 +76,7 @@ test_that("exp_kmeans normal operation works correctly", {
 test_that("exp_kmeans elbow method normal operation works correctly", {
   # Verify elbow method still works when data is valid
   df <- mtcars[1:15, ]
-  result <- exp_kmeans(df, mpg, hp, elbow_method_mode = TRUE, max_centers = 5)
+  result <- exploratory:::exp_kmeans(df, mpg, hp, elbow_method_mode = TRUE, max_centers = 5)
   expect_s3_class(result, "data.frame")
   expect_true(!is.null(result$model[[1]]$elbow_result))
 })
@@ -103,8 +103,49 @@ test_that("calc_permutation_importance_xgboost_regression reports error with var
 
   # Test permutation importance with a non-existent variable to trigger error
   expect_error_with_context(
-    calc_permutation_importance_xgboost_regression(fit, "mpg", c("hp", "nonexistent_var"), df),
-    "variable"
+    exploratory:::calc_permutation_importance_xgboost_regression(fit, "mpg", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+test_that("calc_permutation_importance_xgboost_binary reports error with variable context", {
+  skip_if_not_installed("xgboost")
+  skip_if_not_installed("mmpf")
+
+  df <- mtcars[1:30, ]
+  df$am <- as.logical(df$am)
+
+  model_df <- tryCatch({
+    exp_xgboost(df, am, mpg, hp, wt, test_rate = 0)
+  }, error = function(e) NULL)
+
+  skip_if(is.null(model_df), "Could not build xgboost binary model")
+
+  fit <- model_df$model[[1]]
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_xgboost_binary(fit, "am", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+test_that("calc_permutation_importance_xgboost_multiclass reports error with variable context", {
+  skip_if_not_installed("xgboost")
+  skip_if_not_installed("mmpf")
+
+  df <- iris
+
+  model_df <- tryCatch({
+    exp_xgboost(df, Species, Sepal.Length, Sepal.Width, Petal.Length, Petal.Width, test_rate = 0)
+  }, error = function(e) NULL)
+
+  skip_if(is.null(model_df), "Could not build xgboost multiclass model")
+
+  fit <- model_df$model[[1]]
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_xgboost_multiclass(fit, "Species", "nonexistent_var", df),
+    "nonexistent_var"
   )
 })
 
@@ -123,7 +164,113 @@ test_that("exp_xgboost normal operation works correctly", {
 })
 
 # =============================================================================
-# Phase 3: Survival forest error handling tests
+# Phase 3: LightGBM error handling tests
+# =============================================================================
+
+test_that("calc_permutation_importance_lightgbm_regression reports error with variable context", {
+  skip_if_not_installed("lightgbm")
+  skip_if_not_installed("mmpf")
+
+  df <- mtcars[1:30, c("mpg", "hp", "wt")]
+
+  model_df <- tryCatch({
+    exp_lightgbm(df, mpg, hp, wt, test_rate = 0)
+  }, error = function(e) NULL)
+
+  skip_if(is.null(model_df), "Could not build lightgbm regression model")
+
+  fit <- model_df$model[[1]]
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_lightgbm_regression(fit, "mpg", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+test_that("calc_permutation_importance_lightgbm_binary reports error with variable context", {
+  skip_if_not_installed("lightgbm")
+  skip_if_not_installed("mmpf")
+
+  df <- mtcars[1:30, ]
+  df$am <- as.logical(df$am)
+
+  model_df <- tryCatch({
+    exp_lightgbm(df, am, mpg, hp, wt, test_rate = 0)
+  }, error = function(e) NULL)
+
+  skip_if(is.null(model_df), "Could not build lightgbm binary model")
+
+  fit <- model_df$model[[1]]
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_lightgbm_binary(fit, "am", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+test_that("calc_permutation_importance_lightgbm_multiclass reports error with variable context", {
+  skip_if_not_installed("lightgbm")
+  skip_if_not_installed("mmpf")
+
+  df <- iris
+
+  model_df <- tryCatch({
+    exp_lightgbm(df, Species, Sepal.Length, Sepal.Width, Petal.Length, Petal.Width, test_rate = 0)
+  }, error = function(e) NULL)
+
+  skip_if(is.null(model_df), "Could not build lightgbm multiclass model")
+
+  fit <- model_df$model[[1]]
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_lightgbm_multiclass(fit, "Species", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+# =============================================================================
+# Phase 4: Rpart error handling tests
+# =============================================================================
+
+test_that("calc_permutation_importance_rpart_regression reports error with variable context", {
+  skip_if_not_installed("mmpf")
+
+  df <- mtcars[1:30, c("mpg", "hp", "wt")]
+  fit <- rpart::rpart(mpg ~ hp + wt, df)
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_rpart_regression(fit, "mpg", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+test_that("calc_permutation_importance_rpart_binary reports error with variable context", {
+  skip_if_not_installed("mmpf")
+
+  df <- mtcars[1:30, ]
+  df$am <- as.logical(df$am)
+  fit <- rpart::rpart(am ~ mpg + hp + wt, df)
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_rpart_binary(fit, "am", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+test_that("calc_permutation_importance_rpart_multiclass reports error with variable context", {
+  skip_if_not_installed("mmpf")
+
+  df <- iris
+  fit <- rpart::rpart(Species ~ Sepal.Length + Sepal.Width + Petal.Length + Petal.Width, df)
+
+  expect_error_with_context(
+    exploratory:::calc_permutation_importance_rpart_multiclass(fit, "Species", "nonexistent_var", df),
+    "nonexistent_var"
+  )
+})
+
+# =============================================================================
+# Phase 5: Survival forest error handling tests
 # =============================================================================
 
 test_that("calc_permutation_importance_ranger_survival reports error with variable context", {
@@ -144,26 +291,26 @@ test_that("calc_permutation_importance_ranger_survival reports error with variab
   fit <- model_df$model[[1]]
 
   expect_error_with_context(
-    calc_permutation_importance_ranger_survival(fit, "time", "status", c("age", "nonexistent_var"), df),
+    exploratory:::calc_permutation_importance_ranger_survival(fit, "time", "status", "nonexistent_var", df),
     "nonexistent_var"
   )
 })
 
 # =============================================================================
-# Phase 4: Time series clustering error handling tests
+# Phase 6: Time series clustering error handling tests
 # =============================================================================
 
 test_that("exp_ts_cluster reports error with centers context when tsclust fails", {
   skip_if_not_installed("dtwclust")
 
-  df <- data.frame(
+  df <- expand.grid(
     time = as.Date("2020-01-01") + 0:5,
-    value = c(1, 2, 3, 4, 5, 6),
-    category = c("A", "B", "A", "B", "A", "B")
+    category = c("A", "B", "C")
   )
+  df$value <- seq_len(nrow(df))
 
   expect_error_with_context(
-    exp_ts_cluster(df, time, value, category, centers = 2, centroid = "invalid_centroid"),
+    exploratory:::exp_ts_cluster(df, time, value, category, centers = 2, centroid = "invalid_centroid"),
     "centers="
   )
 })
