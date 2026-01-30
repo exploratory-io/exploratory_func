@@ -1,6 +1,5 @@
 # Design: Improve Error Reporting in purrr::map for Analytics Functions
 
-**Issue:** [exploratory-io/tam#33858](https://github.com/exploratory-io/tam/issues/33858)
 **Date:** 2026-01-27
 **Status:** Draft
 

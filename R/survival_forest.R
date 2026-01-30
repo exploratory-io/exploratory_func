@@ -24,7 +24,7 @@ calc_permutation_importance_ranger_survival <- function(fit, time_col, status_co
       mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
                                   predict.fun = function(object, newdata) {
                                     predicted <- predict(object,data=newdata)
-                                  # Use the weighted mean predicted survival time as the predicted value. To evaluate prediction performance, we will later calculate concordance based on it.
+                                    # Use the weighted mean predicted survival time as the predicted value. To evaluate prediction performance, we will later calculate concordance based on it.
                                     mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
                                     tibble::tibble(x=mean_survival,status=newdata[[status_col]])
                                   },
