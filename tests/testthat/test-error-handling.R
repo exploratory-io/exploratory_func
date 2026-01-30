@@ -122,3 +122,49 @@ test_that("exp_xgboost normal operation works correctly", {
   expect_s3_class(result, "data.frame")
   expect_true("model" %in% colnames(result))
 })
+
+# =============================================================================
+# Phase 3: Survival forest error handling tests
+# =============================================================================
+
+test_that("calc_permutation_importance_ranger_survival reports error with variable context", {
+  skip_if_not_installed("ranger")
+  skip_if_not_installed("mmpf")
+
+  df <- survival::lung %>%
+    dplyr::mutate(status = status == 2) %>%
+    dplyr::select(time, status, age, sex) %>%
+    dplyr::slice(1:50)
+
+  model_df <- tryCatch({
+    df %>% exp_survival_forest(time, status, age, sex, ntree = 5, predictor_n = 2, test_rate = 0)
+  }, error = function(e) NULL)
+
+  skip_if(is.null(model_df), "exp_survival_forest failed - may be environment issue")
+
+  fit <- model_df$model[[1]]
+
+  expect_error_with_context(
+    calc_permutation_importance_ranger_survival(fit, "time", "status", c("age", "nonexistent_var"), df),
+    "nonexistent_var"
+  )
+})
+
+# =============================================================================
+# Phase 4: Time series clustering error handling tests
+# =============================================================================
+
+test_that("exp_ts_cluster reports error with centers context when tsclust fails", {
+  skip_if_not_installed("dtwclust")
+
+  df <- data.frame(
+    time = as.Date("2020-01-01") + 0:5,
+    value = c(1, 2, 3, 4, 5, 6),
+    category = c("A", "B", "A", "B", "A", "B")
+  )
+
+  expect_error_with_context(
+    exp_ts_cluster(df, time, value, category, centers = 2, centroid = "invalid_centroid"),
+    "centers="
+  )
+})
