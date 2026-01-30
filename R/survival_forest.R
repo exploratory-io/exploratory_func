@@ -20,17 +20,22 @@ calc_mean_survival <- function(survival, unique_death_times) {
 calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
-                                predict.fun = function(object, newdata) {
-                                  predicted <- predict(object,data=newdata)
-                                  # Use the weighted mean predicted survival time as the predicted value. To evaluate prediction performance, we will later calcualte concordance based on it.
-                                  mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
-                                  tibble::tibble(x=mean_survival,status=newdata[[status_col]])
-                                },
-                                loss.fun = function(x,y){ # Use 1 - concordance as loss function.
-                                  df <- x %>% dplyr::mutate(time=!!y[[1]])
-                                  1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
-                                })
+    tryCatch({
+      mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
+                                  predict.fun = function(object, newdata) {
+                                    predicted <- predict(object,data=newdata)
+                                    # Use the weighted mean predicted survival time as the predicted value. To evaluate prediction performance, we will later calculate concordance based on it.
+                                    mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
+                                    tibble::tibble(x=mean_survival,status=newdata[[status_col]])
+                                  },
+                                  loss.fun = function(x,y){ # Use 1 - concordance as loss function.
+                                    df <- x %>% dplyr::mutate(time=!!y[[1]])
+                                    1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
+                                  })
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
