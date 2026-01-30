@@ -1,5 +1,4 @@
 # Tests for improved error handling in purrr::map calls
-# Related to: exploratory-io/tam#33858
 # These tests verify that error messages include context information
 # when errors occur inside purrr::map in Analytics View functions.
 #
