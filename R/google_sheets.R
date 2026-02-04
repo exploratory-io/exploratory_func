@@ -174,28 +174,64 @@ normalizeDataForGoogleSheetsExport <- function (df) {
 #' @param firstRowAsHeader - use first row as header
 #' @param col_types - column types specification
 #' @param guess_max - max rows to guess types
+#' @param original_col_types - original col_types for retry logic
 #' @keywords internal
-.read_sheet_with_col_types_padding <- function(gsheet, sheetName, skipNRows, treatTheseAsNA, firstRowAsHeader, col_types, guess_max) {
+.read_sheet_with_col_types_padding <- function(gsheet, sheetName, skipNRows, treatTheseAsNA, firstRowAsHeader, col_types, guess_max, original_col_types = NULL) {
+  # Use original_col_types when provided to control the retry/padding behavior,
+  # otherwise fall back to the current col_types argument.
+  col_types_to_use <- if (!is.null(original_col_types)) original_col_types else col_types
   tryCatch({
     if (!is.null(treatTheseAsNA)) {
-      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types, guess_max = guess_max)
+      df <- gsheet %>% googlesheets4::read_sheet(
+        range = sheetName,
+        skip = skipNRows,
+        na = treatTheseAsNA,
+        col_names = firstRowAsHeader,
+        col_types = col_types_to_use,
+        guess_max = guess_max
+      )
     } else {
-      df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types, guess_max = guess_max)
+      df <- gsheet %>% googlesheets4::read_sheet(
+        range = sheetName,
+        skip = skipNRows,
+        col_names = firstRowAsHeader,
+        col_types = col_types_to_use,
+        guess_max = guess_max
+      )
     }
     df
   }, error = function(e) {
     # Check if this is a col_types length mismatch error and we have a string col_types to pad
     # Error pattern: "Length of `col_types` is not compatible with columns found in sheets"
-    if (is.character(col_types) && length(col_types) == 1 && is.null(names(col_types)) &&
+    if (is.character(col_types_to_use) && length(col_types_to_use) == 1 && is.null(names(col_types_to_use)) &&
         stringr::str_detect(e$message, "Length of `col_types` is not compatible with columns found in sheets")) {
       # Try to pad col_types with '?' for extra columns
-      padded_types <- .pad_col_types_for_column_mismatch(col_types, e$message)
+      padded_types <- .pad_col_types_for_column_mismatch(col_types_to_use, e$message)
       if (!is.null(padded_types)) {
         # Retry with padded col_types
         if (!is.null(treatTheseAsNA)) {
-          return(gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = padded_types, guess_max = guess_max))
+          return(
+            gsheet %>%
+              googlesheets4::read_sheet(
+                range = sheetName,
+                skip = skipNRows,
+                na = treatTheseAsNA,
+                col_names = firstRowAsHeader,
+                col_types = padded_types,
+                guess_max = guess_max
+              )
+          )
         } else {
-          return(gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = padded_types, guess_max = guess_max))
+          return(
+            gsheet %>%
+              googlesheets4::read_sheet(
+                range = sheetName,
+                skip = skipNRows,
+                col_names = firstRowAsHeader,
+                col_types = padded_types,
+                guess_max = guess_max
+              )
+          )
         }
       }
     }
