@@ -145,7 +145,7 @@ fill_between <- function(df, ..., .direction="down", value=NULL) {
 
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
   df <- df %>%
-    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := each_func(.)) %>%
     dplyr::ungroup()
   df <- df %>% unnest_with_drop(!!rlang::sym(tmp_col))
 

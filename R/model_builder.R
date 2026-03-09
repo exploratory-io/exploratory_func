@@ -131,12 +131,12 @@ build_kmeans.kv_ <- function(df,
 
   if(keep.source & !augment){
     output <- df %>%
-      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
+      dplyr::do(!!rlang::sym(model_column) := build_kmeans_each(.), !!rlang::sym(source_column) := (.))
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
   } else {
     output <- df %>%
-      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
+      dplyr::do(!!rlang::sym(model_column) := build_kmeans_each(.))
   }
   # Add a class for Exploratyry to recognize the type of .model
   if(augment){
@@ -242,12 +242,12 @@ build_kmeans.cols <- function(df, ...,
 
   if(keep.source & !augment){
     output <- df %>%
-        dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
+        dplyr::do(!!rlang::sym(model_column) := build_kmeans_each(.), !!rlang::sym(source_column) := (.))
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
   } else {
     output <- df %>%
-      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
+      dplyr::do(!!rlang::sym(model_column) := build_kmeans_each(.))
   }
   if(augment){
     output <- output %>%

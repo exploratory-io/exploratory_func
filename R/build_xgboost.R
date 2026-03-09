@@ -1,3 +1,18 @@
+# xgboost 3.2+ returns ALTREP list objects that don't support $<- assignment.
+# This helper converts the xgboost model to a regular list while preserving
+# the ptr element and class, promoting attributes to list elements.
+as_regular_list_xgb <- function(m) {
+  m2 <- list(ptr = m$ptr)
+  attrs <- attributes(m)
+  for (a in names(attrs)) {
+    if (!a %in% c("class", "names")) {
+      m2[[a]] <- attrs[[a]]
+    }
+  }
+  class(m2) <- class(m)
+  m2
+}
+
 #' formula version of xgboost
 #' @param data Dataframe to create model
 #' @param formula Formula for model
@@ -9,7 +24,7 @@
 #' @param sparse If matrix should be sparse.
 #' As default, it becomes sparse if there is any categorical value.
 #' @export
-fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
+fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, objective = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
   df_for_model_matrix <- tryCatch({
@@ -64,22 +79,40 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     })
     weight <- model.weights(df_for_model_matrix)
 
+    # xgboost 3.2+ requires factor y for binary/multi objectives.
+    # The factor conversion with proper levels is done in xgboost_binary/xgboost_multi
+    # before calling fml_xgboost, so y should already be a factor here.
+
+    # xgboost 3.2+ doesn't support non-default prediction modes
+    # (binary:logitraw, multi:softmax, reg:logistic) in xgboost().
+    # Map to the standard objective and store the original for prediction time.
+    original_objective <- objective
+    if (!is.null(objective)) {
+      if (objective == "binary:logitraw") objective <- "binary:logistic"
+      if (objective == "multi:softmax") objective <- "multi:softprob"
+      if (objective == "reg:logistic") objective <- "reg:squarederror"
+    }
+
     ret <- if(watchlist_rate != 0.0) {
       if (watchlist_rate < 0 ||  1 <= watchlist_rate) {
         stop("watchlist_rate must be between 0 and 1")
       }
       # create validation data set
       index <- sample(seq(nrow(md_mat)), ceiling(nrow(md_mat) * watchlist_rate))
-      watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
-      train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
+      # xgb.DMatrix requires numeric labels, convert factor y to 0-based integer
+      y_numeric <- if (is.factor(y)) as.integer(y) - 1L else y
+      watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y_numeric[index])
+      train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y_numeric[-index])
 
-      xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, ...)
+      xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, objective = objective, ...)
     } else {
-      xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
+      xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, objective = objective, ...)
     }
+    # xgboost 3.2+ returns ALTREP list that doesn't support $<- assignment.
+    # Convert to regular list to allow adding custom attributes.
+    ret <- as_regular_list_xgb(ret)
+    attr(term, ".Environment") <- NULL
     ret$terms <- term
-    # To avoid saving a huge environment when caching with RDS.
-    attr(ret$terms,".Environment") <- NULL
     ret$x_names <- colnames(md_mat)
     ret$is_sparse <- sparse
     pred_cnames <- all.vars(term)[-1]
@@ -87,6 +120,10 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     # this is needed in augment, so that matrix with the same levels
     # can be created
     ret$xlevels <- .getXlevels(term, df_for_model_matrix)
+    # Store original objective for prediction if it was remapped
+    if (!is.null(original_objective) && original_objective != objective) {
+      ret$original_objective <- original_objective
+    }
     ret
   }
 }
@@ -112,7 +149,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   label_levels <- c(0, 1)
   if(is.logical(y_vals)) {
     label_levels <- c(FALSE, TRUE)
-    y_vals <- as.numeric(y_vals)
+    y_vals <- factor(as.numeric(y_vals), levels = c(0, 1))
   } else if (!all(y_vals[!is.na(y_vals)] %in% c(0, 1))){
     # there are values that are not 0 or 1, so should be mapped as factor
     factored <- as.factor(data[[y_name]])
@@ -120,7 +157,10 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
     if(length(label_levels) != 2){
       stop("target variable must have 2 unique values")
     }
-    y_vals <- as.numeric(factored) - 1
+    y_vals <- factor(as.numeric(factored) - 1, levels = c(0, 1))
+  } else {
+    # Already 0/1 numeric — convert to factor for xgboost 3.2+
+    y_vals <- factor(y_vals, levels = c(0, 1))
   }
 
   data[[y_name]] <- y_vals
@@ -133,7 +173,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
                 params = params,
                 ...)
   }, error = function(e){
-    if(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples")){
+    if(any(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples"))){
       stop("The target only contains positive or negative values")
     }
     stop(e)
@@ -178,25 +218,33 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
     to_same_type(levels(factored), data[[y_name]])
   }
 
+  # xgboost 3.2+ requires factor y for multi objectives.
+  # Convert to factor with all levels preserved (important for na.omit cases).
   if(is.logical(y_vals)) {
-    y_vals <- as.numeric(y_vals)
+    y_vals <- factor(as.numeric(y_vals), levels = c(0, 1))
   } else if (is.factor(y_vals)) {
-    # Map the levels to integers from 0 to (number of levels - 1)
     mapping <- 0:(length(label_levels)-1)
     names(mapping) <- as.character(label_levels)
-    y_vals <- mapping[as.character(y_vals)]
+    y_vals <- factor(mapping[as.character(y_vals)], levels = mapping)
   } else {
     factored <- as.factor(data[[y_name]])
-    y_vals <- as.numeric(factored) - 1
+    y_vals <- factor(as.numeric(factored) - 1, levels = 0:(length(label_levels)-1))
   }
 
   data[[y_name]] <- y_vals
 
-  objective <- paste0("multi:", output_type, sep = "")
+  # xgboost 3.2+ rejects multi:softprob for binary (2-level) factors.
+  # Use binary:logistic internally and convert output to multi-class format.
+  is_binary_as_multi <- length(label_levels) == 2
+  if (is_binary_as_multi) {
+    objective <- "binary:logistic"
+  } else {
+    objective <- paste0("multi:", output_type, sep = "")
+  }
   ret <- fml_xgboost(data = data,
                      formula = formula,
                      objective = objective,
-                     num_class = length(label_levels),
+                     num_class = if (!is_binary_as_multi) length(label_levels) else NULL,
                      params = params,
                      ...)
   # add class to control S3 methods
@@ -215,7 +263,11 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NULL, params = list(), tweedie_variance_power = 1.5, ...) {
+xgboost_reg <- function(data, formula, output_type = "squarederror", eval_metric = NULL, params = list(), tweedie_variance_power = 1.5, ...) {
+  # Map deprecated "linear" to "squarederror" (xgboost removed reg:linear)
+  if (output_type == "linear") {
+    output_type <- "squarederror"
+  }
   # There can be more than 2 eval_metric
   # by creating eval_metric parameters in params list,
   # but specify only one so that it is clear what is used for early stopping.
@@ -315,11 +367,21 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
 
 
     obj <- x$params$objective
+    # Handle binary:logistic used as multi-class workaround for xgboost 3.2+
+    # Note: class "xgboost_multi" is removed above (line 334), so predict_xgboost
+    # won't convert binary:logistic to matrix. Do it here instead.
+    is_binary_as_multi <- (obj == "binary:logistic" && length(x$y_levels) == 2)
+    if (is_binary_as_multi && !is.matrix(predicted)) {
+      # Convert binary probability vector to 2-column matrix like multi:softprob
+      prob_class1 <- predicted
+      predicted <- cbind(1 - prob_class1, prob_class1)
+      colnames(predicted) <- x$y_levels
+    }
     if (obj == "multi:softmax") {
       predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
       # fill rows with NA
       original_data[[predicted_label_col]] <- predicted
-    } else if (obj == "multi:softprob") {
+    } else if (obj == "multi:softprob" || is_binary_as_multi) {
       predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
 
       colmax <- max.col(predicted)
@@ -733,7 +795,13 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
   # data frame with
   # number of iteration
   # with chosen evaluation metrics
-  ret <- x$evaluation_log %>% as.data.frame()
+  eval_log <- x$evaluation_log
+  if (is.null(eval_log)) {
+    # xgboost 3.2+ removed evaluation_log. Return minimal info.
+    ret <- data.frame(Note = "Evaluation log not available in xgboost 3.2+")
+    return(ret)
+  }
+  ret <- eval_log %>% as.data.frame()
   ret <- prettify_xgboost_evaluation_log(ret, pretty.name=TRUE)
   ret
 }
@@ -758,7 +826,17 @@ predict_xgboost <- function(model, df) {
 
   obj <- model$params$objective
 
-  if (obj == "multi:softprob") {
+  # Handle xgboost_multi with binary:logistic (2-level factor workaround for xgboost 3.2+)
+  is_multi_model <- "xgboost_multi" %in% class(model)
+  if (is_multi_model && obj == "binary:logistic" && length(model$y_levels) == 2) {
+    # Convert binary probability to 2-column probability matrix like multi:softprob
+    prob_class1 <- predicted
+    prob_class1 <- fill_vec_NA(as.integer(rownames(mat_data)), prob_class1, nrow(df))
+    probs <- cbind(1 - prob_class1, prob_class1)
+    colnames(probs) <- model$y_levels
+    predicted <- probs
+  }
+  else if (obj == "multi:softprob") {
     # predicted is a vector containing probabilities for each class
     probs <- matrix(predicted, nrow = length(model$y_levels)) %>% t()
     # probs <- fill_mat_NA(as.numeric(rownames(mat_data)), probs, nrow(df)) # code from xgboost step.
@@ -1047,7 +1125,7 @@ exp_xgboost <- function(df,
                         eta = 0.3, # We used to set learning_rate parameter here for Analytics Step. Corrected it while 6.2 development.
                                    # Either xgboost package changed parameter name at some point,
                                    # or we might have been wrong about the parameter name in the first place.
-                        output_type_regression = "linear",
+                        output_type_regression = "squarederror",
                         eval_metric_regression = "rmse",
                         output_type_binary = "logistic",
                         eval_metric_binary = "auc",

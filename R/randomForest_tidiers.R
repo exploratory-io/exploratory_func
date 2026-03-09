@@ -1928,7 +1928,7 @@ exp_balance <- function(df,
 
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := each_func(.)) %>%
     dplyr::ungroup() %>%
     tidyr::unnest(!!rlang::sym(tmp_col))
 

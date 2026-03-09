@@ -2766,6 +2766,11 @@ deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId="", s
 parse_html_tables <- function(url, encoding = NULL) {
   loadNamespace("rvest");
   loadNamespace("xml2");
+  if (!is.null(encoding)) {
+    # Map Exploratory UI encoding names (e.g. "Unicode (UTF-8)", "Japanese (Shift_JIS)")
+    # to the actual encoding name expected by xml2/libxml2.
+    encoding <- stringr::str_replace(encoding, "^.*\\((.+)\\)$", "\\1")
+  }
   if (is.null(encoding)) {
     rvest::html_nodes(xml2::read_html(url) ,"table")
   } else {
@@ -3624,9 +3629,9 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   }, error = function(e) {
     # The error message for non-existent file looks like this - "`path` does not exist: '<full-path>'"
     # (The single quotes in the above actually are curly quotes. I'm avoiding typing them here not to break the format of this code.)
-    if (stringr::str_detect(stringr::str_to_lower(e$message), "`path` does not exist")) {
+    if (any(stringr::str_detect(stringr::str_to_lower(e$message), "`path` does not exist"))) {
       stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(path), ' :: The file does not exist.'))
-    } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open url")) { # The actual error looks like this - "cannot open URL '<url>'"
+    } else if (any(stringr::str_detect(stringr::str_to_lower(e$message), "cannot open url"))) { # The actual error looks like this - "cannot open URL '<url>'"
       stop(paste0('EXP-DATASRC-15 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to download from the URL.'))
     } else {
       stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(path, e$message)), ' :: Failed to import file.'))
@@ -3777,12 +3782,12 @@ read_delim_file <- function(file, delim, quote = '"',
     })
     tryCatch({ # try to close connection and ignore error
       readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
-                        locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+                        locale = locale, na = na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
     }, error = function(e) {
       # For the case it's running on Linux (Collaboration Server), show more user friendly message.
       # For Exploratory Desktop, it's already taken care of by Desktop so just show the error message as is.
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
-      if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
+      if(Sys.info()["sysname"]=="Linux" && any(stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte"))) {
         if(locale$encoding == "Shift_JIS") {
           msg <- "The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.";
           stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
@@ -3791,9 +3796,9 @@ read_delim_file <- function(file, delim, quote = '"',
         } else {
           stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
         }
-      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
+      } else if (any(stringr::str_detect(stringr::str_to_lower(e$message), "does not exist"))) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
         stop(stringr::str_c("Could not read data from ", file)); # Show the original URL name in the error message.
-      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter")) {
+      } else if (any(stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter"))) {
         # retry with default delimiter which is comma. This error only happens when delimiter is not specified.
         exploratory::read_delim_file(
           file,
@@ -3841,12 +3846,12 @@ read_delim_file <- function(file, delim, quote = '"',
     # for Free Text case (i.e. is_free_text = TRUE), file is actually a data so do not call file()
     tryCatch({ # try to close connection and ignore error
       readr::read_delim(data, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
-                        locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+                        locale = locale, na = na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
     }, error = function(e) {
       # For the case it's running on Linux (Collaboration Server), show more user friendly message.
       # For Exploraotry Desktkop, it's already taken care of by Desktop so just show the error message as is.
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
-      if(stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
+      if(any(stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte"))) {
         if(locale$encoding == "Shift_JIS") {
           msg <- "The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.";
           stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
@@ -3857,11 +3862,11 @@ read_delim_file <- function(file, delim, quote = '"',
           msg <- stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again.");
           stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, msg)), ' :: Failed to import file.'))
         }
-      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open the connection")) {
+      } else if (any(stringr::str_detect(stringr::str_to_lower(e$message), "cannot open the connection"))) {
         stop(paste0("EXP-DATASRC-1 :: ", jsonlite::toJSON(file), " ::  Failed to read file."))
-      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) {
+      } else if (any(stringr::str_detect(stringr::str_to_lower(e$message), "does not exist"))) {
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
-      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter")) {
+      } else if (any(stringr::str_detect(stringr::str_to_lower(e$message), "could not guess the delimiter"))) {
         # retry with default delimiter which is comma. This error only happens when delimiter is not specified.
         exploratory::read_delim_file(
           file,
@@ -3954,7 +3959,7 @@ read_rds_file <- function(file, refhook = NULL){
     tryCatch({
       readRDS(file, refhook)
     }, error = function(e) {
-      if (stringr::str_detect(e$message, "cannot open the connection")) {
+      if (any(stringr::str_detect(e$message, "cannot open the connection"))) {
         # Assuming that this means the file is missing.
         # Strictly speaking, it might happen when the file is broken as a gzip file, but we can't distinguish between them from the error.
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
@@ -4051,7 +4056,7 @@ read_parquet_file <- function(file, col_select = NULL) {
       }
     }, error = function(e) {
       # Error message for non-existent file case looks like this - "Error : IOError: Failed to open local file '<full filepath>'. Detail: [errno 2] No such file or directory"
-      if (stringr::str_detect(e$message, "No such file or directory")) {
+      if (any(stringr::str_detect(e$message, "No such file or directory"))) {
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
       }
       else {

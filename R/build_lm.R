@@ -380,10 +380,10 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
       message <- e$message
     }
     # Run text match on the extracted message.
-    if (stringr::str_detect(message, "contrasts can be applied only to factors with 2 or more levels")) {
+    if (any(stringr::str_detect(message, "contrasts can be applied only to factors with 2 or more levels"))) {
       stop("more than 1 unique values are expected for categorical columns assigned as predictors")
     }
-    if(stringr::str_detect(message, "0 \\(non\\-NA\\) cases")){
+    if(any(stringr::str_detect(message, "0 \\(non\\-NA\\) cases"))){
       stop("no data after removing NA")
     }
     stop(message)

@@ -286,7 +286,7 @@ do_var.test <- function(df, value, key, ...){
   }
 
   df %>%
-    dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>%
+    dplyr::do(!!rlang::sym(model_col) := do_var.test_each(df = ., ...)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(model_col))
 }
@@ -358,7 +358,7 @@ do_chisq.test_ <- function(df,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(colnames(df), "tmp")
   df %>%
-    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := chisq.test_each(.)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(tmp_col))
 }
@@ -1593,7 +1593,7 @@ gather_repeated_measures <- function(df, column_list, value_col_name) {
   }
   
   # filter out rows that have NA in the columns to gather
-  df <- df %>% filter(across(all_of(cols_to_gather), ~ !is.na(.)))
+  df <- df %>% filter(if_all(all_of(cols_to_gather), ~ !is.na(.)))
 
   df_transformed <- df %>%
     dplyr::select(if (length(column_list) > 1) all_of(cols_to_keep), all_of(cols_to_gather)) %>%
@@ -1816,7 +1816,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
           ss3 <- broom::tidy(car::Anova(model, type="III"))
         }, error = function(e) { # This can fail depending on the data.
           # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
-          if (with_interaction && stringr::str_detect(e$message, "there are aliased coefficients in the model")) {
+          if (with_interaction && any(stringr::str_detect(e$message, "there are aliased coefficients in the model"))) {
             stop('EXP-ANA-9 :: [] :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
           }
           else {
@@ -1936,7 +1936,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       model$with_repeated_measures <- with_repeated_measures 
       model
     }, error = function(e){
-      if(length(grouped_cols) > 0 && !str_detect(e$message, 'EXP-ANA')) {
+      if(length(grouped_cols) > 0 && !any(str_detect(e$message, 'EXP-ANA'))) {
         # In repeat-by case, we report group-specific error in the Summary table,
         # so that analysis on other groups can go on.
         # Also, since translation mechanism for EXP-ANA-xxx message is not there on the route with Note column,

@@ -689,7 +689,7 @@ exp_arima <- function(df, time, valueColumn,
   # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_arima_each(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := do_arima_each(.)) %>%
     dplyr::ungroup()
   ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
 

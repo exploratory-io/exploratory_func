@@ -163,7 +163,7 @@ do_cor.kv_ <- function(df,
   if (return_type == "data.frame") {
     tmp_col <- avoid_conflict(grouped_col, "tmp")
     df %>%
-      dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
+      dplyr::do(!!rlang::sym(tmp_col) := do_cor_each(.)) %>%
       dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(tmp_col))
   }
@@ -246,7 +246,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 
   if (return_type == "data.frame") {
     df %>%
-      dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%
+      dplyr::do(!!rlang::sym(output_cols[[1]]) := do_cor_each(.)) %>%
       dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(output_cols[[1]]))
   }
@@ -432,7 +432,7 @@ do_cmdscale_ <- function(df,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   df %>%
-    dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := do_cmdscale_each(.)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(tmp_col))
 }

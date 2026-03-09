@@ -82,7 +82,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
       broom::tidy(survival::survfit(object, newdata = newdata))
     }, error = function(e){
       # Overwrite message for a rare known case where numeric overflow happens inside survival::agsurv, to be a little more user-friendly.
-      if (stringr::str_detect(e$message, "NA\\/NaN\\/Inf in foreign function call \\(arg 6\\)")) {
+      if (any(stringr::str_detect(e$message, "NA\\/NaN\\/Inf in foreign function call \\(arg 6\\)"))) {
         stop("Numeric overflow happened in the calculation of predicted survival curves.")
       }
       else {

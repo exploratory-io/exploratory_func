@@ -65,7 +65,7 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := calc_doc_sim_each(.)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(tmp_col))
 
@@ -217,7 +217,7 @@ do_dist.kv_ <- function(df,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := calc_dist_each(.)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(tmp_col))
 }
@@ -300,7 +300,7 @@ do_kl_dist.kv_ <- function(df,
     ret
   }
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
+    dplyr::do(!!rlang::sym(cnames[[1]]) := calc_dist_each(.)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(cnames[[1]]))
 }
@@ -387,7 +387,7 @@ do_dist.cols <- function(df,
     ret
   }
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
+    dplyr::do(!!rlang::sym(cnames[[1]]) := calc_dist_each(.)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(cnames[[1]]))
 }

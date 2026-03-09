@@ -93,7 +93,7 @@ getCSVFileFromAzure <- function(fileName, host, securityToken, container, delim,
   tryCatch({
     filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
       # This seems to be returned when the bucket itself does not exist.
       stop(paste0('EXP-DATASRC-12 :: ', jsonlite::toJSON(c(container, fileName)), ' :: There is no such file in the Azure Container.'))
@@ -166,7 +166,7 @@ searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, co
     # Error in list_adls_files(container, ...) :
     #  Not Found (HTTP 404). Failed to complete Storage Services operation. Message:
     #  The specified filesystem does not exist.
-    if (stringr::str_detect(e$message, "The specified filesystem does not exist.")) {
+    if (any(stringr::str_detect(e$message, "The specified filesystem does not exist."))) {
       stop(paste0('EXP-DATASRC-11 :: ', jsonlite::toJSON(container), ' :: The specified Azure container does not exist.'))
     }
     else {
@@ -189,7 +189,7 @@ getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = ""
   tryCatch({
     filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
       # This seems to be returned when the bucket itself does not exist.
       stop(paste0('EXP-DATASRC-12 :: ', jsonlite::toJSON(c(container, fileName)), ' :: There is no such file in the Azure Container.'))
@@ -229,7 +229,7 @@ searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", sec
     # Error in list_adls_files(container, ...) :
     #  Not Found (HTTP 404). Failed to complete Storage Services operation. Message:
     #  The specified filesystem does not exist.
-    if (stringr::str_detect(e$message, "The specified filesystem does not exist.")) {
+    if (any(stringr::str_detect(e$message, "The specified filesystem does not exist."))) {
       stop(paste0('EXP-DATASRC-11 :: ', jsonlite::toJSON(container), ' :: The specified Azure container does not exist.'))
     }
     else {
@@ -249,7 +249,7 @@ getExcelFileFromAzure <- function(fileName, host, securityToken, container, shee
   tryCatch({
     filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
       # This seems to be returned when the bucket itself does not exist.
       stop(paste0('EXP-DATASRC-12 :: ', jsonlite::toJSON(c(container, fileName)), ' :: There is no such file in the Azure Container.'))
@@ -278,7 +278,7 @@ searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, 
     # Error in list_adls_files(container, ...) :
     #  Not Found (HTTP 404). Failed to complete Storage Services operation. Message:
     #  The specified filesystem does not exist.
-    if (stringr::str_detect(e$message, "The specified filesystem does not exist.")) {
+    if (any(stringr::str_detect(e$message, "The specified filesystem does not exist."))) {
       stop(paste0('EXP-DATASRC-11 :: ', jsonlite::toJSON(container), ' :: The specified Azure container does not exist.'))
     }
     else {

@@ -190,7 +190,7 @@ augment_kmeans <- function(df, model, data){
     }
 
     ret <- df %>%
-      dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
+      dplyr::do(!!rlang::sym(model_col) := augment_each(.)) %>%
       dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(model_col))
   }
@@ -989,7 +989,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
       df
     }
 
-    target_df <- ret %>% group_by(is_test_data, add = TRUE)
+    target_df <- ret %>% group_by(is_test_data, .add = TRUE)
     do_on_each_group(target_df, each_mat_func, with_unnest = TRUE)
   } else {
     ret %>% dplyr::arrange(desc(is_test_data), .by_group = TRUE)
@@ -1718,7 +1718,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
 
   tmp_col <- avoid_conflict(colnames(ret), "tmp_col")
   ret <- ret %>%
-    dplyr::do_(.dots=setNames(list(~add_time_zero_row_each(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := add_time_zero_row_each(.)) %>%
     dplyr::ungroup()
   ret <- ret %>%  unnest_with_drop(!!rlang::sym(tmp_col))
 

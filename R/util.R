@@ -129,13 +129,13 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
     # Basic behaviour of Matrix::sparseMatrix is sum.
     # If fun.aggregate is different, it should be aggregated by it.
     if(!identical(fun.aggregate, sum)){
-      # create a formula to aggregate duplicated row and col pairs
-      # ex: ~mean(val)
-      fml <- as.formula(paste0("~", as.character(substitute(fun.aggregate)), "(", val, ")"))
+      # create an expression to aggregate duplicated row and col pairs
+      # ex: mean(val)
+      agg_expr <- rlang::parse_expr(paste0(as.character(substitute(fun.aggregate)), "(", val, ")"))
 
-      # execute the formula to each row and col pair
+      # execute the expression to each row and col pair
       data <- dplyr::group_by(data, !!!rlang::syms(c(row, col))) %>%
-        dplyr::summarise_(.dots=setNames(list(fml), val)) %>%
+        dplyr::summarise(!!rlang::sym(val) := !!agg_expr) %>%
         dplyr::ungroup()
     }
 
@@ -178,7 +178,8 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
     )
   } else {
     loadNamespace("dplyr")
-    dplyr::select_(df, .dots=select_dots) %>%  as.matrix()
+    select_exprs <- lapply(select_dots, function(x) rlang::parse_expr(x))
+    dplyr::select(df, !!!select_exprs) %>%  as.matrix()
   }
 }
 
@@ -592,14 +593,15 @@ as_numeric_matrix_ <- function(df, columns) {
 evaluate_select <- function(df, .dots, excluded = NULL) {
   loadNamespace("dplyr")
   tryCatch({
-    ret <- setdiff(colnames(dplyr::select_(df, .dots=.dots)), excluded)
+    select_exprs <- lapply(.dots, function(x) rlang::parse_expr(x))
+    ret <- setdiff(colnames(dplyr::select(df, !!!select_exprs)), excluded)
     if(length(ret) == 0){
       stop("no column selected")
     }
     ret
   }, error = function(e){
     loadNamespace("stringr")
-    if(stringr::str_detect(e$message, "not found")) {
+    if(any(stringr::str_detect(e$message, "not found"))) {
       stop("undefined columns selected")
     }
     stop(e$message)
@@ -1059,7 +1061,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
+    dplyr::do(!!rlang::sym(tmp_col) := pivot_each(.)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(tmp_col))
 
