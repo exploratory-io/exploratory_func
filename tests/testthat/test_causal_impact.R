@@ -47,5 +47,5 @@ test_that("tidy.bsts extracts and renames coefficients", {
   expect_true("include_prob" %in% colnames(result))
   expect_equal(nrow(result), 2)
   expect_equal(result$market, c("market_A", "market_B"))
-  expect_equal(result$mean_when_included, c(0.5, 0.3))
+  expect_equal(result$mean_when_included, c(0.5, 0.1))
 })
