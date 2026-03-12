@@ -770,3 +770,345 @@ test_that("searchAndReadExcelFiles supports glob-style patterns", {
   # Should include all 3 xlsx files but NOT the csv file
   expect_equal(nrow(result), 9)  # 3 rows from each of 3 files
 })
+
+test_that("test setTokenInfo and getTokenInfo", {
+  # Set a token and retrieve it
+  exploratory::setTokenInfo("test_key_1", "test_value_1")
+  expect_equal(exploratory::getTokenInfo("test_key_1"), "test_value_1")
+
+  # Overwrite with a new value
+  exploratory::setTokenInfo("test_key_1", "updated_value")
+  expect_equal(exploratory::getTokenInfo("test_key_1"), "updated_value")
+
+  # Set to NULL
+  exploratory::setTokenInfo("test_key_1", NULL)
+  expect_null(exploratory::getTokenInfo("test_key_1"))
+
+  # Non-existent key returns NULL
+  expect_null(exploratory::getTokenInfo("nonexistent_key"))
+})
+
+test_that("test geocode_us_state", {
+  df <- data.frame(state = c("CA", "NY"), stringsAsFactors = FALSE)
+  result <- exploratory::geocode_us_state(df, "state")
+  expect_true("longitude" %in% colnames(result))
+  expect_true("latitude" %in% colnames(result))
+  expect_equal(nrow(result), 2)
+  # CA and NY should have valid coordinates
+  expect_true(all(!is.na(result$longitude)))
+  expect_true(all(!is.na(result$latitude)))
+})
+
+test_that("test geocode_us_county", {
+  df <- data.frame(code = c("01003", "13005"), stringsAsFactors = FALSE)
+  result <- exploratory::geocode_us_county(df, "code")
+  expect_true("longitude" %in% colnames(result))
+  expect_true("latitude" %in% colnames(result))
+  expect_equal(nrow(result), 2)
+  expect_true(all(!is.na(result$longitude)))
+  expect_true(all(!is.na(result$latitude)))
+})
+
+test_that("test toDataFrame with data.frame input", {
+  df <- data.frame(a = c("1", "2", "3"), b = c("x", "y", "z"), stringsAsFactors = FALSE)
+  result <- exploratory::toDataFrame(df)
+  expect_true(is.data.frame(result))
+  # Column "a" should be type-converted to numeric
+  expect_true(is.numeric(result$a))
+  # Column "b" should remain character
+  expect_true(is.character(result$b))
+})
+
+test_that("test toDataFrame with matrix input", {
+  m <- matrix(1:6, nrow = 2, ncol = 3)
+  result <- exploratory::toDataFrame(m)
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 2)
+  expect_equal(ncol(result), 3)
+})
+
+test_that("test toDataFrame with guessDataType=FALSE", {
+  df <- data.frame(a = c("1", "2", "3"), b = c("4.5", "5.5", "6.5"), stringsAsFactors = FALSE)
+  result <- exploratory::toDataFrame(df, guessDataType = FALSE)
+  expect_true(is.data.frame(result))
+  # Columns should remain as character when guessDataType is FALSE
+  expect_true(is.character(result$a))
+  expect_true(is.character(result$b))
+})
+
+test_that("test createTempEnvironment", {
+  env <- exploratory::createTempEnvironment()
+  expect_true(is.environment(env))
+  expect_identical(parent.env(env), globalenv())
+})
+
+test_that("test glob_to_regex", {
+  # Single pattern
+  result <- exploratory:::glob_to_regex("*.csv")
+  expect_true(grepl("csv\\$$", result))
+  expect_true(grepl(result, "data.csv"))
+  expect_false(grepl(result, "data.tsv"))
+
+  # Multi-pattern with pipe separator
+  result2 <- exploratory:::glob_to_regex("*.csv|*.tsv")
+  expect_true(grepl(result2, "data.csv"))
+  expect_true(grepl(result2, "data.tsv"))
+  expect_false(grepl(result2, "data.xlsx"))
+})
+
+test_that("test exp_cut basic", {
+  x <- c(1, 5, 10, 15, 20, 25, 30)
+  result <- exploratory:::exp_cut(x, breaks = 5)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+  # No NAs should be produced for valid numeric input
+  expect_false(any(is.na(result)))
+})
+
+test_that("test exp_cut with custom breaks", {
+  x <- c(1, 5, 10, 15, 20)
+  break_points <- c(0, 5, 10, 15, 20)
+  result <- exploratory:::exp_cut(x, breaks = break_points)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+})
+
+test_that("test exp_cut edge cases", {
+  # Empty vector
+  result_empty <- exploratory:::exp_cut(numeric(0))
+  expect_equal(length(result_empty), 0)
+
+  # All same values (all zeros)
+  result_zeros <- exploratory:::exp_cut(c(0, 0, 0), breaks = 5)
+  expect_equal(length(result_zeros), 3)
+
+  # All same non-zero values
+  result_same <- exploratory:::exp_cut(c(5, 5, 5), breaks = 5)
+  expect_equal(length(result_same), 3)
+
+  # With NAs
+  result_na <- exploratory:::exp_cut(c(1, NA, 3, NA, 5), breaks = 3)
+  expect_equal(length(result_na), 5)
+  expect_true(is.na(result_na[2]))
+  expect_true(is.na(result_na[4]))
+})
+
+test_that("test exp_cut with range options", {
+  x <- c(1, 5, 10, 15, 20)
+
+  # With lower.range and upper.range
+  result <- exploratory:::exp_cut(x, breaks = 3, lower.range = 0, upper.range = 25, include.outside.range = TRUE)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+  # No NAs since include.outside.range is TRUE
+  expect_false(any(is.na(result)))
+
+  # With include.outside.range = FALSE
+  result2 <- exploratory:::exp_cut(x, breaks = 3, lower.range = 5, upper.range = 15, include.outside.range = FALSE)
+  expect_true(is.factor(result2))
+  # Values outside range (1, 20) should be NA
+  expect_true(is.na(result2[1]))
+  expect_true(is.na(result2[5]))
+})
+
+test_that("test exp_cut_by_step basic", {
+  x <- c(1, 5, 10, 15, 20)
+  result <- exploratory:::exp_cut_by_step(x, step = 5)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+})
+
+test_that("test exp_cut_by_step with range", {
+  x <- c(1, 5, 10, 15, 20, 25)
+
+  # With custom range and include.outside.range
+  result <- exploratory:::exp_cut_by_step(x, step = 5, lower.range = 5, upper.range = 20, include.outside.range = TRUE)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+  # All values should be assigned (no NAs) since include.outside.range is TRUE
+  expect_false(any(is.na(result)))
+})
+
+test_that("test get_refs_in_script", {
+  # Simple reference
+  result <- exploratory:::get_refs_in_script("dplyr::filter(df, x > 1)")
+  expect_true(is.character(result))
+
+  # Pipe expression
+  result2 <- exploratory:::get_refs_in_script("df %>% dplyr::filter(x > 1)")
+  expect_true(is.character(result2))
+
+  # Assignment
+  result3 <- exploratory:::get_refs_in_script("y <- mean(x)")
+  expect_true(is.character(result3))
+
+  # Invalid script returns NULL
+  result4 <- exploratory:::get_refs_in_script("this is {{{ not valid R")
+  expect_null(result4)
+})
+
+test_that("test toJSON roundtrip", {
+  df <- data.frame(a = 1:3, b = c("x", "y", "z"), stringsAsFactors = FALSE)
+  json_str <- exploratory::toJSON(df)
+  expect_true(is.character(json_str) || inherits(json_str, "json"))
+  # Parse back and verify
+  parsed <- jsonlite::fromJSON(as.character(json_str))
+  expect_equal(parsed$a, df$a)
+  expect_equal(parsed$b, df$b)
+})
+
+test_that("test convertFromJSON with JSON file", {
+  tmp <- tempfile(fileext = ".json")
+  on.exit(unlink(tmp))
+  df_orig <- data.frame(x = 1:3, y = c("a", "b", "c"), stringsAsFactors = FALSE)
+  jsonlite::write_json(df_orig, tmp)
+  result <- exploratory:::convertFromJSON(tmp)
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 3)
+  expect_equal(result$x, c(1L, 2L, 3L))
+  expect_equal(result$y, c("a", "b", "c"))
+})
+
+test_that("test convertFromJSON with NDJSON file", {
+  tmp <- tempfile(fileext = ".ndjson")
+  on.exit(unlink(tmp))
+  # Write NDJSON (one JSON object per line)
+  lines <- c(
+    '{"x":1,"y":"a"}',
+    '{"x":2,"y":"b"}',
+    '{"x":3,"y":"c"}'
+  )
+  writeLines(lines, tmp)
+  result <- exploratory:::convertFromJSON(tmp)
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 3)
+  expect_equal(result$x, c(1L, 2L, 3L))
+  expect_equal(result$y, c("a", "b", "c"))
+})
+
+test_that("test isNDJSON", {
+  # NDJSON file (each line is valid JSON)
+  tmp_ndjson <- tempfile(fileext = ".ndjson")
+  on.exit(unlink(tmp_ndjson), add = TRUE)
+  writeLines(c('{"a":1}', '{"a":2}'), tmp_ndjson)
+  expect_true(exploratory:::isNDJSON(tmp_ndjson))
+
+  # Regular JSON array (first line is "[" which is not valid standalone JSON object in most cases,
+  # but "[" is actually valid JSON, so test with a non-JSON file instead)
+  tmp_nonjson <- tempfile(fileext = ".txt")
+  on.exit(unlink(tmp_nonjson), add = TRUE)
+  writeLines(c("this is not json", "at all"), tmp_nonjson)
+  expect_false(exploratory:::isNDJSON(tmp_nonjson))
+})
+
+test_that("test getObjectListFromRdata and getObjectFromRdata", {
+  tmp <- tempfile(fileext = ".Rdata")
+  on.exit(unlink(tmp))
+  test_df <- data.frame(a = 1:3, b = 4:6)
+  test_vec <- c(10, 20, 30)
+  save(test_df, test_vec, file = tmp)
+
+  # List objects - should only return data.frame objects
+  temp_env <- exploratory::createTempEnvironment()
+  obj_list <- exploratory::getObjectListFromRdata(tmp, temp_env)
+  expect_true("test_df" %in% obj_list)
+  # test_vec is not a data.frame, so it should not be in the list
+  expect_false("test_vec" %in% obj_list)
+
+  # Retrieve specific object
+  retrieved_df <- exploratory::getObjectFromRdata(tmp, "test_df")
+  expect_true(is.data.frame(retrieved_df))
+  expect_equal(retrieved_df$a, 1:3)
+  expect_equal(retrieved_df$b, 4:6)
+})
+
+test_that("test read_raw_lines", {
+  tmp <- tempfile(fileext = ".txt")
+  on.exit(unlink(tmp))
+  writeLines(c("line1", "line2", "line3", "line4", "line5"), tmp)
+
+  # Read all lines
+  result <- exploratory::read_raw_lines(tmp)
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 5)
+  expect_equal(result$line, c("line1", "line2", "line3", "line4", "line5"))
+
+  # Read with skip
+  result_skip <- exploratory::read_raw_lines(tmp, skip = 2)
+  expect_equal(nrow(result_skip), 3)
+  expect_equal(result_skip$line, c("line3", "line4", "line5"))
+
+  # Read with n_max
+  result_nmax <- exploratory::read_raw_lines(tmp, n_max = 2)
+  expect_equal(nrow(result_nmax), 2)
+  expect_equal(result_nmax$line, c("line1", "line2"))
+})
+
+test_that("test read_log_file", {
+  tmp <- tempfile(fileext = ".log")
+  on.exit(unlink(tmp))
+  # Write a simple log file in common log format style
+  log_lines <- c(
+    '127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326',
+    '127.0.0.1 - jane [10/Oct/2000:13:56:00 -0700] "GET /index.html HTTP/1.0" 200 1024'
+  )
+  writeLines(log_lines, tmp)
+
+  result <- exploratory::read_log_file(tmp)
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 2)
+
+  # Test error on missing file
+  expect_error(exploratory::read_log_file("/nonexistent/path/file.log"))
+})
+
+test_that("test guess_csv_file_encoding", {
+  tmp <- tempfile(fileext = ".csv")
+  on.exit(unlink(tmp))
+  writeLines(c("a,b,c", "1,2,3", "4,5,6"), tmp)
+
+  result <- exploratory::guess_csv_file_encoding(tmp)
+  expect_true(is.data.frame(result))
+  expect_true("encoding" %in% colnames(result))
+  # UTF-8 or ASCII should be among the guesses
+  expect_true(any(result$encoding %in% c("UTF-8", "ASCII")))
+})
+
+test_that("test searchAndReadParquetFiles", {
+  skip_if_not_installed("arrow")
+
+  test_dir <- tempfile("test_parquet_")
+  dir.create(test_dir)
+  on.exit(unlink(test_dir, recursive = TRUE))
+
+  # Create test parquet files
+  df1 <- data.frame(a = 1:3, b = 4:6)
+  df2 <- data.frame(a = 7:9, b = 10:12)
+  df3 <- data.frame(a = 13:15, b = 16:18)
+
+  arrow::write_parquet(df1, file.path(test_dir, "data1.parquet"))
+  arrow::write_parquet(df2, file.path(test_dir, "data2.parquet"))
+  arrow::write_parquet(df3, file.path(test_dir, "report.parquet"))
+  # Create a non-parquet file that should NOT be matched
+  write.csv(df3, file.path(test_dir, "data3.csv"), row.names = FALSE)
+
+  # Test: Glob pattern "*.parquet"
+  result <- exploratory::searchAndReadParquetFiles(
+    folder = test_dir,
+    pattern = "*.parquet"
+  )
+  # Should include all 3 parquet files but NOT the csv file
+  expect_equal(nrow(result), 9)  # 3 rows from each of 3 files
+
+  # Test: error on missing folder
+  expect_error(
+    exploratory::searchAndReadParquetFiles(folder = "/nonexistent/folder", pattern = "*.parquet"),
+    "does not exist"
+  )
+
+  # Test: error on no matching files
+  expect_error(
+    exploratory::searchAndReadParquetFiles(folder = test_dir, pattern = "*.xyz"),
+    "no file"
+  )
+})
