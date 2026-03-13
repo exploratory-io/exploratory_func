@@ -2249,3 +2249,318 @@ test_that("extract_numeric", {
   actual <- exploratory::extract_numeric(x)
   expect_equal(actual, expected)
 })
+
+test_that("to_same_type", {
+  # factor
+  orig_factor <- factor(c("a", "b", "c"), levels = c("a", "b", "c"))
+  result <- to_same_type(c("a", "b"), orig_factor)
+  expect_true(is.factor(result))
+  expect_equal(levels(result), levels(orig_factor))
+
+  # factor with values not in original levels
+  result2 <- to_same_type(c("x", "y"), orig_factor)
+  expect_true(is.factor(result2))
+
+  # Date
+  orig_date <- as.Date("2024-01-01")
+  result <- to_same_type("2024-06-15", orig_date)
+  expect_true(inherits(result, "Date"))
+  expect_equal(result, as.Date("2024-06-15"))
+
+  # POSIXct
+  orig_posixct <- as.POSIXct("2024-01-01 12:00:00", tz = "UTC")
+  result <- to_same_type("2024-06-15 08:30:00", orig_posixct)
+  expect_true(inherits(result, "POSIXct"))
+
+  # numeric
+  orig_numeric <- 1.5
+  result <- to_same_type("3.14", orig_numeric)
+  expect_true(is.numeric(result))
+  expect_equal(result, 3.14)
+
+  # character
+  orig_char <- "hello"
+  result <- to_same_type(123, orig_char)
+  expect_true(is.character(result))
+
+  # logical
+  orig_logical <- TRUE
+  result <- to_same_type(1, orig_logical)
+  expect_true(is.logical(result))
+  expect_equal(result, TRUE)
+
+  # integer
+  orig_int <- 1L
+  result <- to_same_type(2.5, orig_int)
+  expect_true(is.integer(result))
+
+  # NULL original
+  result <- to_same_type(c(1, 2, 3), NULL)
+  expect_equal(result, c(1, 2, 3))
+})
+
+test_that("excel_numeric_to_date", {
+  skip_if_not_installed("janitor")
+  # Excel serial date 1 in modern system is 1900-01-01
+  result <- excel_numeric_to_date(1, date_system = "modern")
+  expect_true(inherits(result, "Date"))
+  expect_equal(result, as.Date("1900-01-01"))
+
+  # A known date: 44927 = 2023-01-01 in modern system
+  result2 <- excel_numeric_to_date(44927, date_system = "modern")
+  expect_equal(result2, as.Date("2023-01-01"))
+
+  # Integer input should also work (the wrapper applies as.numeric)
+  result3 <- excel_numeric_to_date(44927L, date_system = "modern")
+  expect_equal(result3, as.Date("2023-01-01"))
+})
+
+test_that("excel_numeric_to_datetime", {
+  skip_if_not_installed("openxlsx")
+  # 44927.5 should be 2023-01-01 12:00:00
+  result <- excel_numeric_to_datetime(44927.5, tz = "UTC")
+  expect_true(inherits(result, "POSIXct"))
+  expect_equal(as.Date(result), as.Date("2023-01-01"))
+  expect_equal(lubridate::hour(result), 12)
+
+  # Integer input should also work
+  result2 <- excel_numeric_to_datetime(44927L, tz = "UTC")
+  expect_true(inherits(result2, "POSIXct"))
+})
+
+test_that("confint_radius", {
+  set.seed(42)
+  x <- c(10, 20, 30, 40, 50)
+  n <- length(x)
+  s <- sd(x)
+
+  # level = 0.95
+  expected_95 <- qt(0.975, df = n - 1) * s / sqrt(n)
+  result_95 <- confint_radius(x, level = 0.95)
+  expect_equal(result_95, expected_95)
+
+  # level = 0.99
+  expected_99 <- qt(0.995, df = n - 1) * s / sqrt(n)
+  result_99 <- confint_radius(x, level = 0.99)
+  expect_equal(result_99, expected_99)
+
+  # higher confidence level should give larger radius
+  expect_true(result_99 > result_95)
+
+  # with NA values
+  x_na <- c(10, 20, NA, 40, 50)
+  result_na <- confint_radius(x_na, level = 0.95)
+  n_na <- sum(!is.na(x_na))
+  s_na <- sd(x_na, na.rm = TRUE)
+  expected_na <- qt(0.975, df = n_na - 1) * s_na / sqrt(n_na)
+  expect_equal(result_na, expected_na)
+})
+
+test_that("prop_confint_radius", {
+  x <- c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE)
+  n <- length(x)
+  p <- sum(x) / n
+
+  # level = 0.95
+  expected_95 <- qnorm(0.975) * sqrt(p * (1 - p) / n)
+  result_95 <- prop_confint_radius(x, level = 0.95)
+  expect_equal(result_95, expected_95)
+
+  # level = 0.99
+  expected_99 <- qnorm(0.995) * sqrt(p * (1 - p) / n)
+  result_99 <- prop_confint_radius(x, level = 0.99)
+  expect_equal(result_99, expected_99)
+
+  # higher confidence level should give larger radius
+  expect_true(result_99 > result_95)
+})
+
+test_that("get_score", {
+  actual <- c(TRUE, TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE)
+  predicted <- c(TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, FALSE, FALSE)
+
+  result <- get_score(actual, predicted)
+
+  # manual calculation
+  tp <- sum(predicted & actual)       # 2
+
+  fp <- sum(predicted & !actual)      # 1
+  tn <- sum(!predicted & !actual)     # 3
+  fn <- sum(!predicted & actual)      # 2
+
+  expect_equal(result$true_positive, tp)
+  expect_equal(result$false_positive, fp)
+  expect_equal(result$true_negative, tn)
+  expect_equal(result$false_negative, fn)
+  expect_equal(result$test_size, length(actual))
+
+  precision <- tp / (tp + fp)
+  recall <- tp / (tp + fn)
+  accuracy <- (tp + tn) / length(actual)
+  f_score <- 2 * (precision * recall) / (precision + recall)
+  specificity <- tn / (tn + fp)
+
+  expect_equal(result$precision, precision)
+  expect_equal(result$recall, recall)
+  expect_equal(result$accuracy_rate, accuracy)
+  expect_equal(result$misclassification_rate, 1 - accuracy)
+  expect_equal(result$f_score, f_score)
+  expect_equal(result$specificity, specificity)
+})
+
+test_that("get_optimized_score", {
+  set.seed(123)
+  actual_val <- c(TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE)
+  pred_prob <- c(0.9, 0.8, 0.7, 0.3, 0.2, 0.1, 0.6, 0.4, 0.85, 0.15)
+
+  # optimize by f_score
+  result <- get_optimized_score(actual_val, pred_prob, threshold = "f_score")
+  expect_true(is.data.frame(result))
+  expect_true("threshold" %in% names(result))
+  expect_true("f_score" %in% names(result))
+  expect_true(result$threshold >= 0 && result$threshold <= 1)
+
+  # optimize by accuracy_rate
+  result2 <- get_optimized_score(actual_val, pred_prob, threshold = "accuracy_rate")
+  expect_true("accuracy_rate" %in% names(result2))
+
+  # invalid threshold should error
+  expect_error(get_optimized_score(actual_val, pred_prob, threshold = "invalid"))
+})
+
+test_that("extract_numeric supplementary edge cases", {
+  # NA handling
+  result_na <- exploratory::extract_numeric(NA_character_)
+  expect_true(is.na(result_na))
+
+  # negative numbers
+  result_neg <- exploratory::extract_numeric("-42.5 degrees")
+  expect_equal(result_neg, -42.5)
+
+  # no numbers in string
+  result_none <- exploratory::extract_numeric("no numbers here")
+  expect_true(is.na(result_none))
+
+  # multiple numbers - should extract first
+  result_multi <- exploratory::extract_numeric("price $12.99 qty 3")
+  expect_equal(result_multi, 12.99)
+})
+
+test_that("separate_japanese_address", {
+  skip_if_not_installed("zipangu")
+  df <- data.frame(
+    id = 1:2,
+    address = c(
+      "\u6771\u4eac\u90fd\u5343\u4ee3\u7530\u533a\u4e38\u306e\u5185\u4e00\u4e01\u76ee",
+      "\u5927\u962a\u5e9c\u5927\u962a\u5e02\u5317\u533a\u4e2d\u4e4b\u5cf6"
+    ),
+    stringsAsFactors = FALSE
+  )
+  result <- separate_japanese_address(df, address)
+  expect_true("prefecture" %in% names(result))
+  expect_true("city" %in% names(result))
+  expect_true("street" %in% names(result))
+  expect_equal(nrow(result), 2)
+  # original columns should be preserved
+  expect_true("id" %in% names(result))
+  expect_true("address" %in% names(result))
+})
+
+test_that("likert_sigma", {
+  # simple Likert scale 1-5
+  x <- c(1, 2, 3, 4, 5, 1, 2, 3, 4, 5)
+  result <- likert_sigma(x)
+  expect_equal(length(result), length(x))
+  # symmetric input should produce symmetric sigma values
+  # values mapped from the same input should be equal
+  expect_equal(result[1], result[6])
+  expect_equal(result[2], result[7])
+  # no NAs in output for non-NA input
+  expect_false(any(is.na(result)))
+
+  # with NA values
+  x_na <- c(1, 2, NA, 4, 5)
+  result_na <- likert_sigma(x_na)
+  expect_true(is.na(result_na[3]))
+  expect_false(is.na(result_na[1]))
+
+  # factor input
+  x_factor <- factor(c("low", "mid", "high", "low", "mid"), levels = c("low", "mid", "high"))
+  result_factor <- likert_sigma(x_factor)
+  expect_equal(length(result_factor), length(x_factor))
+  expect_false(any(is.na(result_factor)))
+})
+
+test_that("unixtime_to_datetime", {
+  # epoch 0 should be 1970-01-01 00:00:00 GMT
+  result <- unixtime_to_datetime(0)
+  expect_true(inherits(result, "POSIXct"))
+  expect_equal(as.Date(result), as.Date("1970-01-01"))
+
+  # known timestamp: 1672531200 = 2023-01-01 00:00:00 UTC
+  result2 <- unixtime_to_datetime(1672531200)
+  expect_equal(as.Date(result2), as.Date("2023-01-01"))
+  expect_equal(lubridate::hour(result2), 0)
+
+  # string input should also work (as.numeric is called internally)
+  result3 <- unixtime_to_datetime("1672531200")
+  expect_equal(result3, result2)
+})
+
+test_that("create_model_meta", {
+  df <- data.frame(
+    y = c(1, 2, 3, 4, 5),
+    x1 = c(10, 20, 30, 40, 50),
+    x2 = factor(c("a", "b", "a", "b", "a")),
+    stringsAsFactors = FALSE
+  )
+  formula <- y ~ x1 + x2
+  result <- create_model_meta(df, formula)
+
+  expect_true(is.list(result))
+  expect_true(!is.null(result$terms))
+  expect_true(!is.null(result$types))
+  expect_true(!is.null(result$flevels))
+
+  # types should contain x1 and x2
+  expect_equal(result$types[["x1"]], "double")
+  expect_equal(result$types[["x2"]], "factor")
+
+  # flevels should contain levels for x2
+  expect_equal(result$flevels[["x2"]], c("a", "b"))
+
+  # x1 should not be in flevels (not a factor)
+  expect_true(is.null(result$flevels[["x1"]]))
+})
+
+test_that("add_response", {
+  # create a simple glm model
+  df <- data.frame(
+    y = c(0, 0, 1, 1, 0, 1, 1, 0),
+    x = c(1, 2, 3, 4, 5, 6, 7, 8)
+  )
+  model <- glm(y ~ x, data = df, family = binomial)
+
+  # create data with .fitted column (as augment would produce)
+  data_with_fitted <- data.frame(
+    x = c(1, 5, 8),
+    .fitted = c(-0.5, 0.0, 0.5)
+  )
+  result <- add_response(data_with_fitted, model)
+  expect_true("predicted_response" %in% names(result))
+  # predicted_response should be linkinv of .fitted (logistic function)
+  expected_vals <- model$family$linkinv(data_with_fitted$.fitted)
+  expect_equal(result$predicted_response, expected_vals)
+  # logistic values should be between 0 and 1
+  expect_true(all(result$predicted_response >= 0 & result$predicted_response <= 1))
+
+  # custom label
+  result2 <- add_response(data_with_fitted, model, response_label = "prob")
+  expect_true("prob" %in% names(result2))
+
+  # empty data frame
+  empty_df <- data.frame(x = numeric(0), .fitted = numeric(0))
+  result3 <- add_response(empty_df, model)
+  expect_equal(nrow(result3), 0)
+  expect_true("predicted_response" %in% names(result3))
+})
