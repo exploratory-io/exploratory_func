@@ -1,5 +1,9 @@
 context("Test smote_keep_synthetic parameter")
 
+testthat::skip_if_not_installed("xgboost")
+testthat::skip_if_not_installed("lightgbm")
+testthat::skip_if_not_installed("ranger")
+
 # ── Shared fixtures ──────────────────────────────────────────────────────────
 # All six models share the same data. Built once at file scope so each
 # test_that block only needs to assert, not re-build.

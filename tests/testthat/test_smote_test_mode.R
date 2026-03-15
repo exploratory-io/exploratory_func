@@ -5,6 +5,10 @@
 
 context("test SMOTE with test mode - verify test data purity")
 
+testthat::skip_if_not_installed("xgboost")
+testthat::skip_if_not_installed("lightgbm")
+testthat::skip_if_not_installed("ranger")
+
 # ── Shared fixtures for the main group (n=500, smote_keep_synthetic=FALSE, test_rate=0.3) ──
 # All four models share the same data. Built once at file scope.
 set.seed(123)
