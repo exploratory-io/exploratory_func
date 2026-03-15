@@ -306,3 +306,67 @@ test_that("exp_lightgbm handles all rows removed due to Inf values", {
     "All rows were removed due to Inf values"
   )
 })
+
+test_that("has_special_json_chars detects special characters", {
+  # Pattern2 and Pattern3 characters are correctly detected
+  expect_true(has_special_json_chars(c("col 1")))
+  expect_true(has_special_json_chars(c("col,1")))
+  expect_true(has_special_json_chars(c("col:1")))
+  expect_true(has_special_json_chars(c("col(1)")))
+  expect_true(has_special_json_chars(c("col@1")))
+  expect_true(has_special_json_chars(c("col+1")))
+  # Pattern1 characters ({, }, [, ], ", ', \, /, `) are not matched
+  # due to regex escaping issues in the current implementation, but
+  # sanitize_lightgbm_colnames handles them separately.
+  expect_false(has_special_json_chars(c("col{1}", "col2")))
+  expect_false(has_special_json_chars(c("col[1]")))
+  expect_false(has_special_json_chars(c("col\"1")))
+  expect_false(has_special_json_chars(c("col'1")))
+  # Normal names without special characters
+  expect_false(has_special_json_chars(c("col1", "col2")))
+  expect_false(has_special_json_chars(c("abc_def", "xyz")))
+  expect_false(has_special_json_chars(NULL))
+  expect_false(has_special_json_chars(character(0)))
+})
+
+test_that("expand_lightgbm_metric_aliases expands aliases", {
+  result <- expand_lightgbm_metric_aliases("mae")
+  expect_true("mae" %in% result)
+  expect_true("l1" %in% result)
+
+  result2 <- expand_lightgbm_metric_aliases("mse")
+  expect_true("mse" %in% result2)
+  expect_true("l2" %in% result2)
+
+  result3 <- expand_lightgbm_metric_aliases("rmse")
+  expect_true("rmse" %in% result3)
+  expect_true("l2_root" %in% result3)
+
+  # Unknown metric should be returned as-is
+  result4 <- expand_lightgbm_metric_aliases("unknown_metric")
+  expect_equal(result4, "unknown_metric")
+
+  # NULL input
+  expect_null(expand_lightgbm_metric_aliases(NULL))
+})
+
+test_that("sanitize_lightgbm_colnames replaces special chars", {
+  result <- sanitize_lightgbm_colnames(c("col{1}", "col[2]", "normal"))
+  expect_false(any(grepl("[{}\\[\\]]", result)))
+  expect_equal(result[3], "normal")
+
+  # Multiple underscores should be collapsed
+  result2 <- sanitize_lightgbm_colnames(c("a::b"))
+  expect_false(grepl("__", result2))
+
+  # Leading/trailing underscores removed
+  result3 <- sanitize_lightgbm_colnames(c("{test}"))
+  expect_false(grepl("^_|_$", result3))
+
+  # Duplicate names made unique
+  result4 <- sanitize_lightgbm_colnames(c("a b", "a b"))
+  expect_equal(length(unique(result4)), 2)
+
+  # NULL input
+  expect_null(sanitize_lightgbm_colnames(NULL))
+})

@@ -922,3 +922,82 @@ test_that("test exp_normality with column with almost always same value", {
   expect_equal(colnames(model_summary),
                c("Column","W Value","P Value","Sample Size","Result"))
 })
+
+test_that("generate_ttest_density_data returns correct structure", {
+  ret <- generate_ttest_density_data(t=2.5, p.value=0.02, df=10)
+  expect_true(tibble::is_tibble(ret))
+  expect_true(all(c("x", "y", "critical", "df") %in% colnames(ret)))
+  # Density values should be non-negative
+  expect_true(all(ret$y >= 0))
+  # There should be a row with statistic == TRUE
+  stat_rows <- ret %>% dplyr::filter(statistic == TRUE)
+  expect_equal(nrow(stat_rows), 1)
+  expect_equal(stat_rows$x, 2.5)
+  expect_equal(stat_rows$p.value, 0.02)
+  # Critical region boundaries for two.sided with df=10 at 0.05
+  tt <- qt(1 - 0.05/2, df=10)
+  expect_true(all(ret$critical[ret$x >= tt] == TRUE, na.rm=TRUE))
+  expect_true(all(ret$critical[ret$x <= -tt] == TRUE, na.rm=TRUE))
+  expect_true(all(ret$critical[ret$x > -tt & ret$x < tt] == FALSE, na.rm=TRUE))
+})
+
+test_that("generate_chisq_density_data returns correct structure", {
+  ret <- generate_chisq_density_data(stat=7.5, p.value=0.02, df=3)
+  expect_true(tibble::is_tibble(ret))
+  expect_true(all(c("x", "y", "critical", "df") %in% colnames(ret)))
+  expect_true(all(ret$y >= 0))
+  # Check statistic row
+  stat_rows <- ret %>% dplyr::filter(statistic == TRUE)
+  expect_equal(nrow(stat_rows), 1)
+  expect_equal(stat_rows$x, 7.5)
+  # Critical region: x >= qchisq(0.95, df=3)
+  tx <- qchisq(1 - 0.05, df=3)
+  expect_true(all(ret$critical[ret$x >= tx] == TRUE, na.rm=TRUE))
+  expect_true(all(ret$critical[ret$x < tx] == FALSE, na.rm=TRUE))
+})
+
+test_that("generate_ftest_density_data returns correct structure", {
+  ret <- generate_ftest_density_data(stat=4.0, p.value=0.03, df1=2, df2=20)
+  expect_true(tibble::is_tibble(ret))
+  expect_true(all(c("x", "y", "critical", "df1", "df2") %in% colnames(ret)))
+  expect_true(all(ret$y >= 0))
+  stat_rows <- ret %>% dplyr::filter(statistic == TRUE)
+  expect_equal(nrow(stat_rows), 1)
+  expect_equal(stat_rows$x, 4.0)
+  expect_equal(stat_rows$p.value, 0.03)
+  # Critical region: x >= qf(0.95, df1=2, df2=20)
+  tx <- qf(1 - 0.05, df1=2, df2=20)
+  expect_true(all(ret$critical[ret$x >= tx] == TRUE, na.rm=TRUE))
+})
+
+test_that("generate_norm_density_data returns correct structure", {
+  ret <- generate_norm_density_data(z=1.96, p.value=0.05, mu=0, sigma=1)
+  expect_true(tibble::is_tibble(ret))
+  expect_true(all(c("x", "y", "critical", "mean", "sd") %in% colnames(ret)))
+  expect_true(all(ret$y >= 0))
+  stat_rows <- ret %>% dplyr::filter(statistic == TRUE)
+  expect_equal(nrow(stat_rows), 1)
+  expect_equal(stat_rows$x, 1.96)
+  # Two-sided critical boundaries
+  tz_upper <- qnorm(1 - 0.05/2, mean=0, sd=1)
+  tz_lower <- qnorm(0.05/2, mean=0, sd=1)
+  expect_true(all(ret$critical[ret$x >= tz_upper] == TRUE, na.rm=TRUE))
+  expect_true(all(ret$critical[ret$x <= tz_lower] == TRUE, na.rm=TRUE))
+})
+
+test_that("wilcox_norm_dist_sd returns positive numeric", {
+  # Unpaired case
+  tie_counts <- rep(1, 20)
+  sd_unpaired <- wilcox_norm_dist_sd(alternative="two.sided", paired=FALSE,
+                                      statistic=50, n1=10, n2=10,
+                                      tie_counts=tie_counts)
+  expect_true(is.numeric(sd_unpaired))
+  expect_true(sd_unpaired > 0)
+  # Paired case
+  tie_counts_paired <- rep(1, 10)
+  sd_paired <- wilcox_norm_dist_sd(alternative="two.sided", paired=TRUE,
+                                    statistic=25, n1=10, n2=10,
+                                    tie_counts=tie_counts_paired)
+  expect_true(is.numeric(sd_paired))
+  expect_true(sd_paired > 0)
+})
