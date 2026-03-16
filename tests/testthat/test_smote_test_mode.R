@@ -5,79 +5,67 @@
 
 context("test SMOTE with test mode - verify test data purity")
 
+testthat::skip_if_not_installed("xgboost")
+testthat::skip_if_not_installed("lightgbm")
+testthat::skip_if_not_installed("ranger")
+
+# ── Shared fixtures for the main group (n=500, smote_keep_synthetic=FALSE, test_rate=0.3) ──
+# All four models share the same data. Built once at file scope.
+set.seed(123)
+n <- 500
+test_mode_data <- data.frame(
+  x1 = rnorm(n),
+  x2 = rnorm(n),
+  target = c(rep(FALSE, 400), rep(TRUE, 100))
+)
+
+glm_test_mode <- test_mode_data %>%
+  build_lm.fast(target, x1, x2,
+                model_type = "glm", test_rate = 0.3, smote = TRUE,
+                smote_keep_synthetic = FALSE, seed = 123)
+
+xgb_test_mode <- test_mode_data %>%
+  exp_xgboost(target, x1, x2,
+              test_rate = 0.3, smote = TRUE,
+              smote_keep_synthetic = FALSE, seed = 123)
+
+lgbm_test_mode <- test_mode_data %>%
+  exp_lightgbm(target, x1, x2,
+               test_rate = 0.3, smote = TRUE,
+               smote_keep_synthetic = FALSE, seed = 123)
+
+rf_test_mode <- test_mode_data %>%
+  calc_feature_imp(target, x1, x2,
+                   test_rate = 0.3, smote = TRUE,
+                   smote_keep_synthetic = FALSE, seed = 123)
+
+# ── Tests: main group ────────────────────────────────────────────────────────
+
 test_that("build_lm.fast GLM with SMOTE and test mode - test data should be pure", {
-  # Create a dataset with imbalanced binary target
-  set.seed(123)
-  n <- 500
-  test_data <- data.frame(
-    x1 = rnorm(n),
-    x2 = rnorm(n),
-    # Create imbalanced target: 80% FALSE, 20% TRUE
-    target = c(rep(FALSE, 400), rep(TRUE, 100))
-  )
+  source_data <- glm_test_mode$source.data[[1]]
+  test_index <- glm_test_mode$.test_index[[1]]
 
-  # Train model with SMOTE and test_rate
-  # Set smote_keep_synthetic = FALSE to test that source.data contains original data only
-  model_df <- test_data %>%
-    build_lm.fast(target, x1, x2,
-                  model_type = "glm",
-                  test_rate = 0.3,
-                  smote = TRUE,
-                  smote_keep_synthetic = FALSE,
-                  seed = 123)
-
-  # Get source.data which should contain original data only (no synthetic samples)
-  source_data <- model_df$source.data[[1]]
-  test_index <- model_df$.test_index[[1]]
-
-  # Verify source.data matches original data size (not inflated by SMOTE)
   expect_equal(nrow(source_data), n)
-
-  # Verify no 'synthesized' column when smote_keep_synthetic = FALSE
   expect_false("synthesized" %in% colnames(source_data))
 
-  # Get test data by extracting rows at test_index from source.data
   test_data_actual <- source_data[test_index, ]
   expected_test_size <- round(n * 0.3)
-
-  # Verify test data size is approximately 30% of original (not inflated by SMOTE)
   expect_gte(nrow(test_data_actual), expected_test_size - 20)
   expect_lte(nrow(test_data_actual), expected_test_size + 20)
 
-  # Get training data (rows NOT in test_index)
   train_data_before_smote <- source_data[-test_index, ]
   expected_train_size <- n - nrow(test_data_actual)
-
-  # Verify training size is approximately 70% of original
   expect_gte(nrow(train_data_before_smote), expected_train_size - 20)
   expect_lte(nrow(train_data_before_smote), expected_train_size + 20)
 })
 
 test_that("exp_xgboost with SMOTE and test mode - test data should be pure", {
-  set.seed(456)
-  n <- 500
-  test_data <- data.frame(
-    x1 = rnorm(n),
-    x2 = rnorm(n),
-    # Create imbalanced target
-    target = c(rep(FALSE, 400), rep(TRUE, 100))
-  )
+  source_data <- xgb_test_mode$source.data[[1]]
+  test_index <- xgb_test_mode$.test_index[[1]]
 
-  model_df <- test_data %>%
-    exp_xgboost(target, x1, x2,
-                test_rate = 0.3,
-                smote = TRUE,
-                smote_keep_synthetic = FALSE,
-                seed = 456)
-
-  source_data <- model_df$source.data[[1]]
-  test_index <- model_df$.test_index[[1]]
-
-  # Verify source.data is original size (no synthetic samples)
   expect_equal(nrow(source_data), n)
   expect_false("synthesized" %in% colnames(source_data))
 
-  # Verify test data size
   test_data_actual <- source_data[test_index, ]
   expected_test_size <- round(n * 0.3)
   expect_gte(nrow(test_data_actual), expected_test_size - 20)
@@ -85,30 +73,12 @@ test_that("exp_xgboost with SMOTE and test mode - test data should be pure", {
 })
 
 test_that("exp_lightgbm with SMOTE and test mode - test data should be pure", {
-  set.seed(789)
-  n <- 500
-  test_data <- data.frame(
-    x1 = rnorm(n),
-    x2 = rnorm(n),
-    # Create imbalanced target
-    target = c(rep(FALSE, 400), rep(TRUE, 100))
-  )
+  source_data <- lgbm_test_mode$source.data[[1]]
+  test_index <- lgbm_test_mode$.test_index[[1]]
 
-  model_df <- test_data %>%
-    exp_lightgbm(target, x1, x2,
-                 test_rate = 0.3,
-                 smote = TRUE,
-                 smote_keep_synthetic = FALSE,
-                 seed = 789)
-
-  source_data <- model_df$source.data[[1]]
-  test_index <- model_df$.test_index[[1]]
-
-  # Verify source.data is original size (no synthetic samples)
   expect_equal(nrow(source_data), n)
   expect_false("synthesized" %in% colnames(source_data))
 
-  # Verify test data size
   test_data_actual <- source_data[test_index, ]
   expected_test_size <- round(n * 0.3)
   expect_gte(nrow(test_data_actual), expected_test_size - 20)
@@ -116,47 +86,30 @@ test_that("exp_lightgbm with SMOTE and test mode - test data should be pure", {
 })
 
 test_that("calc_feature_imp (Ranger) with SMOTE and test mode - test data should be pure", {
-  set.seed(111)
-  n <- 500
-  test_data <- data.frame(
-    x1 = rnorm(n),
-    x2 = rnorm(n),
-    # Create imbalanced target
-    target = c(rep(FALSE, 400), rep(TRUE, 100))
-  )
+  source_data <- rf_test_mode$source.data[[1]]
+  test_index <- rf_test_mode$.test_index[[1]]
 
-  model_df <- test_data %>%
-    calc_feature_imp(target, x1, x2,
-                     test_rate = 0.3,
-                     smote = TRUE,
-                     smote_keep_synthetic = FALSE,
-                     seed = 111)
-
-  source_data <- model_df$source.data[[1]]
-  test_index <- model_df$.test_index[[1]]
-
-  # Verify source.data is original size (no synthetic samples)
   expect_equal(nrow(source_data), n)
   expect_false("synthesized" %in% colnames(source_data))
 
-  # Verify test data size
   test_data_actual <- source_data[test_index, ]
   expected_test_size <- round(n * 0.3)
   expect_gte(nrow(test_data_actual), expected_test_size - 20)
   expect_lte(nrow(test_data_actual), expected_test_size + 20)
 })
 
+# ── One-off tests (distinct configurations) ──────────────────────────────────
+
 test_that("exp_rpart with SMOTE and test mode - test data should be pure", {
   set.seed(222)
-  n <- 500
-  test_data <- data.frame(
-    x1 = rnorm(n),
-    x2 = rnorm(n),
-    # Create imbalanced target
+  n_rpart <- 500
+  rpart_data <- data.frame(
+    x1 = rnorm(n_rpart),
+    x2 = rnorm(n_rpart),
     target = as.factor(c(rep("A", 400), rep("B", 100)))
   )
 
-  model_df <- test_data %>%
+  model_df <- rpart_data %>%
     exp_rpart(target, x1, x2,
               test_rate = 0.3,
               smote = TRUE,
@@ -166,49 +119,43 @@ test_that("exp_rpart with SMOTE and test mode - test data should be pure", {
   source_data <- model_df$source.data[[1]]
   test_index <- model_df$.test_index[[1]]
 
-  # Verify source.data is original size (no synthetic samples)
-  expect_equal(nrow(source_data), n)
+  expect_equal(nrow(source_data), n_rpart)
   expect_false("synthesized" %in% colnames(source_data))
 
-  # Verify test data size
   test_data_actual <- source_data[test_index, ]
-  expected_test_size <- round(n * 0.3)
+  expected_test_size <- round(n_rpart * 0.3)
   expect_gte(nrow(test_data_actual), expected_test_size - 20)
   expect_lte(nrow(test_data_actual), expected_test_size + 20)
 })
 
 test_that("SMOTE with test_rate=0 should still apply SMOTE to all training data", {
-  # When test_rate is 0, SMOTE should be applied to all data (backward compatibility)
   set.seed(333)
-  n <- 500
+  n_zero <- 500
   test_data <- data.frame(
-    x1 = rnorm(n),
-    x2 = rnorm(n),
+    x1 = rnorm(n_zero),
+    x2 = rnorm(n_zero),
     target = c(rep(FALSE, 400), rep(TRUE, 100))
   )
 
   model_df <- test_data %>%
     build_lm.fast(target, x1, x2,
                   model_type = "glm",
-                  test_rate = 0,  # No test split
+                  test_rate = 0,
                   smote = TRUE,
                   smote_keep_synthetic = FALSE,
                   seed = 333)
 
   source_data <- model_df$source.data[[1]]
-
-  # With test_rate=0 and smote_keep_synthetic=FALSE, source.data should still be original size
-  expect_equal(nrow(source_data), n)
+  expect_equal(nrow(source_data), n_zero)
   expect_false("synthesized" %in% colnames(source_data))
 })
 
 test_that("No SMOTE with test mode should not alter data sizes", {
-  # When SMOTE is disabled, data sizes should match expectations exactly
   set.seed(444)
-  n <- 500
+  n_nosmote <- 500
   test_data <- data.frame(
-    x1 = rnorm(n),
-    x2 = rnorm(n),
+    x1 = rnorm(n_nosmote),
+    x2 = rnorm(n_nosmote),
     target = c(rep(FALSE, 400), rep(TRUE, 100))
   )
 
@@ -216,84 +163,61 @@ test_that("No SMOTE with test mode should not alter data sizes", {
     build_lm.fast(target, x1, x2,
                   model_type = "glm",
                   test_rate = 0.3,
-                  smote = FALSE,  # No SMOTE
+                  smote = FALSE,
                   seed = 444)
 
   source_data <- model_df$source.data[[1]]
   test_index <- model_df$.test_index[[1]]
 
-  # Verify source.data is original size
-  expect_equal(nrow(source_data), n)
+  expect_equal(nrow(source_data), n_nosmote)
   expect_false("synthesized" %in% colnames(source_data))
 
-  # Verify test data size is approximately 30%
   test_data_actual <- source_data[test_index, ]
-  expected_test_size <- round(n * 0.3)
+  expected_test_size <- round(n_nosmote * 0.3)
   expect_gte(nrow(test_data_actual), expected_test_size - 20)
   expect_lte(nrow(test_data_actual), expected_test_size + 20)
 
-  # Verify training data size is approximately 70%
   train_data <- source_data[-test_index, ]
-  expected_train_size <- n - nrow(test_data_actual)
+  expected_train_size <- n_nosmote - nrow(test_data_actual)
   expect_gte(nrow(train_data), expected_train_size - 20)
   expect_lte(nrow(train_data), expected_train_size + 20)
 })
 
 test_that("Train/test split works correctly with very few rows (3 rows: 1 test, 2 training)", {
-  # Test edge case: minimal dataset with only 3 rows
-  # This verifies that the split logic works even with very small datasets
-  # Using 3 rows with rate 0.34 ensures nrow(df) * rate = 1.02, which truncates to 1 test row
-  # (sample() truncates fractional sizes, so 1.02 becomes 1)
   set.seed(555)
-  n <- 3
   test_data <- data.frame(
     x1 = c(1, 2, 3),
     x2 = c(10, 20, 30),
-    # Create binary target with both classes present
     target = c(FALSE, TRUE, FALSE)
   )
 
-  # Test with SMOTE disabled first (SMOTE might not work with only 2 training rows)
   model_df <- test_data %>%
     build_lm.fast(target, x1, x2,
                   model_type = "glm",
-                  test_rate = 0.34,  # Should result in 1 test row (3 * 0.34 = 1.02, truncates to 1), 2 training rows
-                  smote = FALSE,  # Disable SMOTE for this minimal case
+                  test_rate = 0.34,
+                  smote = FALSE,
                   seed = 555)
 
   source_data <- model_df$source.data[[1]]
   test_index <- model_df$.test_index[[1]]
 
-  # Verify source.data has all 3 rows
-  expect_equal(nrow(source_data), n)
-
-  # Verify test_index is not empty and has exactly 1 row
+  expect_equal(nrow(source_data), 3)
   expect_true(length(test_index) >= 1)
 
-  # Verify test data has exactly 1 row
   test_data_actual <- source_data[test_index, , drop = FALSE]
   expect_equal(nrow(test_data_actual), 1)
 
-  # Verify training data has exactly 2 rows
   train_data <- source_data[-test_index, , drop = FALSE]
   expect_equal(nrow(train_data), 2)
 
-  # Verify no row overlap between test and training
-  expect_equal(length(intersect(test_index, seq_len(n)[-test_index])), 0)
-
-  # Verify all rows are accounted for
-  expect_equal(nrow(test_data_actual) + nrow(train_data), n)
-
-  # Verify test_index is valid (between 1 and n)
-  expect_true(all(test_index >= 1 & test_index <= n))
-  expect_true(length(test_index) == 1)  # Exactly 1 test row
+  expect_equal(length(intersect(test_index, seq_len(3)[-test_index])), 0)
+  expect_equal(nrow(test_data_actual) + nrow(train_data), 3)
+  expect_true(all(test_index >= 1 & test_index <= 3))
+  expect_true(length(test_index) == 1)
 })
 
 test_that("Train/test split works with very few rows using XGBoost", {
-  # Test the same minimal case with a different model function
-  # Using 3 rows with rate 0.34 ensures 1 test row (3 * 0.34 = 1.02, truncates to 1)
   set.seed(666)
-  n <- 3
   test_data <- data.frame(
     x1 = c(1, 2, 3),
     x2 = c(10, 20, 30),
@@ -302,49 +226,38 @@ test_that("Train/test split works with very few rows using XGBoost", {
 
   model_df <- test_data %>%
     exp_xgboost(target, x1, x2,
-                test_rate = 0.34,  # 3 * 0.34 = 1.02, truncates to 1 test row
-                smote = FALSE,  # Disable SMOTE for minimal case
+                test_rate = 0.34,
+                smote = FALSE,
                 seed = 666)
 
   source_data <- model_df$source.data[[1]]
   test_index <- model_df$.test_index[[1]]
 
-  # Verify split works correctly
-  expect_equal(nrow(source_data), n)
-
-  # Verify test_index is not empty
+  expect_equal(nrow(source_data), 3)
   expect_true(length(test_index) >= 1)
 
   test_data_actual <- source_data[test_index, , drop = FALSE]
   train_data <- source_data[-test_index, , drop = FALSE]
 
-  # Verify exact split: 1 test, 2 training
   expect_equal(nrow(test_data_actual), 1)
   expect_equal(nrow(train_data), 2)
-  expect_equal(nrow(test_data_actual) + nrow(train_data), n)
-
-  # Verify test_index is valid
-  expect_true(all(test_index >= 1 & test_index <= n))
+  expect_equal(nrow(test_data_actual) + nrow(train_data), 3)
+  expect_true(all(test_index >= 1 & test_index <= 3))
   expect_true(length(test_index) == 1)
 })
 
 test_that("Train/test split with very few rows and SMOTE (should handle gracefully)", {
-  # Test that SMOTE is handled gracefully when training data is too small
-  # SMOTE might not apply with only 2 training rows, but split should still work
-  # Using 3 rows with rate 0.34 ensures 1 test row (3 * 0.34 = 1.02, truncates to 1)
   set.seed(777)
-  n <- 3
   test_data <- data.frame(
     x1 = c(1, 2, 3),
     x2 = c(10, 20, 30),
     target = c(FALSE, TRUE, FALSE)
   )
 
-  # Try with SMOTE enabled - it might not apply due to small size, but should not error
   model_df <- test_data %>%
     build_lm.fast(target, x1, x2,
                   model_type = "glm",
-                  test_rate = 0.34,  # 3 * 0.34 = 1.02, truncates to 1 test row
+                  test_rate = 0.34,
                   smote = TRUE,
                   smote_keep_synthetic = FALSE,
                   seed = 777)
@@ -352,21 +265,13 @@ test_that("Train/test split with very few rows and SMOTE (should handle graceful
   source_data <- model_df$source.data[[1]]
   test_index <- model_df$.test_index[[1]]
 
-  # Verify split still works (SMOTE might not have applied due to small size)
-  expect_equal(nrow(source_data), n)
-
-  # Verify test_index is not empty
+  expect_equal(nrow(source_data), 3)
   expect_true(length(test_index) >= 1)
 
   test_data_actual <- source_data[test_index, , drop = FALSE]
   train_data <- source_data[-test_index, , drop = FALSE]
 
-  # Verify exact split: 1 test, 2 training
   expect_equal(nrow(test_data_actual), 1)
   expect_equal(nrow(train_data), 2)
-
-  # With smote_keep_synthetic = FALSE, no synthesized column should exist
-  # (SMOTE likely didn't apply due to small training size)
   expect_false("synthesized" %in% colnames(source_data))
 })
-

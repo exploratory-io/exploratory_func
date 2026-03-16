@@ -2253,49 +2253,49 @@ test_that("extract_numeric", {
 test_that("to_same_type", {
   # factor
   orig_factor <- factor(c("a", "b", "c"), levels = c("a", "b", "c"))
-  result <- to_same_type(c("a", "b"), orig_factor)
+  result <- exploratory:::to_same_type(c("a", "b"), orig_factor)
   expect_true(is.factor(result))
   expect_equal(levels(result), levels(orig_factor))
 
   # factor with values not in original levels
-  result2 <- to_same_type(c("x", "y"), orig_factor)
+  result2 <- exploratory:::to_same_type(c("x", "y"), orig_factor)
   expect_true(is.factor(result2))
 
   # Date
   orig_date <- as.Date("2024-01-01")
-  result <- to_same_type("2024-06-15", orig_date)
+  result <- exploratory:::to_same_type("2024-06-15", orig_date)
   expect_true(inherits(result, "Date"))
   expect_equal(result, as.Date("2024-06-15"))
 
   # POSIXct
   orig_posixct <- as.POSIXct("2024-01-01 12:00:00", tz = "UTC")
-  result <- to_same_type("2024-06-15 08:30:00", orig_posixct)
+  result <- exploratory:::to_same_type("2024-06-15 08:30:00", orig_posixct)
   expect_true(inherits(result, "POSIXct"))
 
   # numeric
   orig_numeric <- 1.5
-  result <- to_same_type("3.14", orig_numeric)
+  result <- exploratory:::to_same_type("3.14", orig_numeric)
   expect_true(is.numeric(result))
   expect_equal(result, 3.14)
 
   # character
   orig_char <- "hello"
-  result <- to_same_type(123, orig_char)
+  result <- exploratory:::to_same_type(123, orig_char)
   expect_true(is.character(result))
 
   # logical
   orig_logical <- TRUE
-  result <- to_same_type(1, orig_logical)
+  result <- exploratory:::to_same_type(1, orig_logical)
   expect_true(is.logical(result))
   expect_equal(result, TRUE)
 
   # integer
   orig_int <- 1L
-  result <- to_same_type(2.5, orig_int)
+  result <- exploratory:::to_same_type(2.5, orig_int)
   expect_true(is.integer(result))
 
   # NULL original
-  result <- to_same_type(c(1, 2, 3), NULL)
+  result <- exploratory:::to_same_type(c(1, 2, 3), NULL)
   expect_equal(result, c(1, 2, 3))
 })
 
@@ -2379,7 +2379,7 @@ test_that("get_score", {
   actual <- c(TRUE, TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE)
   predicted <- c(TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, FALSE, FALSE)
 
-  result <- get_score(actual, predicted)
+  result <- exploratory:::get_score(actual, predicted)
 
   # manual calculation
   tp <- sum(predicted & actual)       # 2
@@ -2414,18 +2414,18 @@ test_that("get_optimized_score", {
   pred_prob <- c(0.9, 0.8, 0.7, 0.3, 0.2, 0.1, 0.6, 0.4, 0.85, 0.15)
 
   # optimize by f_score
-  result <- get_optimized_score(actual_val, pred_prob, threshold = "f_score")
+  result <- exploratory:::get_optimized_score(actual_val, pred_prob, threshold = "f_score")
   expect_true(is.data.frame(result))
   expect_true("threshold" %in% names(result))
   expect_true("f_score" %in% names(result))
   expect_true(result$threshold >= 0 && result$threshold <= 1)
 
   # optimize by accuracy_rate
-  result2 <- get_optimized_score(actual_val, pred_prob, threshold = "accuracy_rate")
+  result2 <- exploratory:::get_optimized_score(actual_val, pred_prob, threshold = "accuracy_rate")
   expect_true("accuracy_rate" %in% names(result2))
 
   # invalid threshold should error
-  expect_error(get_optimized_score(actual_val, pred_prob, threshold = "invalid"))
+  expect_error(exploratory:::get_optimized_score(actual_val, pred_prob, threshold = "invalid"))
 })
 
 test_that("extract_numeric supplementary edge cases", {
@@ -2515,7 +2515,7 @@ test_that("create_model_meta", {
     stringsAsFactors = FALSE
   )
   formula <- y ~ x1 + x2
-  result <- create_model_meta(df, formula)
+  result <- exploratory:::create_model_meta(df, formula)
 
   expect_true(is.list(result))
   expect_true(!is.null(result$terms))
@@ -2546,7 +2546,7 @@ test_that("add_response", {
     x = c(1, 5, 8),
     .fitted = c(-0.5, 0.0, 0.5)
   )
-  result <- add_response(data_with_fitted, model)
+  result <- exploratory:::add_response(data_with_fitted, model)
   expect_true("predicted_response" %in% names(result))
   # predicted_response should be linkinv of .fitted (logistic function)
   expected_vals <- model$family$linkinv(data_with_fitted$.fitted)
@@ -2555,12 +2555,12 @@ test_that("add_response", {
   expect_true(all(result$predicted_response >= 0 & result$predicted_response <= 1))
 
   # custom label
-  result2 <- add_response(data_with_fitted, model, response_label = "prob")
+  result2 <- exploratory:::add_response(data_with_fitted, model, response_label = "prob")
   expect_true("prob" %in% names(result2))
 
   # empty data frame
   empty_df <- data.frame(x = numeric(0), .fitted = numeric(0))
-  result3 <- add_response(empty_df, model)
+  result3 <- exploratory:::add_response(empty_df, model)
   expect_equal(nrow(result3), 0)
   expect_true("predicted_response" %in% names(result3))
 })

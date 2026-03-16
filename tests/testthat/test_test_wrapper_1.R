@@ -924,7 +924,7 @@ test_that("test exp_normality with column with almost always same value", {
 })
 
 test_that("generate_ttest_density_data returns correct structure", {
-  ret <- generate_ttest_density_data(t=2.5, p.value=0.02, df=10)
+  ret <- exploratory:::generate_ttest_density_data(t=2.5, p.value=0.02, df=10)
   expect_true(tibble::is_tibble(ret))
   expect_true(all(c("x", "y", "critical", "df") %in% colnames(ret)))
   # Density values should be non-negative
@@ -942,7 +942,7 @@ test_that("generate_ttest_density_data returns correct structure", {
 })
 
 test_that("generate_chisq_density_data returns correct structure", {
-  ret <- generate_chisq_density_data(stat=7.5, p.value=0.02, df=3)
+  ret <- exploratory:::generate_chisq_density_data(stat=7.5, p.value=0.02, df=3)
   expect_true(tibble::is_tibble(ret))
   expect_true(all(c("x", "y", "critical", "df") %in% colnames(ret)))
   expect_true(all(ret$y >= 0))
@@ -957,7 +957,7 @@ test_that("generate_chisq_density_data returns correct structure", {
 })
 
 test_that("generate_ftest_density_data returns correct structure", {
-  ret <- generate_ftest_density_data(stat=4.0, p.value=0.03, df1=2, df2=20)
+  ret <- exploratory:::generate_ftest_density_data(stat=4.0, p.value=0.03, df1=2, df2=20)
   expect_true(tibble::is_tibble(ret))
   expect_true(all(c("x", "y", "critical", "df1", "df2") %in% colnames(ret)))
   expect_true(all(ret$y >= 0))
@@ -971,7 +971,7 @@ test_that("generate_ftest_density_data returns correct structure", {
 })
 
 test_that("generate_norm_density_data returns correct structure", {
-  ret <- generate_norm_density_data(z=1.96, p.value=0.05, mu=0, sigma=1)
+  ret <- exploratory:::generate_norm_density_data(z=1.96, p.value=0.05, mu=0, sigma=1)
   expect_true(tibble::is_tibble(ret))
   expect_true(all(c("x", "y", "critical", "mean", "sd") %in% colnames(ret)))
   expect_true(all(ret$y >= 0))
@@ -988,14 +988,14 @@ test_that("generate_norm_density_data returns correct structure", {
 test_that("wilcox_norm_dist_sd returns positive numeric", {
   # Unpaired case
   tie_counts <- rep(1, 20)
-  sd_unpaired <- wilcox_norm_dist_sd(alternative="two.sided", paired=FALSE,
+  sd_unpaired <- exploratory:::wilcox_norm_dist_sd(alternative="two.sided", paired=FALSE,
                                       statistic=50, n1=10, n2=10,
                                       tie_counts=tie_counts)
   expect_true(is.numeric(sd_unpaired))
   expect_true(sd_unpaired > 0)
   # Paired case
   tie_counts_paired <- rep(1, 10)
-  sd_paired <- wilcox_norm_dist_sd(alternative="two.sided", paired=TRUE,
+  sd_paired <- exploratory:::wilcox_norm_dist_sd(alternative="two.sided", paired=TRUE,
                                     statistic=25, n1=10, n2=10,
                                     tie_counts=tie_counts_paired)
   expect_true(is.numeric(sd_paired))
