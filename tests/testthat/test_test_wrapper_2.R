@@ -99,6 +99,58 @@ test_that("test exp_wilcox with paired = TRUE, conf.int = TRUE", {
                  "Minimum","Maximum"))
 })
 
+test_that("test exp_wilcox paired results match direct wilcox.test", {
+  # Create paired sample data (n=30 subjects, before/after measurements)
+  set.seed(42)
+  n <- 30
+  before <- round(rnorm(n, mean = 70, sd = 10), 1)
+  after <- round(rnorm(n, mean = 65, sd = 10), 1)
+
+  # Long format data for exp_wilcox
+  data_long <- tibble::tibble(
+    subject_id = rep(paste0("P", sprintf("%02d", 1:n)), 2),
+    period = factor(rep(c("before", "after"), each = n), levels = c("before", "after")),
+    value = c(before, after)
+  )
+
+  # Direct R wilcox.test (the correct result)
+  direct_result <- wilcox.test(before, after, paired = TRUE)
+
+  # exp_wilcox result
+  model_df <- exp_wilcox(data_long, value, period, paired = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type = "model")
+
+  # p-value should match exactly
+  expect_equal(ret$`P Value`[[1]], direct_result$p.value[[1]])
+  # W values should be complementary (sum to n*(n+1)/2) due to fct_rev reordering
+  expect_equal(ret$`W Value`[[1]] + direct_result$statistic[[1]], n * (n + 1) / 2)
+})
+
+test_that("test exp_wilcox paired with conf.int results match direct wilcox.test", {
+  set.seed(42)
+  n <- 30
+  before <- round(rnorm(n, mean = 70, sd = 10), 1)
+  after <- round(rnorm(n, mean = 65, sd = 10), 1)
+
+  data_long <- tibble::tibble(
+    subject_id = rep(paste0("P", sprintf("%02d", 1:n)), 2),
+    period = factor(rep(c("before", "after"), each = n), levels = c("before", "after")),
+    value = c(before, after)
+  )
+
+  direct_result <- wilcox.test(before, after, paired = TRUE, conf.int = TRUE)
+
+  model_df <- exp_wilcox(data_long, value, period, paired = TRUE, conf.int = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type = "model")
+
+  # p-value should match exactly
+  expect_equal(ret$`P Value`[[1]], direct_result$p.value[[1]])
+  # W values should be complementary (sum to n*(n+1)/2) due to fct_rev reordering
+  expect_equal(ret$`W Value`[[1]] + direct_result$statistic[[1]], n * (n + 1) / 2)
+  # Estimate (pseudo-median of differences) should have same magnitude, opposite sign
+  expect_equal(abs(ret$Difference[[1]]), abs(direct_result$estimate[[1]]), tolerance = 1e-4)
+})
+
 test_that("test exp_wilcox with group-level error", {
   df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_wilcox(`value`, `category`)
