@@ -1396,7 +1396,9 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
     }
   }
 
-  # Use a different syntax for paired in R4.4.
+  # For the paired Wilcoxon test, we actually use the 2-vector interface
+  # instead of the formula interface. See each_func for details.
+  # Please keep the following for the reference.
   # https://bugs.r-project.org/show_bug.cgi?id=14359
   if (paired) {
     formula = as.formula(paste0('Pair(`', var1_col, '`, `', var2_col, '`) ~ 1'))
@@ -1434,7 +1436,22 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
         df_test <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := forcats::fct_rev(forcats::fct_infreq(as.factor(!!rlang::sym(var2_col)))))
       }
       base.level <- levels(df_test[[var2_col]])[2]
-      model <- wilcox.test(formula, data = df_test, ...)
+      if (paired) {
+        # Split the target value column (var1_col) into two vectors
+        # by the category of the explanatory variable (var2_col).
+        var1_before <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[1]]
+        var1_after <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[2]]
+
+        # Check that the number of observations in both groups are the same.
+        if (length(var1_before) != length(var1_after)) {
+          stop("Paired Wilcoxon test requires equal number of observations in both groups")
+        }
+
+        # Call wilcox.test with the two vectors.
+        model <- wilcox.test(var1_before, var1_after, paired = TRUE, ...)
+      } else {
+        model <- wilcox.test(formula, data = df_test, ...)
+      }
       count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% dplyr::summarize(n=n())
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
