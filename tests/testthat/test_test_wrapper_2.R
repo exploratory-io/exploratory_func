@@ -151,6 +151,75 @@ test_that("test exp_wilcox paired with conf.int results match direct wilcox.test
   expect_equal(abs(ret$Difference[[1]]), abs(direct_result$estimate[[1]]), tolerance = 1e-4)
 })
 
+test_that("test exp_wilcox paired W value matches direct wilcox.test with same vector order", {
+  # Use small data without ties for exact p-value
+  set.seed(123)
+  n <- 10
+  before <- round(rnorm(n, mean = 50, sd = 5), 1)
+  after <- round(rnorm(n, mean = 45, sd = 5), 1)
+
+  data_long <- tibble::tibble(
+    subject_id = rep(paste0("P", sprintf("%02d", 1:n)), 2),
+    period = factor(rep(c("before", "after"), each = n), levels = c("before", "after")),
+    value = c(before, after)
+  )
+
+  # exp_wilcox uses fct_rev, so effectively calls wilcox.test(after, before).
+  # Match that order for direct comparison.
+  direct_result <- wilcox.test(after, before, paired = TRUE)
+
+  model_df <- exp_wilcox(data_long, value, period, paired = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type = "model")
+
+  # W value should match exactly when using the same vector order
+  expect_equal(ret$`W Value`[[1]], direct_result$statistic[[1]])
+  expect_equal(ret$`P Value`[[1]], direct_result$p.value[[1]])
+})
+
+test_that("test exp_wilcox paired with repeat-by grouping", {
+  set.seed(42)
+  n_per_group <- 15
+
+  # Create data with two groups (e.g., male/female), each with before/after measurements
+  data_long <- tibble::tibble(
+    subject_id = c(paste0("M", sprintf("%02d", 1:n_per_group)),
+                   paste0("M", sprintf("%02d", 1:n_per_group)),
+                   paste0("F", sprintf("%02d", 1:n_per_group)),
+                   paste0("F", sprintf("%02d", 1:n_per_group))),
+    group = factor(c(rep("male", n_per_group * 2), rep("female", n_per_group * 2))),
+    period = factor(rep(c(rep("before", n_per_group), rep("after", n_per_group)), 2),
+                    levels = c("before", "after")),
+    value = c(
+      round(rnorm(n_per_group, mean = 70, sd = 10), 1),  # male before
+      round(rnorm(n_per_group, mean = 65, sd = 10), 1),  # male after
+      round(rnorm(n_per_group, mean = 60, sd = 10), 1),  # female before
+      round(rnorm(n_per_group, mean = 55, sd = 10), 1)   # female after
+    )
+  )
+
+  # Run exp_wilcox with group_by (repeat-by)
+  model_df <- data_long %>% dplyr::group_by(group) %>% exp_wilcox(value, period, paired = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type = "model")
+
+  # Should have results for both groups
+  expect_equal(nrow(ret), 2)
+  # Should have W Value column (signed-rank test)
+  expect_true("W Value" %in% colnames(ret))
+  expect_true("P Value" %in% colnames(ret))
+
+  # Verify each group's result matches direct wilcox.test
+  for (g in c("male", "female")) {
+    group_data <- data_long %>% dplyr::filter(group == g)
+    before_vals <- group_data$value[group_data$period == "before"]
+    after_vals <- group_data$value[group_data$period == "after"]
+    # exp_wilcox uses fct_rev, so effective order is (after, before)
+    direct <- wilcox.test(after_vals, before_vals, paired = TRUE)
+    group_ret <- ret %>% dplyr::filter(group == g)
+    expect_equal(group_ret$`W Value`[[1]], direct$statistic[[1]])
+    expect_equal(group_ret$`P Value`[[1]], direct$p.value[[1]])
+  }
+})
+
 test_that("test exp_wilcox with group-level error", {
   df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_wilcox(`value`, `category`)
