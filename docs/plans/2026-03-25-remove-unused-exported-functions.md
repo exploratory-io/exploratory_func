@@ -76,19 +76,31 @@ For each function in the KEEP-AS-INTERNAL list:
 | Metric | Value |
 |--------|-------|
 | Starting export count | 543 |
-| Final export count | 504 |
-| Functions deleted (removed from R source entirely) | 39 |
-| Functions kept (used in consumer repos) | 504 |
+| Final export count | 518 |
+| Functions deleted (removed from R source entirely) | 25 |
 
 ### Key Deviation from Plan
 
-The initial consumer-repo audit only searched for `exploratory::funcname` call patterns. However, consumer repos (particularly tam) reference many functions as **bare strings** in generated R code (e.g., `case "build_lm":` in `CommandGeneratorBase.js`). This caused the initial analysis to misclassify 171 actively-used functions as unused.
+The initial consumer-repo audit only searched `*.js` and `*.ts` files for `exploratory::funcname` patterns. Consumer repos reference functions in additional ways that were initially missed:
+- **Bare strings** in JS/TS code (e.g., `case "build_lm":` in `CommandGeneratorBase.js`)
+- **Plugin R scripts** (`public/lib/plugins/*/scripts/plugin.r`)
+- **`extension.json` configs** referencing functions as `"function": "exploratory::name"`
+- **JSON analysis templates** with inline R code snippets
+- **R test scripts** in `tools/`
 
-A corrected audit searched for bare function name references and found that 171 of the 210 originally identified candidates are still actively called. Only **39 functions** were confirmed unused across all consumer repos and safely removed.
+A full re-audit across all file types (`*.js`, `*.ts`, `*.R`, `*.r`, `*.json`) in tam, datablog, scheduler, and plugin directories confirmed only **25 functions** are genuinely unused.
 
-### Functions Removed (39)
+### Functions Removed (25)
 
-`any_error`, `augment_glm`, `augment_lm`, `calc_beta_prior`, `calculate_cohens_f_squared`, `city_code_japan`, `do_kl_dist.kv_`, `do_princomp`, `evaluate_glm_training_and_test`, `exp_add_cluster_column`, `geocode_japan_city`, `get_intercom_data`, `get_mailchimp_data`, `get_num_errors`, `get_stripe_data`, `getConnectionPoolMode`, `getGoogleTrends`, `getListOfColumns`, `getTwitter`, `glance_glm`, `glance_kmeans`, `glance_lm`, `HttrOAuthToken1.0`, `HttrOAuthToken2.0`, `load_fred`, `model_confint`, `pivot_`, `queryMongoDB`, `queryNeo4j`, `querySalesforceDataFromTable`, `refreshGoogleTokenForAnalysis`, `refreshGoogleTokenForAnalytics`, `refreshGoogleTokenForBigQuery`, `refreshSalesforceToken`, `refreshTwitterToken`, `riem_stations_exp`, `tidy_glm`, `tidy_kmeans`, `tidy_lm`
+**Obsolete data source plugins:** `getTwitter`, `refreshTwitterToken`, `queryNeo4j`, `get_mailchimp_data`, `getGoogleTrends`
+
+**Unused auth/token:** `refreshGoogleTokenForAnalytics`, `refreshSalesforceToken`
+
+**Unused broom tidiers:** `augment_glm`, `augment_lm`, `glance_glm`, `glance_kmeans`, `glance_lm`, `tidy_glm`, `tidy_kmeans`, `tidy_lm`
+
+**Unused statistical:** `calc_beta_prior`, `calculate_cohens_f_squared`, `do_kl_dist.kv_`, `do_princomp`, `model_confint`
+
+**Unused misc:** `any_error`, `get_num_errors`, `getConnectionPoolMode`, `getListOfColumns`, `pivot_`
 
 ### Test Suite Result
 
