@@ -111,3 +111,11 @@ FAIL 0 | WARN 734 | SKIP 27 | PASS 1562
 ### R CMD Check
 
 0 new ERRORs introduced. Pre-existing WARNINGs and NOTEs only.
+
+### Test File Correction
+
+An early failed attempt to remove 210 functions (later reverted) had incorrectly deleted 36 test files and modified 32 others. These were discovered during PR review and restored to master state. None of the 25 legitimately removed functions had test cases, so no test changes are required.
+
+### Analytics Obsolescence Check
+
+A follow-up comparison of exploratory_func analytics functions against all active analytics in Exploratory Desktop (tam) confirmed **no analytics functions are obsolete**. All underscore-variant functions (e.g. `do_roc_`, `do_survival_roc_`, `evaluate_binary_`, `evaluate_multi_`) are either directly referenced in tam analysis templates/JS or serve as internal implementation helpers for their exported NSE counterparts.
