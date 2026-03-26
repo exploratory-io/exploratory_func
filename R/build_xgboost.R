@@ -8,7 +8,6 @@
 #' Can be na.omit, na.pass, na.fail
 #' @param sparse If matrix should be sparse.
 #' As default, it becomes sparse if there is any categorical value.
-#' @export
 fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
@@ -94,7 +93,6 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 #' formula version of xgboost (multinomial)
 #' @param output_type Type of output. Can be "logistic" or "logitraw"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
-#' @export
 xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", params = list(), ...) {
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
@@ -153,7 +151,6 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 #' formula version of xgboost (multinomial)
 #' @param output_type Type of output. Can be "softprob" or "softmax"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
-#' @export
 xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
@@ -214,7 +211,6 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' formula version of xgboost (regression)
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
-#' @export
 xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NULL, params = list(), tweedie_variance_power = 1.5, ...) {
   # There can be more than 2 eval_metric
   # by creating eval_metric parameters in params list,

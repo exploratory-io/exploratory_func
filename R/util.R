@@ -1,6 +1,5 @@
 #' Column name parser
 #' This function is from https://github.com/tidyverse/broom/blob/master/R/utilities.R
-#' @export
 col_name <- function(x, default = stop("Please supply column name", call. = FALSE)) {
   if (is.character(x))
     return(x)
@@ -23,7 +22,6 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' @param fill Values to fill NA.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @param na.rm If NA in val should be removed
-#' @export
 simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, time_unit=NULL, na.rm = FALSE) {
   loadNamespace("reshape2")
   loadNamespace("tidyr")
@@ -91,7 +89,6 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
 
 #' Cast data to sparse matrix by choosing row and column from a data frame
 #' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
-#' @export
 sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE) {
   loadNamespace("dplyr")
   loadNamespace("tidyr")
@@ -167,7 +164,6 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
 #' @param cnames Column names of output
 #' @param na.rm If NA should be removed from the result
 #' @param zero.rm If 0 should be removed from the result
-#' @export
 upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, zero.rm = TRUE) {
   loadNamespace("Matrix")
   if(is.vector(mat)){
@@ -257,7 +253,6 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
-#' @export
 avoid_conflict <- function(origin, new, suffix = ".new") {
   conflict <- new %in% origin
   while(any(conflict)){
@@ -268,7 +263,6 @@ avoid_conflict <- function(origin, new, suffix = ".new") {
 }
 
 #' check grouped column
-#' @export
 grouped_by <- function(df){
   dplyr::group_vars(df)
 }
@@ -279,7 +273,6 @@ grouped_by <- function(df){
 #' @param na.rm If NA should be removed from the result
 #' @param zero.rm If 0 should be removed from the result
 #' @param diag If diagonal values should be returned
-#' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
   # Set column names. Without it, values of the second column of the output df
   # would be "V1", "V2", ... instead of "1", "2".
@@ -359,7 +352,6 @@ to_same_type <- function(vector, original) {
 }
 
 #' floor with digits argument.
-#' @export
 floor <- function(x, digits = 0) {
   if (digits == 0) {
     base::floor(x)
@@ -370,7 +362,6 @@ floor <- function(x, digits = 0) {
 }
 
 #' ceiling with digits argument.
-#' @export
 ceiling <- function(x, digits = 0) {
   if (digits == 0) {
     base::ceiling(x)
@@ -381,11 +372,9 @@ ceiling <- function(x, digits = 0) {
 }
 
 #' Not %in% function
-#' @export
 `%nin%` <- function (x, table) match(x, table, nomatch = 0L) == 0L
 
 #' get number of elements in list data type column for each row
-#' @export
 list_n <- function(column) {
   sapply(column, length)
 }
@@ -444,7 +433,6 @@ as_numeric_matrix_ <- function(df, columns) {
 #' evaluate select argument
 #' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 #' @param excluded Excluded column names
-#' @export
 evaluate_select <- function(df, .dots, excluded = NULL) {
   loadNamespace("dplyr")
   tryCatch({
@@ -465,7 +453,6 @@ evaluate_select <- function(df, .dots, excluded = NULL) {
 #' re-build arguments of a function as string
 #' @param call This expects returned value from match.call()
 #' @param exclude Argument names that should be excluded for expansion
-#' @export
 expand_args <- function(call, exclude = c()) {
   excluded <- call[!names(call) %in% exclude]
   args <- excluded[-1]
@@ -489,7 +476,6 @@ expand_args <- function(call, exclude = c()) {
 }
 
 #' get sampled indice from data frame
-#' @export
 sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
   # Return NULL (empty vector) for rate 0 case. If we go on, ordered case would return the index for the last row.
   if (rate == 0) return(NULL)
@@ -506,7 +492,6 @@ sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
 }
 
 #' slice of 2 dimensional data that can handle empty vector
-#' @export
 safe_slice <- function(data, index, remove = FALSE) {
   ret <- if(remove){
     if(is.null(index)){
@@ -556,7 +541,6 @@ add_response <- function(data, model, response_label = "predicted_response") {
 #' @param df Data frame whose column will be moved
 #' @param cname Column name to be moved
 #' @param position Column index to move to
-#' @export
 move_col <- function(df, cname, position) {
   # get column index to move
   cname_posi = which(colnames(df) == cname)
@@ -616,7 +600,6 @@ move_col <- function(df, cname, position) {
 
 #' Unix time numeric values to POSIXct
 #' @param data Numeric vector to convert to date
-#' @export
 unixtime_to_datetime <- function(data){
   # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
   as.POSIXct(as.numeric(data), origin="1970-01-01", tz='GMT')
@@ -710,7 +693,6 @@ append_colnames <- function(df, prefix = "", suffix = "") {
 #' It seems there is no commonly accepted name for half-width of confidence interval.
 #' Reference for naming: https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Intervals_for_One_Mean.pdf
 #' Here we name it confint_radius.
-#' @export
 confint_radius <- function(x, level=0.95) {
   n <- sum(!is.na(x))
   s <- sd(x, na.rm = TRUE)
@@ -733,7 +715,6 @@ calc_confint_mean <- function (sd, n, level=0.95) {
 #' Returns half-width of confidence interval of population proportion of the given logical vector. NAs are skipped and not counted.
 #' This is useful when used in dplyr::summarize().
 #' Reference: http://www.r-tutor.com/elementary-statistics/interval-estimation/interval-estimate-population-proportion
-#' @export
 prop_confint_radius <- function(x, level=0.95) {
   n <- sum(!is.na(x))
   t <- sum(x, na.rm = TRUE)
@@ -758,7 +739,6 @@ calc_confint_ratio <- function (ratio, n, level=0.95) {
 #' get confidence interval value
 #' @param val Predicted value
 #' @param conf_int Confidence interval to get
-#' @export
 get_confint <- function(val, se, conf_int = 0.95) {
   critval=qnorm(conf_int,0,1)
   val + critval * se
@@ -776,7 +756,6 @@ get_confint <- function(val, se, conf_int = 0.95) {
 #' @param fill - Value to be filled for missing values
 #' @param na.rm - If na should be removed from values
 #' @param cols_sep - If na should be removed from values
-#' @export
 pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   # make sure to ungroup the data frame first if the row_cols are same as grouped columns.
   grouped_col <- grouped_by(df)
@@ -1145,14 +1124,12 @@ create_model_meta <- function(df, formula) {
 }
 
 #' NSE version of unnest_without_empty_
-#' @export
 unnest_without_empty <- function(data, nested) {
   nested_col <- col_name(substitute(nested))
   unnest_without_empty_(data, nested_col)
 }
 
 #' unnest with removing NULL or empty list
-#' @export
 unnest_without_empty_ <- function(data, nested_col) {
   validate_empty_data(data)
   empty <- list_n(data[[nested_col]]) == 0
@@ -1169,7 +1146,6 @@ unnest_without_empty_ <- function(data, nested_col) {
 
 #' Count FALSE in a vector
 #' @param x vector
-#' @export
 false_count <- function(x) {
   sum(!x, na.rm = TRUE)
 }
@@ -1228,7 +1204,6 @@ validate_empty_data <- function(df) {
 #' @param df Data frame
 #' @param func Function to execute
 #' @param params Parameters for func
-#' @export
 do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE) {
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
@@ -1299,7 +1274,6 @@ categorize_numeric <- function(x, type = "asnum") {
   ret
 }
 
-#' @export
 extract_from_date <- function(x, type = "fltoyear") {
   ret <- NULL
   switch(type,
@@ -1474,7 +1448,6 @@ weekend <- function(x){
 }
 
 
-#' @export
 extract_from_numeric <- function(x, type = "asdisc") {
   switch(type,
     asnum = {
@@ -1496,7 +1469,6 @@ extract_from_numeric <- function(x, type = "asdisc") {
 #' @param null_model_mean - Mean value the basis null model gives.
 #'                          To calculate R-Squared for test data, one from training data should be specified here.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
-#' @export
 r_squared <- function(actual, predicted, null_model_mean=NULL, is_test_data=NULL) {
   # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
   # https://en.wikipedia.org/wiki/Coefficient_of_determination
@@ -1521,7 +1493,6 @@ adjusted_r_squared <- function(rsq, n_observations, df_residual) {
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
-#' @export
 mae <- function(actual, predicted, is_test_data) {
   actual <- actual[is_test_data]
   predicted <- predicted[is_test_data]
@@ -1533,7 +1504,6 @@ mae <- function(actual, predicted, is_test_data) {
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
-#' @export
 rmse <- function(actual, predicted, is_test_data=NULL) {
   if (!is.null(is_test_data)) {
     actual <- actual[is_test_data]
@@ -1547,7 +1517,6 @@ rmse <- function(actual, predicted, is_test_data=NULL) {
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
-#' @export
 mape <- function(actual, predicted, is_test_data) {
   actual <- actual[is_test_data]
   predicted <- predicted[is_test_data]
@@ -1580,7 +1549,6 @@ computeMASE <- function(forecast, train, test, period){
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
-#' @export
 mase <- function(actual, predicted, is_test_data, period = 1) {
   train <- actual[!is_test_data]
   test <- actual[is_test_data]
@@ -1593,7 +1561,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of %in% if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
-#' @export
 `%in_or_all%` <- function(x,y) {
   if (length(y) == 0) {
     return(!(x %in% y))
@@ -1608,7 +1575,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' If y is empty or NULL, return TRUE.
 #' This is used for filter conditions controlled by a variable, so that filtering
 #' is effectively skipped when the variable is empty or NULL.
-#' @export
 `%equal_or_all%` <- function(x, y) {
   # Use %in_or_all% if y has more than one element
   if (length(y) > 1) {
@@ -1629,7 +1595,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' If y is empty or NULL, return TRUE.
 #' This is used for filter conditions controlled by a variable, so that filtering
 #' is effectively skipped when the variable is empty or NULL.
-#' @export
 `%not_equal_or_all%` <- function(x, y) {
   # Use x %nin% y if y has more than one element
   if (length(y) > 1) {
@@ -1648,7 +1613,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of ">" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
-#' @export
 `%greater_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -1661,7 +1625,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of ">=" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
-#' @export
 `%greater_or_equal_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -1674,7 +1637,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of ">" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
-#' @export
 `%less_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -1687,7 +1649,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of "<=" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
-#' @export
 `%less_or_equal_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -1698,7 +1659,6 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 }
 
 
-#' @export
 excel_numeric_to_date <- function(date_num, date_system = "modern",
                                   include_time = FALSE, round_seconds = TRUE) {
   # working around https://github.com/sfirke/janitor/issues/241
@@ -1715,7 +1675,6 @@ extract_argument_names <- function(...) {
 }
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
-#'@export
 bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL, encoding = NULL, use_col_index_as_col_name = FALSE) {
   # for compatiblity with dply::bind_rows
   # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
@@ -1883,7 +1842,6 @@ set_operation_with_force_character <- function(func, x, y, ...) {
 }
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
-#'@export
 union <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
@@ -1893,7 +1851,6 @@ union <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
-#'@export
 union_all <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
@@ -1903,7 +1860,6 @@ union_all <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
-#'@export
 intersect <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
@@ -1913,7 +1869,6 @@ intersect <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::setdiff to support ignoring data type difference.
-#'@export
 setdiff <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
@@ -1923,7 +1878,6 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
-#'@export
 recode <- function(x, ..., type_convert = FALSE, .default = NULL, .missing = NULL) {
   # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
   map <- list(...)
@@ -1962,7 +1916,6 @@ get_unique_values<-function (x, limit) {
 }
 
 #'Wrapper function for dplyr::recode_factor to workaround encoding info getting lost and to handle levels.
-#'@export
 recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missing = NULL, .ordered = TRUE) {
   current_levels = NULL;
   num_of_unique_value = NULL;
@@ -2020,7 +1973,6 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
 }
 
 #'Wrapper function for tidyr::pivot_longer to support type_convert argument.
-#'@export
 pivot_longer <- function(data,
                          cols,
                          ...,
@@ -2071,7 +2023,6 @@ pivot_longer <- function(data,
 }
 
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
-#'@export
 case_when <- function(x, ..., type_convert = FALSE) {
   ret <- dplyr::case_when(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
@@ -2096,7 +2047,6 @@ case_when <- function(x, ..., type_convert = FALSE) {
 
 # This is written by removing unnecessary part from calculate_cohens_d.
 #'Calculate common standard deviation.
-#'@export
 calculate_common_sd <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
@@ -2124,7 +2074,6 @@ calculate_common_sd_aggregated <- function(N1, N2, s1, s2) {
 
 # Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
 #'Calculate Cohen's d
-#'@export
 calculate_cohens_d <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
@@ -2166,7 +2115,6 @@ calculate_cohens_d_aggregated <- function(N1, N2, X1, X2, s1, s2) {
 # Did not use powerAnalysis::ES.anova.oneway() because it only works for the case all categories
 # have same number of observations.
 #'Calculate Cohen's f
-#'@export
 calculate_cohens_f <- function(var1, var2) {
   m <- mean(var1, na.rm = TRUE)
   df <- data.frame(var1=var1, var2=var2)
@@ -2181,7 +2129,6 @@ calculate_cohens_f <- function(var1, var2) {
 
 # Reference: https://rdrr.io/github/markushuff/PsychHelperFunctions/src/R/cohens_w.R
 #'Calculate Cohen's w from Chi-Square value and total number of observations.
-#'@export
 calculate_cohens_w <- function(chi_sq, N) {
   sqrt(chi_sq/N)
 }
@@ -2209,7 +2156,6 @@ calculate_cohens_w_for_ab_test <- function(a_ratio, conversion_rate, diff) {
 # https://stats.stackexchange.com/questions/415037/effect-size-calculation-for-kruskal-wallis-mean-rank-test
 # https://rcompanion.org/handbook/F_08.html
 #'Calculate epsilon squared, which is an effect size of Kruskal-Wallis test.
-#'@export
 calculate_epsilon_squared <- function(KW, N) {
   H = KW$statistic
   Epsilon2 = H / (N-1)
@@ -2481,7 +2427,6 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
 # airquality %>% mutate(total = summarize_row(across(where(is.numeric)), median, na.rm=TRUE))
 #' @param x - data frame
 #' @param f - function
-#' @export
 summarize_row <- function(x, f = mean, ...) {
   apply(x, 1, f, ...)
 }
@@ -2767,7 +2712,6 @@ inter_group_population_var <- function(means, sizes) {
 #' @param means - Means of groups.
 #' @param sizes - Sizes of groups.
 #' @return Variance
-#' @export
 merge_vars <- function(vars, means, sizes) {
   tot_size <- sum(sizes)
   population_vars <- vars * (sizes - 1) / sizes
@@ -3064,7 +3008,6 @@ cumany <- function(x, skip.na = TRUE) {
 #'        enables one-hot encoding mode using names_from column with 1/0 values.
 #' @param ... Additional arguments passed to tidyr::pivot_wider
 #' @return A data frame with pivoted columns
-#' @export
 pivot_wider <- function(data, names_from, values_from = NULL, ...) {
   # Capture arguments as quosures immediately
   names_from_quo <- rlang::enquo(names_from)

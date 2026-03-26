@@ -5,7 +5,6 @@
 #' @param actual_val_col Column name for actual values
 #' @param grid Grid size to reduce data size for drawing chart.
 #' @param with_auc When set to TRUE, AUC is calculated and added as a column of the output.
-#' @export
 do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = FALSE){
   validate_empty_data(df)
 
@@ -89,7 +88,6 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
 #' @param df Data Frame
 #' @param pred_prob_col Column name for probability
 #' @param actual_val_col Column name for actual values
-#' @export
 evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_score"){
   validate_empty_data(df)
 
@@ -139,7 +137,6 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
 #' @param df Model data frame that can work prediction
 #' @param pred_val_col Column name for predicted values
 #' @param actual_val_col Column name for actual values
-#' @export
 evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
   validate_empty_data(df)
 
@@ -202,7 +199,6 @@ evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
 #' @param df Data frame
 #' @param pred_label_col Predicted label colmun name
 #' @param actual_val_col Actual label column name
-#' @export
 evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FALSE, ...) {
   validate_empty_data(df)
 

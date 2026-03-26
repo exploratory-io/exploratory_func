@@ -3,7 +3,6 @@
 
 
 #' SE version of build_kmeans.kv
-#' @export
 build_kmeans.kv_ <- function(df,
                              subject_col,
                              key_col,
@@ -118,7 +117,6 @@ build_kmeans.kv_ <- function(df,
 }
 
 #' kmeans wrapper with do with variable columns as input
-#' @export
 build_kmeans.cols <- function(df, ...,
                             centers=3,
                             iter.max = 10,

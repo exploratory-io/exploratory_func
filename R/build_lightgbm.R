@@ -99,7 +99,6 @@ sanitize_lightgbm_colnames <- function(names) {
 #' @param sparse If matrix should be sparse.
 #' As default, it becomes sparse if there is any categorical value.
 #' @param valid_data Extra validation data to evaluate during training; can be NULL, a data.frame, or a named list of data.frames.
-#' @export
 fml_lightgbm <- function(data, formula, nrounds = 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, valid_data = NULL, ...) {
   loadNamespace("lightgbm")
 
@@ -847,7 +846,6 @@ lightgbm_build_evaluation_log <- function(model) {
 #'     \item{early_stopping_rounds: Number of rounds for early stopping}
 #'   }
 #'   Other LightGBM parameters can also be passed through ...
-#' @export
 lightgbm_binary <- function(data, formula, output_type = "probability", eval_metric = "auc", params = list(), ...) {
   loadNamespace("lightgbm")
 
@@ -913,7 +911,6 @@ lightgbm_binary <- function(data, formula, output_type = "probability", eval_met
 #'     \item{early_stopping_rounds: Number of rounds for early stopping}
 #'   }
 #'   Other LightGBM parameters can also be passed through ...
-#' @export
 lightgbm_multi <- function(data, formula, output_type = "softprob", eval_metric = "multi_error", params = list(), ...) {
   loadNamespace("lightgbm")
 
@@ -983,7 +980,6 @@ lightgbm_multi <- function(data, formula, output_type = "softprob", eval_metric 
 #'     \item{early_stopping_rounds: Number of rounds for early stopping}
 #'   }
 #'   Other LightGBM parameters can also be passed through ...
-#' @export
 lightgbm_reg <- function(data, formula, output_type = "regression", eval_metric = "rmse", params = list(), ...) {
   loadNamespace("lightgbm")
 

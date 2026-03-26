@@ -33,7 +33,6 @@ is_digit <- function(word){
 #' @param exclude Values that should be excluded from stop words
 #' @param is_twitter flag that tells if you want to get twitter related stopwords such as http and https.
 #' @return vector of stop words.
-#' @export
 get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twitter = TRUE){
   if(!requireNamespace("tidystopwords")){stop("package tidystopwords must be installed.")}
   lang <- tolower(lang)
@@ -331,7 +330,6 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
 
 
 #' Calculate sentiment
-#' @export
 get_sentiment <- function(text){
   loadNamespace("sentimentr")
   if(is.character(text)) {
@@ -343,7 +341,6 @@ get_sentiment <- function(text){
 
 #' Wrapper function for readr::parse_character
 #' @param text to parse
-#' @export
 parse_character <- function(text, ...){
   # After updating readr version from 1.1.1 to to 1.3.1,
   # readr::parse_character now fails for non-characters.
@@ -358,7 +355,6 @@ parse_character <- function(text, ...){
 
 #' Wrapper function for readr::parse_number
 #' @param text to parse
-#' @export
 parse_number <- function(text, ...){
   # readr::parse_number used to allow already numeric input, by doing nothing,
   # but after updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
@@ -384,7 +380,6 @@ parse_number <- function(text, ...){
 
 #' Wrapper function for readr::parse_logical
 #' @param text to parse
-#' @export
 parse_logical <- function(text, ...){
   # After updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
   # So if logical, return as is for backward compatibility.
@@ -643,7 +638,6 @@ str_replace_range <- function(column, start, end = -1, replacement = ""){
 #' @param negate If TRUE, return non-matching elements.
 #' @param ignore_case If TRUE, detect the pattern with case insensitive way.
 #' @param allow_empty_pattern if TRUE, assumes it matches (i.e. return TRUE), if FALSE underlying stringr::str_detect raises an error.
-#' @export
 str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE, allow_empty_pattern = TRUE) {
   # if pattern is not empty string and case insensitive is specified, use regex to handle the case insensitive match.
   # any() is necessary to avoid error when pattern is a vector.

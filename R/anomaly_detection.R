@@ -18,7 +18,6 @@
 #'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
-#' @export
 do_anomaly_detection_ <- function(
   df,
   time_col,

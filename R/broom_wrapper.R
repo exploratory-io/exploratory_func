@@ -22,7 +22,6 @@ calc_conf_mat <- function(actual, predicted) {
 }
 
 # For backward compatibilities for broom's rowwise tidier, which was dropped at broom 0.7.0.
-#' @export
 glance_rowwise <- function(df, model, ...) {
   # Intended to do the same the following line. 
   # summarize(df, broom::glance(!!rlang::enquo(model), ...))
@@ -66,7 +65,6 @@ tidy_rowwise <- function(df, model, ...) {
   ret
 }
 
-#' @export
 augment_rowwise <- function(df, model, ...) {
   # Intended to do the same the following line. 
   # summarize(df, broom::augment(!!rlang::enquo(model), ...))
@@ -108,7 +106,6 @@ augment_rowwise_data <- function(df, model, data, ...) {
 #' @param df Data frame to predict
 #' @param model_df Data frame that has model
 #' @param ... Additional argument to be passed to broom::augment
-#' @export
 add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   if (any(class(model_df$model[[1]]) %in% c("coxph_exploratory", "ranger_survival_exploratory"))) { # For now this is only for Cox regression Analytics View model.
     return(add_prediction2(df, model_df, conf_int = conf_int, ...))
@@ -764,7 +761,6 @@ evaluation <- function(df, ...){
 #' For Model Steps, even for ranger, this function is used.
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
-#' @export
 prediction_binary <- function(df, threshold = 0.5, pretty.name = FALSE, ...){
   # ungroup() is necessary to avoid error under rowwise(). Putting rowwise at the end to put it back to rowwise again. TODO: Is it possible that the input is not under rowwise and our adding rowwise affect processing that follows?
   df <- df %>% ungroup() %>% dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){!is.null(x) & "error" %nin% class(x)}))) %>% dplyr::rowwise()
@@ -952,7 +948,6 @@ prediction_binary <- function(df, threshold = 0.5, pretty.name = FALSE, ...){
 #' @param df Data frame to predict. This should have model column.
 #' @param time The point of time at which we predict survival of subjects.
 #' @param threshold The threshold probability to determine predicted_status.
-#' @export
 prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
   validate_empty_data(df)
 

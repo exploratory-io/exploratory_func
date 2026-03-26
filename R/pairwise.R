@@ -14,7 +14,6 @@
 #' @param normalize Whether to normalize values for each key. 
 #' @param cmdscale_k Number of dimention to map the result.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
-#' @export
 do_dist.kv_ <- function(df,
                         subject_col,
                         key_col,
@@ -207,7 +206,6 @@ do_dist.kv_ <- function(df,
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param p The power of the Minkowski distance.
-#' @export
 do_dist.cols <- function(df,
                          ...,
                          label=NULL,

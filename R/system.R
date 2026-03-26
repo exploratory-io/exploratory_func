@@ -7,7 +7,6 @@ user_env$token_info <- new.env()
 user_env$downloads <- new.env()
 
 #' get oauth token info from key
-#' @export
 getTokenInfo <- function(token_key){
   user_env$token_info[[token_key]]
 }
@@ -2237,7 +2236,6 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
 }
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
-#' @export
 extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table, destinationUri, tokenFileId, service_account_file = NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
@@ -2257,7 +2255,6 @@ extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table,
 }
 
 #' API to download data from Google Storage to client and create a data frame from it
-#' @export
 downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId, colTypes = NULL, service_account_file = NULL){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
@@ -2775,7 +2772,6 @@ convertToJSON  <- function(x) {
 #' We do this since the JSON output is not broken under LC_CTYPE of Code Page 1252.
 #' Since JSON output is in UTF-8 even on Windows, we should not have to go through
 #' SJIS on the output path in the first place.
-#' @export
 toJSON <- function(...) {
   tryCatch({
     if (Sys.info()["sysname"] == "Windows") {
@@ -2949,7 +2945,6 @@ checkSourceConflict <- function(files, encoding="UTF-8"){
 #' @param input vector of US state names, abbreviations, or numeric codes.
 #' @param output_type one of "alpha_code", "num_code", "name", "division", or "region"
 #' @return character vector
-#' @export
 statecode <- function(input = input, output_type = output_type) {
   output_types <- c("alpha_code", "num_code", "name", "division", "region")
   if (!output_type %in% output_types) {
@@ -3088,7 +3083,6 @@ prefecturecode <- function(prefecture, output_type="name") {
 #' @param state state name, or 2 letter state code
 #' @param county county name. For an independent city that has a county with the same name, prefix with "City of " or suffix with " City".
 #' @return character vector
-#' @export
 countycode <- function(state = state, county = county) {
   loadNamespace("stringr")
   # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
@@ -4211,7 +4205,6 @@ get_refs_in_script <- function(script, after_pipe = TRUE) {
 #' @param df A data frame.
 #' @param col The column to unnest.
 #' @return A data frame with the unnested column.
-#' @export
 unnest_safe <- function(df, col) {
   ret <- df
   group_col <- grouped_by(ret)

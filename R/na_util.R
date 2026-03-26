@@ -171,7 +171,6 @@ fill_between <- function(df, ..., .direction="down", value=NULL) {
 #'                 "spline" - Spline interpolation.
 #'                 NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param val - 3 element numeric vector that specified values to fill NAs at the begining, in the middle, at the ending of the time series when the corresponding type is "value".
-#' @export
 fill_ts_na <- function(target, time, type = c("value", "previous", "extend"), val = c(0, 0, 0)) {
   if (length(type) == 1) { # If only a single type is given, use it for the mid-section, and fill the beginning and ending with the default types.
     type <- c("value", type, "extend")

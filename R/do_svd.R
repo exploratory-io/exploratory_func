@@ -18,7 +18,6 @@
 #' "long" is a format with 3 columns which represents rows, columns and values
 #' "wide" is a format which spreads the long information into matrix
 #' @return Tidy format of svd result in a data frame.
-#' @export
 do_svd.kv_ <- function(df,
                       subject_col,
                       key_col,
@@ -206,7 +205,6 @@ do_svd.kv_ <- function(df,
 #' "wide" is a format which spreads the long information into matrix
 #' @param keep_cols If TRUE, selected columns are kept in the result.
 #' @return Tidy format of svd result in a data frame.
-#' @export
 do_svd.cols <- function(df,
                         ...,
                         type="group",

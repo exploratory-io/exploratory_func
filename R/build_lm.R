@@ -258,7 +258,6 @@ map_terms_to_orig <- function(terms, mapping) {
 
 #' Common preprocessing of regression data to be done BEFORE sampling.
 #' Only common operations to be done, for example, in Summary View too.
-#' @export
 preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_predictor_numeric_na=TRUE) {
   # ranger and rpart works with NA or Inf in the target, but we decided it would build rather meaningless or biased model.
   # For example, rpart binary classification just replaces NAs with FALSE, which would change the meaning of data inadvertently.
@@ -319,7 +318,6 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
 
 #' Common preprocessing of regression data to be done AFTER sampling.
 #' Only common operations to be done, for example, in Summary View too.
-#' @export
 #' @param df
 #' @param target_col
 #' @param predictor_cols

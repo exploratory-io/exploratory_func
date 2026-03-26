@@ -121,7 +121,6 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=5,
 
 #' Find association rules from itemsets.
 #' It calculates support, confidence and lift values from combinations of items.
-#' @export
 do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=5, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL, max_basket_items=10){
   if (min_support == "auto") { # search for min_support that returns some rules.
     ret <- NULL

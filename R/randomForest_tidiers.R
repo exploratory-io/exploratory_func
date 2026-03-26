@@ -1135,7 +1135,6 @@ rename_groups <- function(n) {
 
 
 #' wrapper for tidy type evaluation
-#' @export
 rf_evaluation <- function(data, ...) {
   ret <- tidy_rowwise(data, model, type = "evaluation", ...)
   if (!is.null(ret$Note)) {
@@ -1147,7 +1146,6 @@ rf_evaluation <- function(data, ...) {
 }
 
 #' wrapper for tidy type evaluation_by_class
-#' @export
 rf_evaluation_by_class <- function(data, ...) {
   tidy_rowwise(data, model, type = "evaluation_by_class", ...)
 }
@@ -1156,7 +1154,6 @@ rf_evaluation_by_class <- function(data, ...) {
 # TODO: This function should be promoted to a generic model evaluation function.
 # Generates Analytics View Summary table for ranger and rpart.
 #' wrapper for tidy type evaluation
-#' @export
 rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
   # Filter out the rows from failed models.
   # This is working depending on rowwise grouping. (Note for when we move out of it.)
@@ -1536,7 +1533,6 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
 
 #' applies SMOTE to a data frame
 #' @param target - the binary value column that becomes target of model later. can be logical, factor, character or numeric.
-#' @export
 exp_balance <- function(df,
                      target,
                      target_minority_perc = 40,
@@ -1881,7 +1877,6 @@ importance_ranger <- function(model) {
 }
 
 #' Get feature importance for multi class classification using randomForest
-#' @export
 calc_feature_imp <- function(df,
                              target,
                              ...,
@@ -2362,7 +2357,6 @@ calc_feature_imp <- function(df,
 
 #' TODO: not really for external use. hide it.
 #' TODO: use this other places doing similar thing.
-#' @export
 #' @param multi_class - TRUE when we need class and size, which we show for multiclass classification case.
 evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
   if (length(actual) != length(predicted)) {
@@ -2952,7 +2946,6 @@ calc_permutation_importance_rpart_multiclass <- function(fit, target, vars, data
   importances_df
 }
 
-#' @export
 exp_rpart <- function(df,
                       target,
                       ...,

@@ -244,7 +244,6 @@ generate_signrank_density_data <- function(stat, p.value, n, sig_level = 0.05, a
 #' @param rescale.p If TRUE, p is rescaled to sum to 1. If FALSE and p doesn't sum to 1, it causes an error.
 #' @param simulate.p.value Whether p value should be calculated by Monte Carlo simulation.
 #' @param B This works only when simulate.p.value is TRUE. The number of replicates for Monte Carlo test.
-#' @export
 do_chisq.test_ <- function(df,
                            selected_cols = c(),
                            correct = TRUE,
@@ -284,7 +283,6 @@ do_chisq.test_ <- function(df,
 #' Chi-Square test wrapper for Analytics View
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
-#' @export
 exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE,
                       test_sig_level = 0.05, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
@@ -724,7 +722,6 @@ t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alt
 
 
 #' t-test wrapper for Analytics View
-#' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
@@ -2147,7 +2144,6 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
 }
 
 #' dummy - Data frame. Since it is just ignored, it is named dummy here.
-#' @export
 exp_chisq_power <- function(dummy, rows=2, cols=2, w=0.1, sig.level=0.05, beta=0.2, n_start=10, n_end=1000, n_step=10) {
   power <- 1.0 - beta
   n = seq(n_start, n_end, by=n_step)

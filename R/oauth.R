@@ -1,6 +1,5 @@
 
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
 getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed")}
   appName = "google"
@@ -28,7 +27,6 @@ getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
 
 
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
 getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
   # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
   # not by clientID
@@ -61,7 +59,6 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
   getGoogleTokenForSheet(tokenFileId, FALSE)
 }
 
-#' @export
 getGoogleTokenForDrive <- function(tokenFileId = "", useCache=TRUE){
   appName = "google"
   # retrieve token info from environment
@@ -93,7 +90,6 @@ refreshGoogleTokenForDrive <- function(tokenFileId = ""){
   getGoogleTokenForDrive(tokenFileId = tokenFileId, FALSE)
 }
 
-#' @export
 getSalesforceToken <- function(tokenFileId = "", useCache=TRUE){
   appName = "salesforce"
   # retrieve token info from environment
@@ -126,7 +122,6 @@ getSalesforceToken <- function(tokenFileId = "", useCache=TRUE){
 
 
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
 getTwitterToken <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
   appName = "twitter"
@@ -156,7 +151,6 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
 
 
 #' tokenFileId is a unique value per data frame and is used to create a token cache file
-#' @export
 getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   # To workaround Error in the HTTP2 framing layer
@@ -187,7 +181,6 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
 }
 
 
-#' @export
 getGoogleTokenForCloudStorage <- function(useCache=TRUE){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   # To workaround Error in the HTTP2 framing layer

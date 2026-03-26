@@ -2,7 +2,6 @@
 #'
 
 #' scale wrapper that returns a vector as a result
-#' @export
 normalize <- function(x, center = TRUE, scale = TRUE) {
   if (scale && (center || (x[1] == 0)) &&
       min(x, na.rm = TRUE) == max(x, na.rm = TRUE)) {
@@ -22,7 +21,6 @@ normalize <- function(x, center = TRUE, scale = TRUE) {
 
 
 #' SE version of do_cor.kv
-#' @export
 do_cor.kv_ <- function(df,
                       subject_col,
                       key_col,
@@ -132,7 +130,6 @@ do_cor.kv_ <- function(df,
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @return correlations between pairs of columns
-#' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
                         distinct = FALSE, diag = FALSE, variable_order = "correlation",
                         return_type = "data.frame") {
@@ -278,7 +275,6 @@ tidy.cor_exploratory <- function(x, type = "cor", ...) { #TODO: add test
 #' Map dist result to k dimensions
 #' @param df Data frame which has group and dimension
 #' @return Tidy format of data frame.
-#' @export
 do_cmdscale_ <- function(df,
                          pair1_col,
                          pair2_col,
