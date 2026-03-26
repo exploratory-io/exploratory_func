@@ -1272,9 +1272,9 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   ret
 }
 
-#' @export
 #' Utility function that categorizes numeric column based on the type argument.
 #' For example, if type argument is aschar, the column value is categorized as character.
+#' @export
 categorize_numeric <- function(x, type = "asnum") {
   ret <- NULL
   switch(type,
@@ -1456,9 +1456,9 @@ extract_from_date <- function(x, type = "fltoyear") {
   ret
 }
 
-#' @export
 #' It returns Weekend if the provided date is weekend and Weekday if the provided date is weekday.
 #' @param x - Date (or POSIXct)
+#' @export
 weekend <- function(x){
   ret <- dplyr::if_else(is.na(x), NA_character_,
                         #if it's 1: Sun or 7: Sat, assume it's Weekend.
@@ -2624,8 +2624,8 @@ time_between <- function(start_date, end_date, unit = "years") {
 
 
 #' Calculates area under ROC. (AUC)
-#' @export
 #' Reference: https://blog.mbq.me/augh-roc/
+#' @export
 auroc <- function(score, bool) {
   not_na <- !(is.na(score) | is.na(bool)) # Index to filter out score-bool pairs with NA in either of them.
   bool <- bool[not_na]
