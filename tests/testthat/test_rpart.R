@@ -58,6 +58,12 @@ test_that("exp_rpart throws error with classification with only one unique value
   }, "Categorical Target Variable must have 2 or more unique values.")
 })
 
+test_that("exp_rpart prediction", {
+  model_df <- flight %>% exp_rpart(`ORIGIN STATE ABR`,`DEP DELAY`, test_rate = 0.3)
+  ret <- model_df %>% prediction(.)
+  test_ret <- model_df %>% prediction(., data = "test")
+  ret_all <- prediction_training_and_test(model_df)
+})
 
 test_that("exp_rpart() error handling for predictor with single unique value", {
   expect_error({

@@ -31,6 +31,8 @@ test_that("exp_arima with aggregation", {
   expect_true(!is.null(model_df$model))
   # test for glance.
   ret <- model_df %>% glance_rowwise(model)
+  ret <- model_df %>% glance_with_ts_metric()
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)","R Squared") %in% names(ret)))
 })
 
 test_that("exp_arima with column names including special characters with group_by." , {
@@ -42,6 +44,9 @@ test_that("exp_arima with column names including special characters with group_b
     exp_arima(`time stamp !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`, `data !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`, 10, time_unit = "day", funs.aggregate.regressors = c(mean), yearly.seasonality = "auto", weekly.seasonality = "auto", output="model")
 
   expect_equal(last(model_df$data[[1]]$`time stamp !"#$%&'()*+, -./:;<=>?@[]^_'{|}~`), as.Date("2010-01-23"))
+  # Make sure glance_with_ts_metric works with group_by including special characters, especially pipe '|' characters.
+  ret <- model_df %>% glance_with_ts_metric()
+  expect_true(all(c("RMSE","MAE","MAPE (Ratio)") %in% names(ret)))
   expect_true(!is.na(model_df$data[[1]]$forecasted_value[[length(model_df$data[[1]]$forecasted_value)]]))
 })
 

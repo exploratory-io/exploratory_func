@@ -392,7 +392,33 @@ test_that("geocode_japan_prefecture", {
   expect_equal(FALSE, any(is.na(res$latitude)))
 })
 
+test_that("city_code_japan", {
+  # Data: tibble(
+  #  x=c("Hokkaido", "Tokyo-to", "Kanagawa-ken", "Kanagawa-ken"),
+  #  y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi", "Ashigarashimo-gun Hakone-machi", "Hakone-machi"))
+  # (In all Japanese Kanji chars).
+  df <- tibble(
+    x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd", "\u795e\u5948\u5ddd\u770c", "\u795e\u5948\u5ddd\u770c"),
+    y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02", "\u8db3\u67c4\u4e0b\u90e1\u7bb1\u6839\u753a", "\u7bb1\u6839\u753a"))
+  res <- exploratory::city_code_japan(df$x, df$y)
+  expect_equal(FALSE, any(is.na(res)))
+  expect_equal("01104", res[1])
+  expect_equal("13225", res[2])
+  # It should resolve the city code from the city name with "gun".
+  expect_equal("14382", res[3])
+  # It should resolve the city code from the city name without "gun".
+  expect_equal("14382", res[4])
 
+})
+
+test_that("geocode_japan_city", {
+  # Data: tibble(x=c("Hokkaido", "Tokyo-to"), y=c("Sapporo-shi Shiraishi-ku", "Inagi-shi"))  (In all Japanese Kanji chars).
+  df <- tibble(x=c("\u5317\u6d77\u9053", "\u6771\u4eac\u90fd"), y=c("\u672d\u5e4c\u5e02\u767d\u77f3\u533a", "\u7a32\u57ce\u5e02"))
+  df$code <- exploratory::city_code_japan(df$x, df$y)
+  res <- exploratory::geocode_japan_city(df, "code")
+  expect_equal(FALSE, any(is.na(res$longitude)))
+  expect_equal(FALSE, any(is.na(res$latitude)))
+})
 
 test_that("center.pacific.ocean argument in geocode_world_country.", {
   df <- tibble(country.code=c("US"))
@@ -548,6 +574,12 @@ test_that("read_parquet_file should be to read the parquet file with an invalid 
   expect_equal(TRUE, is.data.frame(df))
 })
 
+test_that("test filter_cascade",{
+  library(stringr)
+  df <- readRDS(url("https://www.dropbox.com/s/p2vmd79ly1zugh9/airbnb_nyc_filter_7.rds?dl=1"))
+  df <- df %>% filter_cascade(detect_outlier(reviews_per_month, "iqr") == "Normal", cut(reviews_per_month, breaks = 5, dig.lab = 10) %in% c("(0.21,0.31]"))
+  expect_equal(nrow(df), 2661)
+})
 
 test_that("read_excel_files", {
   # Download the files to a local directory
@@ -561,6 +593,21 @@ test_that("read_excel_files", {
   expect_equal(colnames(df), c("id", "放送...1", "放送...2", "個人...3", "個人...4"))
 })
 
+test_that("test setConnectionPoolMode", {
+  # Save the original pool_connection value to restore later
+  original_pool_connection <- exploratory::getConnectionPoolMode()
+
+  # Test setting connection pool mode to TRUE
+  exploratory::setConnectionPoolMode(TRUE)
+  expect_true(exploratory::getConnectionPoolMode())
+
+  # Test setting connection pool mode to FALSE
+  exploratory::setConnectionPoolMode(FALSE)
+  expect_false(exploratory::getConnectionPoolMode())
+
+  # Restore the original value
+  exploratory::setConnectionPoolMode(original_pool_connection)
+})
 
 test_that("unnest_safe handles group columns with and without '|' and other edge cases", {
   # 1. No grouping columns, simple unnest
@@ -809,11 +856,79 @@ test_that("test glob_to_regex", {
   expect_false(grepl(result2, "data.xlsx"))
 })
 
+test_that("test exp_cut basic", {
+  x <- c(1, 5, 10, 15, 20, 25, 30)
+  result <- exploratory:::exp_cut(x, breaks = 5)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+  # No NAs should be produced for valid numeric input
+  expect_false(any(is.na(result)))
+})
 
+test_that("test exp_cut with custom number of breaks", {
+  x <- c(1, 5, 10, 15, 20)
+  # exp_cut expects breaks to be a single number (number of bins), not a vector
+  result <- exploratory:::exp_cut(x, breaks = 3)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+})
 
+test_that("test exp_cut edge cases", {
+  # Empty vector
+  result_empty <- exploratory:::exp_cut(numeric(0))
+  expect_equal(length(result_empty), 0)
 
+  # All same values (all zeros) - returns a single-element factor "(0,0]"
+  # because the all-zeros special case returns one factor level without replication
+  result_zeros <- exploratory:::exp_cut(c(0, 0, 0), breaks = 5)
+  expect_equal(length(result_zeros), 1)
 
+  # All same non-zero values
+  result_same <- exploratory:::exp_cut(c(5, 5, 5), breaks = 5)
+  expect_equal(length(result_same), 3)
 
+  # With NAs
+  result_na <- exploratory:::exp_cut(c(1, NA, 3, NA, 5), breaks = 3)
+  expect_equal(length(result_na), 5)
+  expect_true(is.na(result_na[2]))
+  expect_true(is.na(result_na[4]))
+})
+
+test_that("test exp_cut with range options", {
+  x <- c(1, 5, 10, 15, 20)
+
+  # With lower.range and upper.range
+  result <- exploratory:::exp_cut(x, breaks = 3, lower.range = 0, upper.range = 25, include.outside.range = TRUE)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+  # No NAs since include.outside.range is TRUE
+  expect_false(any(is.na(result)))
+
+  # With include.outside.range = FALSE
+  result2 <- exploratory:::exp_cut(x, breaks = 3, lower.range = 5, upper.range = 15, include.outside.range = FALSE)
+  expect_true(is.factor(result2))
+  # Values outside range (1, 20) should be NA
+  expect_true(is.na(result2[1]))
+  expect_true(is.na(result2[5]))
+})
+
+test_that("test exp_cut_by_step basic", {
+  x <- c(1, 5, 10, 15, 20)
+  result <- exploratory:::exp_cut_by_step(x, step = 5)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+})
+
+test_that("test exp_cut_by_step with range", {
+  x <- c(1, 5, 10, 15, 20, 25)
+
+  # With custom range and include.outside.range
+  result <- exploratory:::exp_cut_by_step(x, step = 5, lower.range = 5, upper.range = 20, include.outside.range = TRUE)
+  expect_true(is.factor(result))
+  expect_equal(length(result), length(x))
+  # All values should be assigned (no NAs) since include.outside.range is TRUE
+  expect_false(any(is.na(result)))
+})
 
 test_that("test get_refs_in_script", {
   # Simple reference - returns NULL when no outside refs are detected

@@ -138,8 +138,165 @@ test_that("test pivot with empty data frame", {
   expect_equal(ncol(df), 1)
 })
 
+test_that("exp_cut", {
+  df <- exploratory::read_delim_file("https://www.dropbox.com/s/ok8m7cpa5cw2lw3/airline_2013_10_tricky.csv?dl=1" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
+  res <- df %>% mutate(c1=exp_cut(ARR_DELAY))
+  expect_equal(class(res$c1),"factor")
+})
+
+test_that("exp_cut upper/lower range support", {
+  expect_equal(levels(exp_cut(4*1:25, breaks=5)), c("[4,23.2]"  , "(23.2,42.4]","(42.4,61.6]","(61.6,80.8]","(80.8,100]" ))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20, upper.range=80)), c( "[-Inf,20]","(20,32]"  ,"(32,44]",  "(44,56]"  ,"(56,68]",  "(68,80]"  ,"(80, Inf]"))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20, upper.range=80, include.outside.range=F)), c("[20,32]","(32,44]","(44,56]","(56,68]","(68,80]"))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20)), c("[-Inf,20]","(20,36]"  ,"(36,52]"  ,"(52,68]" , "(68,84]",  "(84,100]" ))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, lower.range=20, include.outside.range=F)), c("[20,36]" ,"(36,52]", "(52,68]", "(68,84]" ,"(84,100]"))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, upper.range=80)), c("[4,19.2]"  , "(19.2,34.4]","(34.4,49.6]","(49.6,64.8]","(64.8,80]" , "(80,Inf]" ))
+  expect_equal(levels(exp_cut(4*1:25, breaks=5, upper.range=80, include.outside.range=F)), c("[4,19.2]",   "(19.2,34.4]","(34.4,49.6]","(49.6,64.8]","(64.8,80]" ))
 
 
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5)), c("[-Inf,4]",   "(4,36]",     "(36,68]",    "(68,100]",   "(100, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20, upper.range=80)),  c("[-Inf,20]", "(20,40]" ,  "(40,60]" ,  "(60,80]",   "(80, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20, upper.range=80, include.outside.range=F)), c("[-Inf,20]", "(20,40]" ,  "(40,60]" ,  "(60,80]",   "(80, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20)), c("[-Inf,20]",   "(20,46.7]",   "(46.7,73.3]", "(73.3,100]",  "(100, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, lower.range=20, include.outside.range=F)), c("[-Inf,20]",   "(20,46.7]",   "(46.7,73.3]", "(73.3,100]",  "(100, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, upper.range=80)), c("[-Inf,4]",    "(4,29.3]",    "(29.3,54.7]", "(54.7,80]",   "(80, Inf]"))
+  expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, upper.range=80, include.outside.range=F)), c("[-Inf,4]",    "(4,29.3]",    "(29.3,54.7]", "(54.7,80]",   "(80, Inf]"))
+})
+
+test_that("_tam_cut_by_step", {
+  # Without range.
+
+  # Actual value range: 1-21
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:21, 5)), c("(-Inf,1]" ,"(1,6]"  ,  "(6,11]",   "(11,16]" , "(16,21]"  ))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, include.outside.range=F)), c("(1,6]"  , "(6,11]",  "(11,16]" ,"(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, right=F)), c("[1,6)" ,   "[6,11)" ,  "[11,16)" , "[16,21)" , "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, include.outside.range=F, right=F)), c("[1,6)" ,  "[6,11)" , "[11,16)", "[16,21)"))
+
+  # Actual value range: 1-20
+  # Step = 5
+  # The last bucket should include value 20.
+  expect_equal(levels(exp_cut_by_step(1:20, 5)), c("(-Inf,1]", "(1,6]" ,   "(6,11]"  , "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, include.outside.range=F)), c("(1,6]"  , "(6,11]",  "(11,16]" ,"(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, right=F)), c("[1,6)"  ,  "[6,11)"  , "[11,16)" , "[16,21)",  "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, include.outside.range=F, right=F)), c("[1,6)" ,  "[6,11)",  "[11,16)", "[16,21)"))
+
+  # With step less than 1.
+  # Actual value range: 1-10
+  # Step = 0.8
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8)), c("(-Inf,1]", "(1,1.8]",    "(1.8,2.6]",  "(2.6,3.4]",  "(3.4,4.2]",  "(4.2,5]",    "(5,5.8]",    "(5.8,6.6]",  "(6.6,7.4]",  "(7.4,8.2]",  "(8.2,9]",    "(9,9.8]","(9.8,10.6]" ))
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8, include.outside.range=F)), c("(1,1.8]",   "(1.8,2.6]", "(2.6,3.4]", "(3.4,4.2]", "(4.2,5]",   "(5,5.8]",   "(5.8,6.6]", "(6.6,7.4]", "(7.4,8.2]", "(8.2,9]",   "(9,9.8]","(9.8,10.6]"  ))
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8, right=F)), c( "[1,1.8)",    "[1.8,2.6)" , "[2.6,3.4)" , "[3.4,4.2)" , "[4.2,5)"  ,  "[5,5.8)" ,   "[5.8,6.6)"  ,"[6.6,7.4)" , "[7.4,8.2)" , "[8.2,9)" ,   "[9,9.8)"   , "[9.8,10.6)", "[10.6,Inf)" ))
+  expect_equal(levels(exp_cut_by_step(1:10, 0.8, include.outside.range=F, right=F)), c("[1,1.8)" ,   "[1.8,2.6)"  ,"[2.6,3.4)",  "[3.4,4.2)" , "[4.2,5)" ,   "[5,5.8)"  ,  "[5.8,6.6)" , "[6.6,7.4)" , "[7.4,8.2)" , "[8.2,9)"  ,  "[9,9.8)"  ,  "[9.8,10.6)"   ))
+
+  # With range.
+
+  # Actual value range: 1-20
+  # Range: 5-15
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15)), c("(-Inf,5]" , "(5,10]"  ,  "(10,15]" ,  "(15, Inf]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15, include.outside.range=F)), c(  "(5,10]" , "(10,15]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15, right=F)), c("[-Inf,5)" , "[5,10)"  ,  "[10,15)"  , "[15, Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 5, 15, include.outside.range=F, right=F)), c("[5,10)" , "[10,15)"))
+
+  # Actual value range: 1-20
+  # Range: 0-25
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25)), c( "(0,5]" ,  "(5,10]" , "(10,15]", "(15,20]", "(20,25]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25, include.outside.range=F)), c(  "(0,5]"  , "(5,10]",  "(10,15]", "(15,20]" ,"(20,25]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25, right=F)), c("[0,5)" ,  "[5,10)" , "[10,15)", "[15,20)", "[20,25)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 0, 25, include.outside.range=F, right=F)), c("[0,5)" ,  "[5,10)",  "[10,15)" ,"[15,20)" ,"[20,25)"))
+
+  # Actual value range: 1-21
+  # Range: 1-21
+  # Step = 5
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21)), c("(-Inf,1]", "(1,6]" ,   "(6,11]",   "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21, include.outside.range=F)), c(  "(1,6]"  , "(6,11]",  "(11,16]", "(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21, right=F)), c("[1,6)"   , "[6,11)" ,  "[11,16)",  "[16,21)" , "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:21, 5, 1, 21, include.outside.range=F, right=F)), c("[1,6)"  , "[6,11)",  "[11,16)", "[16,21)"))
+
+  # With step less than 1.
+  # Actual value range: -1 - 10
+  # Range: 0-8
+  # Step = 0.8
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8)), c( "(-Inf,0]" , "(0,0.8]"  , "(0.8,1.6]", "(1.6,2.4]", "(2.4,3.2]" ,"(3.2,4]" ,  "(4,4.8]"  , "(4.8,5.6]", "(5.6,6.4]", "(6.4,7.2]", "(7.2,8]"  , "(8, Inf]"  ))
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8, include.outside.range=F)), c(  "(0,0.8]"  , "(0.8,1.6]", "(1.6,2.4]", "(2.4,3.2]" ,"(3.2,4]" ,  "(4,4.8]"  , "(4.8,5.6]", "(5.6,6.4]" ,"(6.4,7.2]", "(7.2,8]"     ))
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8, right=F)), c("[-Inf,0)"  ,"[0,0.8)" ,  "[0.8,1.6)", "[1.6,2.4)", "[2.4,3.2)", "[3.2,4)"  , "[4,4.8)"  , "[4.8,5.6)" ,"[5.6,6.4)", "[6.4,7.2)", "[7.2,8)" ,  "[8, Inf)" ))
+  expect_equal(levels(exp_cut_by_step(-1:10, 0.8, 0, 8, include.outside.range=F, right=F)), c("[0,0.8)",   "[0.8,1.6)" ,"[1.6,2.4)", "[2.4,3.2)" ,"[3.2,4)"  , "[4,4.8)" ,  "[4.8,5.6)" ,"[5.6,6.4)", "[6.4,7.2)", "[7.2,8)"  ))
+
+  # Include infinite values.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4)), c("(-Inf,1]", "(1,5]",    "(5,9]",  "(9,13]"  ,   "(13, Inf]"))
+  # Should be the same result as above.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4, include.outside.range=F)), c("(-Inf,1]", "(1,5]",    "(5,9]", "(9,13]"  ,   "(13, Inf]"))
+
+  # Include infinite values with range.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4, 0, 8)), c("(-Inf,0]", "(0,4]",    "(4,8]",    "(8, Inf]"))
+  # Should be the same result as above.
+  expect_equal(levels(exp_cut_by_step(c(1:10,-Inf,Inf,NA, NaN), 4, 0, 8, include.outside.range=F)), c("(-Inf,0]", "(0,4]",    "(4,8]",    "(8, Inf]"))
+
+  # Edge case test with no step param.
+  expect_equal(levels(exp_cut_by_step(c())), NULL)
+  expect_equal(levels(exp_cut_by_step(c(), include.outside.range=F)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA))), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA), include.outside.range=F)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NaN))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(NaN), include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf), include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf), include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0))), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0), include.outside.range=F)), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4))), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4), include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4))), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4), include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN))), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), include.outside.range=F)), c("[-Inf, Inf]"))
+
+  # Edge case test with step param.
+  expect_equal(levels(exp_cut_by_step(c(), step=5)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(), step=5, include.outside.range=F)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA), step=5)), NULL)
+  expect_equal(levels(exp_cut_by_step(c(NA), step=5, include.outside.range=F)),NULL)
+  expect_equal(levels(exp_cut_by_step(c(NaN), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(NaN), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(Inf), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0), step=5)), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(0,0,0,0), step=5, include.outside.range=F)), c("(-0.001,0]" ,"(0,0.001]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4), step=5)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4), step=5, include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4), step=5)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(4,4,4,4,4), step=5, include.outside.range=F)), c("(3.996,4]", "(4,4.004]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), step=5)), c("[-Inf, Inf]"))
+  expect_equal(levels(exp_cut_by_step(c(-Inf, Inf, NA, NaN), step=5, include.outside.range=F)), c("[-Inf, Inf]"))
+
+  # upper range is smaller than the min data range.
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0)), c("(-Inf,1]","(1,6]",   "(6,11]",  "(11,16]", "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0, include.outside.range=F)), c("(1,6]",  "(6,11]", "(11,16]","(16,21]"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, NA, 0, include.outside.range=F, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)"))
+
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0)), c("(-10,-5]","(-5,0]" , "(0,5]"   , "(5,10]"  , "(10,15]" , "(15,20]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0, include.outside.range=F)), c("(-10,-5]","(-5,0]" , "(0,5]"   , "(5,10]"  , "(10,15]" , "(15,20]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0, right=F)), c("[-10,-5)","[-5,0)"   , "[0,5)"    , "[5,10)"   , "[10,15)"  , "[15,20)"  , "[20,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, -10, 0, include.outside.range=F, right=F)), c("[-10,-5)","[-5,0)" , "[0,5)" ,  "[5,10)" , "[10,15)", "[15,20)"  ))
+
+  # lower range is larger than the max data range.
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA)), c("(-Inf,1]" , "(1,6]" , "(6,11]" , "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA, include.outside.range=F)), c("(1,6]"   , "(6,11]"  , "(11,16]" , "(16,21]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA, right=F)), c( "[1,6)"    , "[6,11)"   , "[11,16)"  , "[16,21)"  , "[21,Inf)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, NA, include.outside.range=F, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)"))
+
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30)), c("(-Inf,1]" , "(1,6]" , "(6,11]" , "(11,16]" , "(16,21]" , "(21,26]" , "(26,31]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30, include.outside.range=F)), c("(1,6]"   , "(6,11]"  , "(11,16]" , "(16,21]" , "(21,26]" , "(26,31]" ))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)" , "[21,26)" , "[26,31)"))
+  expect_equal(levels(exp_cut_by_step(1:20, 5, 21, 30, include.outside.range=F, right=F)), c("[1,6)"   , "[6,11)"  , "[11,16)" , "[16,21)" , "[21,26)" , "[26,31)"))
+
+})
 
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
@@ -422,6 +579,43 @@ test_that("list_n", {
   expect_equal(ret, c(1, 2, 3))
 })
 
+test_that("list_extract", {
+  test_list <- list(seq(1), seq(2), seq(3))
+  def_ret <- list_extract(test_list)
+  expect_equal(def_ret, c(1, 1, 1))
+
+  # index over
+  over_ret <- list_extract(test_list, 3)
+  expect_equal(over_ret, c(NA, NA, 3))
+
+  # index minus
+  minus_ret <- list_extract(test_list, -2)
+  expect_equal(minus_ret, c(NA, 1, 2))
+
+  # index minus over
+  minus_ret <- list_extract(test_list, -5)
+  expect_equal(minus_ret, c(NA, NA, NA))
+
+  test_df_list <- list(data.frame(1), data.frame(1, second=2), data.frame(1, 2, 3))
+  def_ret <- list_extract(test_df_list)
+  expect_equal(def_ret, c(1, 1, 1))
+
+  # index over
+  over_ret <- list_extract(test_df_list, 3)
+  expect_equal(over_ret, c(NA, NA, 3))
+
+  # index minus
+  minus_ret <- list_extract(test_df_list, -2)
+  expect_equal(minus_ret, c(NA, 1, 2))
+
+  # index minus over
+  minus_ret <- list_extract(test_df_list, -5)
+  expect_equal(minus_ret, c(NA, NA, NA))
+
+  # index text
+  minus_ret <- list_extract(test_df_list, "second")
+  expect_equal(minus_ret, c(NA, 2, NA))
+})
 
 test_that("as_numeric_matrix", {
   test_df <- data.frame(
@@ -477,8 +671,68 @@ test_that("evaluate_select negative test", { # TODO: we should move out from old
   }) # Error message here is not consistent between linux ("") and others ("no column selected"). Just verifying it results in error.
 })
 
+test_that("list_to_text should return NA", {
+  test_df <- data.frame(
+    col1 = as.character(seq(10))
+  )
 
+  test_list <- replicate(10, list(replicate(5, letters[2])))
+  test_list[[1]] <- NA
+  test_list[[2]] <- character(0)
+  test_list[[3]] <- c(NA, "b")
 
+  test_df[["test_list"]] <- test_list
+  ret <- dplyr::mutate(test_df, text = list_to_text(test_list) )
+
+  expect_equal(ret[["text"]], c("NA", "", "NA, b", rep("b, b, b, b, b", 7)))
+})
+
+test_that("list_concat", {
+  list1 <- list(
+    NA,
+    NA,
+    character(0),
+    c(3, 5)
+  )
+
+  ret <- list_concat(list1, collapse = TRUE)
+  expect_equal(length(ret), 1)
+  expect_equal(ret[[1]], c(NA, NA, "3", "5"))
+})
+
+test_that("list_concat with multiple list", {
+  list1 <- list(
+    NA,
+    NA,
+    character(0),
+    c(3, 5)
+  )
+
+  list2 <- list(
+    NA,
+    c("a", "c"),
+    character(0),
+    c(6)
+  )
+
+  list3 <- list(
+    NA,
+    c(1, 3),
+    c("a", "c"),
+    c(6)
+  )
+
+  ret1 <- list_concat(list1, list2, list3, collapse = FALSE)
+  expect_equal(ret1[[1]], c(NA, NA, NA))
+  expect_equal(ret1[[2]], c(NA, "a", "c", "1", "3"))
+  expect_equal(ret1[[3]], c("a", "c"))
+  expect_equal(ret1[[4]], c(3, 5, 6, 6))
+
+  ret1_collapse <- list_concat(list1, list2, list3, collapse = TRUE)
+
+  expect_equal(length(ret1_collapse), 1)
+  expect_equal(ret1_collapse[[1]], c(NA, NA, NA, NA, "a", "c", "1", "3", "a", "c", "3", "5", "6", "6"))
+})
 
 test_that("test expand_args", {
   func <- function(..., def = "defalut"){
@@ -585,6 +839,165 @@ test_that("pivot_longer", {
   expect_true(class(df$date) == "character")
 });
 
+test_that("test pivot", {
+  set.seed(1)
+  test_df <- data.frame(
+    group = c(rep(letters[1:2], each = 50),"a"),
+    cat1 = c(letters[round(runif(100)*5)+1], NA),
+    cat2 = c(letters[round(runif(100)*3)+1], "a"),
+    cat3 = c(letters[round(runif(100)*3)+1], "a"),
+    value = c(letters[round(runif(100)*3)+1], "a"),
+    dateCol = c(rep(lubridate::ymd("2022-01-01"),101)),
+    posixctCol = c(rep(lubridate::ymd_hms("2022-01-01 00:00:00"),101)),
+    intCol = as.integer(1:101),
+    num3 = c(NA, seq(100))
+  )
+  test_df <- test_df %>% dplyr::mutate(dateCol = dplyr::case_when(cat2 == "a" ~ as.Date(NA), TRUE ~ dateCol))
+  test_df <- test_df %>% dplyr::mutate(posixctCol = dplyr::case_when(cat2 == "b" ~ as.POSIXct(NA), TRUE ~ posixctCol))
+  test_df <- test_df %>% dplyr::mutate(intCol = dplyr::case_when(cat2 == "b" ~ NA_integer_, TRUE ~ intCol))
+
+  pivoted <- pivot(test_df, row_cols=c("cat1","cat3"), col_cols=c("cat2"))
+  #pivoted <- pivot(test_df, cat1+cat3 ~ cat2)
+  expect_true("cat1" %in% colnames(pivoted))
+  expect_true("cat3" %in% colnames(pivoted))
+
+  pivoted_with_val <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2","cat3"), value = num3, fun.aggregate=mean, fill = 0)
+  expect_true(all(!is.na(pivoted_with_val)))
+
+  # add test case for fill argument is not 0 or 1.
+  pivoted_with_val2 <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2","cat3"), value = num3, fun.aggregate=mean, fill = 10)
+  expect_equal(sum(pivoted_with_val2$a_a), 152)
+
+
+  pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2", "cat3"), value = num3, fun.aggregate=mean, na.rm = FALSE)
+  expect_true(any(is.na(pivoted_with_na)))
+
+  pivoted_with_cols_sep <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2", "cat3"), value = num3, fun.aggregate=mean, na.rm = FALSE, cols_sep='-')
+  expect_true("b-a" %in% colnames(pivoted_with_cols_sep)) # make sure column names are separated by '-'.
+
+  pivoted_with_na_ratio <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2") , value = num3, fun.aggregate=na_ratio, na.rm = TRUE)
+  expect_true(any(pivoted_with_na_ratio %>% select(a,b,c,d) !=0)) # Verify that NA is detected.
+
+  pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("value"),fun.aggregate=mean, na.rm = FALSE) # test for the case where original df has value column
+  expect_true(ncol(pivoted_with_na)>1) # make sure resulting column is not the only one row.
+
+  # value column as categorical column: mode
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = get_mode, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: n_distinct
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: min
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = min, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: max
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: na_count
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: na_ratio
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: non_na_count
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = non_na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as categorical column: non_na_ratio
+  pivoted_with_categorical <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = cat3, fun.aggregate = non_na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_categorical)>1)
+
+  # value column as Date column: mode
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = get_mode, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column:median
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = median, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column:min
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = min, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column:max
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: n_distinct
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: na_count
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: na_ratio
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: non_na_count
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = non_na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as Date column: non_na_ratio
+  pivoted_with_date <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = dateCol, fun.aggregate = non_na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_date)>1)
+
+  # value column as POSIXct column: mode
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = get_mode, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: median
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = median, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: min
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = min, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: max
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = max, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: first
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = first, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: last
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = last, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: n_distinct
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = n_distinct, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: na_count
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: na_ratio
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: non_na_count
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = non_na_count, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as POSIXct column: non_na_ratio
+  pivoted_with_posixct <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = posixctCol, fun.aggregate = non_na_ratio, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_posixct)>1)
+
+  # value column as integer column
+  pivoted_with_int <- pivot(test_df, row_cols = c("cat1"), col_cols = c("cat2"), value = intCol, fun.aggregate = sum, na.rm = TRUE)
+  expect_true(nrow(pivoted_with_int)>1)
+
+})
 
 test_that("test pivot with NA", {
   test_df_na <- data.frame(
@@ -708,6 +1121,11 @@ test_that("test na_pct", {
   expect_true(ret == 40)
 })
 
+test_that("test na_ratio", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- na_ratio(data)
+  expect_true(ret == 0.4)
+})
 
 test_that("test non_na_count", {
   data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
@@ -721,6 +1139,11 @@ test_that("test non_na_pct", {
   expect_true(ret == 60)
 })
 
+test_that("test non_na_ratio", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- non_na_ratio(data)
+  expect_true(ret == 0.6)
+})
 
 test_that("test extract_from_date", {
   data <- as.Date(c("2018-01-23", "2018-01-25", NA, NA))
@@ -889,6 +1312,10 @@ test_that("test mase", {
   expect_equal(ret$`ma se`, 0.667, tolerance=0.01)
 })
 
+test_that("test true_count", {
+  ret <- true_count(c(T,T,T,F,F,NA))
+  expect_equal(ret, 3)
+})
 
 test_that("test false_count", {
   ret <- false_count(c(T,T,T,F,F,NA))
@@ -902,7 +1329,18 @@ test_that("test get_confint", {
   expect_equal(ret, c(1.959964, 2.959964, NA), tolerance=0.0001)
 })
 
+test_that("test str_clean", {
+  ret <- str_clean(c("  not a very  tidy sentence ", " dirty  text ", NA))
+  expect_equal(ret, c("not a very tidy sentence", "dirty text", NA))
+})
 
+test_that("test str_count_all", {
+  # TODO: NA handling in remove.zero = TRUE case.
+  ret <- str_count_all(c("  not a very  tidy sentence ", " dirty  text ", NA), c("very", "dirty"), remove.zero = FALSE)
+  expect_equal(ret, list(data.frame(.count=c(1,0), .pattern=c("very","dirty"), stringsAsFactors = F),
+                         data.frame(.count=c(0,1), .pattern=c("very","dirty"), stringsAsFactors = F),
+                         data.frame(.count=c(NA_integer_,NA_integer_), .pattern=c("very","dirty"), stringsAsFactors = F)))
+})
 
 test_that("test safe_slice", {
   mat <- matrix(c(1,NA,3,NA,5,6,7,8,NA), 3,3)
@@ -969,7 +1407,55 @@ test_that("excel_numeric_to_date", {
   expect_equal(res, as.Date("2036-11-21"))
 })
 
+test_that("excel_numeric_to_datetime", {
+  res <- exploratory::excel_numeric_to_datetime(42370.5, tz = "GMT")
+  expect_equal(res, as.POSIXct("2016-01-01 12:00:00",tz = "GMT"))
+  res <- exploratory::excel_numeric_to_datetime("42370.5", tz = "GMT")
+  expect_equal(res, as.POSIXct("2016-01-01 12:00:00",tz = "GMT"))
 
+})
+
+test_that("one_hot", {
+  # numeric column case
+  df <- data.frame(id = 1:4, x = c(1, 1, 2, 3))
+  res <- df %>% one_hot(x)
+  expect_equal(nrow(res), 4)
+  expect_equal(res$x_1, c(1, 1, 0, 0))
+  expect_equal(res$x_2, c(0, 0, 1, 0))
+  expect_equal(res$x_3, c(0, 0, 0, 1))
+
+  # character column case
+  df <- data.frame(id = 1:4, x = c("A", "A", "B", "C"))
+  res <- df %>% one_hot(x)
+  expect_equal(nrow(res), 4)
+  expect_equal(res$x_A, c(1, 1, 0, 0))
+  expect_equal(res$x_B, c(0, 0, 1, 0))
+  expect_equal(res$x_C, c(0, 0, 0, 1))
+
+  # long data case: same ID with multiple values should be consolidated into one row
+  # ID-0005 has three rows with values D, B, C (in that order)
+  # ID-0006 has two rows with values B and D
+  # After one-hot encoding, each ID should appear once with 1s in all their category columns
+  df <- data.frame(
+    id = c("ID-0001", "ID-0002", "ID-0003", "ID-0004", "ID-0005", "ID-0005", "ID-0005", "ID-0006", "ID-0006"),
+    category = c("A", "A", "B", "B", "D", "B", "C", "B", "D")
+  )
+  res <- df %>% one_hot(category)
+  # 9 rows consolidated to 6 unique IDs
+  expect_equal(nrow(res), 6)
+  # Check that ID-0005 has 1 in category_B, category_C, category_D and 0 in category_A
+  id_0005_row <- res[res$id == "ID-0005", ]
+  expect_equal(id_0005_row$category_B, 1)
+  expect_equal(id_0005_row$category_C, 1)
+  expect_equal(id_0005_row$category_D, 1)
+  expect_equal(id_0005_row$category_A, 0)
+  # Check that ID-0006 has 1 in category_B and category_D, 0 in category_A and category_C
+  id_0006_row <- res[res$id == "ID-0006", ]
+  expect_equal(id_0006_row$category_B, 1)
+  expect_equal(id_0006_row$category_D, 1)
+  expect_equal(id_0006_row$category_A, 0)
+  expect_equal(id_0006_row$category_C, 0)
+})
 
 test_that("get_mode", {
   # numeric column case
@@ -1030,32 +1516,136 @@ test_that("summarize_group", {
 })
 
 
+test_that("sum_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(909, 856, 1454))
+})
+
+test_that("sum_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if_ratio(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 1454/2929)) # 909/909, 856/856, 1454/2929
+})
+
+test_that("sum_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::sum_if_pct(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(100, 100, 100 * 1454/2929)) # 100 * 909/909, 100 * 856/856, 100 * 1454/2929
+})
+
+test_that("count_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
+})
+
+test_that("count_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_ratio(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 8/14)) # 11/11, 7/7, 8/14
+})
+
+test_that("count_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_pct(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(100, 100, 800/14)) # 100 *11/11, 100*7/7, 100*8/14
+})
+
+test_that("count_unique_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique_if(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(10, 4, 4))
+})
+
+test_that("count_unique_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique_if_ratio(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 4/9)) # 10/10, 4/4, 4/9
+})
+
+test_that("count_unique_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique_if_pct(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(100, 100, 100 * 4/9)) # 10/10, 4/4, 4/9
+})
+
+test_that("count_rows", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_rows())
+  expect_equal(df %>% dplyr::pull(custom), c(11, 7, 14))
+})
+
+test_that("count_unique", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_unique(hp))
+  expect_equal(df %>% dplyr::pull(custom), c(10, 4, 9))
+})
+
+test_that("average_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::average_if(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 182))
+})
+
+test_that("average_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::average_if_ratio(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(1, 1, 0.87))
+})
+
+test_that("average_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::average_if_pct(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=0)) %>% dplyr::pull(custom), c(100, 100, 87))
+})
+
+test_that("mean_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% mutate(custom = round(custom)) %>% dplyr::pull(custom), c(83, 122, 182))
+})
+
+test_that("mean_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if_ratio(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(1, 1, 0.87))
+})
+
+test_that("mean_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::mean_if_pct(hp, mpg > 15, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=0)) %>% dplyr::pull(custom), c(100, 100, 87))
+})
+
+test_that("median_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if(hp, mpg > 15, gear > 3))
+  expect_equal(df %>% dplyr::pull(custom), c(78.5, 123.0, 264))
+})
+
+test_that("median_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if_ratio(hp, mpg > 15, gear > 3))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(0.86, 1.12, 1.37))
+})
+
+test_that("median_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::median_if_pct(hp, mpg > 15, gear > 3))
+  expect_equal(df %>% mutate(custom = round(custom, digit=0)) %>% dplyr::pull(custom), c(86, 112, 137))
+})
 
 
+test_that("min_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::min_if(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(52, 105, 150))
+})
 
+test_that("min_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::min_if_ratio(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 1))
+})
 
+test_that("min_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::min_if_pct(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(100, 100, 100))
+})
 
+test_that("max_if", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% dplyr::pull(custom), c(113, 175, 264))
+})
 
+test_that("max_if_ratio", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if_ratio(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=2)) %>% dplyr::pull(custom), c(1, 1, 0.79))
+})
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+test_that("max_if_pct", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::max_if_pct(hp, mpg > 15, gear > 2, na.rm = T))
+  expect_equal(df %>% mutate(custom = round(custom, digit=0)) %>% dplyr::pull(custom), c(100, 100, 79))
+})
 
 test_that("summarize_row", {
  df <- airquality %>% mutate(total = summarize_row(across(where(is.numeric)), mean, na.rm=TRUE))
@@ -1065,6 +1655,15 @@ test_that("summarize_row", {
  expect_equal(colnames(df), c("Ozone", "Solar.R", "Wind", "Temp", "Month", "Day", "total"))
 })
 
+test_that("revert_factor_cols_to_logical", {
+  df <- data.frame(col1 = I(factor(c(TRUE, FALSE, NA))),
+                   col2 = I(forcats::fct_rev(factor(c(TRUE,FALSE,NA)))),
+                   col3 = I(factor(c("A","B","C"))))
+
+  res <- revert_factor_cols_to_logical(df)
+  expect_equal(res$col1, c(TRUE, FALSE, NA))
+  expect_equal(res$col2, c(TRUE, FALSE, NA))
+})
 
 test_that("is_integer", {
   expect_true(exploratory:::is_integer(c(0,1,2,3,4,5)))
@@ -1078,10 +1677,22 @@ test_that("week", {
   expect_equal(exploratory::week(dates, unit="month"), c(1,1,2,5,1,1,2,1,1,2,5,1,1,2,5))
 })
 
+test_that("confint_mean", {
+  # confint_radius is the base implementation.
+  v <- 1:100
+  expect_equal(exploratory::confint_radius(v), exploratory::confint_mean(v))
+})
+
 test_that("calc_confint_mean", {
   # confint_radius is the base implementation.
   v <- 1:100
   expect_equal(exploratory::confint_radius(v), exploratory::calc_confint_mean(sd(v), length(v)))
+})
+
+test_that("confint_ratio", {
+  # prop_confint_radius is the base implementation.
+  v <- 1:100 %% 3 ==0
+  expect_equal(exploratory::prop_confint_radius(v), exploratory::confint_ratio(v))
 })
 
 test_that("calc_confint_ratio", {
@@ -1107,6 +1718,10 @@ test_that("mutate_predictors", {
   expect_true(all(c("x", "t_mon", "t_wday", "t_week_of_quarter", "y", "z", "w") %in% colnames(res)))
 })
 
+test_that("cumsum_decayed", {
+  res <- cumsum_decayed(c(1,1,1,1), 0.5)
+  expect_equal(res, c(1, 1.5, 1.75, 1.875))
+})
 
 test_that("auroc", {
   res <- auroc(c(0.1, 0.2, 0.3, 0.4), c(F, T, F, T))
@@ -1131,13 +1746,51 @@ test_that("merge_sds", {
   expect_equal(sd1, sd2)
 })
 
+test_that("years_between", {
+  age <- years_between(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd_hms("2001-01-01 13:00:00"))
+  expect_equal(age, 1)
+})
 
+test_that("months_between", {
+  age <- months_between(lubridate::ymd("2000-01-01"), lubridate::ymd("2001-01-01"))
+  expect_equal(age, 12)
+})
 
+test_that("weeks_between", {
+  age <- weeks_between(lubridate::ymd("2000-01-01"), lubridate::ymd("2001-01-01"))
+  expect_equal(age, 52.2857142857143)
+})
 
+test_that("days_between", {
+  age <- days_between(lubridate::ymd("2000-01-01"), lubridate::ymd("2001-01-01"))
+  expect_equal(age, 366)
+})
 
+test_that("hours_between", {
+  age <- hours_between(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd_hms("2000-01-01 19:30:00"))
+  expect_equal(age, 6.5)
+})
 
+test_that("minutes_between", {
+  age <- minutes_between(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd_hms("2000-01-01 14:30:00"))
+  expect_equal(age, 90)
+})
 
+test_that("seconds_between", {
+  age <- seconds_between(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd_hms("2000-01-01 13:10:00"))
+  expect_equal(age, 600)
+})
 
+test_that("last_date", {
+  res <- last_date(lubridate::ymd("2000-01-01"))
+  expect_equal(res, lubridate::ymd("2000-01-31"))
+  res <- last_date(lubridate::ymd_hms("2000-01-01 1:00:00"))
+  expect_equal(res, lubridate::ymd_hms("2000-01-31 00:00:00"))
+  res <- last_date(lubridate::ymd("2000-01-01"), previous = TRUE)
+  expect_equal(res, lubridate::ymd("1999-12-31"))
+  res <- last_date(lubridate::ymd_hms("2000-01-01 1:00:00"), previous = TRUE)
+  expect_equal(res, lubridate::ymd_hms("1999-12-31 00:00:00"))
+})
 
 test_that("ts_lag", {
   t <- as.Date(c("2020-01-01", "2021-01-01", "2021-01-08", "2021-02-01"))
@@ -1203,7 +1856,192 @@ test_that("ts_diff_ratio", {
   expect_equal(res, c(NA, 1, 2, 1/3))
 })
 
+test_that("is_japanese_holiday", {
+  current_option <- getOption("lubridate.week.start")
+  # reset the week stat day to Monday (1) to test the fix
+  options(lubridate.week.start = 1)
+  expect_equal(exploratory::is_japanese_holiday("2019-10-14"), TRUE)
+  expect_equal(exploratory::is_japanese_holiday("2019-10-08"), FALSE)
+  expect_equal(exploratory::is_japanese_holiday(c("2019-10-14", "2019-10-08", NA)), c(TRUE, FALSE, FALSE))
 
+  # Make sure the option is not reset by exploratory::is_japanese_holiday
+  expect_equal(getOption("lubridate.week.start"),1)
+  # reset
+  options(lubridate.week.start = current_option)
+})
+
+test_that("mutate_group", {
+  library(lubridate)
+  df <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), mpg_cummean = cummean(mpg), mpg_cumsum = cumsum(mpg))
+  expect_equal(head(df)$mpg_cummean[[1]],22.8)
+  expect_equal(head(df)$mpg_cummean[[2]],23.6)
+  expect_equal(head(df)$cyl[[1]], 4) # cyl is sorted so first line should be 4
+  expect_equal(head(df)$mpg_int10[[1]], 20) # mpg_int10 is sorted so first line should be 20
+  expect_equal(head(df, 12)$cyl[[12]], 6) # cyl is sorted and next group (6) starts from line 12
+  expect_equal(head(df, 12)$mpg_int10[[12]], 10) # mpg_int10 is sorted and the value for the line 12 is 10
+  expect_equal(head(df)$mpg_cumsum[[1]],22.8)
+  expect_equal(head(df)$mpg_cumsum[[2]],47.2)
+  df2 <- mtcars %>% exploratory::mutate_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), wt_cummean = cummean(wt), wt_cumsum = cumsum(wt))
+  expect_equal(head(df2)$wt_cummean[[1]],2.32)
+  print(head(df2)$wt_cummean[[2]])
+  expect_equal(round(head(df2)$wt_cummean[[2]], digits = 2) ,2.76)
+  expect_equal(head(df2)$wt_cumsum[[1]],2.32)
+  expect_equal(head(df2)$wt_cumsum[[2]],5.51)
+  tmp <- tempfile(fileext = ".parquet")
+  empDF <- exploratory::read_parquet_file("https://www.dropbox.com/s/n0jkv4wu9dpb4se/Employee_Data_win_calc.parquet?dl=1")
+
+    # group by Date - floor to year
+  df3 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_year` = "hired_date"),group_funs = c("rtoyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df3)$hired_date_year[[1]], as.Date("1976-01-01"))
+  expect_equal(head(df3)$salary_cumsum[[3]], 13872)
+
+    # group by Date - floor to half year
+  df4 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_halfyear` = "hired_date"),group_funs = c("rtohalfyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df4)$hired_date_halfyear[[1]], as.Date("1976-07-01"))
+  expect_equal(head(df4)$salary_cumsum[[3]], 10169)
+
+  # group by Date - floor to quarter
+  df5 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_q` = "hired_date"),group_funs = c("rtoq"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df5)$hired_date_q[[2]], as.Date("1977-04-01"))
+  expect_equal(head(df5)$salary_cumsum[[4]], 13872)
+
+    # group by Date - floor to bi-month
+  df6 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_bimon` = "hired_date"),group_funs = c("rtobimon"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df6)$hired_date_bimon[[2]], as.Date("1977-05-01"))
+  expect_equal(head(df6)$salary_cumsum[[5]], 19586)
+
+  # group by Date - floor to month
+  df7 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_mon` = "hired_date"),group_funs = c("rtomon"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df7)$hired_date_mon[[2]], as.Date("1977-06-01"))
+  expect_equal(head(df7)$salary_cumsum[[6]], 19045)
+
+  # group by Date - floor to week
+  df8 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("rtoweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df8)$hired_date_week[[2]], as.Date("1977-06-12"))
+  expect_equal(head(df8,7)$salary_cumsum[[7]], 16856)
+
+  # group by Date - floor to day
+  df9 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_day` = "hired_date"),group_funs = c("rtoday"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df9)$hired_date_day[[2]], as.Date("1977-06-13"))
+  expect_equal(head(df9)$salary_cumsum[[3]], 10169)
+
+  # group by Date - extract year
+  df10 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_year` = "hired_date"),group_funs = c("year"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df10)$hired_date_year[[1]], 1976)
+  expect_equal(head(df10)$salary_cumsum[[1]], 19246)
+
+  # group by Date - extract half year
+  df11 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_halfyear` = "hired_date"),group_funs = c("halfyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df11)$hired_date_halfyear[[1]], 1)
+  expect_equal(head(df11)$salary_cumsum[[1]], 2090)
+
+  # group by Date - extract quarter
+  df12 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_quarter` = "hired_date"),group_funs = c("quarter"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df12)$hired_date_quarter[[1]], 1)
+  expect_equal(head(df12)$salary_cumsum[[1]], 2909)
+
+  # group by Date - extract bi-month
+  df13 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_bimon` = "hired_date"),group_funs = c("bimon"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df13)$hired_date_bimon[[2]], 1)
+  expect_equal(head(df13)$salary_cumsum[[1]], 2909)
+
+  # group by Date - extract month (number)
+  df14 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_mon` = "hired_date"),group_funs = c("mon"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df14)$hired_date_mon[[2]], 1)
+  expect_equal(head(df14)$salary_cumsum[[1]], 2426)
+
+  # group by Date - extract month name (short)
+  df15 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monname` = "hired_date"),group_funs = c("monname"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df15)$hired_date_monname[[2]]), "Jan")
+  expect_equal(head(df15)$salary_cumsum[[1]], 2426)
+
+  # group by Date - extract month name (long)
+  df16 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monnamelong` = "hired_date"),group_funs = c("monnamelong"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df16)$hired_date_monnamelong[[2]]), "January")
+  expect_equal(head(df16)$salary_cumsum[[1]], 2426)
+
+  # group by Date - extract month name (year and month)
+  df16b <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_monthname_with_year` = "hired_date"),group_funs = c("monthname_with_year"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df16b)$hired_date_monthname_with_year[[2]]), "1977-06")
+  expect_equal(head(df16b)$salary_cumsum[[1]], 19246)
+
+  # group by Date - extract week
+  df17 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week` = "hired_date"),group_funs = c("week"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df17)$hired_date_week[[2]], 1)
+  expect_equal(head(df17)$salary_cumsum[[3]], 31304)
+
+  # group by Date - extract week (Starts from Sun)
+  df18 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_epiweek` = "hired_date"),group_funs = c("epiweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df18)$hired_date_epiweek[[2]], 1)
+  expect_equal(head(df18)$salary_cumsum[[3]], 21246)
+
+  # group by Date - extract week (Starts from Mon)
+  df19 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_isoweek` = "hired_date"),group_funs = c("isoweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df19)$hired_date_isoweek[[2]], 1)
+  expect_equal(head(df19)$salary_cumsum[[3]], 31304)
+
+  # group by Date - extract week of quarter
+  df19 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week_of_quarter` = "hired_date"),group_funs = c("week_of_quarter"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df19)$hired_date_week_of_quarter[[2]], 1)
+  expect_equal(head(df19)$salary_cumsum[[3]], 15048)
+
+  # group by Date - extract week of Month
+  df20 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_week_of_month` = "hired_date"),group_funs = c("week_of_month"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df20)$hired_date_week_of_month[[2]], 1)
+  expect_equal(head(df20)$salary_cumsum[[3]], 15505)
+
+  # group by Date - extract day of year
+  df21 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofyera` = "hired_date"),group_funs = c("dayofyear"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df21)$hired_date_dayofyera[[2]], 1)
+  expect_equal(head(df21)$salary_cumsum[[3]], 5484)
+
+  # group by Date - extract day of quarter
+  df22 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofquarter` = "hired_date"),group_funs = c("dayofquarter"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df22)$hired_date_dayofquarter[[2]], 1)
+  expect_equal(head(df22)$salary_cumsum[[3]], 14385)
+
+  # group by Date - extract day of month
+  df23 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_day` = "hired_date"),group_funs = c("day"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df23)$hired_date_day[[2]], 1)
+  expect_equal(head(df23)$salary_cumsum[[3]], 22548)
+
+  # group by Date - extract day of week
+  df24 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_dayofweek` = "hired_date"),group_funs = c("dayofweek"),salary_cumsum = cumsum(salary))
+  expect_equal(head(df24)$hired_date_dayofweek[[2]], 1)
+  expect_equal(head(df24)$salary_cumsum[[3]], 8399)
+
+  # group by Date - extract week day
+  df25 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wday` = "hired_date"),group_funs = c("wday"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df25)$hired_date_wday[[2]]), "Sun")
+  expect_equal(head(df25)$salary_cumsum[[3]], 8399)
+
+  # group by Date - extract week day
+  df26 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_wdaylong` = "hired_date"),group_funs = c("wdaylong"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df26)$hired_date_wdaylong[[2]]), "Sunday")
+  expect_equal(head(df26)$salary_cumsum[[3]], 8399)
+
+  # group by Date - extract weekend
+  df27 <- empDF %>% exploratory::mutate_group(group_cols = c(`hired_date_weekend` = "hired_date"),group_funs = c("weekend"),salary_cumsum = cumsum(salary))
+  expect_equal(as.character(head(df27)$hired_date_weekend[[2]]), "Weekday")
+  expect_equal(head(df27)$salary_cumsum[[3]], 13213)
+
+  # group by job and sort by hired_date (asc)
+  df28 <- empDF %>% exploratory::mutate_group(group_cols = c("job"), group_funs = c("none"), sort_cols = c("hired_date"), sort_funs = c("none"), salary_cumsum = cumsum(salary))
+  expect_equal(df28$salary_cumsum[[1]], 10312) # since this is cumsum, row 1 is the first value for the group "health care"
+  expect_equal(df28$salary_cumsum[[131]], 986268) # since this is cumsum, row 131 is the total value for the group "health care"
+
+  # group by job and sort by hired_date (desc)
+  df29 <- empDF %>% exploratory::mutate_group(group_cols = c("job"), group_funs = c("none"), sort_cols = c("hired_date"), sort_funs = c("desc"), salary_cumsum = cumsum(salary))
+  expect_equal(df29$salary_cumsum[[1]], 5538) # since this is cumsum, row 1 is the first value for the group "health care" and this must be different from df28 case.
+  expect_equal(df29$salary_cumsum[[131]], 986268) # since this is cumsum, row 131 is the max value for the group "health care" and this must be same as df28 case.
+
+  # without group by, just sort by hired_date (desc)
+  df30 <- empDF %>% exploratory::mutate_group(sort_cols = c("hired_date"), sort_funs = c("desc"), salary_cumsum = cumsum(salary))
+  expect_equal(df30$salary_cumsum[[1]], 12504) # since this is cumsum without group by, row 1 value must be different from df29 case.
+  expect_equal(df30$salary_cumsum[[131]], 681061) # since this is cumsum without group by, row 131 value must be different from df29 case.
+
+
+})
 
 
 test_that("recode and recode_factor", {
@@ -1244,6 +2082,18 @@ test_that("recode and recode_factor", {
   expect_equal(levels(test.df.result$text), c("abc", "xyz", "b"))
 })
 
+test_that("separate_japanese_address", {
+  #  Address 1. Tokyo-To Shinjuku-ku Hyakunin-cho 1-2
+  #  Address 2. Tokyo-To Shibuya-ku Shoto 2-3
+  df <- data.frame(address2 = c("\u6771\u4EAC\u90FD\u65B0\u5BBF\u533A\u767E\u4EBA\u753A\u0031\u002D\u0032", "\u6771\u4EAC\u90FD\u6E0B\u8C37\u533A\u677E\u6FE4\u0032\u002D\u0033"))
+  df2 <- exploratory::separate_japanese_address(df, address2, prefecture_col = "TODOFUKEN", city_col = "SHIKUCHOSON", street_col = "BANCHI")
+  # The prefecure is Tokyo for both first line and second line.
+  # The city for the first line is Shinjuku-ku and the city for the second line is Shibuya-ku
+  # The street for the fist line is Hyakunin-cho 1-2 and the street for the second line is Shoto 2-3.
+  check <- df2 %>% dplyr::select(-address2)
+  answer <- tibble::tibble(TODOFUKEN = c("\u6771\u4EAC\u90FD", "\u6771\u4EAC\u90FD"),  SHIKUCHOSON = c("\u65B0\u5BBF\u533A", "\u6E0B\u8C37\u533A"), BANCHI = c("\u767E\u4EBA\u753A\u0031\u002D\u0032", "\u677E\u6FE4\u0032\u002D\u0033"))
+  expect_true(isTRUE(all.equal(check, answer)), TRUE)
+})
 
 test_that("format_cut_output function", {
   x <- cut(c(1,2,3,4,5), breaks=3, dig.lab=10)
@@ -1274,6 +2124,33 @@ test_that("construct_new_labels function.", {
 
 })
 
+test_that("likert_sigma", {
+  res <- likert_sigma(c(rep(1,13),rep(2,43),rep(3,21),rep(4,13),rep(5,10),rep(NA_integer_, 5)))
+  # Values from the original 1932 paper - https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
+  expected <- c(rep(-1.6272701,13),rep(-0.4252946,43),rep(0.4322558,21),rep(0.9857673,13),rep(1.7549833,10),rep(NA_real_, 5))
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Case where input does not start with 1.
+  res <- likert_sigma(c(5, 4, 3, 5))
+  expected <- c(0.7978846, -0.3246628, -1.2711063, 0.7978846)
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Work with factor.
+  res <- likert_sigma(factor(c("e","d","c","e"), levels=c("a","b","c","d","e")))
+  expected <- c(0.7978846, -0.3246628, -1.2711063, 0.7978846)
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Work with logical
+  res <- likert_sigma(c(TRUE, FALSE, TRUE))
+  expected <- c(0.5453997, -1.0907993, 0.5453997)
+  expect_equal(res, expected, tolerance=1e-7)
+
+  # Test the case where ratios happens to not add up to exactly 1 due to precision.
+  df <- exploratory::read_delim_file("https://www.dropbox.com/s/ok8m7cpa5cw2lw3/airline_2013_10_tricky.csv?dl=1" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE) %>%
+    filter(`DAY OF MONTH`>3)
+  res <- df %>% mutate(sigma=likert_sigma(`DAY OF MONTH`))
+  expect_true(all(!is.na(res$sigma))) # The output should not have NAs caused by precision issue.
+})
 
 test_that("renamne_with", {
   df <- mtcars;
@@ -1362,6 +2239,16 @@ test_that("between", {
 
 })
 
+test_that("extract_numeric", {
+  # Make sure it works for cases even tidyr::extract_numeric doesn't work.
+  x <- c('Bytedance $75 2017-04-07 AI',
+         'Didi Chuxing $56 2014-12-31 Auto & Transportation',
+         'Stripe $36 2014-01-23 Finance',
+         'SpaceX $33.3 2012-12-01 Other')
+  expected <- c(75, 56, 36, 33.3)
+  actual <- exploratory::extract_numeric(x)
+  expect_equal(actual, expected)
+})
 
 test_that("to_same_type", {
   # factor
@@ -1428,6 +2315,18 @@ test_that("excel_numeric_to_date", {
   expect_equal(result3, as.Date("2023-01-01"))
 })
 
+test_that("excel_numeric_to_datetime", {
+  skip_if_not_installed("openxlsx")
+  # 44927.5 should be 2023-01-01 12:00:00
+  result <- excel_numeric_to_datetime(44927.5, tz = "UTC")
+  expect_true(inherits(result, "POSIXct"))
+  expect_equal(as.Date(result), as.Date("2023-01-01"))
+  expect_equal(lubridate::hour(result), 12)
+
+  # Integer input should also work
+  result2 <- excel_numeric_to_datetime(44927L, tz = "UTC")
+  expect_true(inherits(result2, "POSIXct"))
+})
 
 test_that("confint_radius", {
   set.seed(42)
@@ -1529,8 +2428,68 @@ test_that("get_optimized_score", {
   expect_error(exploratory:::get_optimized_score(actual_val, pred_prob, threshold = "invalid"))
 })
 
+test_that("extract_numeric supplementary edge cases", {
+  # NA handling
+  result_na <- exploratory::extract_numeric(NA_character_)
+  expect_true(is.na(result_na))
 
+  # negative numbers
+  result_neg <- exploratory::extract_numeric("-42.5 degrees")
+  expect_equal(result_neg, -42.5)
 
+  # no numbers in string
+  result_none <- exploratory::extract_numeric("no numbers here")
+  expect_true(is.na(result_none))
+
+  # multiple numbers - should extract first
+  result_multi <- exploratory::extract_numeric("price $12.99 qty 3")
+  expect_equal(result_multi, 12.99)
+})
+
+test_that("separate_japanese_address", {
+  skip_if_not_installed("zipangu")
+  df <- data.frame(
+    id = 1:2,
+    address = c(
+      "\u6771\u4eac\u90fd\u5343\u4ee3\u7530\u533a\u4e38\u306e\u5185\u4e00\u4e01\u76ee",
+      "\u5927\u962a\u5e9c\u5927\u962a\u5e02\u5317\u533a\u4e2d\u4e4b\u5cf6"
+    ),
+    stringsAsFactors = FALSE
+  )
+  result <- separate_japanese_address(df, address)
+  expect_true("prefecture" %in% names(result))
+  expect_true("city" %in% names(result))
+  expect_true("street" %in% names(result))
+  expect_equal(nrow(result), 2)
+  # original columns should be preserved
+  expect_true("id" %in% names(result))
+  expect_true("address" %in% names(result))
+})
+
+test_that("likert_sigma", {
+  # simple Likert scale 1-5
+  x <- c(1, 2, 3, 4, 5, 1, 2, 3, 4, 5)
+  result <- likert_sigma(x)
+  expect_equal(length(result), length(x))
+  # symmetric input should produce symmetric sigma values
+  # values mapped from the same input should be equal
+  expect_equal(result[1], result[6])
+  expect_equal(result[2], result[7])
+  # no NAs in output for non-NA input
+  expect_false(any(is.na(result)))
+
+  # with NA values
+  x_na <- c(1, 2, NA, 4, 5)
+  result_na <- likert_sigma(x_na)
+  expect_true(is.na(result_na[3]))
+  expect_false(is.na(result_na[1]))
+
+  # factor input
+  x_factor <- factor(c("low", "mid", "high", "low", "mid"), levels = c("low", "mid", "high"))
+  result_factor <- likert_sigma(x_factor)
+  expect_equal(length(result_factor), length(x_factor))
+  expect_false(any(is.na(result_factor)))
+})
 
 test_that("unixtime_to_datetime", {
   # epoch 0 should be 1970-01-01 00:00:00 GMT

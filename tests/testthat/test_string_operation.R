@@ -6,6 +6,11 @@ test_df_small <- data.frame(input = c("Hello world!", "This is a data frame for 
 test_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
 test_df <- test_df %>% rename(input=text) # Rename so that it has same column name as test_df_small.
 
+test_that("is_stopword", {
+  test_vec <- c("the", "yourself", "Test", "test")
+  result <- is_stopword(test_vec, exclude = "the", include = "Test")
+  expect_equal(result, c(FALSE, TRUE, TRUE, FALSE))
+})
 
 test_that("check languages", {
   languages <- c(
@@ -43,6 +48,11 @@ test_that("is_digit", {
   expect_equal(result, c(F, T, F, F, F))
 })
 
+test_that("is_alphabet", {
+  test_vec <- c("the", "333", "T est", "1.23", "22_22")
+  result <- is_alphabet(test_vec)
+  expect_equal(result, c(T, F, F, F, F))
+})
 
 test_that("test get_stopwords", {
   result <- get_stopwords()
@@ -55,35 +65,294 @@ test_that("test get_stopwords", {
 
 
 
+test_that("test word_to_sentiment", {
+  result <- word_to_sentiment("good")
+  expect_equal(result, "positive")
+})
+
+test_that("test word_to_sentiment", {
+  result <- word_to_sentiment("bad", lexicon = "AFINN")
+  expect_equal(result, -3)
+})
+
+test_that("test word_to_sentiment to groupd_df", {
+  # this is added because this function was once very slow for grouped data
+  # see https://github.com/exploratory-io/exploratory_func/pull/106 for details
+  df <- data.frame(
+    text = c("good", "sad", letters[1:(10000 * 3 - 2)]),
+    group = rep(seq(10000), 3),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- df %>%
+    dplyr::group_by(group) %>%
+    dplyr::mutate(sent = word_to_sentiment(text))
+  expect_true(is.character(ret[["sent"]]))
+})
+
+test_that("do_tokenize with tokenize_tweets=TRUE and with_sentence_id=TRUE", {
+  result <- test_df %>%
+    do_tokenize(input, tokenize_tweets=T, with_sentence_id=T)
+  expect_equal(colnames(result), c("document_id", "sentence_id", "token"))
+})
+
+test_that("do_tokenize with tokenize_tweets=TRUE and with_sentence_id=FALSE", {
+  result <- test_df %>%
+    do_tokenize(input, tokenize_tweets=T, with_sentence_id=F)
+  expect_equal(colnames(result), c("document_id", "token"))
+})
+
+test_that("do_tokenize with with_sentence_id=FALSE", {
+  result <- test_df %>%
+    do_tokenize(input, with_sentence_id=F)
+  expect_equal(colnames(result), c("document_id", "token"))
+})
+
+test_that("do_tokenize with drop=FALSE", {
+  result <- test_df %>%
+    do_tokenize(input, drop=F)
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+  expect_equal(ncol(result), 4)
+})
+
+test_that("do_tokenize with compound_tokens", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, compound_tokens=c("Hello world", "data frame"))
+  expect_equal(c("hello world", "data frame") %in% result$token, c(T, T))
+})
+
+test_that("do_tokenize with Japanese stopwords", {
+  test_df <- data.frame(
+    input = c('\u9ce5\u304c\u98DB\u3076'), # Tori-ga-tobu - Bird flies
+    hiragana_word_length_to_remove = 0) # To really test the default stopwords, removal of short hiragane has to be disabled.
+  result <- test_df %>%
+    do_tokenize(input, stopwords_lang="japanese")
+  expect_equal(c('\u9ce5','\u98DB\u3076'), # 'Tori', 'tobu' - Stop word 'ga' should be removed.
+               result$token)
+})
+
+test_that("do_tokenize with stopwords and stopwords_to_remove", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, stopwords_lang="english", stopwords=c("World"), stopwords_to_remove=c("is", "hello"))
+  expect_equal(c("is", "hello") %in% result$token, c(T, T))
+  expect_equal(c("world") %in% result$token, c(F))
+})
 
 
+test_that("do_tokenize with keep_cols = TRUE", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, keep_cols = TRUE, drop = TRUE)
+  expect_equal(result$token[[1]], "hello")
+  expect_equal(ncol(result), 4)
+})
 
+test_that("do_tokenize with keep_cols = TRUE with sentences", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, token = "sentences", keep_cols = TRUE)
+  expect_equal(result$token[[1]], "Hello world!")
+  expect_equal(ncol(result), 4)
+})
 
+test_that("do_tokenize_icu with keep_cols = TRUE with sentences", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize_icu(input, drop=FALSE, token = "word", keep_cols = TRUE)
+  expect_equal(result$token[[1]], "hello")
+  expect_equal(ncol(result), 5)
+})
 
+test_that("do_tokenize_icu with summary_level = all", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence. Hello Hello!"),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize_icu(input, drop=TRUE, token = "word", keep_cols = FALSE, summary_level = "all", with_id = FALSE, sort_by = "count")
+  #  token   count
+  #  <chr>   <int>
+  #1 hello       3
+  #2 is          2
+  #3 this        2
+  #4 a           1
+  #5 data        1
+  #6 for         1
+  #7 frame       1
+  #8 second      1
+  #9 sentenc     1
+  #10 test       1
+  #11 world      1
+  expect_equal(result$token[[1]], "hello")
+  expect_equal(result$count[[1]], 3)
+  expect_equal(nrow(result), 11)
+})
 
+test_that("do_tokenize with URLs and twitter social tags", {
+  test_df <- data.frame(
+    input = c("@ExploratoryData and #rstats see: https://cran.r-project.org \uff10\uff11\uff12")) # With test to strip full-width number.
+  result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE, remove_url = FALSE, remove_twitter = FALSE)
+  expect_equal(result$token, c( "exploratorydata", "and", "rstats", "see", "https", "cran.r", "project.org"))
+  result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE)
+  expect_equal(result$token, c("exploratorydata", "and", "rstats","see"))
+  result <- test_df %>% do_tokenize(input) # By default, tokenize_words rather than tokenize_tweets is used for speed.
+  expect_equal(result$token, c("exploratorydata", "and", "rstats", "see"))
+})
 
+test_that("do_tokenize with remove_numbers", {
+  test_df <- data.frame(
+    input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = TRUE)
+  expect_equal(result$token[[1]], "aaa")
+  expect_equal(result$token[[2]], "12aabb33")
+})
 
+test_that("do_tokenize with remove_alphabets", {
+  test_df <- data.frame(
+    input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = FALSE, remove_alphabets = TRUE)
+  expect_equal(result$token[[1]], "12345")
+  expect_equal(result$token[[2]], "12aabb33")
+})
 
+test_that("do_tokenize with both remove_numbers and remove_alphabets", {
+  test_df <- data.frame(
+    input = c("\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF 12345 aaa", "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF 12aabb33", "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF 123456 34567 88999"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = TRUE, remove_alphabet = TRUE)
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+  expect_equal(result$token[[2]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+})
 
+test_that("do_tokenize with remove_punct", {
+  test_df <- data.frame(
+    input = c("#1 )*^%$ 2345 ^&*()", ":;:+-][", "00:01:00"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_punct = FALSE, remove_numbers = FALSE)
+  expect_equal(result$token[[1]], "#")
+})
 
+test_that("do_tokenize with token=words", {
+  result <- test_df %>%
+    do_tokenize(input, token="words", keep_cols = TRUE)
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+  expect_equal(ncol(result), 6)
+})
 
+test_that("do_tokenize when names conflict", {
+  df <- test_df
+  df$document_id <- seq(nrow(df))
+  result <- df %>%
+    do_tokenize(input, token="words", keep_cols = TRUE)
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+  expect_equal(ncol(result), 6)
+  expect_equal(colnames(result)[[1]],"document_id") # If document_id is in the input, it is overwritten.
+})
 
+test_that("do_tokenize with token=sentence", {
+  result <- test_df %>%
+    do_tokenize(input, token="sentences")
+  expect_equal(ncol(result), 2)
+})
 
+test_that("do_tokenize with token=sentence (with content check)", {
+  result <- test_df_small %>%
+    do_tokenize(input, token="sentences")
+  expect_equal(result$token[[1]], "Hello world!")
+  expect_equal(ncol(result), 2)
+})
 
+test_that("do_tokenize should work with output", {
+  result <- test_df %>%
+    do_tokenize(input, output="sentence", token="sentences")
+  expect_equal(ncol(result), 2)
+})
 
+test_that("do_tokenize should work with output (with content check)", {
+  result <- test_df_small %>%
+    do_tokenize(input, output="sentence", token="sentences")
+  expect_equal(result$sentence[[2]], "This is a data frame for test.")
+})
 
+test_that("do_tfidf", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2), 5))
+  test_df["doc id"] <- rep(c(1,2), 5)
+  test_df["colname with space"] <- c("this", "this", "this", letters[1:7])
+  result <- (
+    test_df %>%
+      do_tfidf(`doc id`, `colname with space`)
+  )
+  expect_equal(colnames(result), c("doc id","colname with space","count_per_doc","count_of_docs","tfidf"))
+})
 
+test_that("do_tfidf with group_by", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(group=c(rep(1,10), rep(2,10)), id=rep(c(1,2), 10))
+  test_df["doc id"] <- rep(c(1,2), 10)
+  test_df["colname with space"] <- rep(c("this", "this", "this", letters[1:7]), 2)
+  result <- (
+    test_df %>% dplyr::group_by(group) %>%
+      do_tfidf(`doc id`, `colname with space`)
+  )
+  expect_equal(colnames(result), c("group", "doc id","colname with space","count_per_doc","count_of_docs","tfidf"))
+})
 
+test_that("do_tfidf preserves all document IDs including high numbers", {
+  loadNamespace("dplyr")
+  # Create test data with document IDs that include high numbers (182, 183, 184)
+  # to test the fix for document ID mapping issue
+  test_df <- data.frame(
+    document_id = c(rep(1, 3), rep(2, 3), rep(182, 2), rep(183, 2), rep(184, 1)),
+    token = c("this", "is", "test", "that", "is", "test", "質", "良い", "企画", "毎年", "料理")
+  )
+  result <- test_df %>% do_tfidf(document_id, token)
+  # Verify that all document IDs are present in the result
+  expect_true(all(c(1, 2, 182, 183, 184) %in% result$document_id))
+  # Verify that the result has the expected columns
+  expect_equal(colnames(result), c("document_id", "token", "count_per_doc", "count_of_docs", "tfidf"))
+})
 
+test_that("do_ngram", {
+  loadNamespace("dplyr")
+  df <- data.frame(
+    doc=paste("doc", rep(c(1,2), each=10)) ,
+    token=paste("token",rep(c(1,2),10), sep=""),
+    sentence=rep(seq(5), each=4),
+    stringsAsFactors = F)
 
-
-
-
-
-
-
-
-
+  ret <- df %>%  do_ngram(token, sentence, doc, maxn = 3)
+  expect_equal(colnames(ret), c("doc", "sentence", "gram", "token"))
+  expect_true(any(ret[["gram"]] == 1))
+  expect_true(is.integer(ret[["gram"]]))
+})
 
 test_that("sentimentr", {
   if(requireNamespace("sentimentr")){
@@ -108,6 +377,10 @@ test_that("get_sentiment", {
   }
 })
 
+test_that("stem_word", {
+  ret <- stem_word(c("impingement","feline"))
+  expect_equal(ret, c("imping", "felin"))
+})
 
 test_that("parse_character", {
   ret <- exploratory::parse_character(c(1, 2))
@@ -143,6 +416,61 @@ test_that("parse_logical", {
   expect_equal(ret, c(FALSE, TRUE))
 })
 
+test_that("str_extract_inside", {
+  # bracket ()
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "(", end =")", include_special_chars = FALSE)
+  expect_equal(ret, c("defgh"))
+  # curly bracket {}
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "{", end ="}", include_special_chars = FALSE)
+  expect_equal(ret, NA_character_)
+  # curly bracket {}
+  ret <- exploratory::str_extract_inside("abc{123456}ijk", begin = "{", end ="}", include_special_chars = FALSE)
+  expect_equal(ret, "123456")
+  # curly bracket []
+  ret <- exploratory::str_extract_inside("abc[123456]ijk", begin = "[", end ="]", include_special_chars = FALSE)
+  expect_equal(ret, "123456")
+  # double quote ""
+  ret <- exploratory::str_extract_inside('abc"123456"ijk', begin = '"', end = '"', include_special_chars = FALSE)
+  expect_equal(ret, "123456")
+  # single quote ''
+  ret <- exploratory::str_extract_inside("abc'123456'ijk", begin = "'", end = "'", include_special_chars = FALSE)
+  expect_equal(ret, "123456")
+  # percent %
+  ret <- exploratory::str_extract_inside("abc%123456%ijk", begin = "%", end = "%", include_special_chars = FALSE)
+  expect_equal(ret, "123456")
+  # percent $
+  ret <- exploratory::str_extract_inside("abc$123456$ijk", begin = "$", end = "$", include_special_chars = FALSE)
+  expect_equal(ret, "123456")
+  # percent * $
+  ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$", include_special_chars = FALSE)
+  expect_equal(ret, "123456")
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{{", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "n", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be symbol such as (, {, [.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{", end = "}}")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{", end = "z")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be symbol such as ), }, ].")
+  })
+
+
+})
 
 test_that("str_remove", {
   ret <- exploratory::str_remove("test group", "group", remove_extra_space = TRUE)
@@ -301,6 +629,15 @@ test_that("str_remove_emoji", {
   expect_equal(ret, c("Hello", "Hello", "Hello", "Hello", "Hello"))
 })
 
+test_that("str_remove_word", {
+  ret <- exploratory::str_remove_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", -1, sep = "\\s*\\,\\s*")
+  expect_equal(ret, c("Sequoia Capital China, Qiming Venture Partners"))
+  ret <- exploratory::str_remove_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", 1, sep = "\\s*\\,\\s*")
+  expect_equal(ret, c("Qiming Venture Partners, Tencent Holdings"))
+  ret <- exploratory::str_remove_word("Sequoia Capital, Qiming Venture Partners, Tencent Holdings (China Space)", -1, sep = "\\s+")
+  expect_equal(ret, c("Sequoia Capital, Qiming Venture Partners, Tencent Holdings (China"))
+
+})
 
 test_that("str_replace_word", {
   ret <- exploratory::str_replace_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", -1, sep = "\\s*\\,\\s*", rep = "Last One")
@@ -324,6 +661,34 @@ test_that("str_extract_url", {
   expect_equal(ret, list("https://t.co/tMfGP512D2"))
 })
 
+test_that("str_logical", {
+  ret <- exploratory::str_logical(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA))
+  expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))
+  ret <- exploratory::str_logical(as.factor(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA)))
+  expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))
+  ret <- exploratory::str_logical(c("true", "tRue", "trUe", "truE", "TRue", "TrUe", "TruE", "TRUe", "TRuE", "TrUE", "tRUE", "TRUE","false", "FALSE", NA))
+  expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, NA))
+  ret <- exploratory::str_logical(c("1", "0", "0", "1", "1", "1", "1", "0", "1", "1", "1", "1","1", "0", NA))
+  expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+  ret <- exploratory::str_logical(c(1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1,1, 0, NA))
+  expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+  ret <- exploratory::str_logical(as.integer(c(1, 0, 0, 2, 2, 3, 4, 0, 100, 1000, 10, 11,12, 0, NA)))
+  expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+  ret <- exploratory::str_logical(as.double(c(1.1, 0, 0, 2.2, 2.3, 3.5, 4.3, 0, 100.01, 1000.1234, 10.34343, 11.11,12.89, 0, NA)))
+  expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+  ret <- exploratory::str_logical(as.numeric(c(1.1, 0, 0, 2.2, 2.3, 3.5, 4.3, 0, 100.01, 1000.1234, 10.34343, 11.11,12.89, 0, NA)))
+  expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+  ret <- exploratory::str_logical(bit64::as.integer64(c(1.1, 0, 0, 2.2, 2.3, 3.5, 4.3, 0, 100.01, 1000.1234, 10.34343, 11.11,12.89, 0, NA)))
+  expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+  ret <- exploratory::str_logical(c("Sign Up", "Not Sign Up", "Not Sign Up", "sign Up", "sign up", "SIGN UP", "Sign UP", "Not Sign Up", "Sign Up", "Sign Up", "Sign Up", "Sign Up","Sign Up", "Not Sign Up", NA), true_value = "Sign Up")
+  expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+  ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "aa", "","", NA, NA))
+  expect_equal(ret, c(TRUE, NA, NA, NA, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, NA, NA, NA, NA, NA))
+  ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "YES", "","", NA, NA), true_value = "yes")
+  expect_equal(ret, c(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, NA, NA))
+  ret <- exploratory::str_logical(c(NA, NA, NA, NA, NA, NA, NA, NA))
+  expect_equal(ret, c(NA, NA, NA, NA, NA, NA, NA, NA))
+})
 
 test_that("str_detect", {
   ret <- exploratory::str_detect(c("Test", "test", "ATe"), "Te")
@@ -365,6 +730,14 @@ test_that("str_detect", {
   expect_true(exploratory::str_detect("abc", "(?x)a b c"))
 })
 
+test_that("str_remove_range", {
+  ret <- exploratory::str_remove_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -4, -3)
+  expect_equal(ret, c("Aaron Beran", "Justin Rier", "Craig Reer"))
+  ret2 <- exploratory::str_remove_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), 1, 3)
+  expect_equal(ret2, c("on Bergman", "tin Ritter", "ig Reiter"))
+  ret2 <- exploratory::str_remove_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -3, -9)
+  expect_equal(ret2, c("Aaron Bergman", "Justin Ritter", "Craig Reiter"))
+})
 
 test_that("str_replace_range: negative index", {
   ret <- exploratory::str_replace_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -4, -3, "AAA")
@@ -376,7 +749,19 @@ test_that("str_replace_range: negative index", {
 })
 
 
+test_that("str_remove_before", {
+  ret <- exploratory::str_remove_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("exploratory.io", "exploratory.io", "exploratory.io"))
+  ret <- exploratory::str_remove_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = FALSE)
+  expect_equal(ret, c("@exploratory.io", "@exploratory.io", "@exploratory.io"))
+})
 
+test_that("str_remove_after", {
+  ret <- exploratory::str_remove_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("kei", "hideaki", "hide"))
+  ret <- exploratory::str_remove_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = FALSE)
+  expect_equal(ret, c("kei@", "hideaki@", "hide@"))
+})
 
 test_that("str_replace_before", {
   ret <- exploratory::str_replace_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", rep = "dev")
@@ -392,5 +777,19 @@ test_that("str_replace_after", {
   expect_equal(ret, c("kei@test", "hideaki@test", "hide@test"))
 })
 
+test_that("str_extract_before", {
+  ret <- exploratory::str_extract_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = TRUE)
+  expect_equal(ret, c("kei@", "hideaki@", "hide@"))
+  ret <- exploratory::str_extract_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("kei", "hideaki", "hide"))
 
+})
+
+test_that("str_extract_after", {
+  ret <- exploratory::str_extract_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = TRUE)
+  expect_equal(ret, c("@exploratory.io", "@exploratory.io", "@exploratory.io"))
+  ret <- exploratory::str_extract_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("exploratory.io", "exploratory.io", "exploratory.io"))
+
+})
 

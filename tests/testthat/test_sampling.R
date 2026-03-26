@@ -19,6 +19,11 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save data for performance.
 }
 
+test_that("build_coxph.fast() samples down input to 50000 rows", {
+  model_df <- flight %>% build_coxph.fast(`ARR DELAY`, `delay ed`, `DEP DELAY`, `CAR RIER`)
+  ret <- model_df %>% glance_rowwise(model)
+  expect_lte(ret$n, 50000) # should be less than or equal 50000 after sampling.
+})
 
 test_that("calc_feature_map(regression) samples down input to 50000 rows", {
   model_df <- flight %>%
@@ -38,4 +43,11 @@ test_that("exp_rpart(binary) samples down input to 50000 rows", {
   expect_lte(nrow(ret), 50000) # should be less than or equal 50000 after sampling.
 })
 
+test_that("build_lm.fast (linear regression) samples down input to 50000 rows", {
+  model_df <- flight %>%
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1)
+
+  ret <- model_df %>% prediction(data="training_and_test")
+  expect_lte(nrow(ret), 50000) # should be less than or equal 50000 after sampling.
+})
 
