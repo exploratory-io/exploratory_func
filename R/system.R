@@ -61,6 +61,12 @@ setConnectionPoolMode <- function(val) {
 }
 
 
+#' get connection pool mode. for test purpose.
+#' @export
+getConnectionPoolMode <- function() {
+  user_env$pool_connection
+}
+
 #' Set cache path for oauth token cachefile
 setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
@@ -1938,6 +1944,33 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
   tables
 }
 
+
+getListOfColumns <- function(type, host, port, databaseName, username, password, table, sslMode = '', sslCA = '', role = ''){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- getDBConnection(type, host, port, databaseName, username, password, sslMode = sslMode, sslCA = sslCA, role = role)
+  tryCatch({
+    columns <- DBI::dbListFields(conn, table)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection(type, host, port, databaseName, username)
+    if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
+      tryCatch({ # try to close connection and ignore error
+        DBI::dbDisconnect(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
+    }
+    stop(err)
+  })
+  if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
+    tryCatch({ # try to close connection and ignore error
+      DBI::dbDisconnect(conn)
+    }, warning = function(w) {
+    }, error = function(e) {
+    })
+  }
+  columns
+}
 
 #' API to execute a query that can be handled with DBI
 #' @export

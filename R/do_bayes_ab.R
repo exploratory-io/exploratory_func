@@ -317,6 +317,36 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
 }
 
 
+#' Estimate alpha and beta for prior beta distribution
+#' @param df Data frame
+#' @param rate A column that has success rate
+#' @export
+calc_beta_prior <- function(df, rate, ...){
+  rate_col <- col_name(substitute(rate))
+  grouped_col <- grouped_by(df)
+
+  # this will be executed to each group
+  each_func <- function(df, ...) {
+    rate <- df[[rate_col]]
+    m <- mean(rate, na.rm = TRUE)
+    v <- var(rate, na.rm = TRUE)
+    s <- sd(rate, na.rm = TRUE)
+
+    # https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
+    alpha <- ((1 - m) / v - 1 / m) * m ^ 2
+    beta <- alpha * (1 / m - 1)
+    data.frame(
+      alpha = alpha,
+      beta = beta,
+      average = m,
+      variance = v,
+      sd = s
+      )
+  }
+
+  do_on_each_group(df, each_func, params = substitute(list(...)))
+}
+
 #' S3 tidy method for bayesTest object
 #' @param percentLift Lift threshold to calculate the probability of success
 #' @param credInt Ratio for credible interval

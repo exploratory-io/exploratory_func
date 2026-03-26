@@ -81,6 +81,12 @@ getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
 
 
 #' API to refresh token
+#' @export
+refreshGoogleTokenForAnalytics <- function(tokenFileId){
+  getGoogleTokenForAnalytics(tokenFileId, FALSE)
+}
+
+#' API to refresh token
 #' For backward compatibility
 #' @export
 refreshGoogleTokenForAnalysis <- function(tokenFileId){
@@ -184,6 +190,11 @@ getSalesforceToken <- function(tokenFileId = "", useCache=TRUE){
   }
 }
 
+#' API to refresh token
+#' @export
+refreshSalesforceToken <- function(tokenFileId = ""){
+  getSalesforceToken(tokenFileId = tokenFileId, FALSE)
+}
 
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export

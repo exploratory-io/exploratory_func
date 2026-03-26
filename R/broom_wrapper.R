@@ -121,6 +121,36 @@ model_info <- function(df, model, output = "summary", ...) {
 }
 
 
+#' glance for lm
+#' @export
+glance_lm <- glance_rowwise
+
+#' glance for glm
+#' @export
+glance_glm <- glance_rowwise
+
+#' glance for kmeans
+#' @export
+glance_kmeans <- glance_rowwise
+
+#' tidy for lm
+#' @export
+tidy_lm <- tidy_rowwise
+#' tidy for glm
+#' @export
+tidy_glm <- tidy_rowwise
+#' tidy for kmeans
+#' @export
+tidy_kmeans <- tidy_rowwise
+
+#' augment for lm
+#' @export
+augment_lm <- augment_rowwise
+#' augment for glm
+#' @export
+augment_glm <- augment_rowwise
+
+
 #' augment for kmeans
 #' @export
 augment_kmeans <- function(df, model, data){
@@ -1699,5 +1729,33 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
   colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
   colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  ret
+}
+
+#' tidy after converting model to confint
+#' @export
+model_confint <- function(df, ...){ # TODO: Not used from anywhere, and the output does not look clean since broom 0.7.0. Delete at some point.
+  validate_empty_data(df)
+
+  caller <- match.call()
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("df"))
+  if (arg_char != "") {
+    fml <- paste0("broom::tidy(stats::confint(m, ", arg_char, "))")
+  } else {
+    fml <- paste0("broom::tidy(stats::confint(m))")
+  }
+
+  ret <- df %>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
+      dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
+      tidyr::unnest(output)
+
+  colnames(ret)[colnames(ret) == ".rownames"] <- "Term"
+  # original columns are like X0.5..   X99.5.., so replace X to Prob and remove trailing dots
+  new_p_cnames <- stringr::str_replace(colnames(ret)[(ncol(ret)-1):ncol(ret)], "X", "Prob ") %>%
+    stringr::str_replace("\\.+$", "")
+  colnames(ret)[(ncol(ret)-1):ncol(ret)] <- new_p_cnames
   ret
 }

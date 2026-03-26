@@ -917,6 +917,10 @@ get_confint <- function(val, se, conf_int = 0.95) {
 }
 
 
+pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, ...) {
+  pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, ...)
+}
+
 #' Calculate a pivot table.
 #' @param df Data frame to pivot
 #' @param row_cols - Columns to be the rows of the resulting pivot table.
@@ -2469,6 +2473,11 @@ calculate_cohens_w_for_ab_test <- function(a_ratio, conversion_rate, diff) {
 
 # References:
 # Cohen's f2 definition: https://en.wikipedia.org/wiki/Effect_size
+
+calculate_cohens_f_squared <- function(r2) {
+  f2 <- r2 / (1 - r2)
+  f2
+}
 
 # References:
 # https://stats.stackexchange.com/questions/415037/effect-size-calculation-for-kruskal-wallis-mean-rank-test
