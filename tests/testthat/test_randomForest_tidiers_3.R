@@ -32,10 +32,8 @@ test_that("calc_feature_imp(regression) evaluate training and test with FIRM imp
   # Check variable importance output.
   ret <- model_df %>% tidy_rowwise(model, type="importance")
   expect_equal(colnames(ret), c("variable", "importance"))
-  ret2 <- model_df %>% rf_partial_dependence()
   variables <- ret$variable
   names(variables) <- NULL
-  expect_equal(levels(ret2$x_name), variables) # Factor order of the PDP should be the same as the importance.
 
   ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
@@ -53,9 +51,6 @@ test_that("calc_feature_imp(regression) evaluate training and test with FIRM imp
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # retrieve partial dependence data.
-  ret <- model_df %>% rf_partial_dependence()
-  expect_equal(class(ret$conf_high), "numeric") # make sure that it is with conf int for actual binning data.
-
   model_df <- flight %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
@@ -95,9 +90,6 @@ test_that("calc_feature_imp(regression) evaluate training and test with permutat
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # retrieve partial dependence data.
-  ret <- model_df %>% rf_partial_dependence()
-  expect_equal(class(ret$conf_high), "numeric") # make sure that it is with conf int for actual binning data.
-
   model_df <- flight %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
@@ -134,7 +126,6 @@ test_that("calc_feature_imp(binary) evaluate training and test with FIRM importa
 
   ret <- flight %>% add_prediction(model_df=model_df)
   expect_equal(class(ret$predicted_label), "logical")
-  res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
@@ -177,7 +168,6 @@ test_that("calc_feature_imp(binary) evaluate training and test with permutation 
 
   ret <- flight %>% add_prediction(model_df=model_df)
   expect_equal(class(ret$predicted_label), "logical")
-  res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.

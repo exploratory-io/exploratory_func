@@ -33,6 +33,7 @@ insensitive_join <- function(fun = dplyr::left_join, type = "LEFT") {
 }
 
 #' Wrapper function for dplyr's inner_join to support case insensitive join.
+#' @export
 inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...){
   y <- y %>% ungroup()
   # Limit target columns to use for join when target_columns are set.
@@ -51,6 +52,7 @@ inner_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
 }
 
 #' Wrapper function for dplyr's left_join to support case insensitive join.
+#' @export
 left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...){
   y <- y %>% ungroup()
   # Limit target columns to use for join when target_columns are set.
@@ -69,6 +71,7 @@ left_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ign
 }
 
 #' Wrapper function for dplyr's right_join to support case insensitive join.
+#' @export
 right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...){
   y <- y %>% ungroup()
   # Limit target columns to use for join when target_columns are set.
@@ -87,6 +90,7 @@ right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
 }
 
 #' Wrapper function for dplyr's full_join to support case insensitive join.
+#' @export
 full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, target_columns = NULL, exclude_target_columns = FALSE, na_matches = "never", ...) {
   y <- y %>% ungroup()
   # Limit target columns to use for join when target_columns are set.

@@ -12,19 +12,23 @@ iterate_kmeans <- function(df, max_centers = 10,
   n_centers <- seq(min(max_centers, nrow(df) - 1))
   ret <- data.frame(center = n_centers)
   ret <- ret %>% dplyr::mutate(model = purrr::map(center, function(x) {
-    model_df <- df %>% build_kmeans.cols(everything(),
-                                         centers=x,
-                                         iter.max = iter.max,
-                                         nstart = nstart,
-                                         algorithm = algorithm,
-                                         trace = trace,
-                                         normalize_data = normalize_data,
-                                         seed=seed,
-                                         keep.source=FALSE,
-                                         augment=FALSE,
-                                         na.rm = FALSE) # NA filtering is already done. Skip it to save time. 
-    ret <- model_df$model[[1]]
-    ret
+    tryCatch({
+      model_df <- df %>% build_kmeans.cols(everything(),
+                                           centers=x,
+                                           iter.max = iter.max,
+                                           nstart = nstart,
+                                           algorithm = algorithm,
+                                           trace = trace,
+                                           normalize_data = normalize_data,
+                                           seed=seed,
+                                           keep.source=FALSE,
+                                           augment=FALSE,
+                                           na.rm = FALSE) # NA filtering is already done. Skip it to save time.
+      model_df$model[[1]]
+    }, error = function(e) {
+      stop(paste0(e$message, " (while building k-means model with centers=", x, ")"),
+           call. = FALSE)
+    })
   }))
   ret %>% rowwise(center) %>% glance_rowwise(model)
 }

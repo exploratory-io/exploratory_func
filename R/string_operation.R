@@ -215,6 +215,7 @@ str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = F
 
 #' Wrapper function for stringr::str_remove.
 #' When remove_extra_space argument is TRUE, it applies str_squish on top of the stringr::str_remove result.
+#' @export
 str_remove <- function(string, pattern, remove_extra_space = FALSE) {
   res <- stringr::str_remove(string, pattern)
   if (remove_extra_space) {
@@ -225,6 +226,7 @@ str_remove <- function(string, pattern, remove_extra_space = FALSE) {
 
 #' Wrapper function for stringr::str_remove_all.
 #' When remove_extra_space argument is TRUE, it applies str_squish on top of the stringr::str_remove_all result.
+#' @export
 str_remove_all <- function(string, pattern, remove_extra_space = FALSE) {
   res <- stringr::str_remove_all(string, pattern)
   if (remove_extra_space) {
@@ -358,6 +360,7 @@ str_remove_emoji <- function(column, position = "any"){
 #'Function to replace text before the separator.
 #'
 #'export
+#' @export
 str_replace_before <- function(column, sep = "\\,", rep = "", include_sep = TRUE) {
   if (include_sep) {
     stringr::str_replace(column, stringr::str_c(".*", sep), rep)
@@ -369,6 +372,7 @@ str_replace_before <- function(column, sep = "\\,", rep = "", include_sep = TRUE
 #'Function to replace text after the separator.
 #'
 #'export
+#' @export
 str_replace_after <- function(column, sep = "\\,", rep = "", include_sep = TRUE){
   if (include_sep) {
     stringr::str_replace(column, stringr::str_c(sep, ".*"), rep)
@@ -385,6 +389,7 @@ str_replace_after <- function(column, sep = "\\,", rep = "", include_sep = TRUE)
 #'For validation details, see comment below.
 #'
 #'export
+#' @export
 str_replace_range <- function(column, start, end = -1, replacement = ""){
   # To make the behavior consistent with extract case (i.e. str_sub),
   # if both start and end are negative, end should be greater than or equal to start.

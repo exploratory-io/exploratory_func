@@ -352,6 +352,7 @@ to_same_type <- function(vector, original) {
 }
 
 #' floor with digits argument.
+#' @export
 floor <- function(x, digits = 0) {
   if (digits == 0) {
     base::floor(x)
@@ -362,6 +363,7 @@ floor <- function(x, digits = 0) {
 }
 
 #' ceiling with digits argument.
+#' @export
 ceiling <- function(x, digits = 0) {
   if (digits == 0) {
     base::ceiling(x)
@@ -694,6 +696,7 @@ append_colnames <- function(df, prefix = "", suffix = "") {
 #' It seems there is no commonly accepted name for half-width of confidence interval.
 #' Reference for naming: https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Intervals_for_One_Mean.pdf
 #' Here we name it confint_radius.
+#' @export
 confint_radius <- function(x, level=0.95) {
   n <- sum(!is.na(x))
   s <- sd(x, na.rm = TRUE)
@@ -717,6 +720,7 @@ calc_confint_mean <- function (sd, n, level=0.95) {
 #' Returns half-width of confidence interval of population proportion of the given logical vector. NAs are skipped and not counted.
 #' This is useful when used in dplyr::summarize().
 #' Reference: http://www.r-tutor.com/elementary-statistics/interval-estimation/interval-estimate-population-proportion
+#' @export
 prop_confint_radius <- function(x, level=0.95) {
   n <- sum(!is.na(x))
   t <- sum(x, na.rm = TRUE)
@@ -1182,6 +1186,18 @@ non_na_pct <- function(x) {
   sum(!is.na(x)) / length(x) * 100
 }
 
+#' Ratio of NA in a vector
+#' @param x vector
+na_ratio <- function(x) {
+  sum(is.na(x)) / length(x)
+}
+
+#' Ratio of Non NA in a vector
+#' @param x vector
+non_na_ratio <- function(x) {
+  sum(!is.na(x)) / length(x)
+}
+
 
 #' This is a wrapper of tidyr::unnest
 #' to change the default of .drop,
@@ -1496,6 +1512,7 @@ adjusted_r_squared <- function(rsq, n_observations, df_residual) {
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
 mae <- function(actual, predicted, is_test_data) {
   actual <- actual[is_test_data]
   predicted <- predicted[is_test_data]
@@ -1507,6 +1524,7 @@ mae <- function(actual, predicted, is_test_data) {
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
 rmse <- function(actual, predicted, is_test_data=NULL) {
   if (!is.null(is_test_data)) {
     actual <- actual[is_test_data]
@@ -1520,6 +1538,7 @@ rmse <- function(actual, predicted, is_test_data=NULL) {
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
 mape <- function(actual, predicted, is_test_data) {
   actual <- actual[is_test_data]
   predicted <- predicted[is_test_data]
@@ -1552,6 +1571,7 @@ computeMASE <- function(forecast, train, test, period){
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
 mase <- function(actual, predicted, is_test_data, period = 1) {
   train <- actual[!is_test_data]
   test <- actual[is_test_data]
@@ -1669,6 +1689,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 }
 
 
+#' @export
 excel_numeric_to_date <- function(date_num, date_system = "modern",
                                   include_time = FALSE, round_seconds = TRUE) {
   # working around https://github.com/sfirke/janitor/issues/241
@@ -1685,6 +1706,7 @@ extract_argument_names <- function(...) {
 }
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
+#' @export
 bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL, encoding = NULL, use_col_index_as_col_name = FALSE) {
   # for compatiblity with dply::bind_rows
   # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
@@ -1852,6 +1874,7 @@ set_operation_with_force_character <- function(func, x, y, ...) {
 }
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
+#' @export
 union <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
@@ -1861,6 +1884,7 @@ union <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
+#' @export
 union_all <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
@@ -1870,6 +1894,7 @@ union_all <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
+#' @export
 intersect <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
@@ -1879,6 +1904,7 @@ intersect <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::setdiff to support ignoring data type difference.
+#' @export
 setdiff <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
@@ -1888,6 +1914,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
+#' @export
 recode <- function(x, ..., type_convert = FALSE, .default = NULL, .missing = NULL) {
   # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
   map <- list(...)
@@ -1926,6 +1953,7 @@ get_unique_values<-function (x, limit) {
 }
 
 #'Wrapper function for dplyr::recode_factor to workaround encoding info getting lost and to handle levels.
+#' @export
 recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missing = NULL, .ordered = TRUE) {
   current_levels = NULL;
   num_of_unique_value = NULL;
@@ -1983,6 +2011,7 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
 }
 
 #'Wrapper function for tidyr::pivot_longer to support type_convert argument.
+#' @export
 pivot_longer <- function(data,
                          cols,
                          ...,
@@ -2033,6 +2062,7 @@ pivot_longer <- function(data,
 }
 
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
+#' @export
 case_when <- function(x, ..., type_convert = FALSE) {
   ret <- dplyr::case_when(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
@@ -2578,6 +2608,7 @@ week <- function(date, unit="year") {
 
 #' Wrapper function for between.
 #' if both left and right are NULL, return TRUE for all
+#' @export
 between <- function(x, left, right) {
   if (is.null(left) && is.null(right)) {
     return(rep(TRUE, length(x)))
@@ -2753,6 +2784,7 @@ merge_sds <- function(sds, means, sizes) {
 # See https://github.com/tidyverse/dplyr/blob/main/R/rename.R for the original code.
 # This API has the repair argument where as original dplyr's rename_with does not provide such argument.
 # By default this API returns unique column names when the result columns are duplicated.
+#' @export
 rename_with <- function(.data, .fn, .cols = everything(), repair = "unique", ...) {
   .fn <- rlang::as_function(.fn)
   cols <- tidyselect::eval_select(enquo(.cols), .data, allow_rename = FALSE)
@@ -2929,6 +2961,7 @@ format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.ma
 #' cumsum wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
+#' @export
 cumsum <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cumsum(x[!is.na(x)])
@@ -2941,6 +2974,7 @@ cumsum <- function(x, skip.na = TRUE) {
 #' cummean wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
+#' @export
 cummean <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- dplyr::cummean(x[!is.na(x)])
@@ -2953,6 +2987,7 @@ cummean <- function(x, skip.na = TRUE) {
 #' cummin wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
+#' @export
 cummin <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cummin(x[!is.na(x)])
@@ -2965,6 +3000,7 @@ cummin <- function(x, skip.na = TRUE) {
 #' cummax wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
+#' @export
 cummax <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cummax(x[!is.na(x)])
@@ -2977,6 +3013,7 @@ cummax <- function(x, skip.na = TRUE) {
 #' cumprod wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
+#' @export
 cumprod <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cumprod(x[!is.na(x)])
@@ -2989,6 +3026,7 @@ cumprod <- function(x, skip.na = TRUE) {
 #' cumall wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
+#' @export
 cumall <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- dplyr::cumall(x[!is.na(x)])
@@ -3001,6 +3039,7 @@ cumall <- function(x, skip.na = TRUE) {
 #' cumany wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
+#' @export
 cumany <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- dplyr::cumany(x[!is.na(x)])

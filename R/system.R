@@ -146,13 +146,82 @@ readPasswordRDS = function(sourceName, userName){
   password
 }
 
+resolve_milestone <- function(owner, repository, milestone, username, password) {
+  # Special values pass through unchanged
+  if (milestone %in% c("*", "none")) {
+    return(milestone)
+  }
+
+  # If it's already a whole integer (no decimal), pass through
+  # Note: as.integer("14.5") returns 14, so we need to check for exact match
+  if (grepl("^[0-9]+$", milestone)) {
+    return(milestone)
+  }
+
+  # Otherwise, look up by title
+  endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/milestones")
+
+  # Fetch all milestones (open and closed) to find the title
+  # Use pagination to retrieve all milestones, not just the first 100
+  all_milestones <- list()
+  for (state in c("open", "closed")) {
+    page <- 1
+    repeat {
+      res <- httr::GET(endpoint,
+                       query = list(state = state, per_page = 100, page = page),
+                       httr::authenticate(username, password))
+      if (httr::status_code(res) != 200) {
+        break
+      }
+      jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
+      milestones <- jsonlite::fromJSON(jsondata, flatten = TRUE)
+      if (length(milestones) == 0 || nrow(milestones) == 0) {
+        break
+      }
+      all_milestones <- c(all_milestones, list(milestones))
+      # If we got fewer than 100, we've reached the last page
+      if (nrow(milestones) < 100) {
+        break
+      }
+      page <- page + 1
+    }
+  }
+
+  if (length(all_milestones) > 0) {
+    milestones_df <- dplyr::bind_rows(all_milestones)
+    match <- milestones_df[milestones_df$title == milestone, ]
+    if (nrow(match) > 0) {
+      return(as.character(match$number[1]))
+    }
+  }
+
+  # If not found, return original (API will handle the error)
+  warning(paste0("Milestone '", milestone, "' not found. Using as-is."))
+  return(milestone)
+}
+
 #' github issues plugin script
 #' @export
-getGithubIssues <- function(username, password, owner, repository, ...){
-  # read stored password
+getGithubIssues <- function(username, password, owner, repository,
+                            state = "all",
+                            milestone = NULL,
+                            assignee = NULL,
+                            creator = NULL,
+                            mentioned = NULL,
+                            labels = NULL,
+                            sort = NULL,
+                            direction = NULL,
+                            since = NULL,
+                            type = NULL,
+                            ...){
   loadNamespace("stringr")
   loadNamespace("httr")
   loadNamespace("dplyr")
+
+  # Resolve milestone title to number if needed
+  if (!is.null(milestone)) {
+    milestone <- resolve_milestone(owner, repository, milestone, username, password)
+  }
 
   # Body
   endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/issues")
@@ -160,8 +229,21 @@ getGithubIssues <- function(username, password, owner, repository, ...){
   is_next <- TRUE
   i <- 1
   while(is_next){
+    # Build query list - only include non-NULL parameters
+    query_params <- list(per_page = 100, page = i)
+    query_params$state <- state
+    if (!is.null(milestone)) query_params$milestone <- milestone
+    if (!is.null(assignee)) query_params$assignee <- assignee
+    if (!is.null(creator)) query_params$creator <- creator
+    if (!is.null(mentioned)) query_params$mentioned <- mentioned
+    if (!is.null(labels)) query_params$labels <- labels
+    if (!is.null(sort)) query_params$sort <- sort
+    if (!is.null(direction)) query_params$direction <- direction
+    if (!is.null(since)) query_params$since <- since
+    if (!is.null(type)) query_params$type <- type
+
     res <- httr::GET(endpoint,
-               query = list(state = "all", per_page = 100, page = i),
+               query = query_params,
                httr::authenticate(username, password))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
@@ -2757,6 +2839,7 @@ clean_data_frame <- function(x) {
 #' - remove_space which removes all the white spaces in column names
 #' - trim_space which trims the trailing and leading white spaces in column names.
 #'
+#' @export
 clean_names <- function(dat, ...){
   dots <- list(...)
   # if remove_space option is passed, remove all spaces from the column names.
@@ -2830,6 +2913,7 @@ statecode <- function(input = input, output_type = output_type) {
 #' 1    CA -119.41793 36.77826
 #' 2    NY  -74.21793 43.29943
 #'
+#' @export
 geocode_us_state <- function(df, statecode_colname) {
   mapping <- "state"
   names(mapping) <- statecode_colname
@@ -2844,6 +2928,7 @@ geocode_us_state <- function(df, statecode_colname) {
 #'    code longitude latitude
 #' 1 01003 -87.74607 30.65922
 #' 2 13005 -82.38786 31.56333
+#' @export
 geocode_us_county <- function(df, fipscode_colname) {
   mapping <- "fips"
   names(mapping) <- fipscode_colname
@@ -2880,6 +2965,7 @@ geocode_world_country <- function(df, countrycode_colname, center.pacific.ocean=
 #' 1   東京  139.6917 35.68949
 #' 2 北海道  141.3468 43.06461
 #'
+#' @export
 geocode_japan_prefecture <- function(df, prefecture_colname) {
   mapping <- "name"
   names(mapping) <- prefecture_colname
@@ -2895,6 +2981,7 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 #' > prefecturecode(c("東京都", "京都", "Kanagawa-ken", "Iwate", "あいち", "Kōchi", "gunma"), output_type="name")
 #' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"    "群馬"
 
+#' @export
 prefecturecode <- function(prefecture, output_type="name") {
   if (output_type == "code") { # covert prefecture name to prefecture code
     loadNamespace("zipangu")
@@ -3081,6 +3168,23 @@ searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern 
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
 }
+
+#' Convert glob-style pattern to regex
+#' @param pattern A glob-style pattern (e.g., "*.xls|*.xlsx|*.xlsm")
+#' @return A regex pattern (e.g., ".*\\.xls$|.*\\.xlsx$|.*\\.xlsm$")
+#' @noRd
+glob_to_regex <- function(pattern) {
+  parts <- strsplit(pattern, "\\|")[[1]]
+  regex_parts <- sapply(parts, function(p) {
+    p <- trimws(p)
+    # Escape dots, then convert * to .*
+    p <- gsub("\\.", "\\\\.", p)
+    p <- gsub("\\*", ".*", p)
+    paste0(p, "$")
+  }, USE.NAMES = FALSE)
+  paste(regex_parts, collapse = "|")
+}
+
 #'API that searches and imports multiple same structure Excel files and merge them to a single data frame
 #'@export
 searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
@@ -3091,11 +3195,18 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
+  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
+    # Glob-style pattern (e.g., "*.xls|*.xlsx|*.xlsm") - convert to regex
+    pattern <- glob_to_regex(pattern)
+    pattern <- paste0(fs::fs_path(folder), "/", pattern)
+  } else if (pattern != "") {
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
+  files <- fs::dir_ls(path = folder)
+  if (pattern != "") {
+    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
+  }
   if (length(files) > 0) {
     # Exclude Excel temporary files whose name starts with ~$ (e.g. ~$test.xlsx)
     files <- files[!grepl("/\\~\\$", files)]
@@ -3342,11 +3453,18 @@ searchAndReadDelimFiles <- function(folder, pattern = "", forPreview = FALSE, de
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
+  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
+    # Glob-style pattern (e.g., "*.csv|*.tsv") - convert to regex
+    pattern <- glob_to_regex(pattern)
+    pattern <- paste0(fs::fs_path(folder), "/", pattern)
+  } else if (pattern != "") {
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
+  files <- fs::dir_ls(path = folder)
+  if (pattern != "") {
+    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
+  }
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
@@ -3634,11 +3752,18 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
+  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
+    # Glob-style pattern (e.g., "*.parquet") - convert to regex
+    pattern <- glob_to_regex(pattern)
+    pattern <- paste0(fs::fs_path(folder), "/", pattern)
+  } else if (pattern != "") {
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
+  files <- fs::dir_ls(path = folder)
+  if (pattern != "") {
+    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
+  }
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }

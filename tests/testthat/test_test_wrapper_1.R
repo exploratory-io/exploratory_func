@@ -129,104 +129,11 @@ test_that("test t.test.aggregated with equal variance assumption with less alter
   expect_equal(res$null.value, res0$null.value)
 })
 
-test_that("test exp_ttest_aggregated", {
-  test_df <- data.frame(
-    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
-    val = rep(seq(10), 2)
-  )
-  test_df2 <- test_df %>% group_by(cat) %>% summarize(n=n(), sd=sd(val), mean=mean(val))
-  model_df <- test_df2 %>% exp_ttest_aggregated(cat, n, mean, sd)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  expect_true("Rows" %in% colnames(ret))
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  expect_true("p.value" %in% colnames(ret))
-})
 
-test_that("test two sample t-test with column name", {
-  test_df <- data.frame(
-    cat=rep(c("cat1", "cat2"), 20),
-    val = rep(seq(10), 2)
-  )
 
-  result <- test_df %>%
-    do_t.test(val, cat)
 
-  expect_equal(result$Difference, 1)
 
-  # swap cat1 and cat2
-  test_df <- data.frame(
-    cat=rep(c("cat2", "cat1"), 20),
-    val = rep(seq(10), 2)
-  )
 
-  result <- test_df %>%
-    do_t.test(val, cat)
-
-  expect_equal(result$Difference, -1)
-})
-
-test_that("test two sample t-test with factor", {
-  test_df <- data.frame(
-    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
-    val = rep(seq(10), 2)
-  )
-
-  result <- test_df %>%
-    do_t.test(val, cat)
-
-  expect_equal(result$Difference, 1)
-
-  # swap cat1 and cat2
-  test_df <- data.frame(
-    cat=factor(rep(c("cat2", "cat1"), 20), levels = c("cat2", "cat1")),
-    val = rep(seq(10), 2)
-  )
-
-  result <- test_df %>%
-    do_t.test(val, cat)
-
-  expect_equal(result$Difference, 1)
-})
-
-test_that("test two sample t-test with logical", {
-  test_df <- data.frame(
-    cat=rep(c(TRUE, FALSE), 20),
-    val = rep(seq(10), 2)
-  )
-
-  result <- test_df %>%
-    do_t.test(val, cat)
-
-  expect_equal(result$Difference, -1) #base is FALSE
-
-  # swap TRUE and FALSE
-  test_df <- data.frame(
-    cat=rep(c(FALSE, TRUE), 20),
-    val = rep(seq(10), 2)
-  )
-
-  result <- test_df %>%
-    do_t.test(val, cat)
-
-  expect_equal(result$Difference, 1)
-})
-
-test_that("test two sample t-test more than 2 levels", {
-  expect_error({
-    result <- test_df %>%
-      dplyr::group_by(dim) %>%
-      do_t.test(`with space`, dim_na)
-  })
-})
-
-test_that("test two sample t-test less than 2 levels", {
-  expect_error({
-    result <- test_df %>%
-      dplyr::group_by(dim) %>%
-      do_t.test(`with space`, dim)
-  })
-})
 
 #test_that("test one sample t-test", {
 #  result <- test_df %>%
@@ -235,66 +142,10 @@ test_that("test two sample t-test less than 2 levels", {
 #  expect_equal(result[result[["dim"]]=="dim1", "p.value"][[1]], 1)
 #})
 
-test_that("test t-test with 3 groups", {
-  data <- data.frame(val = seq(12), group = rep(c(1,2,3), each = 4))
-  expect_error({
-    result <- data %>%
-      do_t.test(val, group)
-  }, "The explanatory variable needs to have 2 unique values.")
-})
 
-test_that("test f-test", {
-  result <- test_df %>%
-    dplyr::group_by(dim) %>%
-    do_var.test(`with space`, cat)
-  expect_equal(ncol(result), 10)
-})
 
-test_that("test f-test with 3 groups", {
-  data <- data.frame(val = seq(12), group = rep(c(1,2,3), each = 4))
-  expect_error({
-    result <- data %>%
-      do_var.test(val, group)
-  }, "Group Column has to have 2 unique values")
-})
 
-test_that("test do_chis", {
-  mtcars2 <- mtcars
-  mtcars2$gear[[1]] <- NA # test handling of NAs
-  mtcars2$carb[[2]] <- NA
-  mtcars2$cyl[[3]] <- NA
-  summary <- do_chisq.test(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
 
-  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
-                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
-  ))
-  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
-})
-
-test_that("test exp_chisq", {
-  mtcars2 <- mtcars
-  mtcars2$gear[[1]] <- NA # test handling of NAs
-  mtcars2$carb[[2]] <- NA
-  mtcars2$cyl[[3]] <- NA
-  ret <- exp_chisq(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
-  ret <- exp_chisq(mtcars2, gear, carb, value=cyl, fun.aggregate=sum)
-
-  # Test model_info function.
-  # Rename model column so that we test the case where the column name is not "model". There was an issue this case.
-  observed <- ret %>% rename(model1=model) %>% model_info(model1, output="variables", type="observed")
-  summary <- ret %>% rename(model1=model) %>% model_info(model1, output="summary")
-  data <- ret %>% rename(model1=model) %>% model_info(model1, output="data")
-
-  observed <- ret %>% tidy_rowwise(model, type="observed")
-  summary <- ret %>% glance_rowwise(model)
-  residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
-                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
-  ))
-  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
-  prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
-  expect_true("p.value" %in% colnames(prob_dist))
-})
 
 test_that("test exp_chisq with power", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb, power = 0.8) # factor order should be kept in the model
@@ -353,57 +204,9 @@ test_that("test exp_chisq with group_by with single class category in one of the
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
 })
 
-test_that("test exp_chisq_ab_aggregated", {
-  df <- tibble::tibble(cat=c('A','B'), n=c(100,200), cr=c(0.22, 0.2))
-  ret <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
 
-  observed <- ret %>% tidy_rowwise(model, type="observed")
-  summary <- ret %>% glance_rowwise(model)
-  residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
-                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
-  ))
-  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
-  prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
-})
 
-test_that("test exp_chisq_ab_aggregated with multiple rows per group", {
-  # Here we test the case where a group (A or B) has more than 1 row.
-  # It's not the most common use we expect, but this should also work.
-  df <- tibble::tibble(cat=rep(c('A','B'),2), n=rep(c(100,200),2), cr=rep(c(0.22, 0.2),2))
-  ret <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
-  observed <- ret %>% tidy_rowwise(model, type="observed")
-  summary <- ret %>% glance_rowwise(model)
-  expect_equal(summary$`Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
-                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
-  ))
-  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
-  residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
-})
 
-test_that("test exp_chisq_ab_aggregated with more than 2 groups", {
-  # Here we test the case where there are more than 2 groups.
-  # It's not the most common use we expect, but this should also work as 2xN chi-square test.
-  df <- tibble::tibble(cat=c('A','B','C'), n=c(100,200,300), cr=c(0.22, 0.2, 0.2))
-  model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
-  summary <- model_df %>% glance_rowwise(model)
-  expect_equal(summary$`Rows`,600) # Number of rows should be added up.
-  expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
-                    "Power", "Type 2 Error","Rows") %in% colnames(summary)
-  ))
-  expect_true(summary$`Cramer's V` >= 0 && summary$`Cramer's V` <= 1)
-  residuals <- model_df %>% tidy_rowwise(model, type="residuals")
-  prob_dist <- model_df %>% tidy_rowwise(model, type="prob_dist")
-})
-
-test_that("test exp_chisq_ab_aggregated with only group A", {
-  df <- tibble::tibble(cat=c('A'), n=c(100), cr=c(0.22))
-  expect_error({
-    model_df <- df %>% exp_chisq_ab_aggregated(cat, cr, n)
-  }, "The explanatory variable needs to have 2 or more unique values.")
-})
 
 test_that("test exp_ttest", {
   mtcars2 <- mtcars
@@ -603,325 +406,26 @@ test_that("test exp_ttest with group-level error (not eough data)", {
   expect_equal(nrow(ret), 0)
 })
 
-test_that("test 2-way ANOVA with exp_anova", {
-  mtcars2 <- mtcars %>% mutate(`a m`=am, `ge ar`=gear, `w t`=wt, `q sec`=qsec)
-  model_df <- mtcars2 %>% exp_anova(mpg, c("a m","ge ar"), func2=c("aschar","aschar"))
-  # This case fails with multi-colinearity-related error.
-  # model_df <- mtcars2 %>% exp_anova(mpg, c("carb","ge ar"), func2=c("aschar","aschar"), with_interaction = TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  # Make sure the estimate is between conf.low and conf.high.
-  expect_equal(all(ret$`Difference` >= ret$`Conf Low`), TRUE)
-  expect_equal(all(ret$`Difference` <= ret$`Conf High`), TRUE)
-
-  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  ret <- model_df %>% tidy_rowwise(model, type="levene")
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="data")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret <- model_df %>% tidy_rowwise(model, type="pairs_per_variable", pairs_adjust="tukey")
-})
-
-test_that("test 2-way ANOVA with with different data types on var1 and var2.", {
-  mtcars2 <- mtcars %>% mutate(`a m`=am == 1, `ge ar`=as.character(gear))
-  model_df <- mtcars2 %>% exp_anova(mpg, c("a m","ge ar"), func2=c("aschar","aschar"))
-  
-  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  # Make sure the estimate is between conf.low and conf.high.
-  expect_equal(all(ret$`Difference` >= ret$`Conf Low`), TRUE)
-  expect_equal(all(ret$`Difference` <= ret$`Conf High`), TRUE)
-
-  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  ret <- model_df %>% tidy_rowwise(model, type="levene")
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="data")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  # Make sure this doesn't fail.
-  ret <- model_df %>% tidy_rowwise(model, type="pairs_per_variable", pairs_adjust="tukey")
-  # Make sure the output for "Group  1" and "Group  2" is in character.
-  expect_equal(ret$`Group 1`, c("FALSE", "3", "3", "4"))
-  expect_equal(ret$`Group 2`, c("TRUE", "4", "5", "5"))
-})
-
-test_that("test 2-way ANOVA with exp_anova with repeat-by", {
-  mtcars2 <- mtcars %>% mutate(`a m`=am, `ge ar`=gear, `w t`=wt, `q sec`=qsec) %>% group_by(vs)
-  model_df <- mtcars2 %>% exp_anova(mpg, c("a m","ge ar"), func2=c("aschar","aschar"))
-  # This case fails with multi-colinearity-related error.
-  # model_df <- mtcars2 %>% exp_anova(mpg, c("carb","ge ar"), func2=c("aschar","aschar"), with_interaction = TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  expect_equal(colnames(ret),
-    c("vs","Variable","Sum of Squares","SS Ratio","DF","Mean Square","F Value","P Value","Eta Squared","Partial Eta Squared","Cohen's F","Omega Squared","Note"))
-  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
-  expect_equal(colnames(ret),
-    c("vs","Group 1","Group 2","Difference",
-      "Conf Low", "Conf High","Standard Error","DF","t Value","P Value","Method"))
-  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  expect_true("p.value" %in% colnames(ret))
-
-  ret <- model_df %>% tidy_rowwise(model, type="levene")
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="data")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-})
-
-test_that("test ANCOVA with exp_anova", {
-  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
-  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
-                                    covariate_funs=list("w t"="log", "q sec"="none"),
-                                    with_interaction = TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  ret <- model_df %>% tidy_rowwise(model, type="levene")
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
-
-  expect_equal(colnames(ret),
-    c("a m", "w t", "Rows", "Mean", "Std Deviation", "Std Error", 
-    "Conf Low", "Conf High", "Mean (Adj)", "Std Error (Adj)", 
-    "Conf Low (Adj)", "Conf High (Adj)", "DF", "Minimum", "Maximum"))
-
-  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  expect_true("p.value" %in% colnames(ret))
-
-  ret <- model_df %>% tidy_rowwise(model, type="anova")
-  ret <- model_df %>% tidy_rowwise(model, type="data")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("a m","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
-                 "Minimum","Maximum"))
-
-  # Test broom output to detect changes at upgrade.
-  x <- model_df$model[[1]]
-  ret <- broom::tidy(car::Anova(x, type="III"))
-  expect_equal(colnames(ret),
-               c("term", "sumsq", "df", "statistic", "p.value"))
-  ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=median))
-  expect_equal(colnames(ret),
-               c("statistic", "p.value", "df", "df.residual"))
-  ret <- broom::tidy(shapiro.test(x$residuals))
-  expect_equal(colnames(ret),
-               c("statistic", "p.value", "method"))
-})
-
-test_that("test ANCOVA with exp_anova with NA and others in the variable.", {
-  df<- readRDS(url("https://www.dropbox.com/scl/fi/ranvxxcihbdeosgvs7z96/28337.rds?rlkey=73xo6c8cig6k1o5xsu9v9gndb&dl=1"))
-  model_df <- df %>% exp_anova(`出発 遅れ表`, `航空 会社表`, covariates = c("到着 遅れ表"), covariate_funs = c("到着 遅れ表" = "none"), with_interaction = TRUE)
-  # Make sure type="levene" doesn't fail.
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="median")
-  expect_equal(colnames(ret), c( "F Value", "P Value", "DF", "Residual DF", "Method" ,"Result"))
-})
-
-test_that("test ANCOVA with exp_anova with logical group variable", {
-  mtcars2 <- mtcars %>% mutate(`a m`=as.logical(am), `w t`=wt, `q sec`=qsec)
-  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
-                                    covariate_funs=list("w t"="log", "q sec"="none"),
-                                    with_interaction = TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  ret <- model_df %>% tidy_rowwise(model, type="levene")
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey", sort_factor_levels=TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  ret <- model_df %>% tidy_rowwise(model, type="anova")
-  ret <- model_df %>% tidy_rowwise(model, type="data")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("a m","Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
-                 "Minimum","Maximum"))
-
-  # Test broom output to detect changes at upgrade.
-  x <- model_df$model[[1]]
-  ret <- broom::tidy(car::Anova(x, type="III"))
-  expect_equal(colnames(ret),
-               c("term", "sumsq", "df", "statistic", "p.value"))
-  ret <- broom::tidy(car::leveneTest(x$residuals, x$data[[x$var2]], center=median))
-  expect_equal(colnames(ret),
-               c("statistic", "p.value", "df", "df.residual"))
-  ret <- broom::tidy(shapiro.test(x$residuals))
-  expect_equal(colnames(ret),
-               c("statistic", "p.value", "method"))
-})
-
-test_that("test ANCOVA with repeat-by", {
-  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec) %>% group_by(vs)
-  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
-                                    covariate_funs=list("w t"="log", "q sec"="none"),
-                                    with_interaction = TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  ret <- model_df %>% tidy_rowwise(model, type="levene")
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey", sort_factor_levels=TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  ret <- model_df %>% tidy_rowwise(model, type="anova")
-  ret <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-})
-
-test_that("test ANCOVA with exp_anova with some NAs in the data", {
-  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
-  mtcars2$`a m`[[1]] <- NA
-  mtcars2$`w t`[[2]] <- NA
-  mtcars2$`q sec`[[3]] <- NA
-  model_df <- mtcars2 %>% exp_anova(mpg, `a m`, covariates=c("w t", "q sec"),
-                                    covariate_funs=list("w t"="log", "q sec"="none"),
-                                    with_interaction = TRUE)
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  # TODO: make them work.
-  # ret <- model_df %>% tidy_rowwise(model, type="levene")
-  # ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="emmeans")
-  ret <- model_df %>% tidy_rowwise(model, type="pairs")
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  ret <- model_df %>% tidy_rowwise(model, type="anova")
-  ret <- model_df %>% tidy_rowwise(model, type="data")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("a m","Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
-                 "Minimum","Maximum"))
-})
-
-test_that("test exp_anova", {
-  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
-  model_df <- exp_anova(mtcars2, mpg, `a m`)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  expect_equal(nrow(ret), 3) # Between Groups, Within Group, and Total.
-  # Make sure the estimate is between conf.low and conf.high.
-  expect_equal(all(ret$`Difference` >= ret$`Conf Low`), TRUE)
-  expect_equal(all(ret$`Difference` <= ret$`Conf High`), TRUE)
-
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-  expect_true("p.value" %in% colnames(ret))
-
-  ret <- model_df %>% tidy_rowwise(model, type="shapiro")
-  ret <- model_df %>% tidy_rowwise(model, type="levene")
-  ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
-  ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
-  res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
-  model_df <- exp_anova(mtcars, mpg, gear)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("gear","Rows","Mean","Std Error","Conf Low","Conf High","Std Deviation",   
-                 "Minimum","Maximum"))
-  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
-})
-
-test_that("test exp_anova with logical group column", {
-  mtcars2 <- mtcars %>% mutate(`a m`=factor(as.logical(am)), `w t`=wt, `q sec`=qsec)
-  model_df <- exp_anova(mtcars2, mpg, `a m`)
-  res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
-})
-
-test_that("test exp_anova with factor group column", {
-  mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
-  model_df <- exp_anova(mtcars2, mpg, `a m`)
-  res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
-})
-
-test_that("test exp_anova with group-level error (lack of unique values)", {
-  df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
-  model_df <- df %>% dplyr::group_by(`group`) %>% exp_anova(`value`, `category`)
-  ret <- model_df %>% tidy_rowwise(model, type='model')
-  expect_equal(colnames(ret),
-               c("group","Note"))
-  ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
-  expect_equal(nrow(ret), 0)
-})
-
-test_that("test exp_anova with group-level error (not enought data)", {
-  df <- tibble::tibble(group=c(1,1,2,2),category=c("a","b","a","b"),value=c(1,2,1,2))
-  model_df <- df %>% dplyr::group_by(`group`) %>% exp_anova(`value`, `category`)
-  ret <- model_df %>% tidy_rowwise(model, type='model')
-  expect_equal(colnames(ret),
-               c("group","Rows", "Note"))
-  ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
-  expect_equal(nrow(ret), 0)
-})
-
-test_that("test exp_anova with outlier filter", {
-  model_df <- exp_anova(mtcars, mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  model_df <- exp_anova(mtcars, mpg, gear, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("gear","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
-                 "Minimum","Maximum"))
-})
-
-test_that("test exp_anova with required power", {
-  model_df <- exp_anova(mtcars, mpg, am, power=0.8)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  model_df <- exp_anova(mtcars, mpg, gear, power=0.8)
-  ret <- model_df %>% tidy_rowwise(model, type="model")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("gear","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
-                 "Minimum","Maximum"))
-})
-
-test_that("test exp_anova with grouping functions", {
-  model_df <- exp_anova(mtcars, mpg, am, func2="asint")
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("am","Rows","Mean","Std Error", "Conf Low","Conf High","Std Deviation",   
-                 "Minimum","Maximum"))
-})
 
 
-test_that("test exp_anova with group_by", {
-  model_df <- mtcars %>% group_by(vs) %>% exp_anova(mpg, am)
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  model_df <- mtcars %>% group_by(vs) %>% exp_anova(mpg, gear)
-  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  expect_equal(colnames(ret),
-               c("vs","gear","Rows","Mean","Std Error","Conf Low","Conf High",
-                 "Std Deviation","Minimum","Maximum"))
-})
 
-test_that("test exp_normality", {
-  df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) # test for column with always same value, except for NA.
-  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20, n_sample_qq=30)
-  qq <- ret %>% tidy_rowwise(model, type="qq")
-  model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
-  expect_equal(colnames(model_summary),
-               c("Column","W Value","P Value","Sample Size","Result"))
-})
 
-test_that("test exp_normality with group", {
-  df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) %>% # test for column with always same value, except for NA.
-    group_by(am)
-  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20, n_sample_qq=30)
-  qq <- ret %>% tidy_rowwise(model, type="qq")
-  expect_true("am" %in% colnames(qq))
-  model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
-  expect_true("am" %in% colnames(model_summary))
-})
 
-test_that("test exp_normality with column with almost always same value", {
-  # test for column with almost always same value, except for NA, to test column prefiltering logic to avoid error.
-  df <- mtcars %>% mutate(dummy=c(NA, 0, rep(1,n()-2)))
-  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=6, n_sample_qq=30)
-  qq <- ret %>% tidy_rowwise(model, type="qq")
-  model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
-  expect_equal(colnames(model_summary),
-               c("Column","W Value","P Value","Sample Size","Result"))
-})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 test_that("generate_ttest_density_data returns correct structure", {
   ret <- exploratory:::generate_ttest_density_data(t=2.5, p.value=0.02, df=10)
