@@ -17,6 +17,7 @@ getAzureContainer <- function(host = "", securityToken = "", container = "") {
 #' @param host
 #' @param securityToken
 #' export
+#' @export
 listAzureContainers <- function(host = "", securityToken = ""){
   endpoint <- getAzureEndPoint(host = host, securityToken = securityToken)
   containers <- AzureStor::list_storage_containers(endpoint)
@@ -29,6 +30,7 @@ listAzureContainers <- function(host = "", securityToken = ""){
 #' @param container
 #' @param folder
 #' export
+#' @export
 listItemsInAzure <- function(host = "", securityToken = "", container = "", folder = ""){
   container <- getAzureContainer(host = host, securityToken = securityToken, container = container)
   AzureStor::list_storage_files(container, dir = folder, info = "all")

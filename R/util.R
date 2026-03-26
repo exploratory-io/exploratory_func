@@ -372,6 +372,7 @@ ceiling <- function(x, digits = 0) {
 }
 
 #' Not %in% function
+#' @export
 `%nin%` <- function (x, table) match(x, table, nomatch = 0L) == 0L
 
 #' get number of elements in list data type column for each row
@@ -707,6 +708,7 @@ confint_radius <- function(x, level=0.95) {
 #'
 #` @param sd - standard deviation of the group.
 #` @param n - sample size of the group.
+#' @export
 calc_confint_mean <- function (sd, n, level=0.95) {
   error <- qt((level+1)/2, df=n-1)*sd/sqrt(n)
   error
@@ -731,6 +733,7 @@ prop_confint_radius <- function(x, level=0.95) {
 #'
 #` @param ratio - target ratio (0-1) of the group.
 #` @param n - sample size of the group.
+#' @export
 calc_confint_ratio <- function (ratio, n, level=0.95) {
   error <- qnorm((level+1)/2)*sqrt(ratio*(1-ratio)/n)
   error
@@ -1561,6 +1564,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of %in% if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
+#' @export
 `%in_or_all%` <- function(x,y) {
   if (length(y) == 0) {
     return(!(x %in% y))
@@ -1575,6 +1579,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' If y is empty or NULL, return TRUE.
 #' This is used for filter conditions controlled by a variable, so that filtering
 #' is effectively skipped when the variable is empty or NULL.
+#' @export
 `%equal_or_all%` <- function(x, y) {
   # Use %in_or_all% if y has more than one element
   if (length(y) > 1) {
@@ -1595,6 +1600,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' If y is empty or NULL, return TRUE.
 #' This is used for filter conditions controlled by a variable, so that filtering
 #' is effectively skipped when the variable is empty or NULL.
+#' @export
 `%not_equal_or_all%` <- function(x, y) {
   # Use x %nin% y if y has more than one element
   if (length(y) > 1) {
@@ -1613,6 +1619,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of ">" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
+#' @export
 `%greater_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -1625,6 +1632,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of ">=" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
+#' @export
 `%greater_or_equal_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -1637,6 +1645,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of ">" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
+#' @export
 `%less_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -1649,6 +1658,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' Return result of "<=" if y is not empty or NULL. Otherwise return TRUE.
 #' We use this for filter condition controlled by a variable so that filtering is effectively
 #' skipped when the variable is empty or NULL.
+#' @export
 `%less_or_equal_or_all%` <- function(x,y) {
   if (is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
@@ -2210,6 +2220,7 @@ get_row_numbers_from_index_vector <- function(index_vector) {
 }
 
 # Calculates average moving range of a vector.
+#' @export
 get_average_moving_range <- function(x) {
   # Remove NAs
   x <- x[!is.na(x)]
@@ -2638,6 +2649,7 @@ complete_date <- function(df, date_col, time_unit = "day") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
+#' @export
 ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   if (unit == "day") {
     time_unit_func <- lubridate::days
@@ -2674,6 +2686,7 @@ ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
+#' @export
 ts_diff <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
   res <- x - x_lag
@@ -2681,6 +2694,7 @@ ts_diff <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
+#' @export
 ts_diff_ratio <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
   res <- (x - x_lag)/x_lag
@@ -2807,6 +2821,7 @@ construct_new_labels <- function(base.labels, new.labels) {
 # Example
 # Input: "(0.996,2.33]", "(2.33,3.67]", "(3.67,5]"
 # Output: "0.996 - 2.33", "2.33 - 3.67", "3.67 - 5"
+#' @export
 format_cut_output <- function(x, decimal.digits=2, big.mark=",", small.mark=".", new.labels=NULL, prefix="", suffix="", right=TRUE) {
   # Exit if the length is 0.
   if (length(x) == 0 || all(is.na(x))) {

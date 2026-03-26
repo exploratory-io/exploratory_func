@@ -1,5 +1,7 @@
 #' Forecast time series data by ARIMA model
 # TODO: write docs
+#' @export
+exp_arima <- function(df, time, valueColumn,
                       periods = 10,
                       time_unit = "day",
                       fun.aggregate = sum,

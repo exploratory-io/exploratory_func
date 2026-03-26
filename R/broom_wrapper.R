@@ -681,6 +681,7 @@ add_prediction2 <- function(df, model_df, conf_int = 0.95, ...){
 
 # Simplified, model agnostic version of rf_evaluation_training_and_test.
 # Currently used only by cox regression and survival forest, but planning to migrate others to this one.
+#' @export
 evaluation <- function(df, ...){
   validate_empty_data(df)
 

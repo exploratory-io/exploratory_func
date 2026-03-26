@@ -8,6 +8,7 @@
 #' Can be na.omit, na.pass, na.fail
 #' @param sparse If matrix should be sparse.
 #' As default, it becomes sparse if there is any categorical value.
+#' @export
 fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
@@ -93,6 +94,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 #' formula version of xgboost (multinomial)
 #' @param output_type Type of output. Can be "logistic" or "logitraw"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
+#' @export
 xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", params = list(), ...) {
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
@@ -151,6 +153,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 #' formula version of xgboost (multinomial)
 #' @param output_type Type of output. Can be "softprob" or "softmax"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
+#' @export
 xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
@@ -211,6 +214,7 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' formula version of xgboost (regression)
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
+#' @export
 xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NULL, params = list(), tweedie_variance_power = 1.5, ...) {
   # There can be more than 2 eval_metric
   # by creating eval_metric parameters in params list,
@@ -782,15 +786,10 @@ predict_xgboost <- function(model, df) {
 calc_permutation_importance_xgboost_regression <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    tryCatch({
-      mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
-                                  predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                  # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
-                                  loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
-    }, error = function(e) {
-      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
-           call. = FALSE)
-    })
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
@@ -801,16 +800,11 @@ calc_permutation_importance_xgboost_regression <- function(fit, target, vars, da
 calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    tryCatch({
-      mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
-                                  predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                  loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])), na.rm = TRUE)} # Negative-log-likelihood-based loss function.
-                                  # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
-                                  )
-    }, error = function(e) {
-      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
-           call. = FALSE)
-    })
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])), na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                )
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
@@ -821,16 +815,11 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
 calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    tryCatch({
-      mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
-                                  predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                  # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
-                                  loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
-                                  )
-    }, error = function(e) {
-      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
-           call. = FALSE)
-    })
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]), na.rm = TRUE)} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
+                                )
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
@@ -1021,486 +1010,6 @@ cleanup_df_for_test <- function(df_test, df_train, c_cols) {
   df_test_clean
 }
 
-                        target,
-                        ...,
-                        target_fun = NULL,
-                        predictor_funs = NULL,
-                        max_nrow = 50000, # Down from 200000 when we added partial dependence
-                        # XGBoost-specific parameters
-                        nrounds = 10,
-                        watchlist_rate = 0,
-                        sparse = FALSE,
-                        booster = "gbtree",
-                        early_stopping_rounds = NULL, # No early stop.
-                        max_depth = 6,
-                        min_child_weight = 1,
-                        gamma = 1,
-                        subsample = 1,
-                        colsample_bytree = 1,
-                        eta = 0.3, # We used to set learning_rate parameter here for Analytics Step. Corrected it while 6.2 development.
-                                   # Either xgboost package changed parameter name at some point,
-                                   # or we might have been wrong about the parameter name in the first place.
-                        output_type_regression = "linear",
-                        eval_metric_regression = "rmse",
-                        output_type_binary = "logistic",
-                        eval_metric_binary = "auc",
-                        output_type_multiclass = "softprob",
-                        eval_metric_multiclass = "merror",
-                        # Model agnostic parameters
-                        target_n = 20,
-                        predictor_n = 12, # So that at least months can fit in it.
-                        smote = FALSE,
-                        smote_target_minority_perc = 40,
-                        smote_max_synth_perc = 200,
-                        smote_k = 5,
-                        smote_keep_synthetic = TRUE,
-                        importance_measure = "permutation", # "permutation", "impurity", or "firm".
-                        max_pd_vars = NULL,
-                        # Number of most important variables to calculate partial dependences on. 
-                        # By default, when Boruta is on, all Confirmed/Tentative variables.
-                        # 12 when Boruta is off.
-                        pd_sample_size = 500,
-                        pd_grid_resolution = 20,
-                        pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
-                        # with_boruta = FALSE,
-                        # boruta_max_runs = 20, # Maximal number of importance source runs.
-                        # boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
-                        seed = 1,
-                        test_rate = 0.0,
-                        test_split_type = "random" # "random" or "ordered"
-                        ){
-  if(test_rate < 0 | 1 < test_rate){
-    stop("test_rate must be between 0 and 1")
-  } else if (test_rate == 1){
-    stop("test_rate must be less than 1")
-  }
-
-  # this seems to be the new way of NSE column selection evaluation
-  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
-  # this evaluates select arguments like starts_with
-  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-
-  target_funs <- NULL
-  if (!is.null(target_fun)) {
-    target_funs <- list(target_fun)
-    names(target_funs) <- target_col
-    df <- df %>% mutate_predictors(target_col, target_funs)
-  }
-
-  if (!is.null(predictor_funs)) {
-    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
-    selected_cols <- names(unlist(predictor_funs))
-  }
-  else {
-    selected_cols <- orig_selected_cols
-  }
-
-  grouped_cols <- grouped_by(df)
-
-  # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- stringr::str_sort(selected_cols)
-
-  # Remember if the target column was originally numeric or logical before converting type.
-  is_target_numeric <- is.numeric(df[[target_col]])
-  is_target_logical <- is.logical(df[[target_col]])
-
-  orig_levels <- NULL
-  if (is.factor(df[[target_col]])) {
-    orig_levels <- levels(df[[target_col]])
-  }
-  else if (is.logical(df[[target_col]])) {
-    orig_levels <- c("TRUE","FALSE")
-  }
-
-  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
-
-  clean_df <- clean_ret$clean_df
-  name_map <- clean_ret$name_map
-  clean_target_col <- clean_ret$clean_target_col
-  clean_cols <- clean_ret$clean_cols
-
-  # if target is numeric, it is regression but
-  # if not, it is classification
-  classification_type <- get_classification_type(clean_df[[clean_target_col]])
-
-  each_func <- function(df) {
-    tryCatch({
-      if(!is.null(seed)){
-        set.seed(seed)
-      }
-
-      # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
-      unique_val <- unique(df[[clean_target_col]])
-      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        sample_size <- NULL
-      }
-      else {
-        sample_size <- max_nrow
-      }
-      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample called inside cleanup_df_per_group,
-      # so that we know the original classes of columns before characters are turned into factors,
-      # so that we can sort the partial dependence data for display accordingly.
-      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
-      # orig_predictor_classes than the partial dependence data.
-      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
-      # that should not happen, since the extraction is already done by mutate_predictors.
-      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
-
-      # Count rows with Inf in numeric predictor columns BEFORE cleanup_df_per_group filters them
-      # This is needed because preprocess_regression_data_before_sample (called inside cleanup_df_per_group)
-      # filters Inf values, so we need to count them before they're removed
-      numeric_pred_cols <- clean_cols[sapply(clean_cols, function(col) is.numeric(df[[col]]))]
-      if (length(numeric_pred_cols) > 0) {
-        rows_with_inf <- rowSums(do.call(cbind, lapply(numeric_pred_cols, function(col) is.infinite(df[[col]])))) > 0
-        inf_removed_rows <- sum(rows_with_inf)
-      } else {
-        inf_removed_rows <- 0
-      }
-
-      # Handle edge case: all rows would be removed due to Inf values
-      if (inf_removed_rows == nrow(df)) {
-        stop("All rows were removed due to Inf values in predictors. Please check your data.")
-      }
-
-      # XGBoost can work with NAs in numeric predictors. TODO: verify it.
-      # Also, no need to convert logical to factor unlike ranger.
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE, convert_logical=FALSE)
-      if (is.null(clean_df_ret)) {
-        return(NULL) # skip this group
-      }
-      df <- clean_df_ret$df
-      c_cols <- clean_df_ret$c_cols
-      if  (length(c_cols) == 0) {
-        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
-        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
-      }
-      name_map <- clean_df_ret$name_map
-
-      # Create message if Inf values were removed (they were filtered inside cleanup_df_per_group)
-      if (inf_removed_rows > 0) {
-        inf_removed_message <- paste0(
-          "Note: ", inf_removed_rows, " row(s) with Inf values in predictors were automatically removed."
-        )
-      } else {
-        inf_removed_message <- NULL
-      }
-
-      # Split training and test data BEFORE applying SMOTE
-      # This ensures test data remains pure and doesn't contain synthetic samples
-      source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
-      df <- safe_slice(source_data, test_index, remove = TRUE)
-      if (test_rate > 0) {
-        df_test <- safe_slice(source_data, test_index, remove = FALSE)
-      }
-
-      # Store original training data before SMOTE for later prediction
-      df_train_original <- df
-      
-      # Apply SMOTE only to training data after split
-      unique_val <- unique(df[[clean_target_col]])
-      smote_applied <- FALSE
-      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
-        
-        # Check if SMOTE was actually applied by checking for synthesized column
-        smote_applied <- "synthesized" %in% colnames(df)
-        
-        # If smote_keep_synthetic is TRUE and SMOTE was applied, update source_data
-        if (smote_keep_synthetic && smote_applied) {
-          # Keep the synthesized column to mark synthetic samples
-          # Combine SMOTE-enhanced training data with test data
-          if (test_rate > 0) {
-            # Add synthesized column to test data (all FALSE since they're real)
-            df_test$synthesized <- FALSE
-            # Update source_data to be the combined SMOTE-enhanced train + original test
-            source_data <- bind_rows(df, df_test)
-            # Update test_index to point to the test rows in the new source_data
-            # Test data is now at the end, starting from nrow(df) + 1
-            test_index <- (nrow(df) + 1):nrow(source_data)
-          } else {
-            # No test data, just use SMOTE-enhanced training data
-            source_data <- df
-          }
-        } else if (smote_applied) {
-          # SMOTE was applied but not keeping synthetic samples in output
-          # Remove synthesized column
-          df <- df %>% dplyr::select(-dplyr::any_of("synthesized"))
-        }
-      }
-
-      # Restore source_data column name to original column name
-      rev_name_map <- names(name_map)
-      names(rev_name_map) <- name_map
-      # Preserve column names that don't have mappings (like 'synthesized')
-      new_names <- rev_name_map[colnames(source_data)]
-      colnames(source_data) <- ifelse(is.na(new_names), colnames(source_data), new_names)
-
-      # build formula for randomForest
-      rhs <- paste0("`", c_cols, "`", collapse = " + ")
-      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
-
-      if (is_target_logical) {
-        model <- xgboost_binary(df, fml,
-                        nrounds = nrounds,
-                        watchlist_rate = watchlist_rate,
-                        sparse = sparse,
-                        booster = booster,
-                        early_stopping_rounds = early_stopping_rounds,
-                        max_depth = max_depth,
-                        min_child_weight = min_child_weight,
-                        gamma = gamma,
-                        subsample = subsample,
-                        colsample_bytree = colsample_bytree,
-                        eta = eta,
-                        output_type = output_type_binary, 
-                        eval_metric = eval_metric_binary)
-      }
-      else if(is_target_numeric) {
-        model <- xgboost_reg(df, fml,
-                        nrounds = nrounds,
-                        watchlist_rate = watchlist_rate,
-                        sparse = sparse,
-                        booster = booster,
-                        early_stopping_rounds = early_stopping_rounds,
-                        max_depth = max_depth,
-                        min_child_weight = min_child_weight,
-                        gamma = gamma,
-                        subsample = subsample,
-                        colsample_bytree = colsample_bytree,
-                        eta = eta,
-                        output_type = output_type_regression, 
-                        eval_metric = eval_metric_regression)
-      }
-      else {
-        model <- xgboost_multi(df, fml,
-                        nrounds = nrounds,
-                        watchlist_rate = watchlist_rate,
-                        sparse = sparse,
-                        booster = booster,
-                        early_stopping_rounds = early_stopping_rounds,
-                        max_depth = max_depth,
-                        min_child_weight = min_child_weight,
-                        gamma = gamma,
-                        subsample = subsample,
-                        colsample_bytree = colsample_bytree,
-                        eta = eta,
-                        output_type = output_type_multiclass, 
-                        eval_metric = eval_metric_multiclass)
-      }
-      class(model) <- c("xgboost_exp", class(model))
-
-      # When SMOTE is used, predict on appropriate training data
-      if (smote_applied) {
-        if (smote_keep_synthetic) {
-          # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
-          model$prediction_training <- predict_xgboost(model, df)
-        } else {
-          # If not keeping synthetic samples, predict on original training data (matches source.data)
-          model$prediction_training <- predict_xgboost(model, df_train_original)
-        }
-      } else {
-        model$prediction_training <- predict_xgboost(model, df)
-      }
-
-      if (test_rate > 0) {
-        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
-        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
-        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
-
-        prediction_test <- predict_xgboost(model, df_test_clean)
-
-        attr(prediction_test, "na.action") <- na_row_numbers_test
-        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
-        model$prediction_test <- prediction_test
-        model$df_test <- df_test_clean
-      }
-
-      if (is.null(max_pd_vars)) {
-        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
-      }
-
-      # return partial dependence
-      if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-        if (importance_measure == "permutation") {
-          if (is_target_logical) {
-            imp_df <- calc_permutation_importance_xgboost_binary(model, clean_target_col, c_cols, df)
-          }
-          else if (is_target_numeric) {
-            imp_df <- calc_permutation_importance_xgboost_regression(model, clean_target_col, c_cols, df)
-          }
-          else {
-            imp_df <- calc_permutation_importance_xgboost_multiclass(model, clean_target_col, c_cols, df)
-          }
-          model$imp_df <- imp_df
-        }
-        else if (importance_measure == "impurity" || # "impurity". Use the importance from the xgboost package.
-                 importance_measure == "xgboost") { # Because of an old bug in UI definition, it was specified as "xgboost" in pre-6.5 Desktop. Covering backward compatibility here. Remove it at appropriate timing.
-          imp_df <- importance_xgboost(model)
-          model$imp_df <- imp_df
-        }
-
-        if (importance_measure == "firm") {
-          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence first before calculating FIRM.
-        }
-        else if ("error" %in% class(imp_df)) {
-          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
-          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # just take max_pd_vars first variables
-        }
-        else {
-          imp_vars <- imp_df$variable
-          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        }
-      }
-      else {
-        error <- simpleError("Variable importance requires two or more variables.")
-        model$imp_df <- error
-        imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
-      }
-
-      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      model$imp_vars <- imp_vars
-      # Second element of n argument needs to be less than or equal to sample size, to avoid error.
-      if (length(imp_vars) > 0) {
-        model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df,
-                                                               n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)),
-                                                               classification=!(is_target_numeric||is_target_logical)) # We treat binary classification as a regression to predict probability here.
-      }
-      else {
-        model$partial_dependence <- NULL
-      }
-
-      if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
-        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          pdp_target_col <- attr(model$partial_dependence, "target")
-          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
-        }
-        else {
-          error <- simpleError("Variable importance requires two or more variables.")
-          model$imp_df <- error
-          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
-        }
-
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        model$imp_vars <- imp_vars
-        # Shrink the partial dependence data keeping only the important variables.
-        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
-      }
-
-      if (length(imp_vars) > 0) {
-        if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
-          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
-        }
-      }
-
-      # these attributes are used in tidy of randomForest
-      model$classification_type <- classification_type
-      model$orig_levels <- orig_levels
-      model$terms_mapping <- names(name_map)
-      names(model$terms_mapping) <- name_map
-      # model$y <- model.response(df) TODO: what was this??
-      model$df <- df
-      model$formula_terms <- terms(fml)
-      # To avoid saving a huge environment when caching with RDS.
-      attr(model$formula_terms,".Environment")<-NULL
-      model$sampled_nrow <- clean_df_ret$sampled_nrow
-
-      model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
-      if (!is.null(target_funs)) {
-        model$target_funs <- target_funs
-      }
-      if (!is.null(predictor_funs)) {
-        model$orig_predictor_cols <- orig_selected_cols
-        attr(predictor_funs, "LC_TIME") <- Sys.getlocale("LC_TIME")
-        attr(predictor_funs, "sysname") <- Sys.info()[["sysname"]] # Save platform name (e.g. Windows) since locale name might need conversion for the platform this model will be run on.
-        attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
-        model$predictor_funs <- predictor_funs
-      }
-      model$orig_predictor_classes <- orig_predictor_classes
-      
-      # Store Inf removal information for display in Analytics Guide
-      if (!is.null(inf_removed_message)) {
-        model$inf_removed_rows <- inf_removed_rows
-        model$inf_removed_message <- inf_removed_message
-      }
-
-      list(model = model, test_index = test_index, source_data = source_data)
-    }, error = function(e){
-      if(length(grouped_cols) > 0) {
-        # In repeat-by case, we report group-specific error in the Summary table,
-        # so that analysis on other groups can go on.
-        class(e) <- c("xgboost_exp", class(e))
-        list(model = e, test_index = NULL, source_data = NULL)
-      } else {
-        stop(e)
-      }
-    })
-  }
-
-  model_and_data_col <- "model_and_data"
-  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
-
-  # It is necessary to nest in order to retrieve the result stored in model_and_data_col.
-  # If there is a group column, omit the group column from nest, otherwise nest the whole
-  if (length(grouped_cols) > 0) {
-    ret <- ret %>% tidyr::nest(-grouped_cols)
-  } else {
-    ret <- ret %>% tidyr::nest()
-  }
-
-  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
-  # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
-  ret <- ret %>% dplyr::mutate(model = purrr::imap(data, function(df, idx){
-            tryCatch({
-              df[[model_and_data_col]][[1]]$model
-            }, error = function(e) {
-              stop(paste0(e$message, " (while extracting model from group ", idx, ")"),
-                   call. = FALSE)
-            })
-          })) %>%
-          dplyr::mutate(.test_index = purrr::imap(data, function(df, idx){
-            tryCatch({
-              df[[model_and_data_col]][[1]]$test_index
-            }, error = function(e) {
-              stop(paste0(e$message, " (while extracting test_index from group ", idx, ")"),
-                   call. = FALSE)
-            })
-          })) %>%
-          dplyr::mutate(source.data = purrr::imap(data, function(df, idx){
-            tryCatch({
-              data <- df[[model_and_data_col]][[1]]$source_data
-              if (length(grouped_cols) > 0 && !is.null(data)) {
-                data %>% dplyr::select(-grouped_cols)
-              } else {
-                data
-              }
-            }, error = function(e) {
-              stop(paste0(e$message, " (while extracting source.data from group ", idx, ")"),
-                   call. = FALSE)
-            })
-          })) %>%
-          dplyr::select(-data)
-
-  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
-  if (length(grouped_cols) > 0) {
-    ret <- ret %>% dplyr::rowwise(grouped_cols)
-  } else {
-    ret <- ret %>% dplyr::rowwise()
-  }
-
-  # If all the groups are errors, it would be hard to handle resulting data frames
-  # at the chart preprocessors. Hence, we instead stop the processing here
-  # and just throw the error from the first group.
-  if (purrr::every(ret$model, function(x) {"error" %in% class(x)})) {
-    stop(ret$model[[1]])
-  }
-
-  ret
-}
 
 # This is used from Analytics View only when classification type is regression.
 #' @export
@@ -1516,16 +1025,6 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
     stop("glance.xgboost_exp should not be called for classification")
   }
   ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
-  
-  # Add note about Inf removal if applicable
-  if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
-    if ("Note" %in% colnames(ret)) {
-      ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
-    } else {
-      ret$Note <- x$inf_removed_message
-    }
-  }
-  
   ret
 }
 
@@ -1594,14 +1093,6 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         else {
           predicted <- extract_predicted_multiclass_labels(x)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
-        }
-        # Add note about Inf removal if applicable
-        if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
-          if ("Note" %in% colnames(ret)) {
-            ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
-          } else {
-            ret$Note <- x$inf_removed_message
-          }
         }
         ret
       }

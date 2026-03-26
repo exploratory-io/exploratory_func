@@ -33,6 +33,7 @@ is_digit <- function(word){
 #' @param exclude Values that should be excluded from stop words
 #' @param is_twitter flag that tells if you want to get twitter related stopwords such as http and https.
 #' @return vector of stop words.
+#' @export
 get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twitter = TRUE){
   if(!requireNamespace("tidystopwords")){stop("package tidystopwords must be installed.")}
   lang <- tolower(lang)
@@ -84,252 +85,14 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
 }
 
 
-                                 drop = TRUE, with_id = TRUE, output = token,
-                                 remove_punct = TRUE, remove_numbers = TRUE,
-                                 remove_hyphens = FALSE, remove_separators = TRUE,
-                                 remove_symbols = TRUE, remove_twitter = TRUE,
-                                 remove_url = TRUE, stopwords_lang = NULL,
-                                 hiragana_word_length_to_remove = 2,
-                                 summary_level = "row", sort_by = "", ngrams = 1L, ...){
-
-  if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
-  if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
-  if(!requireNamespace("tidyr")){stop("package tidyr must be installed.")}
-  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
-  # Always put document_id to know what document the tokens are from
-  doc_id <- avoid_conflict(colnames(df), "document_id")
-  output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
-  # For the output column names (i.e. "token" and "count"), make sure that
-  # these column names become unique in case we keep original columns.
-  count_col <- "count"
-  token_col <- output_col
-  if(keep_cols) {
-    count_col <- avoid_conflict(colnames(df), "count")
-  }
-  # This is SE version of dplyr::mutate(df, doc_id = row_number())
-  df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
-  orig_input_col <- col_name(substitute(text_col))
-  textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
-  # Create a corpus from the text column then tokenize.
-  tokens <- quanteda::corpus(textData) %>%
-    quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
-                     remove_symbols = remove_symbols, remove_twitter = remove_twitter,
-                     remove_hyphens = remove_hyphens, remove_separators = remove_separators,
-                     remove_url = remove_url) %>%
-    quanteda::tokens_wordstem()
 
 
-  # when stopwords Language is set, use the stopwords to filter out the result.
-  if(!is.null(stopwords_lang)) {
-    stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang)
-    tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
-  }
-  # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
-  if(hiragana_word_length_to_remove > 0) {
-    tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
-  }
-  if(ngrams > 1) { # if ngrams is greater than 1, generate ngrams.
-    tokens <- quanteda::tokens_ngrams(tokens, n = 1:ngrams)
-  }
-  # convert tokens to dfm object
-  dfm <- tokens %>% quanteda::dfm()
 
-  # Now convert result dfm to a data frame
-  resultTemp <- quanteda::convert(dfm, to = "data.frame")
-  # The first column name returned by quanteda::convert is always "doc_id" so rename it to avoid it conflicts with other tokens
-  docCol <- resultTemp[c(1)]
-  # Exclude the "doc_id" column
-  result <- resultTemp[c(-1)]
-  # Then bring the column back as internal doc_id column
-  result$document.exp.token.col <- docCol$doc_id
 
-  # Convert the data frame from "wide" to "long" format by tidyr::gather.
-  result <- result %>% tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
-    # Exclude unused tokens for the document.
-    dplyr::filter(!!as.name(count_col) > 0) %>%
-    # The internal doc_id column value looks like "text100". Remove text part to make it numeric.
-    dplyr::mutate(document_id = as.numeric(stringr::str_remove(document.exp.token.col, "text"))) %>%
-    # Drop internal doc_id column
-    dplyr::select(-document.exp.token.col) %>%
-    # Sort result by document_id to align with original data frame's order.
-    dplyr::arrange(document_id)
-
-  if(keep_cols) {
-    # If we need to keep original columns, then bring them back by joining the result data frame with original data frame.
-    result <- df %>%  dplyr::left_join(result, by=c("document_id" = "document_id"))
-    if(drop) { # drop the text column
-      result <- result %>% dplyr::select(-orig_input_col)
-    }
-  } else if(!drop) { # Bring back the text column by by joining the result data frame with original data frame and drop unwanted columns.
-    result <- df %>% dplyr::left_join(result, by=c("document_id"= "document_id")) %>%
-      select(document_id, !!count_col, !!token_col, orig_input_col);
-  }
-  if(!with_id) { # Drop the document_id column
-    result <- result %>% dplyr::select(-document_id)
-  }
-  # result column order should be document_id, <token_col>, <count_col> ...
-  if(!with_id) {
-    result <- result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
-  } else {
-    result <- result %>% select(document_id, !!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
-  }
-  # if the summary_level is "all", summarize it by token.
-  if(summary_level == "all") {
-    result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := sum(!!rlang::sym(count_col), na.rm = TRUE))
-  }
-  # Sort handling. if count is specified, sort by count descending.
-  if(sort_by == "count") {
-    result <- result %>% arrange(desc(!!rlang::sym(count_col)))
-  } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
-    result <- result %>% arrange(!!rlang::sym(token_col))
-  } else if (sort_by == "doc" && with_id) { # if document_id exists and sort by option is doc, sort by document_id.
-    result <- result %>% arrange(document_id)
-  }
-  result
-}
-
-                        drop = TRUE, with_sentence_id = TRUE,
-                        output = "token", output_case = "lower",
-                        remove_punct = TRUE, remove_numbers = TRUE,
-                        remove_alphabets = FALSE,
-                        tokenize_tweets = FALSE,
-                        remove_url = TRUE, remove_twitter = TRUE,
-                        stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
-                        hiragana_word_length_to_remove = 2,
-                        compound_tokens = NULL, ...) {
-  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
-  if (!keep_cols) {
-    # Keep only the column to tokenize
-    df <- df[text_col]
-  }
-  # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
-  df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
-  # Preserve df and text_col at this point before modifying them while tokenizing into sentences,
-  # for the purpose of adding them back to the output.
-  df_orig <- df
-  text_col_orig <- text_col
-
-  # As pre-processing, split text into sentences, if sentence_id is needed or the final output should be sentences.
-  if (with_sentence_id || token == "sentences") {
-    text_v <- df[[text_col]]
-    tryCatch({
-      sentences_list <- tokenizers::tokenize_sentences(text_v)
-    }, error = function(e) {
-      # tokenize_sentences can throw error about invalid UTF-8 characters.
-      # Try to recover from it by fixing the input with stri_enc_toutf8.
-      if (stringr::str_detect(e$message, "invalid UTF-8 byte sequence detected")) {
-        text_v <- stringi::stri_enc_toutf8(text_v, validate = TRUE) # validate=TRUE replaces invalid characters with replacement character.
-        sentences_list <<- tokenizers::tokenize_sentences(text_v)
-      }
-      else {
-        stop(e)
-      }
-    })
-    # Create a data.frame, where one row represents one sentence. document_id is the document the sentence belongs (row number in the original df.)
-    # .sentence is the text of the sentence.
-    # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here.
-    # as.integer() is there to convert the matrix unlist() returns there into an integer vector.
-    # unname() is there to unname the named vector unlist returns.
-    res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
-                                                                 sentences_list, seq_along(sentences_list)))),
-                          .sentence = unname(unlist(sentences_list)))
-    df <- res
-    text_col <- ".sentence"
-    # Replace NAs with empty string again. As a result of this tokenization, NAs can be introduced.
-    df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
-  }
-
-  if (token == "words") {
-    text_v <- df[[text_col]]
-    tokens <- tokenize_with_postprocess(text_v,
-                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
-                                        remove_alphabets = remove_alphabets,
-                                        tokenize_tweets = tokenize_tweets,
-                                        remove_url = remove_url, remove_twitter = remove_twitter,
-                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
-                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
-                                        compound_tokens = compound_tokens)
-    tokens_list <- as.list(tokens)
-    if (with_sentence_id) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
-      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, df$document_id))),
-                            sentence_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
-      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
-    }
-    else { # with_sentence_id is FALSE
-      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
-      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
-    }
-    if (output_case == "title") {
-      res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_title(!!rlang::sym(output)))
-    }
-    else if (output_case == "upper") {
-      res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_upper(!!rlang::sym(output)))
-    }
-  }
-  else { # This means token == "sentences"
-    # Just rename the output column from the pre-processing.
-    res <- res %>% dplyr::rename(!!rlang::sym(output) := !!rlang::sym(text_col))
-  }
-
-  # Filter out rows with NA token. This happens if a sentence's tokens were all removed.
-  res <- res %>% dplyr::filter(!is.na(!!rlang::sym(output)))
-
-  # Put back other columns if necessary.
-  if (!drop || keep_cols) {
-    if (drop) {
-      df_orig <- df_orig %>% select(-!!rlang::sym(text_col_orig))
-    }
-    df_orig <- df_orig %>% dplyr::mutate(document_id=seq(n())) # If document_id is in the input, it is overwritten.
-    res <- res %>% dplyr::left_join(df_orig, by="document_id")
-  }
-  res
-}
-
-                      tf_scheme = "logcount",
-                      idf_scheme = "inverse",
-                      tfidf_base = 10,
-                      idf_smoothing = 0,
-                      idf_k = 0,
-                      idf_threshold = 0) {
-  document_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(document))
-  term_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(term))
-  df <- df %>% dplyr::rename(document_id=!!rlang::sym(document_col), term=!!rlang::sym(term_col))
-  each_func <- function(df) {
-    nested <- df %>% dplyr::nest_by(document_id)
-    tokens_list <- purrr::map(nested$data, function(x){x$term})
-    names(tokens_list) <- paste0("text", 1:length(tokens_list)) # Add unique names to the list so that it can be passed to quanteda::tokens().
-    # Create a mapping from position (1, 2, 3...) to actual document_id
-    doc_id_map <- tibble::tibble(document = 1:length(nested$document_id), document_id = nested$document_id)
-    tokens <- quanteda::tokens(tokens_list)
-    dfm_res <- tokens %>% quanteda::dfm()
-    dfm_df <- dfm_to_df(dfm_res)
-    doc_freq_df <- dfm_df %>% dplyr::group_by(token_id) %>% dplyr::summarize(count_of_docs=n()) # We will join this to the main results to show count of documents.
-    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res,
-                                         scheme_tf = tf_scheme,
-                                         scheme_df = idf_scheme,
-                                         base = tfidf_base,
-                                         smoothing = idf_smoothing,
-                                         k = idf_k,
-                                         threshold = idf_threshold)
-    tfidf_df <- dfm_to_df(dfm_tfidf_res)
-    res <- dfm_df %>% dplyr::rename(count_per_doc=value) %>% dplyr::left_join(doc_freq_df, by=c(token_id="token_id"))
-    res <- res %>% dplyr::left_join(tfidf_df %>% dplyr::select(document, token_id, tfidf=value),by=c(document="document", token_id="token_id"))
-    # Map document position back to actual document_id using the mapping
-    res <- res %>% dplyr::left_join(doc_id_map, by="document") %>% dplyr::select(-document)
-    # Drop token_id we used as the join key, since it is an internal info that is not so useful for the users.
-    res <- res %>% dplyr::select(-token_id) %>% dplyr::arrange(document_id)
-    res <- res %>% dplyr::rename(!!rlang::sym(document_col):=document_id, !!rlang::sym(term_col):=token)
-    # Reorder columns to ensure document column comes first, then term column, then the rest
-    res <- res %>% dplyr::select(!!rlang::sym(document_col), !!rlang::sym(term_col), dplyr::everything())
-    res
-  }
-  res <- do_on_each_group(df, each_func, with_unnest = TRUE)
-  res
-}
 
 
 #' Calculate sentiment
+#' @export
 get_sentiment <- function(text){
   loadNamespace("sentimentr")
   if(is.character(text)) {
@@ -341,6 +104,7 @@ get_sentiment <- function(text){
 
 #' Wrapper function for readr::parse_character
 #' @param text to parse
+#' @export
 parse_character <- function(text, ...){
   # After updating readr version from 1.1.1 to to 1.3.1,
   # readr::parse_character now fails for non-characters.
@@ -355,6 +119,7 @@ parse_character <- function(text, ...){
 
 #' Wrapper function for readr::parse_number
 #' @param text to parse
+#' @export
 parse_number <- function(text, ...){
   # readr::parse_number used to allow already numeric input, by doing nothing,
   # but after updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
@@ -380,6 +145,7 @@ parse_number <- function(text, ...){
 
 #' Wrapper function for readr::parse_logical
 #' @param text to parse
+#' @export
 parse_logical <- function(text, ...){
   # After updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
   # So if logical, return as is for backward compatibility.
@@ -577,6 +343,7 @@ get_emoji_regex <- function() {
 }
 
 #'Function to remove emoji from a list of characters.
+#' @export
 str_remove_emoji <- function(column, position = "any"){
   regexp <- get_emoji_regex()
   if (position == "start") {
@@ -611,6 +378,7 @@ str_replace_after <- function(column, sep = "\\,", rep = "", include_sep = TRUE)
 }
 
 
+
 #'Function to replace range of text.
 #'
 #'It uses stringi::stri_sub_replace under the hood, but it does additional parameter validation.
@@ -631,6 +399,8 @@ str_replace_range <- function(column, start, end = -1, replacement = ""){
 }
 
 
+
+
 #' Function to detect pattern from a string.
 #' It's a wrapper function for stringr::str_detect and the wrapper function has ignore_case handling.
 #' @param string Input vector. Either a character vector, or something coercible to one.
@@ -638,6 +408,7 @@ str_replace_range <- function(column, start, end = -1, replacement = ""){
 #' @param negate If TRUE, return non-matching elements.
 #' @param ignore_case If TRUE, detect the pattern with case insensitive way.
 #' @param allow_empty_pattern if TRUE, assumes it matches (i.e. return TRUE), if FALSE underlying stringr::str_detect raises an error.
+#' @export
 str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE, allow_empty_pattern = TRUE) {
   # if pattern is not empty string and case insensitive is specified, use regex to handle the case insensitive match.
   # any() is necessary to avoid error when pattern is a vector.

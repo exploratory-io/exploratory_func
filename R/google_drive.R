@@ -10,6 +10,7 @@
 #' @param sharedWithMe - If this is set as TRUE, it only returns the items that are shared with the user. If this is set as FALSE, it only returns items whose the owner is your user.
 #' If this parameter is set as TRUE, it uses OAuth token set for Google Sheets Data Source.
 
+#' @export
 listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx"), n_max = 5000, pattern = "", useGoogleSheetsToken = FALSE, sharedWithMe = FALSE){
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
@@ -79,6 +80,7 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
 #' set this parameter as TRUE to make it work with Google Sheets Data Source case.
 #' If this parameter is set as TRUE, it uses OAuth token set for Google Sheets Data Source.
 #'
+#' @export
 getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL, useGoogleSheetsToken = FALSE) {
   if(!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")

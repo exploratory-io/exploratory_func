@@ -7,6 +7,7 @@ user_env$token_info <- new.env()
 user_env$downloads <- new.env()
 
 #' get oauth token info from key
+#' @export
 getTokenInfo <- function(token_key){
   user_env$token_info[[token_key]]
 }
@@ -145,104 +146,13 @@ readPasswordRDS = function(sourceName, userName){
   password
 }
 
-# Helper function to resolve milestone title to number
-# The GitHub API requires milestone number, not title.
-# This function allows users to pass either.
-resolve_milestone <- function(owner, repository, milestone, username, password) {
-  # Special values pass through unchanged
-  if (milestone %in% c("*", "none")) {
-    return(milestone)
-  }
-
-  # If it's already a whole integer (no decimal), pass through
-  # Note: as.integer("14.5") returns 14, so we need to check for exact match
-  if (grepl("^[0-9]+$", milestone)) {
-    return(milestone)
-  }
-
-  # Otherwise, look up by title
-  endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/milestones")
-
-  # Fetch all milestones (open and closed) to find the title
-  # Use pagination to retrieve all milestones, not just the first 100
-  all_milestones <- list()
-  for (state in c("open", "closed")) {
-    page <- 1
-    repeat {
-      res <- httr::GET(endpoint,
-                       query = list(state = state, per_page = 100, page = page),
-                       httr::authenticate(username, password))
-      if (httr::status_code(res) != 200) {
-        break
-      }
-      jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
-      milestones <- jsonlite::fromJSON(jsondata, flatten = TRUE)
-      if (length(milestones) == 0 || nrow(milestones) == 0) {
-        break
-      }
-      all_milestones <- c(all_milestones, list(milestones))
-      # If we got fewer than 100, we've reached the last page
-      if (nrow(milestones) < 100) {
-        break
-      }
-      page <- page + 1
-    }
-  }
-
-  if (length(all_milestones) > 0) {
-    milestones_df <- dplyr::bind_rows(all_milestones)
-    match <- milestones_df[milestones_df$title == milestone, ]
-    if (nrow(match) > 0) {
-      return(as.character(match$number[1]))
-    }
-  }
-
-  # If not found, return original (API will handle the error)
-  warning(paste0("Milestone '", milestone, "' not found. Using as-is."))
-  return(milestone)
-}
-
-#' Get GitHub Issues
-#'
-#' Fetches issues from a GitHub repository with optional filtering.
-#'
-#' @param username GitHub username for authentication
-#' @param password GitHub personal access token
-#' @param owner Repository owner (user or organization)
-#' @param repository Repository name
-#' @param state Issue state: "open", "closed", or "all" (default: "all")
-#' @param milestone Filter by milestone number or title, "*" (any), or "none"
-#' @param assignee Filter by assignee username, "*" (any), or "none"
-#' @param creator Filter by issue creator username
-#' @param mentioned Filter by mentioned username
-#' @param labels Comma-separated label names (e.g., "bug,ui")
-#' @param sort Sort by: "created", "updated", or "comments"
-#' @param direction Sort direction: "asc" or "desc"
-#' @param since Only issues updated after this time (ISO 8601 format)
-#' @param type Filter by issue type, "*" (any), or "none"
-#' @param ... Reserved for future use
-#' @return A data frame of GitHub issues
+#' github issues plugin script
 #' @export
-getGithubIssues <- function(username, password, owner, repository,
-                            state = "all",
-                            milestone = NULL,
-                            assignee = NULL,
-                            creator = NULL,
-                            mentioned = NULL,
-                            labels = NULL,
-                            sort = NULL,
-                            direction = NULL,
-                            since = NULL,
-                            type = NULL,
-                            ...){
+getGithubIssues <- function(username, password, owner, repository, ...){
+  # read stored password
   loadNamespace("stringr")
   loadNamespace("httr")
   loadNamespace("dplyr")
-
-  # Resolve milestone title to number if needed
-  if (!is.null(milestone)) {
-    milestone <- resolve_milestone(owner, repository, milestone, username, password)
-  }
 
   # Body
   endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/issues")
@@ -250,21 +160,8 @@ getGithubIssues <- function(username, password, owner, repository,
   is_next <- TRUE
   i <- 1
   while(is_next){
-    # Build query list - only include non-NULL parameters
-    query_params <- list(per_page = 100, page = i)
-    query_params$state <- state
-    if (!is.null(milestone)) query_params$milestone <- milestone
-    if (!is.null(assignee)) query_params$assignee <- assignee
-    if (!is.null(creator)) query_params$creator <- creator
-    if (!is.null(mentioned)) query_params$mentioned <- mentioned
-    if (!is.null(labels)) query_params$labels <- labels
-    if (!is.null(sort)) query_params$sort <- sort
-    if (!is.null(direction)) query_params$direction <- direction
-    if (!is.null(since)) query_params$since <- since
-    if (!is.null(type)) query_params$type <- type
-
     res <- httr::GET(endpoint,
-               query = query_params,
+               query = list(state = "all", per_page = 100, page = i),
                httr::authenticate(username, password))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
@@ -680,59 +577,6 @@ salesforce_glue_transformer <- function(expr, envir) {
   sql_glue_transformer_internal(expr, envir, salesforce=TRUE)
 }
 
-                         limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
-                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParams = NULL, connectionString = NULL, sslClientCertKey = NULL, subType = NULL, ...){
-  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  loadNamespace("jsonlite")
-
-  # read stored password
-  # get connection from connection pool
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection,
-                         isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams,
-                         timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey, subType = subType)
-  if(fields == ""){
-    fields = "{}"
-  }
-  if(sort == ""){
-    sort = "{}"
-  }
-  data <- NULL
-  tryCatch({
-    if(queryType == "aggregate"){
-      pipeline <- convertUserInputToUtf8(pipeline)
-      # set .envir = parent.frame() to get variables from users environment, not papckage environment
-      pipeline <- glue_exploratory(pipeline, .transformer=js_glue_transformer, .envir = parent.frame())
-      # convert js query into mongo JSON, which mongolite understands.
-      pipeline <- jsToMongoJson(pipeline)
-      data <- con$aggregate(pipeline = pipeline)
-    } else if (queryType == "find") {
-      query <- convertUserInputToUtf8(query)
-      fields <- convertUserInputToUtf8(fields)
-      sort <- convertUserInputToUtf8(sort)
-      # set .envir = parent.frame() to get variables from users environment, not papckage environment
-      query <- glue_exploratory(query, .transformer=js_glue_transformer, .envir = parent.frame())
-      # convert js query into mongo JSON, which mongolite understands.
-      query <- jsToMongoJson(query)
-      fields <- jsToMongoJson(fields)
-      sort <- jsToMongoJson(sort)
-      data <- con$find(query = query, limit=limit, fields=fields, sort = sort, skip = skip)
-    }
-  }, error = function(err) {
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
-    stop(err)
-  })
-  result <-data
-  if (flatten) {
-    result <- jsonlite::flatten(data)
-  }
-  if (nrow(result)==0) {
-    # possibly this is an error. clear connection once.
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
-    stop("No Data Found");
-  } else {
-    result
-  }
-}
 
 #' Returns a data frame that has names of the collections in its "name" column.
 #' @export
@@ -1881,6 +1725,7 @@ isConnecitonPoolEnabled <- function(type){
   type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver", "snowflake", "teradata")
 }
 
+#' @export
 getListOfTablesWithODBC <- function(conn){
   topLevels <- odbc::odbcListObjects(conn)
   schemas <- NULL
@@ -1977,6 +1822,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
 }
 
 
+
 #' @export
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslCA = "", ...){
   if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
@@ -2011,6 +1857,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 #' @param sslCA
 #' @param type (optional) Default is postgres. Set either postgres or redshift for now. When querying against Redshift, be sure to pass "redshift" as the type parameter so that correct sslCA handling is done for Linux case.
 #'
+#' @export
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslMode = '', sslCA = '', type = "postgres", ...){
   if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
@@ -2102,6 +1949,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param catalog - For Snowflake's Warehouse.
 #' @param timezone - For database session timezone.
 #'
+#' @export
 queryODBC <- function(dsn="", username="", password="", additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", connectionString = "",  subType = "", role = "", authMethod = "", secretKeyFile = "", secretKeyFilePassword = "", ...){
   if(type == "") {
     type <- "odbc"
@@ -2170,6 +2018,8 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
 }
 
 
+
+
 #' API to submit a Google Big Query Job
 #' @export
 submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId, useStandardSQL = FALSE, service_account_file = NULL,  ...){
@@ -2236,6 +2086,7 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
 }
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
+#' @export
 extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table, destinationUri, tokenFileId, service_account_file = NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
@@ -2255,6 +2106,7 @@ extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table,
 }
 
 #' API to download data from Google Storage to client and create a data frame from it
+#' @export
 downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId, colTypes = NULL, service_account_file = NULL){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
@@ -2772,6 +2624,7 @@ convertToJSON  <- function(x) {
 #' We do this since the JSON output is not broken under LC_CTYPE of Code Page 1252.
 #' Since JSON output is in UTF-8 even on Windows, we should not have to go through
 #' SJIS on the output path in the first place.
+#' @export
 toJSON <- function(...) {
   tryCatch({
     if (Sys.info()["sysname"] == "Windows") {
@@ -2879,6 +2732,7 @@ getObjectFromRdata <- function(rdata_path, object_name){
 }
 
 
+
 #' This function can clean the given data frame. It actually does
 #' 1) split a column with a data.frame vector into seprate columns
 #' 2) repair column names such as columns with NA for column names,
@@ -2945,6 +2799,7 @@ checkSourceConflict <- function(files, encoding="UTF-8"){
 #' @param input vector of US state names, abbreviations, or numeric codes.
 #' @param output_type one of "alpha_code", "num_code", "name", "division", or "region"
 #' @return character vector
+#' @export
 statecode <- function(input = input, output_type = output_type) {
   output_types <- c("alpha_code", "num_code", "name", "division", "region")
   if (!output_type %in% output_types) {
@@ -3004,6 +2859,7 @@ geocode_us_county <- function(df, fipscode_colname) {
 #' 1   JP 138.252924 36.20482
 #' 2   GB  -3.435973 55.37805
 #'
+#' @export
 geocode_world_country <- function(df, countrycode_colname, center.pacific.ocean=FALSE) {
   mapping <- "iso2c"
   names(mapping) <- countrycode_colname
@@ -3071,6 +2927,7 @@ prefecturecode <- function(prefecture, output_type="name") {
 }
 
 
+
 #' Converts pair of state name and county name into county ID,
 #' which is concatenation of FIPS state code and FIPS county code.
 #'
@@ -3083,6 +2940,7 @@ prefecturecode <- function(prefecture, output_type="name") {
 #' @param state state name, or 2 letter state code
 #' @param county county name. For an independent city that has a county with the same name, prefix with "City of " or suffix with " City".
 #' @return character vector
+#' @export
 countycode <- function(state = state, county = county) {
   loadNamespace("stringr")
   # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
@@ -3223,23 +3081,6 @@ searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern 
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
 }
-
-#' Convert glob-style pattern to regex
-#' @param pattern A glob-style pattern (e.g., "*.xls|*.xlsx|*.xlsm")
-#' @return A regex pattern (e.g., ".*\\.xls$|.*\\.xlsx$|.*\\.xlsm$")
-#' @noRd
-glob_to_regex <- function(pattern) {
-  parts <- strsplit(pattern, "\\|")[[1]]
-  regex_parts <- sapply(parts, function(p) {
-    p <- trimws(p)
-    # Escape dots, then convert * to .*
-    p <- gsub("\\.", "\\\\.", p)
-    p <- gsub("\\*", ".*", p)
-    paste0(p, "$")
-  }, USE.NAMES = FALSE)
-  paste(regex_parts, collapse = "|")
-}
-
 #'API that searches and imports multiple same structure Excel files and merge them to a single data frame
 #'@export
 searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
@@ -3250,18 +3091,11 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
-    # Glob-style pattern (e.g., "*.xls|*.xlsx|*.xlsm") - convert to regex
-    pattern <- glob_to_regex(pattern)
-    pattern <- paste0(fs::fs_path(folder), "/", pattern)
-  } else if (pattern != "") {
+  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder)
-  if (pattern != "") {
-    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
-  }
+  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) > 0) {
     # Exclude Excel temporary files whose name starts with ~$ (e.g. ~$test.xlsx)
     files <- files[!grepl("/\\~\\$", files)]
@@ -3508,18 +3342,11 @@ searchAndReadDelimFiles <- function(folder, pattern = "", forPreview = FALSE, de
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
-    # Glob-style pattern (e.g., "*.csv|*.tsv") - convert to regex
-    pattern <- glob_to_regex(pattern)
-    pattern <- paste0(fs::fs_path(folder), "/", pattern)
-  } else if (pattern != "") {
+  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder)
-  if (pattern != "") {
-    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
-  }
+  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
@@ -3807,18 +3634,11 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
   if (stringr::str_starts(pattern, "\\^")) {
     # If the pattern starts with "^", it needs to replace the "^" with a folder since the pattern match is done with the full path
     pattern <- paste0(fs::fs_path(folder), "/", stringr::str_sub(pattern, start = 2,))
-  } else if (pattern != "" && stringr::str_starts(pattern, "\\*")) {
-    # Glob-style pattern (e.g., "*.parquet") - convert to regex
-    pattern <- glob_to_regex(pattern)
-    pattern <- paste0(fs::fs_path(folder), "/", pattern)
-  } else if (pattern != "") {
+  } else if (pattern != "" && !stringr::str_starts(pattern, "\\*")) { # For the "all files" case, the pattern starts with *
     # For the "contains" and "ends with" cases, make sure to set the folder so that it only matches with file names.
     pattern <- paste0(fs::fs_path(folder), "/.*", pattern)
   }
-  files <- fs::dir_ls(path = folder)
-  if (pattern != "") {
-    files <- grep(pattern, files, perl = TRUE, value = TRUE, ignore.case = TRUE)
-  }
+  files <- fs::dir_ls(path = folder, regexp = stringr::str_c("(?i)", pattern))
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
@@ -3922,9 +3742,6 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
   df <- data.frame(line = line, stringsAsFactors = FALSE)
 }
 
-#'Wrapper for dplyr::filter to support successive calls instead of single filter
-#'call with multiple conditions.
-#
 
 #'Helper API that can be used inside filter function for filtering with predefined date operation
 #'@param date_column - date column for this filter operation.
@@ -3959,6 +3776,7 @@ within_date_range <- function(date_column, operator){
   result
 
 }
+
 
 
 # Names of functions that uses column specifications, but would never reference outside data frame, such as select.
@@ -4160,6 +3978,7 @@ get_refs_in_call <- function(call,
 
 # Returns names that references outside objects (most likely data frames) from the script.
 # priv_step_df - The data frame of the previous step. Refs to the columns of it are not considered outside refs.
+#' @export
 get_refs_in_script <- function(script, after_pipe = TRUE) {
   exprs <- NULL
   tryCatch({
@@ -4182,29 +4001,14 @@ get_refs_in_script <- function(script, after_pipe = TRUE) {
   }
 }
 
-# Function to split numbers into groups by equal data range.
-# Mainly for chart bucketing function.
-#
-# Enhanced and customized version of cut function
-# include.lowest=TRUE by default to include the lowest value with
-# the custom breaks based on min/max value in order to avoid
-# having a smaller value than the min value in the actual value.
 
-# Cut number by the step specified.
-# @param x
-# @param step
-# @param lower.range Min value to start the bucketing.
-#                    If you don't specify, min(x) will be used.
-# @param upper.range Max value to end the bucketing.
-#                    If you don't specify, max(x) will be used.
-# @param include.outside.range If you set it to TRUE, it will create buckets
-#                              for outside of the upper and lower ranges.
 
 #' It does select() and unnest() at once to avoid the error from unnest()
 #' when the column name for group_by is too complex.
 #' @param df A data frame.
 #' @param col The column to unnest.
 #' @return A data frame with the unnested column.
+#' @export
 unnest_safe <- function(df, col) {
   ret <- df
   group_col <- grouped_by(ret)
