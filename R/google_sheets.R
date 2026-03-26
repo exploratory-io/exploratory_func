@@ -91,7 +91,6 @@ updateGoogleSheet <- function(filepath, id, overwrite = FALSE) {
 #' @param spreadSheetId - sheet id (when updating an existing spread sheet)
 #' @param workSheet - name of the worksheet
 #'
-#' @export
 uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetName = "", workSheet = "") {
   if (!requireNamespace("googlesheets4", quietly = TRUE)) {
     stop("The 'googlesheets4' package must be installed.")
@@ -131,7 +130,6 @@ uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetNam
 #' API to normalize data for Google Sheets Export
 #' @param df - data frame
 #
-#' @export
 normalizeDataForGoogleSheetsExport <- function (df) {
   requireNamespace("dplyr")
   requireNamespace("lubridate")

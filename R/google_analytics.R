@@ -56,7 +56,6 @@ getGoogleAnalyticsV4Property <- function(accountId){
   web_prop()
 }
 
-#' @export
 getGoogleAnalyticsSegmentList <- function(){
   if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
@@ -72,7 +71,6 @@ getGoogleAnalyticsSegmentList <- function(){
 #' @param webPropertyId - property id
 #' @param viewId - for V3 only.
 #'
-#' @export
 getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""){
   token <- getGoogleTokenForAnalytics();
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
@@ -108,7 +106,6 @@ getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""
 #' @param tzone - timezone applied to POSIXct column (force_tz)
 #' @param tzonForDisplay - timezone for displaying POSIXct column (with_tz)
 #' @param samplingLevel - Sampling Level (for V3)
-#' @export
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
                                lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, tzoneForDisplay = NULL, isV4 = FALSE, samplingLevel = "DEFAULT", ...){

@@ -20,17 +20,22 @@ calc_mean_survival <- function(survival, unique_death_times) {
 calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
-                                predict.fun = function(object, newdata) {
-                                  predicted <- predict(object,data=newdata)
-                                  # Use the weighted mean predicted survival time as the predicted value. To evaluate prediction performance, we will later calcualte concordance based on it.
-                                  mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
-                                  tibble::tibble(x=mean_survival,status=newdata[[status_col]])
-                                },
-                                loss.fun = function(x,y){ # Use 1 - concordance as loss function.
-                                  df <- x %>% dplyr::mutate(time=!!y[[1]])
-                                  1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
-                                })
+    tryCatch({
+      mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
+                                  predict.fun = function(object, newdata) {
+                                    predicted <- predict(object,data=newdata)
+                                    # Use the weighted mean predicted survival time as the predicted value. To evaluate prediction performance, we will later calculate concordance based on it.
+                                    mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
+                                    tibble::tibble(x=mean_survival,status=newdata[[status_col]])
+                                  },
+                                  loss.fun = function(x,y){ # Use 1 - concordance as loss function.
+                                    df <- x %>% dplyr::mutate(time=!!y[[1]])
+                                    1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
+                                  })
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
@@ -208,6 +213,343 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
   ret
 }
 
+#' builds cox model quickly by way of sampling or fct_lumn, for analytics view.
+#' @export
+exp_survival_forest <- function(df,
+                    time,
+                    status,
+                    ...,
+                    start_time = NULL,
+                    end_time = NULL,
+                    time_unit = "day",
+                    predictor_funs = NULL,
+                    max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
+                    max_sample_size = NULL, # Half of max_nrow.
+                    ntree = 20,
+                    nodesize = 12,
+                    predictor_n = 12, # so that at least months can fit in it.
+                    importance_measure = "permutation", # "permutation" or "impurity".
+                    max_pd_vars = NULL,
+                    pd_sample_size = 500,
+                    pred_survival_time = NULL,
+                    pred_survival_threshold = 0.5,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
+                    seed = 1,
+                    test_rate = 0.0,
+                    test_split_type = "random" # "random" or "ordered"
+                    ){
+  # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
+
+  if (importance_measure == "permutation") { # For permutation importance, we turn off ranger's importance calculation adn use our own implementation.
+    importance_measure_ranger <- "none"
+  }
+  else {
+    importance_measure_ranger <- importance_measure
+  }
+
+  # using the new way of NSE column selection evaluation
+  # ref: http://dplyr.tidyverse.org/articles/programming.html
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  start_time_col <- NULL
+  end_time_col <- NULL
+  if (length(time_col) == 0) { # This means time was NULL
+    start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+    end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+    time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
+    time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
+    # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
+    # This is to make resulting survival curve to have integer data point in the specified time unit.
+    # This also results in faster training of survival forest, since it reduces the number of distinct death times.
+    # Though, it does give undesirable bias to longer survival time when the time unit is larger.
+    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
+    time_col <- ".time"
+  }
+  status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
+  # this evaluates select arguments like starts_with
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- stringr::str_sort(selected_cols)
+
+  grouped_cols <- grouped_by(df)
+
+  # remove grouped col or time/status col
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, time_col, status_col))
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
+  if (any(c(time_col, status_col, selected_cols) %in% grouped_cols)) {
+    stop("grouping column is used as variable columns")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
+  # check status_col.
+  if (!is.logical(df[[status_col]])) {
+    stop(paste0("Status column (", status_col, ")  must be logical."))
+  }
+
+  # check time_col
+  if (!is.numeric(df[[time_col]])) {
+    stop(paste0("Time column (", time_col, ") must be numeric"))
+  }
+
+  if (is.null(pred_survival_time)) {
+    # By default, use mean of observations with event.
+    # median gave a point where survival rate was still predicted 100% in one of our test case.
+    pred_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+    # Pick maximum of existing values equal or less than the actual mean.
+    pred_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!pred_survival_time))[[time_col]], na.rm=TRUE)
+    # Since 0 is most likely meaningless as a prediction time, pick 1 if the above gives 0.
+    if (pred_survival_time == 0) pred_survival_time <- 1
+  }
+
+  # cols will be filtered to remove invalid columns
+  cols <- selected_cols
+
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+
+  # randomForest fails if columns are not clean. TODO is this needed?
+  #clean_df <- janitor::clean_names(df)
+  clean_df <- df # turn off clean_names for lm
+  # Replace column names with names like c1_, c2_...
+  # _ is so that name part and value part of categorical coefficient can be separated later,
+  # even with values that starts with number like "9E".
+  names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
+  name_map <- colnames(clean_df)
+  names(name_map) <- colnames(df)
+
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame
+  # and it causes an error,
+  # so the value of grouping columns
+  # should be still the names of grouping columns
+  name_map[grouped_cols] <- grouped_cols
+  colnames(clean_df) <- name_map
+
+  clean_status_col <- name_map[status_col]
+  clean_time_col <- name_map[time_col]
+  clean_cols <- name_map[cols]
+  clean_start_time_col <- NULL
+  clean_end_time_col <- NULL
+  if (!is.null(start_time_col)) {
+    clean_start_time_col <- name_map[start_time_col]
+    clean_end_time_col <- name_map[end_time_col]
+  }
+
+  each_func <- function(df) {
+    tryCatch({
+      if(!is.null(seed)){
+        set.seed(seed)
+      }
+
+      df <- df %>%
+        dplyr::filter(!is.na(df[[clean_status_col]])) # this form does not handle group_by. so moved into each_func from outside.
+
+      df <- preprocess_regression_data_before_sample(df, clean_time_col, clean_cols)
+      clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
+
+      # sample the data for performance if data size is too large.
+      sampled_nrow <- NULL
+      if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+        # Record that sampling happened.
+        sampled_nrow <- max_nrow
+        df <- df %>% sample_rows(max_nrow)
+      }
+
+      # Remove outliers if specified so.
+      # This has to be done before preprocess_regression_data_after_sample, since it can remove rows and reduce number of unique values,
+      # just like sampling.
+      df <- remove_outliers_for_regression_data(df, clean_time_col, clean_cols,
+                                                NULL, #target_outlier_filter_type
+                                                NULL, #target_outlier_filter_threshold
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
+
+      # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
+      clean_cols_without_names <- clean_cols
+      names(clean_cols_without_names) <- NULL # remove names to eliminate renaming effect of select.
+      if (is.null(clean_start_time_col)) {
+        df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
+      else {
+        df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_start_time_col), !!rlang::sym(clean_end_time_col), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
+
+      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample,
+      # so that we know the original classes of columns before characters are turned into factors,
+      # so that we can sort the partial dependence data for display accordingly.
+      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
+      # orig_predictor_classes than the partial dependence data.
+      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
+      # that should not happen, since the extraction is already done by mutate_predictors.
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
+      df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
+      c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
+      name_map <- attr(df, 'name_map')
+
+      source_data <- df
+
+      # split training and test data
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+        df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+      }
+
+      # build formula for survival forest.
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste0("survival::Surv(`", clean_time_col, "`, `", clean_status_col, "`) ~ ", rhs))
+      # all or max_sample_size data will be used for randomForest
+      # to grow a tree
+      if (is.null(max_sample_size)) { # default to half of max_nrow
+        max_sample_size = max_nrow/2
+      }
+      sample.fraction <- min(c(max_sample_size / max_nrow, 1))
+      model <- ranger::ranger(fml, data = df, importance = importance_measure_ranger,
+        num.trees = ntree,
+        min.node.size = nodesize,
+        keep.inbag=TRUE,
+        sample.fraction = sample.fraction)
+      # these attributes are used in tidy of randomForest TODO: is this good for lm too?
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$sampled_nrow <- sampled_nrow
+
+      if (length(c_cols) > 1) { # Show importance only when there are multiple variables.
+        # get importance to decide variables for partial dependence
+        if (importance_measure != "permutation") {
+          imp <- ranger::importance(model)
+          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+            variable = names(imp),
+            importance = imp
+            ) %>% dplyr::arrange(-importance)
+        }
+        else { # For permutation, we use our own implementation. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
+          imp_df <- calc_permutation_importance_ranger_survival(model, clean_time_col, clean_status_col, c_cols, df)
+        }
+        model$imp_df <- imp_df
+        imp_vars <- imp_df$variable
+      }
+      else {
+        error <- simpleError("Variable importance requires two or more variables.")
+        model$imp_df <- error
+        imp_vars <- c_cols
+      }
+
+      if (is.null(max_pd_vars)) {
+        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+      }
+      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+      model$imp_vars <- imp_vars
+      model$orig_predictor_classes <- orig_predictor_classes
+      model$partial_dependence <- partial_dependence.ranger_survival_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
+      model$pred_survival_time <- pred_survival_time
+      model$pred_survival_threshold <- pred_survival_threshold
+      model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars, orig_predictor_classes)
+
+      # Calculate concordance.
+      # Concordance by model$survival is too bad, most likely because it is out-of-bag prediction. We explictly predict with training data to calculate training concordance.
+      prediction_training <- predict(model, data=df)
+      model$prediction_training <- prediction_training
+      concordance_df <- tibble::tibble(x=calc_mean_survival(prediction_training$survival, prediction_training$unique.death.times), time=df[[clean_time_col]], status=df[[clean_status_col]])
+
+      # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
+      model$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
+
+      model$auc <- survival_auroc(extract_survival_rate_at(prediction_training$survival, prediction_training$unique.death.times, pred_survival_time),
+                               df[[clean_time_col]], df[[clean_status_col]], pred_survival_time,
+                               revert=TRUE)
+
+      # Add cleaned column names. Used for prediction of survival rate on the specified day, and date the survival probability drops to the specified rate. 
+      model$clean_start_time_col <- clean_start_time_col
+      model$clean_end_time_col <- clean_end_time_col
+      model$clean_time_col <- clean_time_col
+      model$clean_status_col <- clean_status_col
+      model$time_unit <- time_unit
+
+      if (test_rate > 0) {
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
+        prediction_test <- predict(model, data=df_test_clean)
+        # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
+        # We do not keep this for training since na.roughfix should fill values and not delete rows. TODO: Is this comment valid here for survival forest?
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
+        model$prediction_test <- prediction_test
+        model$df_test <- df_test_clean
+
+        # Calculate concordance.
+        concordance_df_test <- tibble::tibble(x=calc_mean_survival(prediction_test$survival, prediction_test$unique.death.times), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
+        # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
+        model$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
+
+        model$auc_test <- survival_auroc(extract_survival_rate_at(prediction_test$survival, prediction_test$unique.death.times, pred_survival_time),
+                                      df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time,
+                                      revert=TRUE)
+
+        model$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
+      }
+      model$df <- df
+      model$nevent <- sum(df[[clean_status_col]], na.rm=TRUE)
+
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        attr(predictor_funs, "LC_TIME") <- Sys.getlocale("LC_TIME")
+        attr(predictor_funs, "sysname") <- Sys.info()[["sysname"]] # Save platform name (e.g. Windows) since locale name might need conversion for the platform this model will be run on.
+        attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
+        model$predictor_funs <- predictor_funs
+      }
+
+      # add special lm_coxph class for adding extra info at glance().
+      class(model) <- c("ranger_survival_exploratory", class(model))
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("ranger_survival_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
+  attr(ret, "pred_survival_time") <- pred_survival_time
+  # Pass down time unit for prediction step UI.
+  attr(ret, "time_unit") <- time_unit
+  ret
+}
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export

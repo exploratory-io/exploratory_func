@@ -1,5 +1,108 @@
+#' Calculate similarity of each pair of groups.
+#' @param df data frame in tidy format
+#' @param subject A column you want to calculate the correlations for.
+#' @param key A column you want to use as a dimension to calculate the correlations.
+#' @param value A column for the values you want to use to calculate the correlations.
+#' @param distinct The returned pair should be duplicated in swapped order or not.
+#' TRUE makes it easy to filter group names.
+#' @param diag If similarity between itself should be returned or not.
+#' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
+#' @param fun.aggregate Set an aggregate function when there are multiple entries for the key column per each category.
+#' @export
+do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
+  validate_empty_data(df)
 
+  loadNamespace("qlcMatrix")
+  loadNamespace("tidytext")
+  loadNamespace("Matrix")
+  loadNamespace("stringr")
+  subject_col <- col_name(substitute(subject))
+  key_col <- col_name(substitute(key))
+  value_col <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
 
+  grouped_column <- grouped_by(df)
+
+  if(subject_col %in% grouped_column){
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
+  # column names are "{subject}.x", "{subject}.y", "value"
+  cnames <- avoid_conflict(grouped_column,
+                            c(paste0(subject_col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                              "value")
+                           )
+
+  # this is executed on each group
+  calc_doc_sim_each <- function(df){
+    mat <- sparse_cast(df, key_col, subject_col, val = value_col, fun.aggregate = fun.aggregate, count = TRUE)
+    sim <- qlcMatrix::cosSparse(mat)
+    # Most likely, because of Matrix upgraded to 1.5-3, output from qlcMatrix::cosSparse loses rownames/colnames.
+    # Set them back.
+    colnames(sim) <- colnames(mat)
+    rownames(sim) <- colnames(mat)
+
+    if(distinct){
+      if(!diag){
+        diag <- NULL
+      }
+      df <- upper_gather(sim, rownames(mat), diag=diag, cnames=cnames, na.rm = FALSE, zero.rm = FALSE)
+    }else{
+      loadNamespace("reshape2")
+      loadNamespace("dplyr")
+      df <- sim %>%  as.matrix() %>%  mat_to_df(cnames, na.rm = FALSE, zero.rm = FALSE)
+      if(!diag){
+        df <- df[df[,1] != df[,2],]
+      }
+    }
+    df
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_column, "tmp")
+  df %>%
+    dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
+    unnest_with_drop(!!rlang::sym(tmp_col))
+
+}
+
+#' integrated do_dist
+#' @export
+do_dist <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  validate_empty_data(df)
+
+  if (!is.null(skv)) {
+    #.kv pattern
+    if (!length(skv) %in% c(2, 3)) {
+      stop("length of skv has to be 2 or 3")
+    }
+    value <- if(length(skv) == 2)  NULL else skv[[3]]
+    do_dist.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
+  } else {
+    #.cols pattern
+    do_dist.cols(df, ...)
+  }
+}
+
+#' Non Standard Evaluation version of do_dist
+#' Calculate distance of each pair of groups
+#' @export
+do_dist.kv <- function(df, subject, key, value = NULL, ...){
+  subject_col <- col_name(substitute(subject))
+  key_col <- col_name(substitute(key))
+  if(!is.null(substitute(value))){
+    value_col <- col_name(substitute(value))
+  } else {
+    value_col <- NULL
+  }
+
+  do_dist.kv_(df, subject_col, key_col, value_col, ...)
+}
 
 #' Calculate distance of each pair of groups
 #' @param df data frame in tidy format

@@ -240,6 +240,165 @@ tidy.lm_exploratory_0 <- function(x, ...) {
   ret
 }
 
+#' lm wrapper with do
+#' @return deta frame which has lm model
+#' @param data Data frame to be used as data
+#' @param formula Formula for lm
+#' @param ... Parameters to be passed to lm function
+#' @param keep.source Whether source should be kept in source.data column
+#' @param augment Whether the result should be augmented immediately
+#' @param group_cols A vector with columns names to be used as group columns
+#' @param test_rate Ratio of test data
+#' @param seed Random seed to control test data sampling
+#' @export
+build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 1){
+  validate_empty_data(data)
+
+  # make variables factor sorted by the frequency
+  fml_vars <- all.vars(formula)
+  for(var in fml_vars) {
+    if(is.character(data[[var]])){
+      data[[var]] <- forcats::fct_infreq(data[[var]])
+    }
+  }
+
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+
+  # deal with group columns by index because those names might be changed
+  group_col_index <- colnames(data) %in% group_cols
+
+  # change column names to avoid name conflict when tidy or glance are executed
+  reserved_names <- c(
+    "model", ".test_index", "data", ".model_metadata",
+    # for tidy
+    "term", "estimate", "std.error", "statistic", "p.value",
+    # for glance
+    "r.squared", "adj.r.squared", "sigma", "statistic", "p.value",
+    "df", "logLik", "AIC", "BIC", "deviance", "df.residual"
+  )
+
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
+  colnames(data)[group_col_index] <- avoid_conflict(
+    reserved_names,
+    colnames(data)[group_col_index],
+    ".group"
+  )
+
+  # make column names unique
+  colnames(data) <- make.unique(colnames(data), sep = "")
+
+  if(!is.null(group_cols)){
+    data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
+  }
+
+  # Filter out NA and Inf from target variable.
+  target_cols <- all.vars(lazyeval::f_lhs(formula))
+  for (target_col in target_cols) {
+    data <- data %>%
+      dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col)))
+  }
+
+  group_col_names <- grouped_by(data)
+
+  # check if grouping columns are in the formula
+  grouped_var <- group_col_names[group_col_names %in% fml_vars]
+  if (length(grouped_var) == 1) {
+    stop(paste0(grouped_var, " is a grouping column. Please remove it from variables."))
+  } else if (length(grouped_var) > 0) {
+    stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
+  }
+
+  model_col <- "model"
+  source_col <- "source.data"
+
+  caller <- match.call()
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
+
+  ret <- tryCatch({
+    ret <- data %>%
+      tidyr::nest(source.data=-dplyr::group_cols()) %>%
+      # create test index
+      dplyr::mutate(.test_index = purrr::map(source.data, function(df){
+        sample_df_index(df, rate = test_rate)
+      })) %>%
+      # slice training data
+      dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
+        data <- safe_slice(df, index, remove = TRUE)
+
+        # execute lm with parsed arguments
+        model <- eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+
+        # Strip environments to save rds size when cached.
+        if (!is.null(model$terms)) {
+          attr(model$terms,".Environment")<-NULL
+        }
+        if (!is.null(model$model) && !is.null(attr(model$model,"terms"))) {
+          attr(attr(model$model,"terms"),".Environment") <- NULL
+        }
+
+        class(model) <- c("lm_exploratory_0", class(model))
+        model
+      })) %>%
+      dplyr::mutate(.model_metadata = purrr::map(source.data, function(df){
+        if(!is.null(formula)){
+          create_model_meta(df, formula)
+        } else {
+          list()
+        }
+      }))
+    if(!keep.source & !augment){
+      ret <- dplyr::select(ret, -source.data)
+    } else {
+      class(ret[[source_col]]) <- c("list", ".source.data")
+    }
+    ret <- dplyr::rowwise(ret)
+    ret
+  }, error = function(e){
+    # Error message was changed when upgrading dplyr to 0.7.1
+    # so use stringr::str_detect to make these robust.
+    # With dplyr 1.0.8, it seems that the message is separated into e$message and e$parant$message.
+    # With dplyr 1.0.10, it seems that the message is further separated into e$message, e$parant$message, and e$parent$parent$message.
+    # First extract the root message text.
+    if (!is.null(e$parent)) {
+      if (!is.null(e$parent$parent)) {
+        message <- e$parent$parent$message
+      }
+      else {
+        message <- e$parent$message
+      }
+    }
+    else { # Handling for before dplyr 1.0.8. (With 6.9.5 we do not bundle dplyr 1.0.8 yet.)
+      message <- e$message
+    }
+    # Run text match on the extracted message.
+    if (stringr::str_detect(message, "contrasts can be applied only to factors with 2 or more levels")) {
+      stop("more than 1 unique values are expected for categorical columns assigned as predictors")
+    }
+    if(stringr::str_detect(message, "0 \\(non\\-NA\\) cases")){
+      stop("no data after removing NA")
+    }
+    stop(message)
+  })
+  if(augment){
+    if(test_rate == 0){
+      ret <- prediction(ret, data = "training")
+    } else {
+      ret <- prediction(ret, data = "test")
+    }
+  } else {
+    class(ret[[model_col]]) <- c("list", ".model", ".model.lm")
+  }
+  ret
+}
 
 # Map terms back to the original variable names.
 # If term is for categorical variable, e.g. c1_UA,
@@ -479,6 +638,646 @@ remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
   df
 }
 
+#' builds lm model quickly for analytics view.
+#' @param seed - Random seed to control data sampling, SMOTE, and bootstrapping for confidence interval of relative importance.
+#' @param test_rate Ratio of test data
+#' @export
+build_lm.fast <- function(df,
+                    target,
+                    ...,
+                    target_fun = NULL,
+                    predictor_funs = NULL,
+                    weight = NULL,
+                    weight_fun = NULL,
+                    model_type = "lm",
+                    family = NULL,
+                    link = NULL,
+                    max_nrow = 50000,
+                    predictor_n = 12, # so that at least months can fit in it.
+                    normalize_target = FALSE,
+                    normalize_predictors = FALSE,
+                    target_outlier_filter_type = NULL,
+                    target_outlier_filter_threshold = NULL,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
+                    smote = FALSE,
+                    smote_target_minority_perc = 40,
+                    smote_max_synth_perc = 200,
+                    smote_k = 5,
+                    smote_keep_synthetic = TRUE,
+                    importance_measure = "permutation", # "firm", or "permutation" if available. Defaulting to permutation for backward compatibility for pre-6.5.
+                    with_marginal_effects = FALSE,
+                    with_marginal_effects_confint = FALSE,
+                    variable_metric = NULL,
+                    p_value_threshold = 0.05,
+                    max_pd_vars = 20,
+                    pd_sample_size = 500,
+                    pd_grid_resolution = 20,
+                    seed = 1,
+                    test_rate = 0.0,
+                    test_split_type = "random" # "random" or "ordered"
+                    ){
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
+
+  weight_col <- tidyselect::vars_select(names(df), !! rlang::enquo(weight))
+  if (is.null(weight_col) || length(weight_col) == 0) { # It seems that if weight_col is not specified weight_col can be named character(0), which can be detected by length(weight_col)=0.
+    weight_col <- NULL
+  }
+  if (!is.null(weight_col) && !is.null(weight_fun)) {
+    weight_funs <- list(weight_fun)
+    names(weight_funs) <- weight_col
+    df <- df %>% mutate_predictors(weight_col, weight_funs)
+  }
+  if (!is.null(weight_col) && min(df[[weight_col]], na.rm=TRUE) <= 0) {
+    # We enforce strict positive values because with weights including 0, the model throws error at prediction.
+    stop("EXP-ANA-10 :: [] :: Weight column must be positive.")
+  }
+  if (!is.null(weight_col)) {
+    # Fill NA weight with 1.
+    df <- df %>% dplyr::mutate(!!rlang::sym(weight_col) := ifelse(is.na(!!rlang::sym(weight_col)), 1, !!rlang::sym(weight_col)))
+  }
+
+  grouped_cols <- grouped_by(df)
+
+  if (!is.null(variable_metric)  && variable_metric == "ame") { # Special argument for integration with Analytics View.
+    with_marginal_effects <- TRUE
+  }
+
+  if (model_type == "glm" && is.null(family)) {
+    family <- "binomial" # default for glm is logistic regression.
+    link <- "logit"
+  }
+
+  # For backward compatibility, importance_measure defaults to "permutation",
+  # but these GLMs do not have permutation importance support. Fall back to FIRM.
+  if (importance_measure == "permutation" &&
+      model_type == "glm" && family %in% c("Gamma", "negativebinomial", "inverse.gaussian")) {
+    importance_measure <- "firm"
+  }
+
+
+  if (model_type == "glm" && family == "binomial" && (is.null(link) || link == "logit")) {
+    if (!is.logical(df[[target_col]]) && !is.numeric(df[[target_col]])) {
+      # numeric still works, but our official guidance will be to use logical.
+      stop("Target variable for logistic regression must be a logical.")
+    }
+  }
+
+  # If we do permutation importance, sort predictors so that the result of it is stable against change of column order.
+  # Otherwise, avoid sorting so that user has control over the order of variables on partial dependence plot.
+  if (model_type == "lm" || family %in% c("binomial", "gaussian") || (family == "poisson" && (is.null(link) || link == "log"))) {
+    selected_cols <- stringr::str_sort(selected_cols)
+  }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col, weight_col), drop=FALSE]
+
+  # Remove grouped col or target col. Weight col is not removed because it can be one of the predictors.
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
+
+  if (any(c(target_col, selected_cols, weight_col) %in% grouped_cols)) {
+    stop("grouping column is used as variable columns")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
+  orig_levels <- NULL # For recording original factor levels for binary classification, to show data size for each class in Summary View.
+  if (!is.null(model_type) && model_type == "glm" && family %in% c("binomial", "quasibinomial")) {
+    # binomial case.
+    unique_val <- unique(df[[target_col]])
+    if (length(unique_val[!is.na(unique_val)]) != 2) {
+      stop(paste0("Column to predict (", target_col, ") with Binomial Regression must have 2 unique values."))
+    }
+    if (!is.numeric(df[[target_col]]) && !is.factor(df[[target_col]]) && !is.logical(df[[target_col]])) {
+      # make other types factor so that it passes stats::glm call.
+      df[[target_col]] <- factor(df[[target_col]])
+    }
+    # record original factor levels.
+    if (is.factor(df[[target_col]])) {
+      orig_levels <- levels(df[[target_col]])
+      # Keep only the ones that actually are used.
+      # One with larger index seems to be treated as TRUE (i.e. 1 in model$y) by glm.
+      orig_levels <- orig_levels[orig_levels %in% unique_val]
+    }
+    else if (is.logical(df[[target_col]])) {
+      orig_levels <- c("FALSE","TRUE")
+    }
+  }
+  else { # this means the model is lm or glm with family other than binomial
+    if (!is.numeric(df[[target_col]])) {
+      # TODO: message should handle other than lm too.
+      stop(paste0("Column to predict (", target_col, ") with Linear Regression must be numeric"))
+    }
+  }
+
+  # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
+  clean_df <- df
+  # Replace column names with names like c1_, c2_...
+  # _ is so that name part and value part of categorical coefficient can be separated later,
+  # even with values that starts with number like "9E".
+  # We avoid following known issues by this.
+  # - Column name issue for marginal_effects(). Space is not handled well.
+  #   ()"' are known to be ok as of version 5.5.2.
+  # - Column name issue for mmpf::marginalPrediction (for partial dependence). Comma is not handled well.
+  # Note that the data frames in source_data column are with the replaced column names for simplicity,
+  # rather than the original column names, unlike what we do for ranger or rpart. (Maybe we should do it for ranger or rpart.)
+  # The reverse mapping of the column names are done in augment.lm_exploratory or augment.glm_exploratory.
+  names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
+  # this mapping will be used to restore column names
+  name_map <- colnames(clean_df)
+  names(name_map) <- colnames(df)
+
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame
+  # and it causes an error,
+  # so the value of grouping columns
+  # should be still the names of grouping columns
+  name_map[grouped_cols] <- grouped_cols
+  colnames(clean_df) <- name_map
+
+  clean_target_col <- name_map[target_col]
+  if (!is.null(weight_col)) {
+    clean_weight_col <- name_map[weight_col]
+  }
+  else {
+    clean_weight_col <- NULL
+  }
+  clean_cols <- name_map[selected_cols]
+
+  each_func <- function(df) {
+    tryCatch({
+      if(!is.null(seed)){
+        set.seed(seed)
+      }
+
+      df_test <- NULL # declare variable for test data
+
+      df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols)
+      clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
+
+      # Sample the data because randomForest takes long time if data size is too large.
+      # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
+      sampled_nrow <- NULL
+      if (!smote) {
+        if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+          # Record that sampling happened.
+          sampled_nrow <- max_nrow
+          df <- df %>% sample_rows(max_nrow)
+        }
+      }
+
+      # Remove outliers if specified so.
+      # This has to be done before preprocess_regression_data_after_sample, since it can remove rows and reduce number of unique values,
+      # just like sampling.
+      df <- remove_outliers_for_regression_data(df, clean_target_col, clean_cols,
+                                                target_outlier_filter_type,
+                                                target_outlier_filter_threshold,
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
+
+      # Capture the classes of the columns at this point before preprocess_regression_data_after_sample,
+      # so that we know the original classes of columns before characters are turned into factors,
+      # so that we can sort the partial dependence data for display accordingly.
+      # preprocess_regression_data_after_sample can remove columns, but it should not cause problem that we have more columns in
+      # orig_predictor_classes than the partial dependence data.
+      # Also, preprocess_regression_data_after_sample has code to add columns extracted from Date/POSIXct, but with recent releases,
+      # that should not happen, since the extraction is already done by mutate_predictors.
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
+      df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
+      c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
+      name_map <- attr(df, 'name_map')
+
+      # Normalize numeric target variable,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_target) {
+        if (is.numeric(df[[clean_target_col]])) {
+          df[[clean_target_col]] <- normalize(df[[clean_target_col]])
+        }
+      }
+      # Normalize numeric predictors so that resulting coefficients are comparable among them,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_predictors) {
+        for (col in c_cols) {
+          if (is.numeric(df[[col]])) {
+            df[[col]] <- normalize(df[[col]])
+          }
+        }
+      }
+
+      # Reverse mapping of variable names.
+      terms_mapping <- names(name_map)
+      names(terms_mapping) <- name_map
+
+      # build formula for lm
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
+      fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
+      if (model_type == "glm") {
+        # Split training and test data BEFORE applying SMOTE
+        # This ensures test data remains pure and doesn't contain synthetic samples
+        source_data <- df
+        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        }
+
+        # Store original training data before SMOTE for later prediction
+        df_train_original <- df
+        
+        # Apply SMOTE only to training data after split
+        if (smote) {
+          if (with_marginal_effects) {
+            # Keep the version of training data before SMOTE,
+            # since we want to know average marginal effect on a data that has
+            # close distribution to the original data.
+            df_before_smote <- df
+          }
+          # Note: If there is weight column, we synthesize weight column as well.
+          df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+          
+          # Check if SMOTE was actually applied by checking for synthesized column
+          smote_applied <- "synthesized" %in% colnames(df)
+          
+          # If smote_keep_synthetic is TRUE and SMOTE was applied, update source_data
+          if (smote_keep_synthetic && smote_applied) {
+            # Keep the synthesized column to mark synthetic samples
+            # Combine SMOTE-enhanced training data with test data
+            if (test_rate > 0) {
+              # Add synthesized column to test data (all FALSE since they're real)
+              df_test$synthesized <- FALSE
+              # Update source_data to be the combined SMOTE-enhanced train + original test
+              source_data <- bind_rows(df, df_test)
+              # Update test_index to point to the test rows in the new source_data
+              # Test data is now at the end, starting from nrow(df) + 1
+              test_index <- (nrow(df) + 1):nrow(source_data)
+            } else {
+              # No test data, just use SMOTE-enhanced training data
+              source_data <- df
+            }
+          } else if (smote_applied) {
+            # SMOTE was applied but not keeping synthetic samples in output
+            # Remove synthesized column
+            df <- df %>% dplyr::select(-dplyr::any_of("synthesized"))
+          }
+          
+          # Factor level cleanup after SMOTE
+          for(col in names(df)){
+            if(is.factor(df[[col]])) {
+              # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
+              # In case of SMOTE, this has to be done after that. TODO: Do this just once in any case.
+              df[[col]] <- forcats::fct_drop(df[[col]])
+              if (with_marginal_effects) {
+                df_before_smote <- df_before_smote %>% dplyr::filter(!!rlang::sym(col) %in% levels(df[[col]]))
+                df_before_smote[[col]] <- forcats::fct_drop(df_before_smote[[col]])
+              }
+            }
+          }
+          if (with_marginal_effects) {
+            # Sample df_before_smote for speed.
+            # We do not remove imbalance here to keep close distribution to the original data.
+            df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
+          }
+        }
+
+        # When link is not specified, use default link function for each family,
+        # except for the case where family is negativebinomial, which we should use MASS::glm.nb
+        if (is.null(link) && family != "negativebinomial") {
+          if (is.null(clean_weight_col)) {
+            model <- stats::glm(fml, data = df, family = family) 
+          }
+          else {
+            model <- stats::glm(fml, data = df, family = family, weights=df[[clean_weight_col]])
+          }
+        }
+        else {
+
+
+          if (family == "gaussian") {
+            family_arg <- stats::gaussian(link=link)
+          }
+          else if (family == "binomial") {
+            family_arg <- stats::binomial(link=link)
+          }
+          else if (family == "Gamma") {
+            family_arg <- stats::Gamma(link=link)
+          }
+          else if (family == "inverse.gaussian") {
+            family_arg <- stats::inverse.gaussian(link=link)
+          }
+          else if (family == "poisson") {
+            family_arg <- stats::poisson(link=link)
+          }
+          else if (family == "quasi") {
+            family_arg <- stats::quasi(link=link)
+          }
+          else if (family == "quasibinomial") {
+            family_arg <- stats::quasibinomial(link=link)
+          }
+          else if (family == "quasipoisson") {
+            family_arg <- stats::quasipoisson(link=link)
+          }
+          else if (family == "negativebinomial") {
+            family_arg <- family
+          }
+          else { # default gaussian
+            family_arg <- stats::gaussian(link=link)
+          }
+
+          if (family == "negativebinomial"){
+            # In MASS::glm.nb function, the link arg must be one of log, sqrt or identity.
+            # So if the other is used, the link arg should be set to "log" which is the default value.
+            if (is.null(link) || (!link %in% c("log", "sqrt", "identity"))){
+              link <- "log"
+            }
+
+            if (dplyr::n_distinct(df[[clean_target_col]]) == 1) {
+              # If only 1 unique value is there in target column, glm.nb seems to return error like following.
+              # Error in while ((it <- it + 1) < limit && abs(del) > eps) { : 
+              # missing value where TRUE/FALSE needed
+              stop("Target column has only one unique value.")
+            }
+            # The argument link in MASS::glm.nb is evaluated by substitution with delay,
+            # so the variable specified in the argument is interpreted as the link argument as it is.
+            # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
+            # link "link" not available for poisson family; available links are 'log', 'identity', 'sqrt'
+            # Therefore, we used eval to pass the string (log etc.) specified in the argument to link as it is.
+            if (is.null(clean_weight_col)) {
+              model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+            }
+            else {
+              model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ", weights=df[[clean_weight_col]])")))
+            }
+
+            # A model by MASS::glm.nb has not a formula attribute.
+            model$formula <- fml
+          } else {
+            if (is.null(clean_weight_col)) {
+              model <- stats::glm(fml, data = df, family = family_arg) 
+            }
+            else {
+              model <- stats::glm(fml, data = df, family = family_arg, weights=df[[clean_weight_col]])
+            }
+          }
+        }
+        if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
+          if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
+            if (family == "binomial") {
+              model$imp_df <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
+            }
+            else if (family == "poisson" && (is.null(link) || link == "log")) {
+              model$imp_df <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
+            }
+            else if (family == "gaussian") {
+              model$imp_df <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+            }
+          }
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+        }
+      }
+      else { # model_type == "lm"
+        # split training and test data
+        source_data <- df
+        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        }
+        if (is.null(clean_weight_col)) {
+          model <- stats::lm(fml, data = df)
+        }
+        else {
+          model <- stats::lm(fml, data = df, weights=df[[clean_weight_col]]) 
+        }
+        if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
+          if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
+            model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+          }
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+        }
+      }
+
+      # Strip environments to save rds size when cached.
+      if (!is.null(model$terms)) {
+        attr(model$terms,".Environment")<-NULL
+      }
+      if (!is.null(model$formula)) {
+        attr(model$formula,".Environment")<-NULL
+      }
+      if (!is.null(model$model) && !is.null(attr(model$model,"terms"))) {
+        attr(attr(model$model,"terms"),".Environment") <- NULL
+      }
+
+      tryCatch({
+        model$vif <- calc_vif(model, terms_mapping)
+      }, error = function(e){
+        model$vif <<- e
+      })
+
+      # When SMOTE is used, generate predictions on appropriate training data
+      if (smote && smote_applied) {
+        if (smote_keep_synthetic) {
+          # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
+          model$prediction_training <- predict(model, df, se.fit = TRUE)
+        } else {
+          # If not keeping synthetic samples, predict on original training data (matches source.data)
+          model$prediction_training <- predict(model, df_train_original, se.fit = TRUE)
+        }
+        model$smote_applied <- TRUE
+        model$smote_keep_synthetic <- smote_keep_synthetic
+      }
+      
+      if (test_rate > 0) {
+        # Remove rows with categorical values which does not appear in training data and unknown to the model.
+        # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
+        # matches with original data can be generated later.
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
+        # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
+        model$prediction_test <- predict(model, df_test_clean, se.fit = TRUE)
+        model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
+      }
+      # these attributes are used in tidy of randomForest TODO: is this good for lm too?
+      model$terms_mapping <- terms_mapping
+      model$orig_levels <- orig_levels
+
+      # For displaying if sampling happened or not.
+      model$sampled_nrow <- sampled_nrow
+
+      # add special lm_exploratory class for adding extra info at glance().
+      if (model_type == "glm") {
+        class(model) <- c("glm_exploratory", class(model))
+        if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
+          if (smote) {
+            model$marginal_effects <- calc_average_marginal_effects(model, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          }
+          else {
+            model$marginal_effects <- calc_average_marginal_effects(model, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          }
+        }
+      }
+      else {
+        class(model) <- c("lm_exploratory", class(model))
+      }
+      # Calculate variable importances. 
+      if (!is.null(model$imp_df) && "error" %nin% class(model$imp_df)) { # if importance is available, show only max_pd_vars most important vars.
+        imp_df <- model$imp_df
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$variable)
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+      }
+      else if (importance_measure == "firm") {
+        imp_vars <- c_cols # For FIRM, we need to calculate partial dependence for all predictors first.
+      }
+      else  {
+        # Show only max_pd_vars most significant (ones with the smallest P values) vars.
+        # For categorical, pick the smallest P value among all classes of it.
+        c_cols_list <- as.list(c_cols)
+        # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+        # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+        # even for lm.
+        coef_df <- broom:::tidy.glm(model)
+        # str_detect matches with all categorical class terms that belongs to the variable.
+        p_values_list <- c_cols_list %>% purrr::map(function(x){(coef_df %>% filter(stringr::str_detect(term, paste0("^`?", x))) %>% summarize(p.value=min(p.value, na.rm=TRUE)))$p.value})
+        p_values_df <- tibble::tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
+        imp_vars <- (p_values_df %>% dplyr::arrange(p.value))$term
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+
+        # We tried showing only significant variables, but decided oftentimes we wanted to see even insignificant ones. Keeping that code for now.
+        #
+        # signif_df <- broom::tidy(model) %>% filter(p.value < p_value_threshold) # One-liner to keep only significant predictors by matching names with result of tidy().
+        # if (nrow(signif_df) > 0) {
+        #   imp_vars <- c_cols[sapply(c_cols,function(x){any(stringr::str_detect(signif_df$term, paste0("^`?", x)))})]
+        # }
+        # else  {
+        #   imp_vars <- c()
+        # }
+      }
+
+      if (length(imp_vars) > 0) {
+        model$imp_vars <- imp_vars
+        model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
+
+      if (importance_measure == "firm") {
+        if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
+          pdp_target_col <- attr(model$partial_dependence, "target")
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+          model$imp_vars <- imp_vars
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+        }
+
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+      }
+
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        attr(predictor_funs, "LC_TIME") <- Sys.getlocale("LC_TIME")
+        attr(predictor_funs, "sysname") <- Sys.info()[["sysname"]] # Save platform name (e.g. Windows) since locale name might need conversion for the platform this model will be run on.
+        attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
+        model$predictor_funs <- predictor_funs
+      }
+
+      model$target_col <- clean_target_col # We use target column info to bring the column next to the predicted value in the prediction() output.
+      model$orig_predictor_classes <- orig_predictor_classes
+
+      list(model = model, test_index = test_index, source_data = source_data)
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        if (model_type == "glm") {
+          class(e) <- c("glm_exploratory", class(e))
+        }
+        else {
+          class(e) <- c("lm_exploratory", class(e))
+        }
+        list(model = e, test_index = NULL, source_data = NULL)
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$model
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data)
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
+  ret
+}
 
 #' special version of glance.lm function to use with build_lm.fast.
 #' @export
@@ -975,6 +1774,35 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   )
 }
 
+#' wrapper for tidy type partial dependence
+#' @export
+lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
+  res <- df %>% tidy_rowwise(model, type="partial_dependence", ...)
+  if (nrow(res) == 0) {
+    return(data.frame()) # Skip the rest of processing by returning empty data.frame.
+  }
+  grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
+                                 # grouped_by has to be on res rather than on df since dplyr::group_vars
+                                 # does not work on rowwise-grouped data frame.
+
+  if (length(grouped_col) > 0) {
+    res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+    # Folloing is not necessary since we separately display partial dependence plot for each group since v5.5.
+    # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
+    # res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+
+    res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
+    res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
+  }
+  else {
+    res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
+  }
+  # gather we did after edarf::partial_dependence call turned x_value into factor if not all variables were in a same data type like numeric.
+  # to keep the numeric or factor order (e.g. Sun, Mon, Tue) of x_value in the resulting chart, we do fct_inorder here while x_value is in order.
+  # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+  res <- res %>% dplyr::mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+  res
+}
 
 #' @export
 augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
@@ -1116,8 +1944,114 @@ find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
   model$data
 }
 
+# Generates Summary table for Analytics View. It can handle Test Mode.
+# This is written for linear regression analytics view and GLM analytics views that makes numeric prediction.
+evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
+  # Get the summary row for traninng data. Info is retrieved from model by glance()
+  training_ret <- df %>% glance_rowwise(model, pretty.name = pretty.name)
+  ret <- training_ret
+
+  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
+
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and generate summary row for test data.
+  # Unlike training data, this involves calculating metrics by ourselves from test prediction result.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
+    ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
+    each_func <- function(df){
+      # With the way this is called, df becomes list rather than data.frame.
+      # Make it data.frame again so that prediction() can be applied on it.
+      if (!is.data.frame(df)) {
+        df <- tibble::tribble(~model, ~.test_index, ~source.data,
+                              df$model, df$.test_index, df$source.data)
+      }
+
+      tryCatch({
+        test_pred_ret <- prediction(df, data = "test")
+        ## get Model Object
+        m <- (df %>% filter(!is.null(model)))$model[[1]]
+        actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
+        # Get original target column name.
+        actual_val_col_orig <- df$model[[1]]$terms_mapping[[actual_val_col]]
+
+        actual <- test_pred_ret[[actual_val_col_orig]]
+        predicted <- test_pred_ret$predicted_value
+        root_mean_square_error <- rmse(actual, predicted)
+        test_n <- sum(!is.na(predicted)) # Sample size for test.
+
+        # To calculate R Squared for test data, use same null model basis as training,
+        # so that the results are comparable.
+        null_model_mean <- mean(df$model[[1]]$model[[actual_val_col]], na.rm=TRUE)
+
+        rsq <- r_squared(actual, predicted, null_model_mean)
+
+        # Calculate Adjusted R Sauared
+        # https://en.wikipedia.org/wiki/Coefficient_of_determination
+        n_observations <- nrow(df$model[[1]]$model)
+        df_residual <- df$model[[1]]$df.residual
+        adj_rsq <- adjusted_r_squared(rsq, n_observations, df_residual)
+
+        test_ret <- data.frame(
+                          r.squared = rsq,
+                          adj.r.squared = adj_rsq,
+                          rmse = root_mean_square_error,
+                          n = test_n
+                          )
+        if(pretty.name) {
+          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `Rows`=n)
+        }
+        test_ret$is_test_data <- TRUE
+        test_ret
+      }, error = function(e){
+        data.frame()
+      })
+    }
+
+    # df is already grouped rowwise, but to get group column value on the output, we need to group it explicitly with the group column.
+    if (length(grouped_col) > 0) {
+      df <- df %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+    }
+
+    test_ret <- do_on_each_group(df, each_func, with_unnest = TRUE)
+    ret <- ret %>% dplyr::bind_rows(test_ret)
+  }
+
+  # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
+  if (!is.null(ret$is_test_data)) {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+    }
+    else {
+      ret <- ret %>% dplyr::select(is_test_data, everything())
+    }
+  }
+  else {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), everything())
+    }
+  }
+
+  if (length(grouped_col) > 0){
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
+  }
+
+  # Prettify is_test_data column. Do this after the above select calls, since it looks at is_test_data column.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>% 
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+
+  # Bring Note column at the end.
+  if (!is.null(ret$Note)) {
+    ret <- ret %>% dplyr::select(-Note, everything(), Note)
+  }
+
+  ret
+}
 
 
+# Generates Summary table for glm based analytics view.
+# (Gamma, Inverse Gaussian, Poisson, Negative Binomial) 
 
 # Calculate log likelihood and residual deviance from actual and predicted values for GLM families
 calc_glm_test_metrics <- function(actual, predicted, m) {

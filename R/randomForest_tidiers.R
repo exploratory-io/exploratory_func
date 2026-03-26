@@ -1,5 +1,182 @@
+#' Random Forest wrapper for regression
+#' Differences from randomForest::randomForest
+#' * When . is used in right hand side of formula,
+#'   only numeric/logical columns are used as predictors.
+#' * terms_mapping attribute is added to model
+#'   for keeping mapping of original column names and cleaned-up column names.
+#' @export
+randomForestReg <- function(data, formula, na.action = na.omit, ...) {
+  target_col <- all.vars(formula)[[1]]
 
+  if(!is.numeric(data[[target_col]])){
+    stop("Target must be numeric column")
+  }
 
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  names(updated_colnames) <- original_colnames
+
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  ret <- tryCatch({
+    randomForest::randomForest(formula = formula, data = data, na.action = na.action, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      # TODO: Should find the root cause of this error because indicating
+      # numerical and categorical predictors doesn't always cause this error
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+
+  ret
+}
+
+#' Random Forest wrapper for classification
+#' This is needed because boolean target starts regression task,
+#' not classification task
+#' Differences from randomForest::randomForest
+#' * When . is used in right hand side of formula,
+#'   only numeric/logical columns are used as predictors.
+#' * terms_mapping attribute is added to model
+#'   for keeping mapping of original column names and cleaned-up column names.
+#' @export
+randomForestBinary <- function(data, formula, na.action = na.omit, ...) {
+  target_col <- all.vars(formula)[[1]]
+  original_val <- data[[target_col]]
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  # this will be used to get original colmn names later
+  names(updated_colnames) <- original_colnames
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  data[[target_col]] <- as.factor(data[[target_col]])
+
+  if(!is.logical(original_val) &&
+     length(levels(data[[target_col]] )) != 2){
+    stop("There should be 2 unique values for binary classification.")
+  }
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  ret <- tryCatch({
+    randomForest::randomForest(formula = formula, data = data, na.action = na.omit, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+  ret$classification_type = "binary"
+
+  ret
+}
+
+#' Random Forest wrapper for classification
+#' This is needed because boolean target starts regression task,
+#' not classification task
+#' Differences from randomForest::randomForest
+#' * When . is used in right hand side of formula,
+#'   only numeric/logical columns are used as predictors.
+#' * terms_mapping attribute is added to model
+#'   for keeping mapping of original column names and cleaned-up column names.
+#' @export
+randomForestMulti <- function(data, formula, na.action = na.omit, ...) {
+  target_col <- all.vars(formula)[[1]]
+  original_val <- data[[target_col]]
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  names(updated_colnames) <- original_colnames
+
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  data[[target_col]] <- as.factor(data[[target_col]])
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  ret <- tryCatch({
+    randomForest::randomForest(formula = formula, data = data, na.action = na.omit, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  if(is.logical(original_val) ||
+     length(levels(data[[target_col]] )) == 2){
+    ret$classification_type = "binary"
+  } else {
+    ret$classification_type = "multi"
+  }
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+
+  ret
+}
 
 # Common routine use for binary/multinomial classification and regression
 # TODO: Make it a common routine and use it from calc_feature_imp too.
@@ -111,6 +288,32 @@ rangerCore <- function(data, formula, na.action = na.omit,
   ret
 }
 
+#' Random Forest wrapper for regression by ranger packages
+#' ranger::ranger don't compute importance by default. So importance_mode args is needed.
+#' @export
+rangerReg <- function(data, formula, na.action = na.omit, importance_mode = "permutation", ...) {
+  rangerCore(data, formula, na.action = na.omit,
+             importance_mode = importance_mode,
+             model_type = "regression", ...)
+}
+
+#' Random Forest wrapper for classification by ranger package
+#' @export
+rangerBinary <- function(data, formula, na.action = na.omit, importance_mode = "permutation", ...) {
+  rangerCore(data, formula, na.action = na.omit,
+             importance_mode = importance_mode,
+             model_type = "classification_binary", ...)
+}
+
+#' Random Forest wrapper for classification by ranger package
+#' This is needed because boolean target starts regression task,
+#' not classification task
+#' @export
+rangerMulti <- function(data, formula, na.action = na.omit, importance_mode = "permutation", ...) {
+  rangerCore(data, formula, na.action = na.omit,
+             importance_mode = importance_mode,
+             model_type = "classification_multi", ...)
+}
 
 # these are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
 #' tidy for randomForest model
@@ -1133,8 +1336,14 @@ rename_groups <- function(n) {
   ifelse(grepl("^\\d", n), paste0("group_", n), n)
 }
 
+#' wrapper for tidy type importance
+#' @export
+rf_importance <- function(data, ...) {
+  tidy_rowwise(data, model, type = "importance", ...)
+}
 
 #' wrapper for tidy type evaluation
+#' @export
 rf_evaluation <- function(data, ...) {
   ret <- tidy_rowwise(data, model, type = "evaluation", ...)
   if (!is.null(ret$Note)) {
@@ -1146,6 +1355,7 @@ rf_evaluation <- function(data, ...) {
 }
 
 #' wrapper for tidy type evaluation_by_class
+#' @export
 rf_evaluation_by_class <- function(data, ...) {
   tidy_rowwise(data, model, type = "evaluation_by_class", ...)
 }
@@ -1154,6 +1364,7 @@ rf_evaluation_by_class <- function(data, ...) {
 # TODO: This function should be promoted to a generic model evaluation function.
 # Generates Analytics View Summary table for ranger and rpart.
 #' wrapper for tidy type evaluation
+#' @export
 rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
   # Filter out the rows from failed models.
   # This is working depending on rowwise grouping. (Note for when we move out of it.)
@@ -1362,6 +1573,36 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   ret
 }
 
+#' wrapper for tidy type partial dependence
+#' @export
+rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
+  res <- df %>% tidy_rowwise(model, type="partial_dependence", ...)
+  if (nrow(res) == 0) {
+    return(data.frame()) # Skip the rest of processing by returning empty data.frame.
+  }
+  grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
+                                 # grouped_by has to be on res rather than on df since dplyr::group_vars
+                                 # does not work on rowwise-grouped data frame.
+
+  if (length(grouped_col) > 0) {
+    res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+
+    # Folloing is not necessary since we separately display partial dependence plot for each group since v5.5.
+    # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
+    # res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+
+    res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
+    res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
+  }
+  else {
+    res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
+  }
+  # gather we did after edarf::partial_dependence call turned x_value into factor if not all variables were in a same data type like numeric.
+  # to keep the numeric or factor order (e.g. Sun, Mon, Tue) of x_value in the resulting chart, we do fct_inorder here while x_value is in order.
+  # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+  res <- res %>% dplyr::mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+  res
+}
 
 ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k=5, ...) {
   if(!is.factor(Y))
@@ -1533,6 +1774,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
 
 #' applies SMOTE to a data frame
 #' @param target - the binary value column that becomes target of model later. can be logical, factor, character or numeric.
+#' @export
 exp_balance <- function(df,
                      target,
                      target_minority_perc = 40,
@@ -1877,6 +2119,7 @@ importance_ranger <- function(model) {
 }
 
 #' Get feature importance for multi class classification using randomForest
+#' @export
 calc_feature_imp <- function(df,
                              target,
                              ...,
@@ -2357,6 +2600,7 @@ calc_feature_imp <- function(df,
 
 #' TODO: not really for external use. hide it.
 #' TODO: use this other places doing similar thing.
+#' @export
 #' @param multi_class - TRUE when we need class and size, which we show for multiclass classification case.
 evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
   if (length(actual) != length(predicted)) {
@@ -2946,6 +3190,7 @@ calc_permutation_importance_rpart_multiclass <- function(fit, target, vars, data
   importances_df
 }
 
+#' @export
 exp_rpart <- function(df,
                       target,
                       ...,

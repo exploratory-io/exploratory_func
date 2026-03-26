@@ -1,3 +1,27 @@
+#' Clone implementation of now deprecated tidytext::pair_count for backward compatibility in Exploratory.
+#' @export
+pair_count <- function (df,
+                        group,
+                        value,
+                        distinct = TRUE,
+                        diag = FALSE,
+                        sort = TRUE,
+                        unite = FALSE,
+                        group_by = NULL){
+
+  group_col <- col_name(substitute(group))
+  value_col <- col_name(substitute(value))
+  group_by_col <- col_name(substitute(group_by))
+
+  pair_count_(df,
+              group_col,
+              value_col,
+              distinct = distinct,
+              diag = diag,
+              sort = sort,
+              unite = unite,
+              group_by_col = group_by_col)
+}
 #' Clone implementation of now deprecated tidytext::pair_count_ for backward compatibility in Exploratory.
 pair_count_ <- function(df,
                          group_col,

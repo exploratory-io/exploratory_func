@@ -1408,11 +1408,16 @@ importance_lightgbm <- function(model) {
 calc_permutation_importance_lightgbm_regression <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(
-      data, var, target, fit, nperm = 1,
-      predict.fun = function(object, newdata) { predict_lightgbm(object, newdata) },
-      loss.fun = function(x, y) { sum((x - y) ^ 2, na.rm = TRUE) / length(x) }
-    )
+    tryCatch({
+      mmpf::permutationImportance(
+        data, var, target, fit, nperm = 1,
+        predict.fun = function(object, newdata) { predict_lightgbm(object, newdata) },
+        loss.fun = function(x, y) { sum((x - y) ^ 2, na.rm = TRUE) / length(x) }
+      )
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble::tibble(variable = vars, importance = pmax(importances, 0))
@@ -1423,11 +1428,16 @@ calc_permutation_importance_lightgbm_regression <- function(fit, target, vars, d
 calc_permutation_importance_lightgbm_binary <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(
-      data, var, target, fit, nperm = 1,
-      predict.fun = function(object, newdata) { predict_lightgbm(object, newdata) },
-      loss.fun = function(x, y) { -sum(log(1 - abs(x - y[[1]])), na.rm = TRUE) }
-    )
+    tryCatch({
+      mmpf::permutationImportance(
+        data, var, target, fit, nperm = 1,
+        predict.fun = function(object, newdata) { predict_lightgbm(object, newdata) },
+        loss.fun = function(x, y) { -sum(log(1 - abs(x - y[[1]])), na.rm = TRUE) }
+      )
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable = vars, importance = pmax(importances, 0))
@@ -1438,13 +1448,18 @@ calc_permutation_importance_lightgbm_binary <- function(fit, target, vars, data)
 calc_permutation_importance_lightgbm_multiclass <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(
-      data, var, target, fit, nperm = 1,
-      predict.fun = function(object, newdata) { predict_lightgbm(object, newdata) },
-      loss.fun = function(x, y) {
-        sum(-log(x[match(y[[1]][row(x)], colnames(x)) == col(x)]), na.rm = TRUE)
-      }
-    )
+    tryCatch({
+      mmpf::permutationImportance(
+        data, var, target, fit, nperm = 1,
+        predict.fun = function(object, newdata) { predict_lightgbm(object, newdata) },
+        loss.fun = function(x, y) {
+          sum(-log(x[match(y[[1]][row(x)], colnames(x)) == col(x)]), na.rm = TRUE)
+        }
+      )
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable = vars, importance = pmax(importances, 0))
@@ -1511,6 +1526,493 @@ partial_dependence.lightgbm <- function(fit, vars = colnames(data),
   pd
 }
 
+#' Build LightGBM model for Analytics View.
+#' @export
+exp_lightgbm <- function(df,
+                         target,
+                         ...,
+                         target_fun = NULL,
+                         predictor_funs = NULL,
+                         max_nrow = 50000,
+                         # LightGBM-specific parameters
+                         nrounds = 10,
+                         watchlist_rate = 0,
+                         sparse = FALSE,
+                         early_stopping_rounds = NULL,
+                         num_leaves = 31,
+                         max_depth = -1,
+                         min_data_in_leaf = 20,
+                         min_gain_to_split = 0,
+                         feature_fraction = 1,
+                         bagging_fraction = 1,
+                         bagging_freq = 0,
+                         learning_rate = 0.1,
+                         lambda_l1 = 0,
+                         lambda_l2 = 0,
+                         output_type_regression = "regression",
+                         eval_metric_regression = "rmse",
+                         output_type_binary = "probability",
+                         eval_metric_binary = "auc",
+                         output_type_multiclass = "softprob",
+                         eval_metric_multiclass = "multi_error",
+                         # Model agnostic parameters
+                         target_n = 20,
+                         predictor_n = 12,
+                         smote = FALSE,
+                         smote_target_minority_perc = 40,
+                         smote_max_synth_perc = 200,
+                         smote_k = 5,
+                         smote_keep_synthetic = TRUE,
+                         importance_measure = "permutation",
+                         max_pd_vars = NULL,
+                         pd_sample_size = 500,
+                         pd_grid_resolution = 20,
+                         pd_with_bin_means = TRUE, # Default is TRUE to match XGBoost behavior and show confidence intervals
+                         seed = 1,
+                         test_rate = 0.0,
+                         test_split_type = "random") {
+  loadNamespace("lightgbm")
+
+  if (test_rate < 0 | 1 < test_rate) {
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1) {
+    stop("test_rate must be less than 1")
+  }
+
+  target_col <- tidyselect::vars_select(names(df), !!rlang::enquo(target))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!!rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  } else {
+    selected_cols <- orig_selected_cols
+  }
+
+  grouped_cols <- grouped_by(df)
+  selected_cols <- stringr::str_sort(selected_cols)
+
+  is_target_numeric <- is.numeric(df[[target_col]])
+  is_target_logical <- is.logical(df[[target_col]])
+
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  } else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE", "FALSE")
+  }
+
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
+
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
+
+  each_func <- function(df) {
+    tryCatch({
+      if (!is.null(seed)) {
+        set.seed(seed)
+      }
+
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        sample_size <- NULL
+      } else {
+        sample_size <- max_nrow
+      }
+
+      orig_predictor_classes <- capture_df_column_classes(df, clean_cols)
+
+      # Count rows with Inf in numeric predictor columns BEFORE cleanup_df_per_group filters them
+      # This is needed because preprocess_regression_data_before_sample (called inside cleanup_df_per_group)
+      # filters Inf values, so we need to count them before they're removed
+      numeric_pred_cols <- clean_cols[sapply(clean_cols, function(col) is.numeric(df[[col]]))]
+      if (length(numeric_pred_cols) > 0) {
+        inf_flags <- lapply(numeric_pred_cols, function(col) is.infinite(df[[col]]))
+        rows_with_inf <- rowSums(do.call(cbind, inf_flags)) > 0
+        inf_removed_rows <- sum(rows_with_inf)
+      } else {
+        inf_removed_rows <- 0
+      }
+
+      # Handle edge case: all rows would be removed due to Inf values
+      if (inf_removed_rows == nrow(df)) {
+        stop("All rows were removed due to Inf values in predictors. Please check your data.")
+      }
+
+      # LightGBM can handle NAs in numeric predictors; keep NA filtering off (match xgboost).
+      clean_df_ret <- cleanup_df_per_group(
+        df, clean_target_col, sample_size, clean_cols, name_map, predictor_n,
+        filter_numeric_na = FALSE, convert_logical = FALSE
+      )
+      if (is.null(clean_df_ret)) {
+        return(NULL)
+      }
+
+      df <- clean_df_ret$df
+      c_cols <- clean_df_ret$c_cols
+      if (length(c_cols) == 0) {
+        stop("Invalid Predictors: Only one unique value.")
+      }
+      name_map <- clean_df_ret$name_map
+
+      # Create message if Inf values were removed (they were filtered inside cleanup_df_per_group)
+      if (inf_removed_rows > 0) {
+        inf_removed_message <- paste0(
+          "Note: ", inf_removed_rows, " row(s) with Inf values in predictors were automatically removed."
+        )
+      } else {
+        inf_removed_message <- NULL
+      }
+
+      # Split data into train/test BEFORE applying SMOTE
+      # This ensures test data remains pure and doesn't contain synthetic samples
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      
+      # Extract test data if test_rate > 0 (needed for smote_keep_synthetic logic)
+      df_test_temp <- NULL
+      if (test_rate > 0) {
+        df_test_temp <- safe_slice(source_data, test_index, remove = FALSE)
+      }
+
+      # Store original training data before SMOTE for later prediction
+      df_train_original <- df
+      
+      # Apply SMOTE only to training data after split
+      unique_val <- unique(df[[clean_target_col]])
+      smote_applied <- FALSE
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+        
+        # Check if SMOTE was actually applied by checking for synthesized column
+        smote_applied <- "synthesized" %in% colnames(df)
+        
+        # If smote_keep_synthetic is TRUE and SMOTE was applied, update source_data
+        if (smote_keep_synthetic && smote_applied) {
+          # Keep the synthesized column to mark synthetic samples
+          # Combine SMOTE-enhanced training data with test data
+          if (test_rate > 0) {
+            # Add synthesized column to test data (all FALSE since they're real)
+            df_test_temp$synthesized <- FALSE
+            # Update source_data to be the combined SMOTE-enhanced train + original test
+            source_data <- bind_rows(df, df_test_temp)
+            # Update test_index to point to the test rows in the new source_data
+            # Test data is now at the end, starting from nrow(df) + 1
+            test_index <- (nrow(df) + 1):nrow(source_data)
+          } else {
+            # No test data, just use SMOTE-enhanced training data
+            source_data <- df
+          }
+        } else if (smote_applied) {
+          # SMOTE was applied but not keeping synthetic samples in output
+          # Remove synthesized column
+          if ("synthesized" %in% names(df)) {
+            df <- df %>% dplyr::select(-synthesized)
+          }
+        }
+      }
+
+      # If we are in "test mode" (test_rate > 0) but there is no explicit watchlist_rate,
+      # we pass the cleaned test split to LightGBM as an extra validation dataset so that
+      # per-iteration evaluation metrics (evaluation_log) include both train and test.
+      df_test <- NULL
+      df_test_clean <- NULL
+      na_row_numbers_test <- NULL
+      unknown_category_rows_index <- NULL
+      valid_data <- NULL
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+        if (watchlist_rate == 0 && !is.null(df_test_clean) && nrow(df_test_clean) > 0) {
+          valid_data <- list(test = df_test_clean)
+        }
+      }
+
+      # Restore source_data column name to original column name
+      rev_name_map <- names(name_map)
+      names(rev_name_map) <- name_map
+      # Preserve column names that don't have mappings (like 'synthesized')
+      new_names <- rev_name_map[colnames(source_data)]
+      colnames(source_data) <- ifelse(is.na(new_names), colnames(source_data), new_names)
+
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+
+      common_params <- list(
+        num_leaves = num_leaves,
+        max_depth = max_depth,
+        min_data_in_leaf = min_data_in_leaf,
+        min_gain_to_split = min_gain_to_split,
+        feature_fraction = feature_fraction,
+        bagging_fraction = bagging_fraction,
+        bagging_freq = bagging_freq,
+        learning_rate = learning_rate,
+        lambda_l1 = lambda_l1,
+        lambda_l2 = lambda_l2
+      )
+
+      if (is_target_logical) {
+        model <- lightgbm_binary(
+          df, fml,
+          nrounds = nrounds,
+          watchlist_rate = watchlist_rate,
+          sparse = sparse,
+          early_stopping_rounds = early_stopping_rounds,
+          output_type = output_type_binary,
+          eval_metric = eval_metric_binary,
+          params = common_params,
+          valid_data = valid_data
+        )
+      } else if (is_target_numeric) {
+        model <- lightgbm_reg(
+          df, fml,
+          nrounds = nrounds,
+          watchlist_rate = watchlist_rate,
+          sparse = sparse,
+          early_stopping_rounds = early_stopping_rounds,
+          output_type = output_type_regression,
+          eval_metric = eval_metric_regression,
+          params = common_params,
+          valid_data = valid_data
+        )
+      } else {
+        model <- lightgbm_multi(
+          df, fml,
+          nrounds = nrounds,
+          watchlist_rate = watchlist_rate,
+          sparse = sparse,
+          early_stopping_rounds = early_stopping_rounds,
+          output_type = output_type_multiclass,
+          eval_metric = eval_metric_multiclass,
+          params = common_params,
+          valid_data = valid_data
+        )
+      }
+
+      class(model) <- c("lightgbm_exp", class(model))
+
+      # Store evaluation log in XGBoost-compatible shape (wide, with iter).
+      model$evaluation_log <- lightgbm_build_evaluation_log(model)
+
+      # When SMOTE is used, predict on appropriate training data
+      if (smote_applied) {
+        if (smote_keep_synthetic) {
+          # If keeping synthetic samples, predict on SMOTE-enhanced data (matches source.data)
+          model$prediction_training <- predict_lightgbm(model, df)
+        } else {
+          # If not keeping synthetic samples, predict on original training data (matches source.data)
+          model$prediction_training <- predict_lightgbm(model, df_train_original)
+        }
+      } else {
+        model$prediction_training <- predict_lightgbm(model, df)
+      }
+
+      if (test_rate > 0) {
+        # Reuse the cleaned test data prepared above.
+        if (is.null(df_test_clean) || nrow(df_test_clean) == 0) {
+          # Keep consistent behavior: if no valid test rows remain, skip test prediction.
+          if (!is.null(df_test) && is.data.frame(df_test)) {
+            df_test_clean <- df_test[0, , drop = FALSE]
+          } else {
+            df_test_clean <- data.frame()
+          }
+        }
+        prediction_test <- predict_lightgbm(model, df_test_clean)
+
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
+        model$prediction_test <- prediction_test
+        model$df_test <- df_test_clean
+      }
+
+      if (is.null(max_pd_vars)) {
+        max_pd_vars <- 20
+      }
+      # Guard against the surprising behavior of 1:0 (which yields c(1, 0)).
+      # Treat non-positive values as "no partial dependence vars".
+      max_pd_vars <- suppressWarnings(as.integer(max_pd_vars))
+      if (is.na(max_pd_vars) || max_pd_vars < 0) {
+        max_pd_vars <- 0
+      }
+
+      if (length(c_cols) > 1) {
+        if (importance_measure == "permutation") {
+          if (is_target_logical) {
+            imp_df <- calc_permutation_importance_lightgbm_binary(model, clean_target_col, c_cols, df)
+          } else if (is_target_numeric) {
+            imp_df <- calc_permutation_importance_lightgbm_regression(model, clean_target_col, c_cols, df)
+          } else {
+            imp_df <- calc_permutation_importance_lightgbm_multiclass(model, clean_target_col, c_cols, df)
+          }
+          model$imp_df <- imp_df
+        } else if (importance_measure == "impurity" || importance_measure == "lightgbm") {
+          imp_df <- importance_lightgbm(model)
+          model$imp_df <- imp_df
+        } else if (importance_measure == "firm") {
+          # For firm importance, imp_df will be computed later from partial dependence
+          # Initialize to NULL to ensure it's defined
+          model$imp_df <- NULL
+        }
+
+        if (importance_measure == "firm") {
+          imp_vars <- c_cols
+        } else if ("error" %in% class(model$imp_df)) {
+          imp_vars <- c_cols
+          imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
+        } else {
+          imp_vars <- model$imp_df$variable
+          imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
+        }
+      } else {
+        error <- simpleError("Variable importance requires two or more variables.")
+        model$imp_df <- error
+        imp_vars <- c_cols
+      }
+
+      imp_vars <- as.character(imp_vars)
+      model$imp_vars <- imp_vars
+      if (length(imp_vars) > 0) {
+        model$partial_dependence <- partial_dependence.lightgbm(
+          model, vars = imp_vars, data = df,
+          n = c(pd_grid_resolution, min(nrow(df), pd_sample_size)),
+          classification = !(is_target_numeric || is_target_logical)
+        )
+      } else {
+        model$partial_dependence <- NULL
+      }
+
+      if (importance_measure == "firm") {
+        if (length(c_cols) > 1) {
+          pdp_target_col <- attr(model$partial_dependence, "target")
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        } else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols
+        }
+
+        imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
+        model$imp_vars <- imp_vars
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+      }
+
+      if (length(imp_vars) > 0) {
+        if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+          # imp_vars contains processed column names (like "c9_") which match the column names in df
+          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+        }
+      }
+
+      model$classification_type <- classification_type
+      model$orig_levels <- orig_levels
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$df <- df
+      model$formula_terms <- terms(fml)
+      attr(model$formula_terms, ".Environment") <- NULL
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
+
+      model$orig_target_col <- target_col
+      if (!is.null(target_funs)) {
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        attr(predictor_funs, "LC_TIME") <- Sys.getlocale("LC_TIME")
+        attr(predictor_funs, "sysname") <- Sys.info()[["sysname"]]
+        attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
+        model$predictor_funs <- predictor_funs
+      }
+      model$orig_predictor_classes <- orig_predictor_classes
+      
+      # Store Inf removal information for display in Analytics Guide
+      if (!is.null(inf_removed_message)) {
+        model$inf_removed_rows <- inf_removed_rows
+        model$inf_removed_message <- inf_removed_message
+      }
+
+      list(model = model, test_index = test_index, source_data = source_data)
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) {
+        class(e) <- c("lightgbm_exp", class(e))
+        list(model = e, test_index = NULL, source_data = NULL)
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+
+  ret <- ret %>% dplyr::ungroup()
+  ret <- ret %>%
+    dplyr::mutate(model = purrr::imap(data, function(df, idx) {
+      tryCatch({
+        df[[model_and_data_col]][[1]]$model
+      }, error = function(e) {
+        stop(paste0(e$message, " (while extracting model from group ", idx, ")"),
+             call. = FALSE)
+      })
+    })) %>%
+    dplyr::mutate(.test_index = purrr::imap(data, function(df, idx) {
+      tryCatch({
+        df[[model_and_data_col]][[1]]$test_index
+      }, error = function(e) {
+        stop(paste0(e$message, " (while extracting test_index from group ", idx, ")"),
+             call. = FALSE)
+      })
+    })) %>%
+    dplyr::mutate(source.data = purrr::imap(data, function(df, idx) {
+      tryCatch({
+        data <- df[[model_and_data_col]][[1]]$source_data
+        if (length(grouped_cols) > 0 && !is.null(data)) {
+          data %>% dplyr::select(-grouped_cols)
+        } else {
+          data
+        }
+      }, error = function(e) {
+        stop(paste0(e$message, " (while extracting source.data from group ", idx, ")"),
+             call. = FALSE)
+      })
+    })) %>%
+    dplyr::select(-data)
+
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
+
+  if (purrr::every(ret$model, function(x) { "error" %in% class(x) })) {
+    stop(ret$model[[1]])
+  }
+
+  ret
+}
 
 # This is used from Analytics View only when classification type is regression.
 #' @export
@@ -1524,7 +2026,18 @@ glance.lightgbm_exp <- function(x, pretty.name = FALSE, ...) {
   } else {
     stop("glance.lightgbm_exp should not be called for classification")
   }
-  glance.method(x, pretty.name = pretty.name, ...)
+  ret <- glance.method(x, pretty.name = pretty.name, ...)
+  
+  # Add note about Inf removal if applicable
+  if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
+    if ("Note" %in% colnames(ret)) {
+      ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
+    } else {
+      ret$Note <- x$inf_removed_message
+    }
+  }
+  
+  ret
 }
 
 #' @export
@@ -1568,11 +2081,20 @@ tidy.lightgbm_exp <- function(x, type = "importance", pretty.name = FALSE, binar
         if (x$classification_type == "binary") {
           predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
           predicted_probability <- extract_predicted(x)
-          evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         } else {
           predicted <- extract_predicted_multiclass_labels(x)
-          evaluate_multi_(data.frame(predicted = predicted, actual = actual), "predicted", "actual", pretty.name = pretty.name)
+          ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual), "predicted", "actual", pretty.name = pretty.name)
         }
+        # Add note about Inf removal if applicable
+        if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
+          if ("Note" %in% colnames(ret)) {
+            ret$Note <- paste(ret$Note, x$inf_removed_message, sep = " ")
+          } else {
+            ret$Note <- x$inf_removed_message
+          }
+        }
+        ret
       }
     },
     evaluation_by_class = {

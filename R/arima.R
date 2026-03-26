@@ -1,5 +1,20 @@
 #' Forecast time series data by ARIMA model
 # TODO: write docs
+#' @param df - Data frame
+#' @param time_col - Column that has time data
+#' @param value_col - Column that has value data
+#' @param periods - Number of time periods (e.g. days. unit is determined by time_unit) to forecast.
+#' @param time_unit - "second"/"sec", "minute"/"min", "hour", "day", "week", "month", "quarter", or "year".
+#' @param include_history - Whether to include history data in forecast or not.
+#' @param fun.aggregate - Function to aggregate values.
+#' @param na_fill_type - Type of NA fill:
+#'                       NULL - Skip NA fill. Default behavior.
+#'                       "previous" - Fill with previous non-NA value.
+#'                       "value" - Fill with the value of na_fill_value.
+#'                       "interpolate" - Linear interpolation.
+#'                       "spline" - Spline interpolation.
+#' @param na_fill_value - Value to fill NA when na_fill_type is "value"
+#' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
 exp_arima <- function(df, time, valueColumn,
                       periods = 10,
@@ -772,4 +787,35 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   #    <dbl>   <dbl> <dbl> <dbl> <dbl>
   # 1 0.0293    499. -995. -995. -984.
 
+}
+
+#' Model agnostic function to get common time series metric and model specific glance info.
+#' @export
+glance_with_ts_metric <- function(df) {
+  ret1 <- df %>% glance_rowwise(model)
+  ret2 <- df %>% unnest_safe("data")
+  value_col <- attr(df$data[[1]], "value_col")
+  if ("is_test_data" %in% colnames(ret2) && any(ret2$is_test_data)) {
+    ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, is_test_data), `MAPE (Ratio)`=exploratory::mape(!!rlang::sym(value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(value_col), forecasted_value, is_test_data), `R Squared`=r_squared(!!rlang::sym(value_col), forecasted_value, is_test_data=is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))
+  }
+  else {
+    ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), `MAPE (Ratio)`=exploratory::mape(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), `R Squared`=r_squared(!!rlang::sym(value_col), forecasted_value, is_test_data=!is.na(!!rlang::sym(value_col))), `Number of Rows`=sum(!is.na(!!rlang::sym(value_col))))
+  }
+
+  group_col <- grouped_by(ret1)
+  if (length(group_col) > 0) { # Remove group_by column from ret1 before bind_cols to avoid column name conflict.
+    ret1 <- ret1 %>% dplyr::ungroup() %>% dplyr::select(-!!rlang::sym(group_col))
+  }
+
+  ret <- dplyr::bind_cols(ret2, ret1) # We show the model agnostic metrics first.
+  if ("Number of Rows" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows`, everything(), `Number of Rows`)
+  }
+  if ("Number of Rows for Training" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows for Training`, everything(), `Number of Rows for Training`)
+  }
+  if ("Number of Rows for Test" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows for Test`, everything(), `Number of Rows for Test`)
+  }
+  ret
 }

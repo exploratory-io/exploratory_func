@@ -30,6 +30,14 @@ tidy.bsts <- function(x) {
   df
 }
 
+#' NSE version of do_market_impact
+#' @export
+do_market_impact <- function(df, time, value = NULL, market, ...) { # value = NULL is necessary to take no column for Number of Rows aggregation
+  time_col <- col_name(substitute(time))
+  value_col <- col_name(substitute(value))
+  market_col <- col_name(substitute(market))
+  do_market_impact_(df, time_col, value_col, market_col, ...)
+}
 
 #' Calculate impact of an event in timeseries data.
 #' @param df - Data frame

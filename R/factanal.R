@@ -28,6 +28,86 @@ preprocess_factanal_data_before_sample <- function(df, predictor_cols) {
   df
 }
 
+#' Function for Factor Analysis Analytics View
+#' @export
+exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1) {
+  # this evaluates select arguments like starts_with
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  if (length(selected_cols) < nfactors) {
+    stop("EXP-ANA-5 :: [] :: You need to set the number of factors to be less than or equal to the number of variables.")
+  }
+
+  grouped_cols <- grouped_by(df)
+
+  # remove grouped col or target col
+  selected_cols <- setdiff(selected_cols, grouped_cols)
+
+  if (any(selected_cols %in% grouped_cols)) {
+    stop("Repeat-By column cannot be used as a variable column.")
+  }
+
+  # list and difftime etc. causes error in tidy_rowwise(model, type="biplot").
+  # For now, we are removing them upfront.
+  df <- df %>% dplyr::select(-where(is.list),
+                             -where(lubridate::is.difftime),
+                             -where(lubridate::is.duration),
+                             -where(lubridate::is.interval),
+                             -where(lubridate::is.period))
+
+  if(!is.null(seed)) { # Set seed before starting to call sample_n.
+    set.seed(seed)
+  }
+
+  each_func <- function(df) {
+    # sample the data for quicker turn around on UI,
+    # if data size is larger than specified max_nrow.
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      df <- df %>% sample_rows(max_nrow)
+    }
+
+    # As the name suggests, this preprocessing function was originally designed to be done
+    # before sampling, but we found that for this factor analysis function, that makes the
+    # process as a whole slower in the cases we tried. So, we are doing this after sampling.
+    filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+    selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
+
+    # select_ was not able to handle space in target_col. let's do it in base R way.
+    cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]
+
+    # remove columns with only one unique value
+    cols_copy <- colnames(cleaned_df)
+    for (col in cols_copy) {
+      unique_val <- unique(cleaned_df[[col]])
+      if (length(unique_val) == 1) {
+        cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
+      }
+    }
+    min_ncol <- 2
+    if (length(colnames(cleaned_df)) < min_ncol) {
+      if (length(grouped_cols) < 1) {
+        # If without group_by, throw error to display message.
+        stop("There are not enough columns after removing the columns with only NA or a single value.")
+      }
+      else {
+        # skip this group if less than 2 column is left. (We can't handle single column for now.)
+        return(NULL)
+      }
+    }
+    fit <- psych::fa(cleaned_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
+
+    fit$correlation <- cor(cleaned_df) # For creating scree plot later.
+    fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
+    fit$grouped_cols <- grouped_cols
+    fit$sampled_nrow <- sampled_nrow
+    class(fit) <- c("fa_exploratory", class(fit))
+    fit
+  }
+
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
 
 glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
   # glance.factanal works on psych::fa due to compatibility kept to some degree. TODO: Extract and output more info from psych::fa

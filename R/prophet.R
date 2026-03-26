@@ -133,6 +133,7 @@ add_country_holidays <- function(m, country_names) {
 #' @param mcmc.samples - MCMC samples for full bayesian inference. Default is 0.
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
+#' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = "auto", yearly.seasonality = "auto",

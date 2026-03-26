@@ -1,8 +1,41 @@
 #'
 #'
 
+#' integrated build_kmeans
+#' @export
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, seed=1){
+  validate_empty_data(df)
+
+  if (!is.null(skv)) {
+    #.kv pattern
+    if (!(length(skv) %in% c(2, 3))) {
+      stop("length of skv has to be 2 or 3")
+    }
+    value <- if(length(skv) == 2) NULL else skv[[3]]
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, seed=seed, ...)
+  } else {
+    #.cols pattern
+    build_kmeans.cols(df, seed=seed, ...)
+  }
+}
+
+#' kmeans wrapper with do with key-value columns as input
+#' @param centers Set an integer number to decide how many clusters (groups) to build.
+#' @param keep.source It will make .source.data column to preserve source data.
+#' @param seed This is random seed. You can change the result if you change this number.
+#' @return deta frame which has kmeans model
+#' @export
+build_kmeans.kv <- function(df, subject, key, value = NULL, ...){
+
+  row_col <- col_name(substitute(subject))
+  col_col <- col_name(substitute(key))
+  value_col <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
+
+  build_kmeans.kv_(df, row_col, col_col, value_col, ...)
+}
 
 #' SE version of build_kmeans.kv
+#' @export
 build_kmeans.kv_ <- function(df,
                              subject_col,
                              key_col,
@@ -117,6 +150,7 @@ build_kmeans.kv_ <- function(df,
 }
 
 #' kmeans wrapper with do with variable columns as input
+#' @export
 build_kmeans.cols <- function(df, ...,
                             centers=3,
                             iter.max = 10,

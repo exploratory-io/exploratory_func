@@ -1,5 +1,6 @@
 #' Column name parser
 #' This function is from https://github.com/tidyverse/broom/blob/master/R/utilities.R
+#' @export
 col_name <- function(x, default = stop("Please supply column name", call. = FALSE)) {
   if (is.character(x))
     return(x)
@@ -22,6 +23,7 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' @param fill Values to fill NA.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @param na.rm If NA in val should be removed
+#' @export
 simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, time_unit=NULL, na.rm = FALSE) {
   loadNamespace("reshape2")
   loadNamespace("tidyr")
@@ -89,6 +91,7 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
 
 #' Cast data to sparse matrix by choosing row and column from a data frame
 #' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
+#' @export
 sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE) {
   loadNamespace("dplyr")
   loadNamespace("tidyr")
@@ -156,6 +159,28 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
   sparseMat
 }
 
+#' as.matrix from select argument or cast by three columns
+#' @export
+to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean) {
+  should_cast <- !(is.null(by_col) & is.null(key_col) & is.null(value_col))
+  if(should_cast) {
+    if(is.null(by_col) | is.null(key_col) | is.null(value_col)){
+      stop("all by, key and value should be defined")
+    }
+    simple_cast(
+      df,
+      by_col,
+      key_col,
+      value_col,
+      fun.aggregate = fun.aggregate,
+      fill=fill,
+      na.rm = TRUE
+    )
+  } else {
+    loadNamespace("dplyr")
+    dplyr::select_(df, .dots=select_dots) %>%  as.matrix()
+  }
+}
 
 #' Gather only right upper half of matrix - where row_num > col_num
 #' @param mat Matrix to be converted to data frame
@@ -164,6 +189,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
 #' @param cnames Column names of output
 #' @param na.rm If NA should be removed from the result
 #' @param zero.rm If 0 should be removed from the result
+#' @export
 upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, zero.rm = TRUE) {
   loadNamespace("Matrix")
   if(is.vector(mat)){
@@ -253,6 +279,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
+#' @export
 avoid_conflict <- function(origin, new, suffix = ".new") {
   conflict <- new %in% origin
   while(any(conflict)){
@@ -263,6 +290,7 @@ avoid_conflict <- function(origin, new, suffix = ".new") {
 }
 
 #' check grouped column
+#' @export
 grouped_by <- function(df){
   dplyr::group_vars(df)
 }
@@ -273,6 +301,7 @@ grouped_by <- function(df){
 #' @param na.rm If NA should be removed from the result
 #' @param zero.rm If 0 should be removed from the result
 #' @param diag If diagonal values should be returned
+#' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
   # Set column names. Without it, values of the second column of the output df
   # would be "V1", "V2", ... instead of "1", "2".
@@ -378,10 +407,98 @@ ceiling <- function(x, digits = 0) {
 `%nin%` <- function (x, table) match(x, table, nomatch = 0L) == 0L
 
 #' get number of elements in list data type column for each row
+#' @export
 list_n <- function(column) {
   sapply(column, length)
 }
 
+#' extract elements from each row of list type column or data frame type column
+#' @export
+list_extract <- function(column, position = 1, rownum = 1) {
+
+  if(position==0){
+    stop("position 0 is not supported")
+  }
+
+  if(is.data.frame(column[[1]])){
+    if(position<0){
+      sapply(column, function(column) {
+        index <- ncol(column) + position + 1
+        if(is.null(column[rownum, index]) | index <= 0) {
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[rownum, index][[1]]
+        }
+      })
+    } else {
+      sapply(column, function(column) {
+        if(is.null(column[rownum, position])) {
+          NA
+        } else {
+          column[rownum, position][[1]]
+        }
+      })
+    }
+  } else {
+    if(position<0){
+      sapply(column, function(column) {
+        index <- length(column) + position + 1
+        if(index <= 0){
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[index]
+        }
+      })
+    } else {
+      sapply(column, function(column) {
+        column[position]
+      })
+    }
+  }
+}
+
+#' convert list column into text column
+#' @export
+list_to_text <- function(column, sep = ", ") {
+  loadNamespace("stringr")
+  ret <- sapply(column, function(x) {
+    ret <- stringr::str_c(stringr::str_replace_na(x), collapse = sep)
+    if(identical(ret, character(0))){
+      # if it's character(0). Not too sure if this would still happen now that we do str_replace_na first.
+      NA
+    } else {
+      ret
+    }
+  })
+  as.character(ret)
+}
+
+#' concatinate vectors in a list
+#' @export
+list_concat <- function(..., collapse = FALSE) {
+  lists <- list(...)
+
+  # size of each list
+  lengths <- lapply(lists, function(arg){
+    length(arg)
+  })
+
+  max_index <- which.max(lengths)
+
+  ret <- lapply(seq(lengths[[max_index]]), function(index) {
+    val <- unlist(lapply(lists, function(arg){
+      arg[[index]]
+    }))
+  })
+
+  if(collapse){
+    ret <- list(unlist(ret))
+  }
+
+  ret
+}
 
 #' wrapper around sample_n to avoid error caused by fewer rows than size.
 #' @export
@@ -416,6 +533,41 @@ sample_rows <- function(df, size, seed = NULL, ...) {
   ret
 }
 
+#' replace sequence of spaces or periods with
+#' single space or period, then trim spaces on both ends.
+#' @export
+str_clean <- function(words){
+  # change \n, \t into space
+  words <- stringr::str_replace_all(words, "\n|\t", " ")
+  # change continuous spaces into one space
+  words <- stringr::str_replace_all(words, " +", " ")
+  # change continuous period into one period
+  words <- stringr::str_replace_all(words, "\\.\\.+", ".")
+  # remove spaces on the both side
+  words <- stringr::str_trim(words)
+}
+
+#' count word patterns
+#' @export
+str_count_all <- function(text, patterns, remove.zero = TRUE) {
+  # string count for each pattern list
+  lapply(text, function(text_elem) {
+    countList <- lapply(patterns, function(pattern) {
+      stringr::str_count(text_elem, pattern)
+    })
+    count <- as.numeric(countList)
+    # if remove.zero is FALSE, it returns all element
+    return_elem <- (!remove.zero | count > 0)
+    data.frame(.count=count[return_elem], .pattern=patterns[return_elem], stringsAsFactors = FALSE)
+  })
+}
+
+#' Normalize characters in the text according to Unicode Normalization Forms.
+#' This is a wrapper around stringi::stri_trans_nfkc to give it a user-friendly name.
+#' @export
+str_normalize <- function(text) {
+  stringi::stri_trans_nfkc(text)
+}
 
 #' convert df to numeric matrix
 #' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
@@ -436,6 +588,7 @@ as_numeric_matrix_ <- function(df, columns) {
 #' evaluate select argument
 #' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 #' @param excluded Excluded column names
+#' @export
 evaluate_select <- function(df, .dots, excluded = NULL) {
   loadNamespace("dplyr")
   tryCatch({
@@ -456,6 +609,7 @@ evaluate_select <- function(df, .dots, excluded = NULL) {
 #' re-build arguments of a function as string
 #' @param call This expects returned value from match.call()
 #' @param exclude Argument names that should be excluded for expansion
+#' @export
 expand_args <- function(call, exclude = c()) {
   excluded <- call[!names(call) %in% exclude]
   args <- excluded[-1]
@@ -479,6 +633,7 @@ expand_args <- function(call, exclude = c()) {
 }
 
 #' get sampled indice from data frame
+#' @export
 sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
   # Return NULL (empty vector) for rate 0 case. If we go on, ordered case would return the index for the last row.
   if (rate == 0) return(NULL)
@@ -495,6 +650,7 @@ sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
 }
 
 #' slice of 2 dimensional data that can handle empty vector
+#' @export
 safe_slice <- function(data, index, remove = FALSE) {
   ret <- if(remove){
     if(is.null(index)){
@@ -544,6 +700,7 @@ add_response <- function(data, model, response_label = "predicted_response") {
 #' @param df Data frame whose column will be moved
 #' @param cname Column name to be moved
 #' @param position Column index to move to
+#' @export
 move_col <- function(df, cname, position) {
   # get column index to move
   cname_posi = which(colnames(df) == cname)
@@ -603,6 +760,7 @@ move_col <- function(df, cname, position) {
 
 #' Unix time numeric values to POSIXct
 #' @param data Numeric vector to convert to date
+#' @export
 unixtime_to_datetime <- function(data){
   # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
   as.POSIXct(as.numeric(data), origin="1970-01-01", tz='GMT')
@@ -704,6 +862,10 @@ confint_radius <- function(x, level=0.95) {
   error
 }
 
+#' Calculate the confidence interval range (half-width of confidence interval)
+#' of a given vector.
+#' A synonym to confint_radius.
+confint_mean <- confint_radius
 
 #' Calculate the confidence interval range (half-width of confidence interval)
 #' from a sample size and an sd values of a group.
@@ -711,7 +873,6 @@ confint_radius <- function(x, level=0.95) {
 #'
 #` @param sd - standard deviation of the group.
 #` @param n - sample size of the group.
-#' @export
 calc_confint_mean <- function (sd, n, level=0.95) {
   error <- qt((level+1)/2, df=n-1)*sd/sqrt(n)
   error
@@ -730,6 +891,10 @@ prop_confint_radius <- function(x, level=0.95) {
 }
 
 
+#' Calculate the confidence interval range (half-width of confidence interval)
+#' of a population proportion of a given vector.
+#' A synonym to prop_confint_radius.
+confint_ratio <- prop_confint_radius
 
 #' Calculate the confidence interval range (half-width of confidence interval)
 #' of a population proportion from a size and a target ratio of a group.
@@ -737,7 +902,6 @@ prop_confint_radius <- function(x, level=0.95) {
 #'
 #` @param ratio - target ratio (0-1) of the group.
 #` @param n - sample size of the group.
-#' @export
 calc_confint_ratio <- function (ratio, n, level=0.95) {
   error <- qnorm((level+1)/2)*sqrt(ratio*(1-ratio)/n)
   error
@@ -746,6 +910,7 @@ calc_confint_ratio <- function (ratio, n, level=0.95) {
 #' get confidence interval value
 #' @param val Predicted value
 #' @param conf_int Confidence interval to get
+#' @export
 get_confint <- function(val, se, conf_int = 0.95) {
   critval=qnorm(conf_int,0,1)
   val + critval * se
@@ -763,6 +928,7 @@ get_confint <- function(val, se, conf_int = 0.95) {
 #' @param fill - Value to be filled for missing values
 #' @param na.rm - If na should be removed from values
 #' @param cols_sep - If na should be removed from values
+#' @export
 pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   # make sure to ungroup the data frame first if the row_cols are same as grouped columns.
   grouped_col <- grouped_by(df)
@@ -1131,12 +1297,14 @@ create_model_meta <- function(df, formula) {
 }
 
 #' NSE version of unnest_without_empty_
+#' @export
 unnest_without_empty <- function(data, nested) {
   nested_col <- col_name(substitute(nested))
   unnest_without_empty_(data, nested_col)
 }
 
 #' unnest with removing NULL or empty list
+#' @export
 unnest_without_empty_ <- function(data, nested_col) {
   validate_empty_data(data)
   empty <- list_n(data[[nested_col]]) == 0
@@ -1150,13 +1318,33 @@ unnest_without_empty_ <- function(data, nested_col) {
   }
 }
 
+#' Count TRUE in a vector
+#' @param x vector
+#' @export
+true_count <- function(x) {
+  sum(x, na.rm = TRUE)
+}
 
 #' Count FALSE in a vector
 #' @param x vector
+#' @export
 false_count <- function(x) {
   sum(!x, na.rm = TRUE)
 }
 
+#' Percentage of TRUE in a vector
+#' @param x vector
+#' @export
+true_pct <- function(x) {
+  sum(x, na.rm =!all(is.na(x))) / length(x) * 100
+}
+
+#' Percentage of FALSE in a vector
+#' @param x vector
+#' @export
+false_pct <- function(x) {
+  sum(!x, na.rm =!all(is.na(x))) / length(x) * 100
+}
 
 #' Count NA in a vector
 #' @param x vector
@@ -1188,16 +1376,31 @@ non_na_pct <- function(x) {
 
 #' Ratio of NA in a vector
 #' @param x vector
+#' @export
 na_ratio <- function(x) {
   sum(is.na(x)) / length(x)
 }
 
+#' Ratio of TRUE in a vector
+#' @param x vector
+#' @export
+true_ratio <- function(x) {
+  sum(x, na.rm =!all(is.na(x))) / length(x)
+}
+
+#' Ratio of FALSE in a vector
+#' @param x vector
+#' @export
+false_ratio <- function(x) {
+  sum(!x, na.rm =!all(is.na(x))) / length(x)
+}
+
 #' Ratio of Non NA in a vector
 #' @param x vector
+#' @export
 non_na_ratio <- function(x) {
   sum(!is.na(x)) / length(x)
 }
-
 
 #' This is a wrapper of tidyr::unnest
 #' to change the default of .drop,
@@ -1223,6 +1426,7 @@ validate_empty_data <- function(df) {
 #' @param df Data frame
 #' @param func Function to execute
 #' @param params Parameters for func
+#' @export
 do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE) {
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
@@ -1272,9 +1476,9 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   ret
 }
 
+#' @export
 #' Utility function that categorizes numeric column based on the type argument.
 #' For example, if type argument is aschar, the column value is categorized as character.
-#' @export
 categorize_numeric <- function(x, type = "asnum") {
   ret <- NULL
   switch(type,
@@ -1293,6 +1497,7 @@ categorize_numeric <- function(x, type = "asnum") {
   ret
 }
 
+#' @export
 extract_from_date <- function(x, type = "fltoyear") {
   ret <- NULL
   switch(type,
@@ -1456,9 +1661,9 @@ extract_from_date <- function(x, type = "fltoyear") {
   ret
 }
 
+#' @export
 #' It returns Weekend if the provided date is weekend and Weekday if the provided date is weekday.
 #' @param x - Date (or POSIXct)
-#' @export
 weekend <- function(x){
   ret <- dplyr::if_else(is.na(x), NA_character_,
                         #if it's 1: Sun or 7: Sat, assume it's Weekend.
@@ -1466,7 +1671,47 @@ weekend <- function(x){
   factor(ret, levels = c("Weekday", "Weekend"))
 }
 
+#' @export
+#' Wrapper function for zipangu::is_jholiday
+#' To get correct Japanese Holiday information with zipangu's is_jholiday API,
+#' week start day (i.e. lubridate.week.start) should be 7 (Sunday).
+#' But there are cases that users want to use a different week start day
+#' and still want to detect the correct Japanese holidays.
+#' To workaround it, this wrapper function first sets the week start day to 7 (Sunday)
+#' and switches it back to the original value once the process is done.
+#'
+is_japanese_holiday <- function(date) {
+  # This API is originally from https://github.com/uribo/zipangu/blob/main/R/jholiday.R
+  # With this wrapper function, we added NA handling fix as well lubridate.week.start handling fix on top of it.
 
+  # Remember the current option so that we can restore to it once the process is done.
+  current_option <- getOption("lubridate.week.start")
+  result <- tryCatch({
+    # Make sure to set 7 as the week start date to make the result stable.
+    # This is required since zipangu calls lubridate::wday without passing wee_start argument. (see https://github.com/uribo/zipangu/issues/40 for details)
+    options(lubridate.week.start = 7)
+    date <-
+      lubridate::as_date(date)
+      # make sure to exclude NA otherwise, lubridate::as_date(unlist(zipangu::jholiday(yr, "en")))
+    yr <-
+      unique(lubridate::year(date[!is.na(date)]))
+    jholidays <-
+      unique(c(
+        zipangu:::jholiday_df$date,            # Holidays from https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv
+        lubridate::as_date(unlist(zipangu::jholiday(yr, "en")))   # Calculated holidays
+      ))
+
+    # exclude NA from jholidays then check if the date is Japanese Holiday or not.
+    date %in% jholidays[!is.na(jholidays)]
+  }, error=function(cond) {
+    stop(cond)
+  }, finally = {
+    options(lubridate.week.start = current_option)
+  })
+  result
+}
+
+#' @export
 extract_from_numeric <- function(x, type = "asdisc") {
   switch(type,
     asnum = {
@@ -1488,6 +1733,7 @@ extract_from_numeric <- function(x, type = "asdisc") {
 #' @param null_model_mean - Mean value the basis null model gives.
 #'                          To calculate R-Squared for test data, one from training data should be specified here.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
 r_squared <- function(actual, predicted, null_model_mean=NULL, is_test_data=NULL) {
   # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
   # https://en.wikipedia.org/wiki/Coefficient_of_determination
@@ -1689,6 +1935,13 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 }
 
 
+#' Column reorder function we use from Reorder steps of Exploratory.
+#' @export
+reorder_cols <- function(df, ...) {
+  # use any_of to make it work even if the columns in the arguments do not exist.
+  dplyr::select(df, dplyr::any_of(!!purrr::flatten_chr(purrr::map(rlang::quos(...), rlang::as_name))), dplyr::everything())
+}
+
 #' @export
 excel_numeric_to_date <- function(date_num, date_system = "modern",
                                   include_time = FALSE, round_seconds = TRUE) {
@@ -1698,6 +1951,27 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
                                  include_time = include_time, round_seconds = round_seconds)
 }
 
+#' @export
+excel_numeric_to_datetime <- function(datetime_num, tz = "", ...) {
+  res <- openxlsx::convertToDateTime(as.numeric(datetime_num), tz = tz, ...)
+  # Convert output timezone to the specified tz, in addition to reading the number with the tz.
+  res <- lubridate::with_tz(res, tz = tz)
+  res
+}
+
+#' A utility function for One-hot encoding
+#' @export
+one_hot <- function(df, key) {
+  key_quo <- rlang::enquo(key)
+  key_name <- rlang::as_name(key_quo)
+
+  # Use pivot_wider in one-hot encoding mode with column name prefix.
+  df %>%
+    pivot_wider(
+      names_from = !!key_quo,
+      names_prefix = paste0(key_name, "_")
+    )
+}
 
 # API to get a list of argument names
 extract_argument_names <- function(...) {
@@ -1706,7 +1980,7 @@ extract_argument_names <- function(...) {
 }
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
-#' @export
+#'@export
 bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL, encoding = NULL, use_col_index_as_col_name = FALSE) {
   # for compatiblity with dply::bind_rows
   # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
@@ -1874,7 +2148,7 @@ set_operation_with_force_character <- function(func, x, y, ...) {
 }
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
-#' @export
+#'@export
 union <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
@@ -1884,7 +2158,7 @@ union <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
-#' @export
+#'@export
 union_all <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
@@ -1894,7 +2168,7 @@ union_all <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
-#' @export
+#'@export
 intersect <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
@@ -1904,7 +2178,7 @@ intersect <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::setdiff to support ignoring data type difference.
-#' @export
+#'@export
 setdiff <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
@@ -1914,7 +2188,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...) {
 }
 
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
-#' @export
+#'@export
 recode <- function(x, ..., type_convert = FALSE, .default = NULL, .missing = NULL) {
   # Recreate the dynamic dots. Without it recoding a single dot (".") leads to an error when called from inside mutate().
   map <- list(...)
@@ -1953,7 +2227,7 @@ get_unique_values<-function (x, limit) {
 }
 
 #'Wrapper function for dplyr::recode_factor to workaround encoding info getting lost and to handle levels.
-#' @export
+#'@export
 recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missing = NULL, .ordered = TRUE) {
   current_levels = NULL;
   num_of_unique_value = NULL;
@@ -2011,7 +2285,7 @@ recode_factor <- function(x, ..., reverse_order = FALSE, .default = NULL, .missi
 }
 
 #'Wrapper function for tidyr::pivot_longer to support type_convert argument.
-#' @export
+#'@export
 pivot_longer <- function(data,
                          cols,
                          ...,
@@ -2062,7 +2336,7 @@ pivot_longer <- function(data,
 }
 
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
-#' @export
+#'@export
 case_when <- function(x, ..., type_convert = FALSE) {
   ret <- dplyr::case_when(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
@@ -2087,6 +2361,7 @@ case_when <- function(x, ..., type_convert = FALSE) {
 
 # This is written by removing unnecessary part from calculate_cohens_d.
 #'Calculate common standard deviation.
+#'@export
 calculate_common_sd <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
@@ -2114,6 +2389,7 @@ calculate_common_sd_aggregated <- function(N1, N2, s1, s2) {
 
 # Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
 #'Calculate Cohen's d
+#'@export
 calculate_cohens_d <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
@@ -2155,6 +2431,7 @@ calculate_cohens_d_aggregated <- function(N1, N2, X1, X2, s1, s2) {
 # Did not use powerAnalysis::ES.anova.oneway() because it only works for the case all categories
 # have same number of observations.
 #'Calculate Cohen's f
+#'@export
 calculate_cohens_f <- function(var1, var2) {
   m <- mean(var1, na.rm = TRUE)
   df <- data.frame(var1=var1, var2=var2)
@@ -2169,6 +2446,7 @@ calculate_cohens_f <- function(var1, var2) {
 
 # Reference: https://rdrr.io/github/markushuff/PsychHelperFunctions/src/R/cohens_w.R
 #'Calculate Cohen's w from Chi-Square value and total number of observations.
+#'@export
 calculate_cohens_w <- function(chi_sq, N) {
   sqrt(chi_sq/N)
 }
@@ -2196,6 +2474,7 @@ calculate_cohens_w_for_ab_test <- function(a_ratio, conversion_rate, diff) {
 # https://stats.stackexchange.com/questions/415037/effect-size-calculation-for-kruskal-wallis-mean-rank-test
 # https://rcompanion.org/handbook/F_08.html
 #'Calculate epsilon squared, which is an effect size of Kruskal-Wallis test.
+#'@export
 calculate_epsilon_squared <- function(KW, N) {
   H = KW$statistic
   Epsilon2 = H / (N-1)
@@ -2250,7 +2529,6 @@ get_row_numbers_from_index_vector <- function(index_vector) {
 }
 
 # Calculates average moving range of a vector.
-#' @export
 get_average_moving_range <- function(x) {
   # Remove NAs
   x <- x[!is.na(x)]
@@ -2402,6 +2680,77 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
 }
 
 # Wrapper function that takes care of dplyr::group_by and dplyr::mutate as a single step.
+#' @param .data - data frame
+#' @param group_cols - Columns to group_by
+#' @param group_funs - Functions to apply to group_by columns
+#' @param sort_cols - Columns to sort
+#' @param sort_funs - Either desc or none and none means asc.
+#' @param ... - Name-value pairs of mutate functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
+#' @export
+mutate_group <- function(.data, keep_group = FALSE, group_cols = NULL, group_funs = NULL, sort_cols = NULL, sort_funs = NULL, ...) {
+  ret <- if(length(group_cols) == 0) {
+    if (!is.null(sort_cols) && !is.null(sort_funs)) {
+      # If sort_cols and associated sort functions are provided,
+      # quote the columns/functions with rlang::quo so that dplyr can understand them.
+      sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+      .data %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(.data = .data, ...)
+    } else {
+      .data %>% dplyr::mutate(.data = .data, ...)
+    }
+  } else {
+    # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
+    # when group_cols conflict with group columns in previous steps.
+    .data <- .data %>% dplyr::ungroup()
+    groupby_args <- list() # default empty list
+    name_list <- list()
+    name_index = 1
+    # If group_by columns and associated categorizing functionts are provided,
+    # quote the columns/functions with rlang::quo so that dplyr can understand them.
+    if (!is.null(group_funs)) {
+      groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
+      # Set names of group_by columns in the output.
+      name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
+      if (is.null(name_list)) { # If name is not specified, use original column names.
+        name_list <- group_cols
+      }
+      names(groupby_args) <- name_list
+      # If sort_cols and associated sort functions are provided,
+      # quote the columns/functions with rlang::quo so that dplyr can understand them.
+      if (!is.null(sort_cols) && !is.null(sort_funs)) {
+        sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+        .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      } else {
+        # make sure to sort result by group by columns
+        .data %>% dplyr::group_by(!!!groupby_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      }
+    } else {
+      # If sort_cols and associated sort functions are provided,
+      # quote the columns/functions with rlang::quo so that dplyr can understand them.
+      if (!is.null(sort_cols) && !is.null(sort_funs)) {
+        sort_args <- purrr::map2(sort_funs, sort_cols, column_mutate_quosure)
+        # make sure to sort result by group by columns
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::arrange(!!!sort_args) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      } else {
+        # make sure to sort result by group by columns
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% dplyr::mutate(...) %>% dplyr::arrange(!!!groupby_args)
+      }
+    }
+  }
+  # For integer columns (like # of rows, unique), change them to numeric columns for better usability.
+  # Without this, when the next transform step is a mutate using case_when that contains the # of rows as a condition,
+  # case_when command fails due to data type mismatch (integer vs numeric).
+  #
+  ret <- ret %>% dplyr::mutate(across(where(is.integer), as.numeric))
+  if (keep_group) {
+    ret
+  } else { # if keep_group is FALSE, make sure to ungroup result but move the columns used for grouping at the beginning.
+    if (!is.null(group_cols) && !is.null(group_funs)) {
+      ret %>% dplyr::ungroup() %>% dplyr::relocate(name_list)
+    } else {
+      ret
+    }
+  }
+}
 
 bind_expr <- function(expr1, expr2) {
   rlang::expr(!!expr1 & !!expr2)
@@ -2461,6 +2810,135 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
 
 }
 
+#' export
+sum_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "sum", ..., na.rm = na.rm)
+}
+
+#' export
+sum_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "sum_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+sum_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "sum_pct", ..., na.rm = na.rm)
+}
+
+#' export
+count_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "count", ..., na.rm = na.rm)
+}
+
+#' export
+count_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "count_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+count_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "count_pct", ..., na.rm = na.rm)
+}
+
+#' export
+average_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "average", ..., na.rm = na.rm)
+}
+
+#' export
+average_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "average_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+average_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "average_pct", ..., na.rm = na.rm)
+}
+
+#' export
+mean_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "mean", ..., na.rm = na.rm)
+}
+
+#' export
+mean_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "mean_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+mean_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "mean_pct", ..., na.rm = na.rm)
+}
+
+#' export
+median_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "median", ..., na.rm = na.rm)
+}
+
+#' export
+median_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "median_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+median_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "median_pct", ..., na.rm = na.rm)
+}
+
+#' export
+min_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "min", ..., na.rm = na.rm)
+}
+
+#' export
+min_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "min_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+min_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "min_pct", ..., na.rm = na.rm)
+}
+
+#' export
+max_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "max", ..., na.rm = na.rm)
+}
+
+#' export
+max_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "max_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+max_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "max_pct", ..., na.rm = na.rm)
+}
+
+#' export
+count_unique_if <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "n_distinct", ..., na.rm = na.rm)
+}
+
+#' export
+count_unique_if_ratio <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "n_distinct_ratio", ..., na.rm = na.rm)
+}
+
+#' export
+count_unique_if_pct <- function(x, ..., na.rm = TRUE) {
+  aggregate_if(x, "n_distinct_pct", ..., na.rm = na.rm)
+}
+
+#' Alias for n()
+#' export
+count_rows <- function(...) { # Discard arguments and keep going rather than throwing an error.
+  dplyr::n()
+}
+
+#' Alias for n_distinct()
+#' export
+count_unique <- dplyr::n_distinct
 
 
 # Wrapper function around apply to apply aggregation function across columns for each row.
@@ -2468,6 +2946,7 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
 # airquality %>% mutate(total = summarize_row(across(where(is.numeric)), median, na.rm=TRUE))
 #' @param x - data frame
 #' @param f - function
+#' @export
 summarize_row <- function(x, f = mean, ...) {
   apply(x, 1, f, ...)
 }
@@ -2555,6 +3034,14 @@ mutate_predictors <- function(df, cols, funs) {
   })
 }
 
+#' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
+#' with level of "TRUE" and "FALSE". This function reverts such columns back to logical.
+#' @export
+revert_factor_cols_to_logical <- function(df) {
+  dplyr::mutate(df, across(where(function(col) {
+    is.factor(col) && length(levels(col)) == 2 && (all(levels(col) == c("TRUE", "FALSE")) || all(levels(col) == c("FALSE", "TRUE")))
+  }), as.logical))
+}
 
 # Checks if a vector has only integer values.
 is_integer <- function(x) {
@@ -2590,6 +3077,9 @@ sample_frac <- function(..., seed = NULL){
 
 # Get the week number of month https://stackoverflow.com/a/58370031
 # @deprecated Leave it for a while for Desktop 5.4.0.12 support.
+get_week_of_month <- function(date) {
+  (5 + lubridate::day(date) + lubridate::wday(lubridate::floor_date(date, "month"))) %/% 7;
+}
 
 #' Wrapper function for lubridate::week
 #' @export
@@ -2608,7 +3098,6 @@ week <- function(date, unit="year") {
 
 #' Wrapper function for between.
 #' if both left and right are NULL, return TRUE for all
-#' @export
 between <- function(x, left, right) {
   if (is.null(left) && is.null(right)) {
     return(rep(TRUE, length(x)))
@@ -2622,10 +3111,57 @@ time_between <- function(start_date, end_date, unit = "years") {
   lubridate::time_length(lubridate::interval(start_date, end_date), unit = unit)
 }
 
+#' API to calculate duration between the start_date and the end_date in years.
+years_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date)
+}
+
+#' API to calculate duration between the start_date and the end_date in months.
+months_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "months")
+}
+
+#' API to calculate duration between the start_date and the end_date in weeks.
+weeks_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "weeks")
+}
+
+#' API to calculate duration between the start_date and the end_date in days.
+days_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "days")
+}
+
+#' API to calculate duration between the start_date and the end_date in hours
+hours_between <- function(start_date, end_date=lubridate::now()) {
+  time_between(start_date, end_date, unit = "hours")
+}
+
+#' API to calculate duration between the start_date and the end_date in minutes
+minutes_between <- function(start_date, end_date=lubridate::now()) {
+  time_between(start_date, end_date, unit = "minutes")
+}
+
+#' API to calculate duration between the start_date and the end_date in seconds
+seconds_between <- function(start_date, end_date=lubridate::now()) {
+  time_between(start_date, end_date, unit = "seconds")
+}
+
+#' Returns the last day of the specified time period (e.g. month) that the original date belongs to.
+last_date <- function(x, unit = "month", previous = FALSE,
+                      week_start = getOption("lubridate.week.start", 7)) {
+  if (previous) { # The last date of the previous period.
+    lubridate::floor_date(x, unit = unit,
+                          week_start = week_start) - lubridate::days(1);
+  }
+  else { # The last date of the current period.
+    lubridate::ceiling_date(x, unit = unit,
+                            week_start = week_start) - lubridate::days(1);
+  }
+}
 
 #' Calculates area under ROC. (AUC)
-#' Reference: https://blog.mbq.me/augh-roc/
 #' @export
+#' Reference: https://blog.mbq.me/augh-roc/
 auroc <- function(score, bool) {
   not_na <- !(is.na(score) | is.na(bool)) # Index to filter out score-bool pairs with NA in either of them.
   bool <- bool[not_na]
@@ -2680,7 +3216,6 @@ complete_date <- function(df, date_col, time_unit = "day") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
-#' @export
 ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   if (unit == "day") {
     time_unit_func <- lubridate::days
@@ -2717,7 +3252,6 @@ ts_lag <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
-#' @export
 ts_diff <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
   res <- x - x_lag
@@ -2725,7 +3259,6 @@ ts_diff <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
 }
 
 #' @param na_fill_type - "previous", "next", or "none".
-#' @export
 ts_diff_ratio <- function(time, x, unit = "year", n = 1, na_fill_type = "previous") {
   x_lag <- ts_lag(time, x, unit = unit, n = n, na_fill_type = na_fill_type)
   res <- (x - x_lag)/x_lag
@@ -2734,6 +3267,11 @@ ts_diff_ratio <- function(time, x, unit = "year", n = 1, na_fill_type = "previou
 
 # Caluculates cumulative sum of decaying effects.
 # It is same as cumsum when r is 1.
+#' @param r - After n periods, original effect a decays down to a*r^n.
+#' @export
+cumsum_decayed <- function(x, r) {
+  purrr::accumulate(x, function(x, y){x*r + y})
+}
 
 # Caluculates intra group population variance. Used by merge_vars.
 #' @param population_vars
@@ -2757,6 +3295,7 @@ inter_group_population_var <- function(means, sizes) {
 #' @param means - Means of groups.
 #' @param sizes - Sizes of groups.
 #' @return Variance
+#' @export
 merge_vars <- function(vars, means, sizes) {
   tot_size <- sum(sizes)
   population_vars <- vars * (sizes - 1) / sizes
@@ -2779,12 +3318,31 @@ merge_sds <- function(sds, means, sizes) {
 }
 
 # Wrapper function for zipangu's separate_address
+#' @param df - data frame
+#' @param address - column that contains address text data
+#' @param prefecture_col - new column name for prefecture
+#' @param city_col - new column name for city
+#' @param street_col - new column name for street
+#' @export
+separate_japanese_address <- function(df, address, prefecture_col = "prefecture", city_col = "city", street_col = "street"){
+  # get column name from address.
+  address_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(address))
+  # prepare new column names for the result data frame.
+  prefecture_col <- avoid_conflict(colnames(df), prefecture_col)
+  city_col <- avoid_conflict(colnames(df), city_col)
+  street_col <- avoid_conflict(colnames(df), street_col)
+  new_names <- c(names(df), prefecture_col, city_col, street_col)
+  # create a new column with a dummy column name and store the separated address elements.
+  df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = zipangu::separate_address(!!rlang::sym(address_col)))
+  # since the .exploratory_dummy_column_for_japanese_address column is a list that contains address elements,
+  # call tidyr::unnest_wider so that each element becomes dedicated column like prefecture, city, and street.
+  df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = ~new_names)
+}
 
 # Wrapper function for dplyr::rename_with
 # See https://github.com/tidyverse/dplyr/blob/main/R/rename.R for the original code.
 # This API has the repair argument where as original dplyr's rename_with does not provide such argument.
 # By default this API returns unique column names when the result columns are duplicated.
-#' @export
 rename_with <- function(.data, .fn, .cols = everything(), repair = "unique", ...) {
   .fn <- rlang::as_function(.fn)
   cols <- tidyselect::eval_select(enquo(.cols), .data, allow_rename = FALSE)
@@ -2853,7 +3411,6 @@ construct_new_labels <- function(base.labels, new.labels) {
 # Example
 # Input: "(0.996,2.33]", "(2.33,3.67]", "(3.67,5]"
 # Output: "0.996 - 2.33", "2.33 - 3.67", "3.67 - 5"
-#' @export
 format_cut_output <- function(x, decimal.digits=2, big.mark=",", small.mark=".", new.labels=NULL, prefix="", suffix="", right=TRUE) {
   # Exit if the length is 0.
   if (length(x) == 0 || all(is.na(x))) {
@@ -2957,11 +3514,34 @@ format_cut_output_levels <- function(x, decimal.digits=2, big.mark=",", small.ma
 # Calculates Likert sigma values.
 # Input - Discrete values which can work as ranking but may not have contiguous meaning.
 # Output - Likert sigma values.
+likert_sigma <- function(x) {
+  # Convert the input into a factor, so that the actual numeric input values would not matter
+  # when mapping them into the output sigma values. Note that factor() assigns the levels to the distinct values in ascending sorted order.
+  if (!is.factor(x)) {
+    x0 <- factor(x)
+  }
+  else {
+    x0 <- x
+  }
+  # Remove NA before calculating the mapping.
+  x1 <- x[!is.na(x0)]
+  ratios <- as.numeric(table(x1))/length(x1) # as.numeric is to convert table class object to numeric.
+  p1 <- cumsum(ratios)
+  # If the ratios do not exactly add up to 1, qnorm(p1) can return NaN instead of Inf, which leads to unexpected NAs in the output.
+  # Set 1 to avoid it.
+  p1[length(p1)] <- 1
+  p0 <- lag(p1)
+  p0[is.na(p0)] <- 0
+  # Reference: https://stats.stackexchange.com/questions/237828/how-did-likert-calculate-sigma-values-in-his-original-1932-paper
+  # Note that weighted mean of x in each segment can be calculated this way since integral of x*dnorm(x) is -dnorm(x),
+  mapping <- (dnorm(qnorm(p0)) - dnorm(qnorm(p1)))/ratios
+  res <- mapping[x0] # Note that factor levels of x0 rather than the face value of x is used for the mapping here.
+  res
+}
 
 #' cumsum wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
-#' @export
 cumsum <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cumsum(x[!is.na(x)])
@@ -2974,7 +3554,6 @@ cumsum <- function(x, skip.na = TRUE) {
 #' cummean wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
-#' @export
 cummean <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- dplyr::cummean(x[!is.na(x)])
@@ -2987,7 +3566,6 @@ cummean <- function(x, skip.na = TRUE) {
 #' cummin wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
-#' @export
 cummin <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cummin(x[!is.na(x)])
@@ -3000,7 +3578,6 @@ cummin <- function(x, skip.na = TRUE) {
 #' cummax wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
-#' @export
 cummax <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cummax(x[!is.na(x)])
@@ -3013,7 +3590,6 @@ cummax <- function(x, skip.na = TRUE) {
 #' cumprod wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
-#' @export
 cumprod <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- base::cumprod(x[!is.na(x)])
@@ -3026,7 +3602,6 @@ cumprod <- function(x, skip.na = TRUE) {
 #' cumall wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
-#' @export
 cumall <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- dplyr::cumall(x[!is.na(x)])
@@ -3039,7 +3614,6 @@ cumall <- function(x, skip.na = TRUE) {
 #' cumany wrapper function. It skips NA values in the calculation by default.
 #' @param x vector
 #' @param skip.na logical. If TRUE, NA values are skipped. If FALSE, it respects NA values. Default is TRUE.
-#' @export
 cumany <- function(x, skip.na = TRUE) {
   if (skip.na) {
     x[!is.na(x)] <- dplyr::cumany(x[!is.na(x)])
@@ -3049,6 +3623,12 @@ cumany <- function(x, skip.na = TRUE) {
   }
 }
 
+#' extract_numeric wrapper function. It overrides the tidyr::extract_numeric function.
+#' @param x vector
+#' @return numeric vector
+extract_numeric <- function(x) {
+  exploratory::parse_number(x)
+}
 
 #' Wrapper for tidyr::pivot_wider with one-hot encoding support
 #'
@@ -3062,6 +3642,7 @@ cumany <- function(x, skip.na = TRUE) {
 #'        enables one-hot encoding mode using names_from column with 1/0 values.
 #' @param ... Additional arguments passed to tidyr::pivot_wider
 #' @return A data frame with pivoted columns
+#' @export
 pivot_wider <- function(data, names_from, values_from = NULL, ...) {
   # Capture arguments as quosures immediately
   names_from_quo <- rlang::enquo(names_from)

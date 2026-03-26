@@ -13,6 +13,12 @@ maxmind_closure <- function(type){
   }
 }
 
+#'Convert IP address to country name
+#'@param ip IP address
+#'@return Country name
+#'@export
+ip_to_country <- maxmind_closure("country_name")
+
 
 #' countrycode wrapper.
 #'

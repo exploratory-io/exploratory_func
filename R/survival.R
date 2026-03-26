@@ -1,4 +1,137 @@
 
+#' Function for Survival Analysis view.
+#' It does survfit and survdiff.
+#' @param end_time_fill - "max", "today", or actual value or string expresion of Date.
+#' @export
+exp_survival <- function(df, time, status, start_time, end_time, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
+  validate_empty_data(df)
+
+  grouped_col <- grouped_by(df)
+  status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
+  orig_cohort_col <- tidyselect::vars_select(names(df), !! rlang::enquo(cohort))
+  start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+  end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+  time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+
+  orig_levels <- NULL
+
+  if (length(orig_cohort_col) > 0) { # TODO: Better way to check if column is specified or not?
+    # rename cohort column to workaround the case where the column name has space in it.
+    # https://github.com/therneau/survival/issues/41
+    colnames(df)[colnames(df) == orig_cohort_col] <- ".cohort" #TODO avoid conflict, and adjust cohort output value from survfit.
+    cohort_col <- ".cohort"
+
+    if (!is.null(cohort_func)) {
+      df[[cohort_col]] <- extract_from_date(df[[cohort_col]], type=cohort_func)
+    }
+    quoted_cohort_col <- paste0("`", cohort_col, "`")
+
+    # keep original factor levels to set them back later.
+    if (is.factor(df[[cohort_col]])) {
+      orig_levels <- levels(df[[cohort_col]])
+    }
+    else if (is.logical(df[[cohort_col]])) {
+      orig_levels <- c("TRUE","FALSE")
+    }
+  }
+  else {
+    # no cohort column is set. Just draw a single survival curve.
+    cohort_col <- "1"
+    quoted_cohort_col <- "1" # no need to quote column name since it is not column.
+  }
+
+  if (length(time_col) == 0) {
+    df[[start_time_col]] <- as.Date(df[[start_time_col]]) # convert to Date in case it is POSIXct.
+    if (length(end_time_col) > 0) { # if end_time exists, fill NA with the way specified by end_time_fill.
+      df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
+      # set value to fill NAs of end time
+      if (is.character(end_time_fill) && end_time_fill == "max") { # type check before comparison is necessary to avoid error.
+        end_time_fill_val <- max(df[[start_time_col]], df[[end_time_col]], na.rm = TRUE)
+      }
+      else if (is.character(end_time_fill) && end_time_fill == "today") {
+        end_time_fill_val <- lubridate::today()
+      }
+      else {
+        end_time_fill_val <- as.Date(end_time_fill)
+      }
+      df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=end_time_fill_val)
+    }
+    else { # if end_time does not exist, create .end_time column with value of today()
+      end_time_col <- avoid_conflict(colnames(df), ".end_time")
+      df[[end_time_col]] <- lubridate::today()
+    }
+
+    # as.numeric() does not support all units.
+    # also support of units are different between Date and POSIXct.
+    # let's do it ourselves.
+    time_unit_days = switch(time_unit,
+                            day = 1,
+                            week = 7,
+                            month = 365.25/12,
+                            quarter = 365.25/4,
+                            year = 365.25,
+                            1)
+
+    time_col <- avoid_conflict(colnames(df), ".time")
+
+    # we are ceiling survival time to make it integer in the specified time unit.
+    # this is to make resulting survival curve to have integer data point in the specified time unit.
+    df <- df %>% dplyr::mutate(!!rlang::sym(time_col) := ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days") / time_unit_days))
+  }
+
+  fml <- as.formula(paste0("survival::Surv(`", time_col, "`, `", status_col, "`) ~ ", quoted_cohort_col))
+
+  # By default, use mean of observations with event.
+  # median gave a point where survival rate was still predicted 100% in one of our test case.
+  default_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+  # Pick maximum of existing values equal or less than the actual mean.
+  default_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!default_survival_time))[[time_col]], na.rm=TRUE)
+
+  # calls survfit for each group.
+  each_func1 <- function(df) {
+    ret <- survival::survfit(fml, data = df)
+    # strata is ignored by survfit if all rows have same value.
+    # In such case, we need to put it back later. Record the value in the model.
+    if (cohort_col != "1" && length(unique(df[[cohort_col]])) == 1) {
+      ret$single_strata_value = df[[cohort_col]][[1]]
+    }
+    ret$orig_levels <- orig_levels
+    attr(ret, "default_survival_time") <- default_survival_time
+    class(ret) <- c("survfit_exploratory", class(ret))
+    ret
+  }
+
+  # calls survdiff (log rank test) for each group.
+  each_func2 <- function(df) {
+    ret <- NULL
+    if (cohort_col != "1") {
+      if (length(unique(df[[cohort_col]][!is.na(df[[cohort_col]])])) > 1) {
+        tryCatch({
+          ret <- survival::survdiff(fml, data = df)
+          class(ret) <- c("survdiff_exploratory", class(ret))
+        }, error = function(e){
+          # error like following is possible. ignore it just for this group, rather than stopping whole thing.
+          # Error in solve.default(vv, temp2) : Lapack routine dgesv: system is exactly singular
+          ret_ <- list(error=e)
+          class(ret_) <- c("survdiff_exploratory", class(ret))
+          ret <<- ret_
+        })
+      }
+      else {
+        ret <- list(error=simpleError("Test was not performed because there is only one group."))
+        class(ret) <- c("survdiff_exploratory", class(ret))
+      }
+    } else {
+      # If there is no cohort, return the number of data except NAs (n) 
+      # and number of TRUEs (nevent).
+      ret <- list(n = sum(!is.na(df[[status_col]]), na.rm = TRUE), nevent = sum(df[[status_col]], na.rm = TRUE))
+      class(ret) <- c("survdiff_exploratory", class(ret))
+    }
+    ret
+  }
+
+  do_on_each_group_2(df, each_func1, each_func2)
+}
 
 #' @export
 tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time = NULL, ...) {

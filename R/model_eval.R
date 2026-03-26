@@ -1,3 +1,13 @@
+#' Non standard evaluation version of do_roc_
+#' @param df Data frame
+#' @param pred_prob Column name for probability
+#' @param actual_val Column name for actual values
+#' @export
+do_roc <- function(df, pred_prob, actual_val, ...){
+  pred_prob_col <- col_name(substitute(pred_prob))
+  actual_val_col <- col_name(substitute(actual_val))
+  do_roc_(df, pred_prob_col, actual_val_col, ...)
+}
 
 #' Return cordinations for ROC curve
 #' @param df Data frame
@@ -5,6 +15,7 @@
 #' @param actual_val_col Column name for actual values
 #' @param grid Grid size to reduce data size for drawing chart.
 #' @param with_auc When set to TRUE, AUC is calculated and added as a column of the output.
+#' @export
 do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = FALSE){
   validate_empty_data(df)
 
@@ -83,11 +94,44 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
   ret
 }
 
+#' Returns cordinations for time-dependent ROC curve for survival prediction.
+#' @param df - Data frame
+#' @param score_col - Column name for predicted event risk.
+#' @param time_col - Column name for actual survival time.
+#' @param status_col - Column name for actual event status. 
+#' @param at - The time at which the time-dependent ROC is calculated.
+#' @param grid - Grid size to reduce data size for drawing chart.
+#' @param with_auc - When set to TRUE, AUC is calculated and added as a column of the output.
+#' @param revert - If TRUE, the higher the score is, the lower the risk of event is.
+#' @export
+do_survival_roc_ <- function(df, score_col, time_col, status_col, at = NULL, grid = NULL, with_auc = FALSE, revert = FALSE){
+  if (is.null(at)) {
+    at <- attr(df, "pred_survival_time")
+  }
+  df <- df %>% filter(!(!!rlang::sym(time_col) < !!at & !(!!rlang::sym(status_col)))) %>% # Filter out censored rows with shorter survival time.
+    mutate(dead = !!rlang::sym(time_col) < !!at | (!!rlang::sym(time_col) == !!at & !!rlang::sym(status_col))) # Add dead column that indicates if it was dead at the specified time.
+  if (revert) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(score_col) := -!!rlang::sym(score_col))
+  }
+  do_roc_(df, score_col, "dead", grid = grid, with_auc = with_auc)
+}
+
+#' Non standard evaluation version of evaluate_binary_
+#' @param df Model data frame that can work prediction
+#' @param pred_prob Column name for probability
+#' @param actual_val Column name for actual values
+#' @export
+evaluate_binary <- function(df, pred_prob, actual_val, ...){
+  pred_prob_col <- col_name(substitute(pred_prob))
+  actual_val_col <- col_name(substitute(actual_val))
+  evaluate_binary_(df, pred_prob_col, actual_val_col, ...)
+}
 
 #' Calculate binary classification evaluation
 #' @param df Data Frame
 #' @param pred_prob_col Column name for probability
 #' @param actual_val_col Column name for actual values
+#' @export
 evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_score"){
   validate_empty_data(df)
 
@@ -132,11 +176,22 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
   ret
 }
 
+#' Non standard evaluation version of evaluate_regression_
+#' @param df Data frame
+#' @param pred_val Column name for predicted values
+#' @param actual_val Column name for actual values
+#' @export
+evaluate_regression <- function(df, pred_val, actual_val){
+  pred_val_col <- col_name(substitute(pred_val))
+  actual_val_col <- col_name(substitute(actual_val))
+  evaluate_regression_(df, pred_val_col, actual_val_col)
+}
 
 #' Calculate continuous regression evaluation
 #' @param df Model data frame that can work prediction
 #' @param pred_val_col Column name for predicted values
 #' @param actual_val_col Column name for actual values
+#' @export
 evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
   validate_empty_data(df)
 
@@ -194,11 +249,22 @@ evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
   ret
 }
 
+#' Non standard evaluation version of evaluate_multi_
+#' @param df Data frame
+#' @param pred_label Predicted label colmun name
+#' @param actual_val Actual label column name
+#' @export
+evaluate_multi <- function(df, pred_label, actual_val, ...) {
+  pred_label_col <- col_name(substitute(pred_label))
+  actual_val_col <- col_name(substitute(actual_val))
+  evaluate_multi_(df, pred_label_col, actual_val_col, ...)
+}
 
 #' Evaluate multi classification
 #' @param df Data frame
 #' @param pred_label_col Predicted label colmun name
 #' @param actual_val_col Actual label column name
+#' @export
 evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FALSE, ...) {
   validate_empty_data(df)
 
@@ -291,4 +357,114 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 }
 
 # Generates Analytics View Summary Table for logistic/binomial regression. Handles Test Mode.
+#' @export
+evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_score", pretty.name = FALSE){
+  actual_val_col <- col_name(substitute(actual_val)) # Get name of column as string.
+  training_ret <- df %>% glance_rowwise(model, binary_classification_threshold = threshold)
+  ret <- training_ret
+
+  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
+
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and work on generating Summary row for prediction on test data.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
+    ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
+    each_func <- function(df) {
+      if (!is.data.frame(df)) {
+        df <- tribble(~model, ~.test_index, ~source.data,
+                      df$model, df$.test_index, df$source.data)
+      }
+
+      tryCatch({
+        test_pred_ret <- prediction_binary(df, data = "test")
+  
+        # Evaluate the binary classification result.
+        eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
+  
+        test_ret <- eret %>% dplyr::mutate(n = true_positive + false_positive + true_negative + false_negative,
+                                           positives = true_positive + false_negative,
+                                           negatives = true_negative + false_positive) %>%
+                             dplyr::select(auc = AUC, f_score, accuracy_rate,
+                                           misclassification_rate, precision, recall,
+                                           n, positives, negatives)
+        test_ret$is_test_data <- TRUE
+        test_ret
+      }, error = function(e){
+        data.frame()
+      })
+    }
+
+    target_df <- if (length(grouped_col) > 0) {
+      df %>% group_by(!!!rlang::syms(grouped_col))
+    } else {
+      df
+    }
+
+    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+    ret <- ret %>% dplyr::bind_rows(test_ret)
+  }
+
+  # sort column order
+  ret <- ret %>% dplyr::select(auc, f_score, accuracy_rate, misclassification_rate, precision,
+                               recall, p.value, positives, negatives, n, logLik, AIC, BIC, # The order of positives, negatives, n is made the same as random forest and decision tree.
+                               deviance, null.deviance, df.null, df.residual, everything())
+
+  # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
+  if (!is.null(ret$is_test_data)) {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+    }
+    else {
+      ret <- ret %>% dplyr::select(is_test_data, everything())
+    }
+  }
+  else {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), everything())
+    }
+  }
+
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "f_score"] <- "F1 Score"
+    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclass. Rate"
+    colnames(ret)[colnames(ret) == "precision"] <- "Precision"
+    colnames(ret)[colnames(ret) == "recall"] <- "Recall"
+    colnames(ret)[colnames(ret) == "auc"] <- "AUC"
+    colnames(ret)[colnames(ret) == "n"] <- "Rows"
+    colnames(ret)[colnames(ret) == "positives"] <- "Rows (TRUE)"
+    colnames(ret)[colnames(ret) == "negatives"] <- "Rows (FALSE)"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
+    colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+    colnames(ret)[colnames(ret) == "df.null"] <- "Null Model DF"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
+
+    base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]
+    if (length(base_cols) > 0) {
+      for (col in base_cols) {
+        # Using gsub as opposed to str_replace, since str_replace seems to garble Japanese column name on Windows.
+        colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", gsub("_base$", "", col))
+      }
+    }
+
+    # Bring "Residual DF" after "Residual Deviance".
+    if (all(c("Residual DF", "Residual Deviance") %in% colnames(ret))) {
+      ret <- ret %>% dplyr::relocate(`Residual DF`, .after=`Residual Deviance`)
+    }
+  }
+
+  if (length(grouped_col) > 0){
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
+  }
+
+  # Prettify is_test_data column. Note that column order is already taken care of.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+  ret
+}
+
 

@@ -5,7 +5,6 @@
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
 #' This API takes care of Salesforce authentication and should be called before calling any Salesforce related APIs.
-#' @export
 loginToSalesforce <- function(server = NULL, username, password, securityToken = NULL){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
@@ -39,7 +38,6 @@ loginToSalesforce <- function(server = NULL, username, password, securityToken =
 #' @param username - Salesforce login user name
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
-#' @export
 querySalesforceMetadata <- function(server = NULL, username, password, securityToken = NULL){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
@@ -59,7 +57,6 @@ querySalesforceMetadata <- function(server = NULL, username, password, securityT
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
 #' @param table - name of the table that you want to get details.
-#' @export
 querySalesforceTableDetails <- function(server = NULL, username, password, securityToken = NULL, table){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
@@ -77,7 +74,6 @@ querySalesforceTableDetails <- function(server = NULL, username, password, secur
 #' @param query - SOQL query.
 #' @param apiType - it could be either REST, SOAP, Bulk 1.0, or Bulk 2.0. By default it's REST.
 #' Bulk can handle a large data set but it has limitation (ref: https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/asynch_api_concepts_limits.htm)
-#' @export
 querySalesforceDataWithQuery <- function(server = NULL, username, password, securityToken = NULL, query = "", guessType = TRUE, apiType = "REST"){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
@@ -88,4 +84,3 @@ querySalesforceDataWithQuery <- function(server = NULL, username, password, secu
   query <- glue_exploratory(query, .transformer=salesforce_glue_transformer, .envir = parent.frame())
   salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType, api_type = apiType)
 }
-

@@ -1,4 +1,5 @@
 #' @rdname build_model_
+#' @export
 build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
   .dots <- lazyeval::dots_capture(...)
   
@@ -40,6 +41,7 @@ build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = 
 #' @param .dots Additional parameters to work around error of non standard evaluation.
 #' @param ... Parameters for model_func
 #' @param valid_data Optional validation data frame to pass to model_func. This parameter is extracted from ... before lazyeval processing to avoid errors on some platforms (e.g., Linux CI) where data frames cannot be converted to lazy objects. If provided, it will be passed through to the model function (e.g., lightgbm_binary) which can use it for early stopping or evaluation during training.
+#' @export
 build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ..., valid_data = NULL) {
   validate_empty_data(data)
 
