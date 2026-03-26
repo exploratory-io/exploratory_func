@@ -80,6 +80,13 @@ getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
 }
 
 
+#' API to refresh token
+#' For backward compatibility
+#' @export
+refreshGoogleTokenForAnalysis <- function(tokenFileId){
+  getGoogleTokenForAnalytics(tokenFileId, FALSE)
+}
+
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
@@ -239,6 +246,11 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
   }
 }
 
+#' API to refresh token
+#' @export
+refreshGoogleTokenForBigQuery <- function(tokenFileId){
+  getGoogleTokenForBigQuery(tokenFileId, FALSE)
+}
 
 #' @export
 getGoogleTokenForCloudStorage <- function(useCache=TRUE){

@@ -65,6 +65,26 @@ get_riem_measures <- function(station = "SFO", date_start = NULL, date_end = NUL
   }
 }
 
+#' Wrapper API for riem_stations
+#' @export
+riem_stations_exp <- function(network = NULL) {
+  # make sure only return "online" status stations.
+  df <- riem::riem_stations(network) %>% filter(online)
+  df <- df %>% dplyr::mutate(name = dplyr::case_when(
+    id == "RJOA" ~ "Hiroshima-shi",
+    id == "RJOO" ~ "Osaka (Itami)",
+    id == "RJOY" ~ "Osaka (Yao)",
+    id == "RJBB" ~ "Kansai International",
+    id == "RJCO" ~ "Sapporo (Okadama)",
+    id == "RJCC" ~ "Sapporo (New Chitose)",
+    id == "RJAA" ~ "Tokyo (Narita)",
+    id == "RJTT" ~ "Tokyo (Haneda)",
+    id == "RJTF" ~ "Tokyo (Chofu)",
+    TRUE ~ name
+  )
+  )
+  df
+}
 
 #' Wrapper API for tidyquant data source
 #' @export

@@ -222,16 +222,6 @@ do_dist.kv_ <- function(df,
     unnest_with_drop(!!rlang::sym(tmp_col))
 }
 
-
-#' Calculate distance of each pair of groups.
-#' @param df data frame in tidy format
-#' @param group A column you want to calculate the correlations for.
-#' @param dimension A column you want to use as a dimension to calculate the correlations.
-#' @param value A column for the values you want to use to calculate the correlations.
-#' @param distinct The returned pair should be duplicated in swapped order or not.
-#' TRUE makes it easy to filter group names.
-#' @param diag If similarity between itself should be returned or not.
-#' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param p The power of the Minkowski distance.
 #' @export
 do_dist.cols <- function(df,
@@ -309,3 +299,4 @@ do_dist.cols <- function(df,
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(cnames[[1]]))
 }
+

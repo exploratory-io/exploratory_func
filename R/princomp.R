@@ -1,4 +1,3 @@
-
 #' extracts results from princomp as a dataframe
 #' @export
 tidy.princomp_exploratory <- function(x, type="variances", ...) { #TODO: add test

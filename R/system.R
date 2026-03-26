@@ -681,6 +681,61 @@ salesforce_glue_transformer <- function(expr, envir) {
   sql_glue_transformer_internal(expr, envir, salesforce=TRUE)
 }
 
+#' @export
+queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
+                         limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
+                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParams = NULL, connectionString = NULL, sslClientCertKey = NULL, subType = NULL, ...){
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  loadNamespace("jsonlite")
+
+  # read stored password
+  # get connection from connection pool
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection,
+                         isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams,
+                         timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey, subType = subType)
+  if(fields == ""){
+    fields = "{}"
+  }
+  if(sort == ""){
+    sort = "{}"
+  }
+  data <- NULL
+  tryCatch({
+    if(queryType == "aggregate"){
+      pipeline <- convertUserInputToUtf8(pipeline)
+      # set .envir = parent.frame() to get variables from users environment, not papckage environment
+      pipeline <- glue_exploratory(pipeline, .transformer=js_glue_transformer, .envir = parent.frame())
+      # convert js query into mongo JSON, which mongolite understands.
+      pipeline <- jsToMongoJson(pipeline)
+      data <- con$aggregate(pipeline = pipeline)
+    } else if (queryType == "find") {
+      query <- convertUserInputToUtf8(query)
+      fields <- convertUserInputToUtf8(fields)
+      sort <- convertUserInputToUtf8(sort)
+      # set .envir = parent.frame() to get variables from users environment, not papckage environment
+      query <- glue_exploratory(query, .transformer=js_glue_transformer, .envir = parent.frame())
+      # convert js query into mongo JSON, which mongolite understands.
+      query <- jsToMongoJson(query)
+      fields <- jsToMongoJson(fields)
+      sort <- jsToMongoJson(sort)
+      data <- con$find(query = query, limit=limit, fields=fields, sort = sort, skip = skip)
+    }
+  }, error = function(err) {
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
+    stop(err)
+  })
+  result <-data
+  if (flatten) {
+    result <- jsonlite::flatten(data)
+  }
+  if (nrow(result)==0) {
+    # possibly this is an error. clear connection once.
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
+    stop("No Data Found");
+  } else {
+    result
+  }
+}
 
 #' Returns a data frame that has names of the collections in its "name" column.
 #' @export
@@ -3022,6 +3077,30 @@ prefecturecode <- function(prefecture, output_type="name") {
   }
 }
 
+#' Returns city codes from the prefecture and city names.
+#' Original geocode data is from https://geolonia.github.io/japanese-addresses/
+#' @param prefecture Prefecture name
+#' @param city City name.
+#' @return 5-digit city code in a character vector
+#' @export
+city_code_japan <- function(prefecture, city) {
+  name <- stringr::str_c(prefecture, city)
+  # return matching city code.
+  jp_city_name_code_map$code[match(name, jp_city_name_code_map$name)]
+}
+
+#' It adds the 'longitude' and 'latitude' columns to the given data frame
+#' that contains the 5-digit Japan city code column.
+#'
+#' Original geocode data is from https://geolonia.github.io/japanese-addresses/
+#' @param city_code_colname City code column name in the data frame.
+#' @return data frame.
+#' @export
+geocode_japan_city <- function(df, city_code_colname) {
+  mapping <- "code"
+  names(mapping) <- c(city_code_colname)
+  df %>% left_join(jp_city_coordinates, by=mapping)
+}
 
 #' Converts pair of state name and county name into county ID,
 #' which is concatenation of FIPS state code and FIPS county code.
@@ -3923,6 +4002,39 @@ within_date_range <- function(date_column, operator){
   }
   result
 
+}
+
+#'API to load economic data from FRED (Federal Reserve Bank Economic Data)
+#'@param series_ids - e.g. c("UNRATE", "CPIAUCSL", "DGS10")
+#'@param date_start - Start Date for the query. This is optional field.
+#'@param date_end - End Date for the query. By default it's today.
+#'@export
+load_fred <- function(series_ids, date_start = "", date_end = "", password) {
+  loadNamespace("fredr")
+  fredr::fredr_set_key(password)
+  # Desktop passes empty string if end date is not selected. For this case fallback to today.
+  if (date_end == "") {
+    date_end <- lubridate::today()
+  } else {
+    date_end <- lubridate::ymd(date_end)
+  }
+  # date_start is an optional parameter, so if it's not specified, execute the query without the start_date.
+  if (date_start == "") {
+    purrr::map_dfr(series_ids, function(series_id){
+      fredr::fredr(
+        series_id = series_id,
+        observation_end = date_end
+      )
+    })
+  } else {
+    purrr::map_dfr(series_ids, function(series_id){
+      fredr::fredr(
+        series_id = series_id,
+        observation_start = lubridate::ymd(date_start),
+        observation_end = date_end
+      )
+    })
+  }
 }
 
 
