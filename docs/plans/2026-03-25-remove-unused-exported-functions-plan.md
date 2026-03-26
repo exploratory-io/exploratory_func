@@ -1,7 +1,5 @@
 # Remove Unused Exported Functions — Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Remove all exported functions from `exploratory_func` that are not called by any of the three known consumers (tam, datablog, scheduler), reducing the public API from 543 exports to ~175.
 
 **Architecture:** Script-assisted diff to produce authoritative DELETE and KEEP-AS-INTERNAL lists, then systematic removal from R source files + NAMESPACE regeneration via `devtools::document()`.
@@ -13,7 +11,8 @@
 ## Background
 
 - `NAMESPACE` has 543 `export(...)` entries (plus S3methods).
-- Consumer repos use `exploratory::<fn>` syntax exclusively.
+- Consumer repos reference functions via `exploratory::<fn>` in JS/TS/R code, as bare strings in switch/case statements, and in JSON plugin configs — all patterns must be searched.
+- The package's own test suite (`tests/testthat/`) also constitutes a usage signal: functions with test coverage should be retained.
 - Internal dependencies (kept functions calling candidate-removal functions) must be preserved as unexported helpers.
 - Design doc: `docs/plans/2026-03-25-remove-unused-exported-functions.md`
 
@@ -28,7 +27,7 @@
 
 ```bash
 grep -roh "exploratory::[A-Za-z0-9_.]*" \
-  ~/Work/gitrepo/tam/src \
+  /path/to/tam/src \
   --include="*.js" --include="*.ts" 2>/dev/null \
   | sed 's/exploratory:://' | sort -u
 ```
@@ -37,7 +36,7 @@ grep -roh "exploratory::[A-Za-z0-9_.]*" \
 
 ```bash
 grep -roh "exploratory::[A-Za-z0-9_.]*" \
-  ~/Work/gitrepo/datablog/src \
+  /path/to/datablog/src \
   --include="*.js" --include="*.ts" 2>/dev/null \
   | sed 's/exploratory:://' | sort -u
 ```
@@ -46,7 +45,7 @@ grep -roh "exploratory::[A-Za-z0-9_.]*" \
 
 ```bash
 grep -roh "exploratory::[A-Za-z0-9_.]*" \
-  ~/Work/gitrepo/scheduler \
+  /path/to/scheduler \
   --include="*.js" --include="*.ts" --include="*.R" 2>/dev/null \
   | sed 's/exploratory:://' | sort -u
 ```
@@ -55,9 +54,9 @@ grep -roh "exploratory::[A-Za-z0-9_.]*" \
 
 ```bash
 { \
-  grep -roh "exploratory::[A-Za-z0-9_.]*" ~/Work/gitrepo/tam/src --include="*.js" --include="*.ts" 2>/dev/null; \
-  grep -roh "exploratory::[A-Za-z0-9_.]*" ~/Work/gitrepo/datablog/src --include="*.js" --include="*.ts" 2>/dev/null; \
-  grep -roh "exploratory::[A-Za-z0-9_.]*" ~/Work/gitrepo/scheduler --include="*.js" --include="*.ts" --include="*.R" 2>/dev/null; \
+  grep -roh "exploratory::[A-Za-z0-9_.]*" /path/to/tam/src --include="*.js" --include="*.ts" 2>/dev/null; \
+  grep -roh "exploratory::[A-Za-z0-9_.]*" /path/to/datablog/src --include="*.js" --include="*.ts" 2>/dev/null; \
+  grep -roh "exploratory::[A-Za-z0-9_.]*" /path/to/scheduler --include="*.js" --include="*.ts" --include="*.R" 2>/dev/null; \
 } | sed 's/exploratory:://' | sort -u > /tmp/used_functions.txt
 
 wc -l /tmp/used_functions.txt
@@ -76,7 +75,7 @@ Expected: ~170–180 lines.
 **Step 1: Extract exported function names from NAMESPACE**
 
 ```bash
-grep "^export(" /Users/hidekoji/Work/gitrepo/exploratory_func/NAMESPACE \
+grep "^export(" ./NAMESPACE \
   | sed 's/export(\(.*\))/\1/' \
   | sort > /tmp/exported_functions.txt
 
@@ -113,7 +112,7 @@ Expected: empty output (or a handful of operator/re-exported names like `%>%`). 
 **Step 1: For each candidate, grep R/ source for calls to it**
 
 ```bash
-cd /Users/hidekoji/Work/gitrepo/exploratory_func
+cd /path/to/exploratory_func
 
 while IFS= read -r func; do
   # Match function call pattern: funcname( or funcname (
@@ -170,7 +169,7 @@ cat /tmp/internal_deps.txt | sort > /tmp/keep_as_internal.txt
 **Step 1: Map each DELETE function to its source file**
 
 ```bash
-cd /Users/hidekoji/Work/gitrepo/exploratory_func
+cd /path/to/exploratory_func
 
 while IFS= read -r func; do
   file=$(grep -rl "^${func}\s*<-\s*function\|^${func}\s*=\s*function\|^#' @rdname ${func}" R/ --include="*.R" | head -1)
@@ -269,7 +268,7 @@ git commit -m "refactor: convert internal-dep functions to unexported helpers"
 **Step 1: Regenerate NAMESPACE**
 
 ```bash
-cd /Users/hidekoji/Work/gitrepo/exploratory_func
+cd /path/to/exploratory_func
 Rscript -e "devtools::document()"
 ```
 
@@ -309,7 +308,7 @@ git commit -m "refactor: regenerate NAMESPACE after removing unused exports"
 **Step 1: Run the full test suite**
 
 ```bash
-cd /Users/hidekoji/Work/gitrepo/exploratory_func
+cd /path/to/exploratory_func
 Rscript -e "devtools::test()"
 ```
 
@@ -338,7 +337,7 @@ Expected: all tests pass, 0 failures.
 **Step 1: Full package check**
 
 ```bash
-cd /Users/hidekoji/Work/gitrepo/exploratory_func
+cd /path/to/exploratory_func
 Rscript -e "devtools::check()"
 ```
 

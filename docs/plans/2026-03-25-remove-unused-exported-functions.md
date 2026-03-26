@@ -76,8 +76,8 @@ For each function in the KEEP-AS-INTERNAL list:
 | Metric | Value |
 |--------|-------|
 | Starting export count | 543 |
-| Final export count | 518 |
-| Functions deleted (removed from R source entirely) | 25 |
+| Final export count | 538 |
+| Functions deleted (removed from R source entirely) | 5 |
 
 ### Key Deviation from Plan
 
@@ -88,19 +88,22 @@ The initial consumer-repo audit only searched `*.js` and `*.ts` files for `explo
 - **JSON analysis templates** with inline R code snippets
 - **R test scripts** in `tools/`
 
-A full re-audit across all file types (`*.js`, `*.ts`, `*.R`, `*.r`, `*.json`) in tam, datablog, scheduler, and plugin directories confirmed only **25 functions** are genuinely unused.
+A full re-audit across all file types (`*.js`, `*.ts`, `*.R`, `*.r`, `*.json`) in tam, datablog, scheduler, and plugin directories, combined with a review of the package's own test suite, confirmed only **5 functions** are safe to remove.
 
-### Functions Removed (25)
+### Functions Removed (5)
 
 **Obsolete data source plugins:** `getTwitter`, `refreshTwitterToken`, `queryNeo4j`, `get_mailchimp_data`, `getGoogleTrends`
 
-**Unused auth/token:** `refreshGoogleTokenForAnalytics`, `refreshSalesforceToken`
+These five functions correspond to discontinued third-party integrations (Twitter, Neo4j, Mailchimp, Google Trends) with no active callers in any consumer repo or test file.
 
-**Unused broom tidiers:** `augment_glm`, `augment_lm`, `glance_glm`, `glance_kmeans`, `glance_lm`, `tidy_glm`, `tidy_kmeans`, `tidy_lm`
+### Functions Retained
 
-**Unused statistical:** `calc_beta_prior`, `calculate_cohens_f_squared`, `do_kl_dist.kv_`, `do_princomp`, `model_confint`
+An additional 20 functions were initially identified as candidates for removal but were restored after further review:
 
-**Unused misc:** `any_error`, `get_num_errors`, `getConnectionPoolMode`, `getListOfColumns`, `pivot_`
+- **Auth/token helpers** (`refreshGoogleTokenForAnalytics`, `refreshSalesforceToken`) — referenced in plugin configs.
+- **Broom tidier aliases** (`augment_glm`, `augment_lm`, `glance_glm`, `glance_kmeans`, `glance_lm`, `tidy_glm`, `tidy_kmeans`, `tidy_lm`) — backward-compatibility wrappers with corresponding tests in the package test suite.
+- **Statistical functions** (`calc_beta_prior`, `calculate_cohens_f_squared`, `do_kl_dist.kv_`, `do_princomp`, `model_confint`) — exercised by the package's own tests.
+- **Misc helpers** (`any_error`, `get_num_errors`, `getConnectionPoolMode`, `getListOfColumns`, `pivot_`) — referenced in the package's own tests (e.g., `test_system.R` calls `getConnectionPoolMode()`).
 
 ### Test Suite Result
 
@@ -114,7 +117,7 @@ FAIL 0 | WARN 734 | SKIP 27 | PASS 1562
 
 ### Test File Correction
 
-An early failed attempt to remove 210 functions (later reverted) had incorrectly deleted 36 test files and modified 32 others. These were discovered during PR review and restored to master state. None of the 25 legitimately removed functions had test cases, so no test changes are required.
+An early failed attempt to remove 210 functions (later reverted) had incorrectly deleted 36 test files and modified 32 others. These were discovered during PR review and restored to master state. No test files are changed by this PR.
 
 ### Analytics Obsolescence Check
 
