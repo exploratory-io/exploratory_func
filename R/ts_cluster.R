@@ -1,6 +1,3 @@
-#' Time series clustering by dtwclust.
-#' @export
-exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
                            variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent",
                            roll_mean_window = NULL,

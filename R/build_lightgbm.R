@@ -1526,9 +1526,6 @@ partial_dependence.lightgbm <- function(fit, vars = colnames(data),
   pd
 }
 
-#' Build LightGBM model for Analytics View.
-#' @export
-exp_lightgbm <- function(df,
                          target,
                          ...,
                          target_fun = NULL,

@@ -1,6 +1,3 @@
-#' Clone implementation of now deprecated tidytext::pair_count for backward compatibility in Exploratory.
-#' @export
-pair_count <- function (df,
                         group,
                         value,
                         distinct = TRUE,

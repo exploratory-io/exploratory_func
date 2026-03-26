@@ -1,33 +1,4 @@
-#' integrated do_svd
-#' @export
-do_svd <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
-  validate_empty_data(df)
-  if (!is.null(skv)) {
-    #.kv pattern
-    if (!length(skv) %in% c(2, 3)) {
-      stop("length of skv has to be 2 or 3")
-    }
-    value <- if(length(skv) == 2)  NULL else skv[[3]]
-    do_svd.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
-  } else {
-    #.cols pattern
-    do_svd.cols(df, ...)
-  }
-}
 
-#' Non Standard Evaluation version of do_svd.kv_
-#' @export
-do_svd.kv <- function(df, subject, key, value = NULL, ...){
-  subject_col <- col_name(substitute(subject))
-  key_col <- col_name(substitute(key))
-  if(!is.null(substitute(value))){
-    value_col <- col_name(substitute(value))
-  } else {
-    value_col <- NULL
-  }
-
-  do_svd.kv_(df, subject_col, key_col, value_col, ...)
-}
 
 
 #' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.

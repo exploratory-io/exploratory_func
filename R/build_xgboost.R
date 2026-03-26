@@ -1025,9 +1025,6 @@ cleanup_df_for_test <- function(df_test, df_train, c_cols) {
   df_test_clean
 }
 
-#' Build XGBoost model for Analytics View.
-#' @export
-exp_xgboost <- function(df,
                         target,
                         ...,
                         target_fun = NULL,

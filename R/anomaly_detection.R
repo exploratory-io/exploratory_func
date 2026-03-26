@@ -1,11 +1,4 @@
 
-#' NSE version of do_anomaly_detection_
-#' @export
-do_anomaly_detection <- function(df, time, value = NULL, ...){
-  time_col <- col_name(substitute(time))
-  value_col <- col_name(substitute(value))
-  do_anomaly_detection_(df, time_col, value_col, ...)
-}
 
 #' Detect anomaly data
 #' @param df Data frame

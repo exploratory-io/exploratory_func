@@ -152,64 +152,8 @@ do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=5, min_suppor
   }
 }
 
-#' Find association rules from itemsets.
-#' It calculates support, confidence and lift values from combinations of items.
-#' @export
-do_apriori <- function(df, subject, key, minlen=1, maxlen=5, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL, max_basket_items=10){
-  subject_col <- col_name(substitute(subject))
-  key_col <- col_name(substitute(key))
-  do_apriori_(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs, max_basket_items)
-}
 
 # rules_metric can be "support", "confidence", or "lift".
-get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support", min_edge_width=1, max_edge_width=4) {
-  rules <- rules %>% dplyr::top_n(max_rules, UQ(rlang::sym(rules_metric))) # limit within 30 rules so that they can be visualized comfortably.
-  if (nrow(rules) > max_rules) { # this means there are ties. remove the rows with minimum support to fit within 30 rules.
-    if (!(rules_metric == "confidence" && min(rules$confidence) == 1)) { # exception is when supports for all rules are 1.0.
-      rules <- rules %>% dplyr::filter(UQ(rlang::sym(rules_metric)) != min(UQ(rlang::sym(rules_metric))))
-    }
-    else {
-      rules <- rules %>% slice_sample(n = max_rules) # in this case, just sample so that plotting will not take very long time.
-    }
-  }
-
-  # Give names to the rules. groceries is the dataframe that is the result of the Market Basket Analysis.
-  rules <- rules %>% dplyr::mutate(rule = row_number(), rule = stringr::str_c("Rule ",as.character(rule)))
-  
-  # Create a dataframe for the relationships from rules to right-hand side products.
-  rule_rhs_edges <- rules %>%
-    dplyr::select(rule, rhs, support) %>%
-    dplyr::rename(from = rule, to = rhs)
-  
-  # Create a dataframe for the relationships from left-hand side products to the Rules.
-  lhs_rule_edges <- rules %>%
-    tidyr::separate_rows(lhs, sep = "\\s*\\,\\s*") %>%
-    dplyr::select(lhs, rule, support) %>%
-    dplyr::rename(from = lhs, to = rule)
-  
-  # Create a dataframe for all the relationships in the graph by binding the above 2 dataframes.
-  edges <- lhs_rule_edges %>%
-    dplyr::bind_rows(rule_rhs_edges)
-
-  # Set edge width based on support. Re-scale the range from min(support) to max(support) into the range from min_edge_width to max_edge_width.
-  edges <- edges %>% dplyr::mutate(width=(max_edge_width - min_edge_width)*(support - min(support))/(max(support) - min(support)) + min_edge_width)
-  # Arrow head size around 0.15 times the width visually looks about right. Note that igraph currently does not allow setting different arrow size for each edge.
-  edges <- edges %>% dplyr::mutate(arrow.size=max_edge_width*0.15)
-  
-  product_names <- unique(c(lhs_rule_edges$from, rule_rhs_edges$to))
-  
-  rule_vertices <- rules %>% dplyr::select(rule, support, confidence, lift) %>% dplyr::rename(name=rule)
-  # set min of rule confidence as dummy confidence value for product vertices, so that min/max does not change
-  # even after bind_rows. this helps when normalizing for color scale later.
-  products_vertices <- data.frame(name=product_names, support=0, confidence=min(rule_vertices$confidence), lift=0, stringsAsFactors = FALSE)
-  vertices_data <- rule_vertices %>%
-    dplyr::bind_rows(products_vertices)
-  
-  ret <- list(edges=edges, vertices=vertices_data)
-  ret <- tibble::tibble(model=list(ret)) # return as data.frame. TODO: handle group_by
-  class(ret$model) <- c("list", ".model", ".model.arules_graph")
-  ret
-}
 
 # Code to plot the result with igraph:
 #

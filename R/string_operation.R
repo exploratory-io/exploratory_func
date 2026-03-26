@@ -1,40 +1,3 @@
-#' Check if the token is in stopwords.
-#' @param token Character to be checked if it's stopword.
-#' @param lang Type of stopwords.
-#' One of
-#' "danish",
-#' "dutch",
-#' "english",
-#' "english_snowball",
-#' "english_smart",
-#' "english_onix",
-#' "finnish",
-#' "french",
-#' "german",
-#' "hungarian",
-#' "italian",
-#' "japanese",
-#' "norwegian",
-#' "portuguese",
-#' "russian",
-#' "spanish",
-#' "swedish",
-#' "smart",
-#' "snowball",
-#' "onix"
-#' @param include Values that should be included as stopwords
-#' @param exclude Values that should be excluded from stopwords
-#' @param hiragana_word_length_to_assume_stopword Assume it as a stopword if the token is a Hirgana word whose the legnth is fewer than this or equal to this.
-#' @return Logical vector if the token is in stop words or not.
-#' @export
-is_stopword <- function(token, lang = "english", include = c(), exclude = c(), hiragana_word_length_to_assume_stopword = 0, ...){
-  if(hiragana_word_length_to_assume_stopword > 0) { # for Japanese, assume the token is stopword if it's one letter
-    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...) | stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
-  } else {
-    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
-  }
-  result
-}
 
 
 #' Check if the word is digits.
@@ -45,16 +8,6 @@ is_digit <- function(word){
   stringr::str_detect(word, "^[[:digit:]]+$")
 }
 
-#' Check if the word is digits.
-#' @param word Character to be checked if it's digits.
-#' @return Logical vector if the word is digits or not.
-#' @export
-is_alphabet <- function(word){
-  loadNamespace("stringr")
-  # To treat non-ascii characters as FALSE, use [a-zA-Z]
-  # instead of [:alpha:]
-  stringr::str_detect(word, "^[a-zA-Z]+$")
-}
 
 #' Get vector of stopwords
 #' @param lang Type of stopwords.
@@ -131,49 +84,7 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
   ret
 }
 
-#' Get sentiments of words
-#' @param words Vector of words to check sentiment.
-#' @param lexicon Type of sentiment. One of "nrc" "bing" "AFINN".
-#' @return Vector of sentiment.
-#' @export
-word_to_sentiment <- function(words, lexicon="bing"){
-  loadNamespace("tidytext")
-  loadNamespace("dplyr")
-  # get data saved internally in this package by chosen lexicon
-  sentiment <- get(paste0("sentiment_", lexicon))
-  # sentiment is named vector (for "bing" and "AFINN")
-  # or named list (for "nrc" because it can have many sentiment types for one word)
-  # this is faster than using left join
-  ret <- sentiment[words]
-  # remove the name
-  names(ret) <- NULL
-  ret
-}
 
-
-#' Tokenize text with ICU.
-#' @param df Data frame
-#' @param text Set a column of which you want to tokenize.
-#' @param token Select the unit of token from "character" or "word".
-#' @param keep_cols Whether existing columns should be kept or not.
-#' @param drop Whether input column should be removed.
-#' @param with_id Whether output should contain original document id in each document.
-#' @param output Set a column name for the new column to store the tokenized values.
-#' @param remove_punct Whether it should remove punctuations.
-#' @param remove_numbers Whether it should remove numbers.
-#' @param remove_hyphens Whether it should remove hyphens.
-#' @param remove_separators Whether it should remove separators.
-#' @param remove_symbols Whether it should remove symbols.
-#' @param remove_twitter Whether it should remove remove Twitter characters @ and #.
-#' @param remove_url Whether it should remove URL starts with http(s).
-#' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
-#' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
-#' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
-#' @param sort_by Supported options are "count", "name", and "doc"
-#' @param ngrams - by default it's 1. Pass 2 for bigram, 3 for trigram.
-#' @return Data frame with tokenized column.
-#' @export
-do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  drop = TRUE, with_id = TRUE, output = token,
                                  remove_punct = TRUE, remove_numbers = TRUE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
@@ -279,26 +190,6 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   result
 }
 
-#' Tokenize text and unnest
-#' @param df Data frame
-#' @param text Set a column of which you want to split the text or tokenize.
-#' @param token Select the unit of token from "words", or "sentences".
-#' @param keep_cols Whether existing columns should be kept or not
-#' @param drop Whether input column should be removed.
-#' @param with_sentence_id Whether output should contain sentence id in each document.
-#' @param output Set a column name for the new column to store the tokenized values.
-#' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
-#' @param remove_punct Whether it should remove punctuations.
-#' @param remove_numbers Whether it should remove numbers.
-#' @param remove_url Whether it should remove URLs.
-#' @param remove_twitter Whether it should remove Twitter social tags.
-#' @param stopwords Additional stopwords.
-#' @param stopwords_to_remove Words to be removed from the set of stopwords.
-#' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
-#' @param compound_tokens Sequence of words that should be treated as one word.
-#' @return Data frame with tokenized column
-#' @export
-do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                         drop = TRUE, with_sentence_id = TRUE,
                         output = "token", output_case = "lower",
                         remove_punct = TRUE, remove_numbers = TRUE,
@@ -396,12 +287,6 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   res
 }
 
-#' Calculate tfidf, which shows how much particular the token is in a group.
-#' @param df - Data frame which has columns of groups and their terms
-#' @param document - Column of documet ID
-#' @param term - Column of terms
-#' @export
-do_tfidf <- function(df, document, term,
                       tf_scheme = "logcount",
                       idf_scheme = "inverse",
                       tfidf_base = 10,
@@ -444,76 +329,6 @@ do_tfidf <- function(df, document, term,
   res
 }
 
-#' Stem word so that words which are the same kind of word become the same charactor
-#' @param language This can be "porter" or a kind of languages which use alphabet like "english" or "french".
-#' @export
-stem_word <- function(...){
-  loadNamespace("quanteda")
-  quanteda::char_wordstem(...)
-}
-
-#' Generate ngram in groups.
-#' @param df Data frame which has tokens.
-#' @param token Column name of token data.
-#' @param n How many tokens should be together as new tokens. This should be numeric vector.
-#' @export
-do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
-  validate_empty_data(df)
-
-  loadNamespace("dplyr")
-  loadNamespace("tidyr")
-  loadNamespace("stringr")
-  loadNamespace("lazyeval")
-  token_col <- col_name(substitute(token))
-  sentence_col <- col_name(substitute(sentence))
-  document_col <- col_name(substitute(document))
-
-  # this is executed for ngrams not to be connected over sentences
-  grouped <- NULL
-  if (sentence_col != document_col) {
-    grouped <- df %>%
-      dplyr::group_by(!!!rlang::syms(c(document_col, sentence_col))) # convert the column name to symbol for column names with backticks
-  } else {
-    # If document_col and sentence_col are identical, just group the data frame by the document_col.
-    # NOTE: If you group_by the data frame with identical columns, group_by throws an error.
-    grouped <- df %>%
-      dplyr::group_by(!!rlang::sym(document_col)) # convert the column name to symbol for column names with backticks
-  }
-  prev_cname <- token_col
-  # create ngram columns in this iteration
-  for(n in seq(maxn)[-1]){
-    # column name is gram number
-    cname <- n
-
-    # Use following non-standard evaluation formulas to use token_col, prev_cname and cname variables
-
-    # lead the token to n-1 position
-    # if n is 3 and a token is in 5th token in a group, it goes to 3rd row in the group
-    lead_fml <- lazyeval::interp(~dplyr::lead(x, y), x=as.symbol(token_col), y=n-1)
-    # connect the lead token to the ngram created previously
-    # if n is 3 and the token is 5th token in a group, the token is connected with 3rd and 4th token in the group
-    str_c_fml <- lazyeval::interp(~stringr::str_c(x, y, sep=z), x=as.symbol(prev_cname), y=as.symbol(cname), z=sep)
-
-    # execute the formulas
-    grouped <- (grouped %>%
-              dplyr::mutate_(.dots=setNames(list(lead_fml), cname)) %>%
-              dplyr::mutate_(.dots=setNames(list(str_c_fml), cname))
-              )
-
-    # preserve the cname to be used in next iteration
-    prev_cname <- cname
-  }
-  ret <- dplyr::ungroup(grouped)
-
-  # this change original token column name to be 1 (mono-gram)
-  colnames(ret)[colnames(ret) == token_col] <- 1
-  kv_cnames <- avoid_conflict(c(document_col, sentence_col), c("gram", "token"))
-  # gather columns that have token (1 and newly created columns)
-  ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], c("1", colnames(ret)[(ncol(ret) - maxn + 2):ncol(ret)]), na.rm = TRUE, convert = TRUE)
-  # sort the result
-  ret <- dplyr::arrange(ret, !!!rlang::syms(c(document_col, sentence_col, kv_cnames[[1]])))
-  ret
-}
 
 #' Calculate sentiment
 #' @export
@@ -584,41 +399,6 @@ parse_logical <- function(text, ...){
   }
 }
 
-#'Function to extract text inside the characters like bracket.
-#'@export
-str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE, include_special_chars = TRUE) {
-  # Ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
-  # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
-  # between them.
-  # Also, regarding the "*?" (? after asterisk) in the regular expression, it's necessary to handle the case
-  # like below.
-  #> stringr::str_extract("aaa[xxx][ggg]","(?<=\\[).*(?=\\])")
-  #[1] "xxx][ggg"
-  #> stringr::str_extract("aaa[xxx][ggg]","(?<=\\[).*?(?=\\])")
-  #[1] "xxx"
-  # As you can see in the above example, with *? it can extract xxx but without it, it ends up with "xxx][ggg"
-  if(stringr::str_length(begin) > 1) {
-    stop("The begin argument must be one character.")
-  }
-  if(stringr::str_length(end) > 1) {
-    stop("The end argument must be one character.")
-  }
-  if(grepl("[A-Za-z]", begin)) {
-    stop("The begin argument must be symbol such as (, {, [.")
-  }
-  if(grepl("[A-Za-z]", end)) {
-    stop("The end argument must be symbol such as ), }, ].")
-  }
-  exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
-  if(!include_special_chars) {
-    exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
-  }
-  if(all) {
-    stringr::str_extract_all(column, exp)
-  } else {
-    stringr::str_extract(column, exp)
-  }
-}
 
 #'Function to remove text inside the characters like bracket.
 #'@export
@@ -720,11 +500,6 @@ str_extract_url <- function(text, position = "any"){
   stringr::str_extract_all(text, stringr::regex(reg, ignore_case = TRUE))
 }
 
-#'Function to remove word from text.
-#'@export
-str_remove_word <- function(string, start = 1L, end = start, sep = fixed(" ")) {
-  str_replace_word(string, start, end, sep, rep = "")
-}
 
 #'Function to remove word from text.
 #'@export
@@ -817,27 +592,7 @@ str_remove_emoji <- function(column, position = "any"){
   stringi::stri_replace_all(column, regex = regexp, "")
 }
 
-#'Function to extract text before the separator.
-#'
-#'export
-str_extract_before <- function(column, sep = "\\,", include_sep = FALSE) {
-  if (include_sep) {
-    stringr::str_extract(column, stringr::str_c(".*", sep))
-  } else {
-    stringr::str_extract(column, stringr::str_c("(.*)(?=", sep, ")"))
-  }
-}
 
-#'Function to extract text after the separator.
-#'
-#'export
-str_extract_after <- function(column, sep = "\\,", include_sep = FALSE){
-  if (include_sep){
-    stringr::str_extract(column, stringr::str_c(sep, ".*"))
-  } else {
-    stringr::str_extract(column, stringr::str_c("(?<=", sep, ")(.*)"))
-  }
-}
 #'Function to replace text before the separator.
 #'
 #'export
@@ -859,28 +614,7 @@ str_replace_after <- function(column, sep = "\\,", rep = "", include_sep = TRUE)
     stringr::str_replace(column, stringr::str_c("(?<=", sep, ")(.*)"), rep)
   }
 }
-#'Function to remove text before the separator.
-#'
-#'export
-str_remove_before <- function(column, sep = "\\,", include_sep = TRUE) {
-  exploratory::str_replace_before(column, sep = sep, include_sep = include_sep)
-}
 
-#'Function to remove text after the separator.
-#'
-#'export
-str_remove_after <- function(column, sep = "\\,", include_sep = TRUE){
-  exploratory::str_replace_after(column, sep = sep, include_sep = include_sep)
-}
-
-#'Function to remove range of text.
-#'This uses exploratory::str_replace_range under the hood and pass empty string as replacement to remove it.
-#'
-#'export
-str_remove_range <- function(column, start, end = -1){
-  # Pass empty string "", to remove the range of text.
-  str_replace_range(column, start = start, end = end, replacement = "")
-}
 
 #'Function to replace range of text.
 #'
@@ -901,28 +635,6 @@ str_replace_range <- function(column, start, end = -1, replacement = ""){
   }
 }
 
-
-
-#'Function to extract logical value from the specified column.
-#'If true_value is provided, use it to decide TRUE or FALSE.
-#'If true_value is not provided, "true", "yes", "1", and 1 are treated as TRUE.
-#'@export
-str_logical <- function(column, true_value = NULL) {
-   # if true_value is explicitly provided, honor it
-   if(!is.null(true_value)) {
-     stringr::str_to_lower(stringr::str_trim(column)) == stringr::str_to_lower(true_value)
-   } else if (is.numeric(column)) { # for numeric columns (integer, double, numeric, etc), use as.logical
-     as.logical(column)
-   } else { # default handling.
-      # if value is "true" or "yes" or "1", return TRUE
-      target <- stringr::str_to_lower(stringr::str_trim(column))
-      ifelse (target %in% c("true", "yes", "1"),
-              TRUE,
-              # if value is "false" or "no" or "0", return FALSE.
-              # All the other cases are NA
-              ifelse(target %in%  c("false", "no", "0"), FALSE, NA))
-   }
-}
 
 #' Function to detect pattern from a string.
 #' It's a wrapper function for stringr::str_detect and the wrapper function has ignore_case handling.

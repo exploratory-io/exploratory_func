@@ -33,9 +33,6 @@ iterate_kmeans <- function(df, max_centers = 10,
   ret %>% rowwise(center) %>% glance_rowwise(model)
 }
 
-#' analytics function for K-means view
-#' @export
-exp_kmeans <- function(df, ...,
                        centers=3, # build_kmeans.cols arguments.
                        iter.max = 10,
                        nstart = 1,

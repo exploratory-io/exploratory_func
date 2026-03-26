@@ -1,4 +1,3 @@
-#' @export
 HttrOAuthToken2.0 <- R6::R6Class("HttrOAuthToken2.0", inherit = httr::Token2.0, list(
   initialize = function(
     ...,
@@ -29,7 +28,6 @@ HttrOAuthToken2.0 <- R6::R6Class("HttrOAuthToken2.0", inherit = httr::Token2.0, 
   }
 ))
 
-#' @export
 HttrOAuthToken1.0 <- R6::R6Class("HttrOAuthToken1.0", inherit = httr::Token1.0, list(
   initialize = function(
     ...,

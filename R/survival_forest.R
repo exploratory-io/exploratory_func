@@ -213,9 +213,6 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
   ret
 }
 
-#' builds cox model quickly by way of sampling or fct_lumn, for analytics view.
-#' @export
-exp_survival_forest <- function(df,
                     time,
                     status,
                     ...,

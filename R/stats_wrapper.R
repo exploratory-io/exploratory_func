@@ -20,53 +20,6 @@ normalize <- function(x, center = TRUE, scale = TRUE) {
   }
 }
 
-#' integrated do_cor
-#' @export
-do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
-  validate_empty_data(df)
-
-  if (!is.null(skv)) {
-    #.kv pattern
-    if (!(length(skv) %in% c(2, 3))) {
-      stop("length of skv has to be 2 or 3")
-    }
-    value <- if(length(skv) == 2) NULL else skv[[3]]
-    do_cor.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
-  } else {
-    #.cols pattern
-    do_cor.cols(df, ...)
-  }
-}
-
-#'
-#' Calculate correlation among groups and output the correlation of each pair
-#' @param df data frame in tidy format
-#' @param group A column you want to calculate the correlations for.
-#' @param dimension A column you want to use as a dimension to calculate the correlations.
-#' @param value A column for the values you want to use to calculate the correlations.
-#' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
-#' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
-#' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
-#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
-#' @return correlations between pairs of groups
-#' @export
-do_cor.kv <- function(df,
-                   subject,
-                   key,
-                   value = NULL,
-                   ...)
-{
-  loadNamespace("reshape2")
-  loadNamespace("dplyr")
-  loadNamespace("tidyr")
-  loadNamespace("lazyeval")
-
-  row <- col_name(substitute(key))
-  col <- col_name(substitute(subject))
-  val <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
-
-  do_cor.kv_(df, col, row, val, ...)
-}
 
 #' SE version of do_cor.kv
 #' @export
@@ -321,21 +274,6 @@ tidy.cor_exploratory <- function(x, type = "cor", ...) { #TODO: add test
   }
 }
 
-#' Non standard evaluation version for do_cmdscale_
-#' @return Tidy format of data frame.
-#' @export
-do_cmdscale <- function(df,
-                         pair_name1,
-                         pair_name2,
-                         value,
-                         ...){
-  loadNamespace("dplyr")
-  loadNamespace("tidyr")
-  pair1_col <- col_name(substitute(pair_name1))
-  pair2_col <- col_name(substitute(pair_name2))
-  value_col <- col_name(substitute(value))
-  do_cmdscale_(df, pair1_col, pair2_col, value_col, ...)
-}
 
 #' Map dist result to k dimensions
 #' @param df Data frame which has group and dimension
