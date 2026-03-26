@@ -76,26 +76,25 @@ For each function in the KEEP-AS-INTERNAL list:
 | Metric | Value |
 |--------|-------|
 | Starting export count | 543 |
-| Final export count | 247 |
-| Functions deleted (removed from R source entirely) | 210 |
-| Functions converted to internal (@export stripped) | ~170 |
-| Lines deleted vs master | ~22,248 deletions across 128 files |
+| Final export count | 504 |
+| Functions deleted (removed from R source entirely) | 39 |
+| Functions kept (used in consumer repos) | 504 |
 
-### Key Deviations from Plan
+### Key Deviation from Plan
 
-- **`HttrOAuthToken1.0` and `HttrOAuthToken2.0`** were kept as unexported helpers (called by oauth.R internal functions) rather than fully deleted.
-- **6 functions restored during test pass** because they were internal dependencies missed by the initial grep-based check: `na_ratio`, `glob_to_regex`, `searchAndReadExcelFiles`, `searchAndReadDelimFiles`, `searchAndReadParquetFiles`, `getGithubIssues` (full version), `iterate_kmeans`, `preprocess_regression_data_before_sample`.
-- **3 malformed roxygen blocks fixed** (`weekend`, `categorize_numeric`, `auroc`) that were generating bogus NAMESPACE exports due to missing blank lines between the roxygen block and the function definition.
-- **NAMESPACE regenerated via `devtools::document()`** (not surgical removal as originally planned) to ensure correctness.
-- **Final export count is 247, not ~175** as originally estimated, because some functions that were kept as internal helpers still retained their `@export` tags from the master branch and were not stripped in the conversion phase.
+The initial consumer-repo audit only searched for `exploratory::funcname` call patterns. However, consumer repos (particularly tam) reference many functions as **bare strings** in generated R code (e.g., `case "build_lm":` in `CommandGeneratorBase.js`). This caused the initial analysis to misclassify 171 actively-used functions as unused.
+
+A corrected audit searched for bare function name references and found that 171 of the 210 originally identified candidates are still actively called. Only **39 functions** were confirmed unused across all consumer repos and safely removed.
+
+### Functions Removed (39)
+
+`any_error`, `augment_glm`, `augment_lm`, `calc_beta_prior`, `calculate_cohens_f_squared`, `city_code_japan`, `do_kl_dist.kv_`, `do_princomp`, `evaluate_glm_training_and_test`, `exp_add_cluster_column`, `geocode_japan_city`, `get_intercom_data`, `get_mailchimp_data`, `get_num_errors`, `get_stripe_data`, `getConnectionPoolMode`, `getGoogleTrends`, `getListOfColumns`, `getTwitter`, `glance_glm`, `glance_kmeans`, `glance_lm`, `HttrOAuthToken1.0`, `HttrOAuthToken2.0`, `load_fred`, `model_confint`, `pivot_`, `queryMongoDB`, `queryNeo4j`, `querySalesforceDataFromTable`, `refreshGoogleTokenForAnalysis`, `refreshGoogleTokenForAnalytics`, `refreshGoogleTokenForBigQuery`, `refreshSalesforceToken`, `refreshTwitterToken`, `riem_stations_exp`, `tidy_glm`, `tidy_kmeans`, `tidy_lm`
 
 ### Test Suite Result
 
 ```
-FAIL 2 | WARN 734 | SKIP 27 | PASS 1557
+FAIL 0 | WARN 734 | SKIP 27 | PASS 1562
 ```
-
-The 2 failures are pre-existing GitHub API timeout issues unrelated to this change.
 
 ### R CMD Check
 
