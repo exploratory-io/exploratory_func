@@ -316,6 +316,7 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
   }
 }
 
+
 #' Estimate alpha and beta for prior beta distribution
 #' @param df Data frame
 #' @param rate A column that has success rate

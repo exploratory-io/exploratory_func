@@ -31,6 +31,7 @@ generate_examples <- function(function_name, args){
   ret
 }
 
+
 #' Returns TRUE if test_results has any error in it. For test automation.
 #' @export
 any_error <- function(test_results) {

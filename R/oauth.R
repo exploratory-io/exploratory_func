@@ -80,7 +80,6 @@ getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
 }
 
 
-
 #' API to refresh token
 #' @export
 refreshGoogleTokenForAnalytics <- function(tokenFileId){
@@ -191,7 +190,6 @@ getSalesforceToken <- function(tokenFileId = "", useCache=TRUE){
   }
 }
 
-
 #' API to refresh token
 #' @export
 refreshSalesforceToken <- function(tokenFileId = ""){
@@ -227,11 +225,6 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
   }
 }
 
-#' API to refresh token
-#' @export
-refreshTwitterToken <- function(tokenFileId){
-  getTwitterToken(tokenFileId, FALSE)
-}
 
 #' tokenFileId is a unique value per data frame and is used to create a token cache file
 #' @export
@@ -305,6 +298,5 @@ getGoogleTokenForCloudStorage <- function(useCache=TRUE){
 refreshGoogleTokenForCloudStorage <- function(){
   getGoogleTokenForCloudStorage(FALSE)
 }
-
 
 

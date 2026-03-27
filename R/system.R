@@ -60,6 +60,7 @@ setConnectionPoolMode <- function(val) {
   }
 }
 
+
 #' get connection pool mode. for test purpose.
 #' @export
 getConnectionPoolMode <- function() {
@@ -1943,7 +1944,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
   tables
 }
 
-#' @export
+
 getListOfColumns <- function(type, host, port, databaseName, username, password, table, sslMode = '', sslCA = '', role = ''){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- getDBConnection(type, host, port, databaseName, username, password, sslMode = sslMode, sslCA = sslCA, role = role)
@@ -2008,25 +2009,6 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     }, error = function(e) {
     })
   }
-  df
-}
-
-#' @export
-queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ...){
-  if(!requireNamespace("RNeo4j")){stop("package RNeo4j must be installed.")}
-  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
-  url <- ifelse(isSSL == TRUE,  "https://" , "http://");
-  url <- stringr::str_c(url, host,":",  port,  "/db/data");
-
-  graph <- NULL
-  if(!is.null(username) && !is.null(password)){
-    graph = RNeo4j::startGraph(url, username = username, password = password)
-  } else {
-    graph = RNeo4j::startGraph(url)
-  }
-  query <- convertUserInputToUtf8(query)
-  df <- RNeo4j::cypher(graph, query)
   df
 }
 
@@ -2221,91 +2203,6 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
     })
   }
   df
-}
-
-
-#' Access twitter search api
-#' @param n - Maximum number of tweets.
-#' @param lang - Language to filter result.
-#' @param lastNDays - From how many days ago tweets should be searched.
-#' @param searchString - Query to search.
-#' @param tokenFileId - File id for oauth
-#' @param withSentiment - Whether there should be sentiment column calculated by get_sentiment.
-#' @param includeRts - Whether result should include retweets or not.
-#' @export
-getTwitter <- function(n=10000, lang=NULL,  lastNDays=7, searchString, tokenFileId=NULL, withSentiment = FALSE, includeRts = FALSE, ...){
-  if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
-  loadNamespace("lubridate")
-  twitter_token = getTwitterToken(tokenFileId)
-  twitter_token = rtweet:::check_token(twitter_token);
-  # this parameter needs to be character with YYYY-MM-DD format
-  # to get the latest tweets, pass NULL for until
-  until = NULL
-  since = as.character(lubridate::today() - lubridate::days(lastNDays))
-  locale = NULL
-  geocode = NULL
-  sinceID = NULL
-  maxID = NULL
-  # hard cocde it as recent for now
-  resultType = "recent"
-  retryOnRateLimit = 120
-
-  # convert search string to UTF-8 before sending it on the wire on windows.
-  searchString <- convertUserInputToUtf8(searchString)
-  tweetList <- rtweet::search_tweets(q = searchString, token = twitter_token, n = n, lang = lang, verbose = TRUE, since = since,
-                                     unitl = until, locale = locale, geocode = geocode, include_rts = includeRts,
-                                     type = resultType,  retryonratelimit=TRUE)
-  if(length(tweetList)>0){
-    users <- rtweet::users_data(tweetList) %>%  dplyr::rename(
-      user_id = id,
-      profile_image_url = profile_image_url_https
-    )
-    # to make column names consistent with existing data frame, rename the in_reply_to_aaa to reply_to_aaa
-    reply_to_cols <- c(status_id = "id_str",
-                       reply_to_status_id = "in_reply_to_status_id",
-                       reply_to_status_id_str = "in_reply_to_status_id_str",
-                       reply_to_user_id = "in_reply_to_user_id",
-                       reply_to_user_id_str = "in_reply_to_user_id_str",
-                       reply_to_screen_name = "in_reply_to_screen_name")
-    # to make column name consistent with existing data frame, rename below place related columns
-    place_cols <- c(place_id = "place_place_id",
-                    place_url = "place_place_url",
-                    place_name = "place_place_name",
-                    place_full_name = "place_place_full_name",
-                    place_type = "place_place_place_type",
-                    country = "place_place_country",
-                    country_code = "place_place_country_code")
-    # entities column is a list column so extract it to columns.
-    tweetList <- tweetList %>% tidyr::unnest_wider(entities, names_repair = "unique") %>%
-    # It's possible that reply_to_cols are not available in the query result, so use any_of to avoid column does not exist error.
-    # remove id column since it's same as status_id column.
-    dplyr::rename(dplyr::any_of(reply_to_cols)) %>% dplyr::select(-id) %>%
-    # user_mentions column is a list column so extract it to columns.
-    tidyr::unnest_wider(user_mentions, names_sep = "_", names_repair = "unique") %>%
-    # place column is a list column so extract it to columns.
-    tidyr::unnest_wider(place, names_sep = "_", names_repair = "unique") %>%
-    # place_place is created from the above unnest_wider and is a list column so extract it to columns.
-    tidyr::unnest_wider(place_place, names_sep = "_", names_repair = "unique") %>%
-    # It's possible that place_cols are not available in the query result, so use any_of to avoid column does not exist error.
-    dplyr::rename(dplyr::any_of(place_cols))
-    # Make sure to make below column names unique
-    conflictNames <- c(created_at_users = "created_at",
-                       withheld_in_countries_users = "withheld_in_countries",
-                       withheld_scope_users = "withheld_scope")
-    users <- users %>% dplyr::rename(dplyr::any_of(conflictNames))
-    # combine tweet data and user information.
-    tweetList <- cbind(tweetList, users)
-
-    if(withSentiment){
-      # calculate sentiment
-      tweetList %>% dplyr::mutate(sentiment = get_sentiment(text))
-    } else {
-      tweetList
-    }
-  } else {
-    stop('No Tweets found.')
-  }
-
 }
 
 
@@ -3019,7 +2916,6 @@ getObjectFromRdata <- function(rdata_path, object_name){
   rm(temp.space)
   obj
 }
-
 
 
 #' This function can clean the given data frame. It actually does

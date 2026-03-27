@@ -916,8 +916,7 @@ get_confint <- function(val, se, conf_int = 0.95) {
   val + critval * se
 }
 
-#' SE version of pivot. For backward compatibility.
-#' @export
+
 pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, ...) {
   pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, ...)
 }
@@ -2474,8 +2473,7 @@ calculate_cohens_w_for_ab_test <- function(a_ratio, conversion_rate, diff) {
 
 # References:
 # Cohen's f2 definition: https://en.wikipedia.org/wiki/Effect_size
-#'Calculate Cohen's f squared, which is an effect size of F-test for multiple regression.
-#'@export
+
 calculate_cohens_f_squared <- function(r2) {
   f2 <- r2 / (1 - r2)
   f2

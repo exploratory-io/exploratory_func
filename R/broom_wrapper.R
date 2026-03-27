@@ -120,6 +120,7 @@ model_info <- function(df, model, output = "summary", ...) {
   }
 }
 
+
 #' glance for lm
 #' @export
 glance_lm <- glance_rowwise
@@ -1745,7 +1746,7 @@ model_confint <- function(df, ...){ # TODO: Not used from anywhere, and the outp
     fml <- paste0("broom::tidy(stats::confint(m))")
   }
 
-  ret <- df %>% 
+  ret <- df %>%
       dplyr::ungroup() %>%
       dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
       dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%

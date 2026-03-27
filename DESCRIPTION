@@ -75,6 +75,6 @@ Suggests:
     rgeolocate,
     bayesAB,
     ranger
-RoxygenNote: 6.1.1
+RoxygenNote: 7.3.3
 Depends: 
     R (>= 2.10)
