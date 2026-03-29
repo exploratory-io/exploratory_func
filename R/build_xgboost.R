@@ -77,6 +77,12 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     } else {
       xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
     }
+    # xgboost 3.x returns an ALTLIST object that does not support $<- assignment.
+    # Create a plain list with the booster's elements to allow metadata attachment
+    # while preserving the class for method dispatch (predict, xgb.importance, etc.).
+    # - ptr: the C++ external pointer, used by xgb.get.handle() inside predict/importance
+    # - params: training params stored as R attribute in 3.x, needed by predict_xgboost()
+    ret <- structure(list(ptr = ret$ptr, params = attr(ret, "params")), class = class(ret))
     ret$terms <- term
     # To avoid saving a huge environment when caching with RDS.
     attr(ret$terms,".Environment") <- NULL
@@ -851,6 +857,10 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
 
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
+
   target = all.vars(fit$terms)[[1]]
 
   predict.fun = function(object, newdata) {
@@ -1382,21 +1392,25 @@ exp_xgboost <- function(df,
 
       if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          pdp_target_col <- attr(model$partial_dependence, "target")
-          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
+          if (is.null(model$partial_dependence)) { # mmpf unavailable — partial_dependence returned NULL
+            model$imp_df <- simpleError("Package 'mmpf' is not available. FIRM importance cannot be calculated.")
+          } else {
+            pdp_target_col <- attr(model$partial_dependence, "target")
+            imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+            model$imp_df <- imp_df
+            imp_vars <- imp_df$variable
+
+            imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+            model$imp_vars <- imp_vars
+            # Shrink the partial dependence data keeping only the important variables.
+            model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+          }
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
           model$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
-
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        model$imp_vars <- imp_vars
-        # Shrink the partial dependence data keeping only the important variables.
-        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (length(imp_vars) > 0) {

@@ -1471,6 +1471,11 @@ calc_permutation_importance_lightgbm_multiclass <- function(fit, target, vars, d
 partial_dependence.lightgbm <- function(fit, vars = colnames(data),
                                        n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
                                        classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
+
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
+
   target <- all.vars(fit$terms)[[1]]
 
   predict.fun <- function(object, newdata) {
@@ -1897,19 +1902,23 @@ exp_lightgbm <- function(df,
 
       if (importance_measure == "firm") {
         if (length(c_cols) > 1) {
-          pdp_target_col <- attr(model$partial_dependence, "target")
-          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
+          if (is.null(model$partial_dependence)) { # mmpf unavailable — partial_dependence returned NULL
+            model$imp_df <- simpleError("Package 'mmpf' is not available. FIRM importance cannot be calculated.")
+          } else {
+            pdp_target_col <- attr(model$partial_dependence, "target")
+            imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+            model$imp_df <- imp_df
+            imp_vars <- imp_df$variable
+
+            imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
+            model$imp_vars <- imp_vars
+            model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+          }
         } else {
           error <- simpleError("Variable importance requires two or more variables.")
           model$imp_df <- error
           imp_vars <- c_cols
         }
-
-        imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
-        model$imp_vars <- imp_vars
-        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (length(imp_vars) > 0) {

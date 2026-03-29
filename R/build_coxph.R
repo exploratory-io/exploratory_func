@@ -66,6 +66,11 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
 partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
+
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
+
   # Come up with appropriate time-axis values (times).
   grid <- 40 # 40 grid point is what we display on the Analytics View.
   step <- max(data[[time_col]], na.rm=TRUE) %/% grid
@@ -342,6 +347,9 @@ calc_efron_log_likelihood <- function(lp, time, status) { # TODO: Add a test to 
 
 # Calculates permutation importance for Cox regression.
 calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
    var_list <- as.list(vars)
    importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=1,
@@ -613,9 +621,13 @@ build_coxph.fast <- function(df,
       if (length(c_cols) > 1) {
         model$permutation_importance <- calc_permutation_importance_coxph(model, clean_time_col, clean_status_col, c_cols, df)
         # get importance to decide variables for partial dependence
-        imp_df <- model$permutation_importance
-        imp_df <- imp_df %>% dplyr::arrange(-importance)
-        imp_vars <- imp_df$term
+        if (inherits(model$permutation_importance, "error")) {
+          imp_vars <- c_cols
+        } else {
+          imp_df <- model$permutation_importance
+          imp_df <- imp_df %>% dplyr::arrange(-importance)
+          imp_vars <- imp_df$term
+        }
       }
       else {
         error <- simpleError("Variable importance requires two or more variables.")
@@ -754,9 +766,8 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     permutation_importance = {
       if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(term=character(), importance=numeric()))
       }
       ret <- x$permutation_importance
       # Add p.value column.
@@ -771,6 +782,9 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     },
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
+      if (is.null(ret)) {
+        return(data.frame())
+      }
       ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
         mutate(data = purrr::map(data,function(df){
           if (df$chart_type[[1]] == 'line') {
@@ -795,6 +809,9 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     },
     partial_dependence = {
       ret <- x$partial_dependence
+      if (is.null(ret)) {
+        return(data.frame())
+      }
       pred_survival_time <- x$pred_survival_time
       ret <- ret %>%
         filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time

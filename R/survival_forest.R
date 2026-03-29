@@ -18,6 +18,9 @@ calc_mean_survival <- function(survival, unique_death_times) {
 
 # Permutation importance. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
 calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -97,6 +100,11 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars, ori
 partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
+
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
+
   times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
   # Add time 0 if times does not start with 0.
   time_zero_added <- FALSE
@@ -454,7 +462,11 @@ exp_survival_forest <- function(df,
           imp_df <- calc_permutation_importance_ranger_survival(model, clean_time_col, clean_status_col, c_cols, df)
         }
         model$imp_df <- imp_df
-        imp_vars <- imp_df$variable
+        if (inherits(imp_df, "error")) {
+          imp_vars <- c_cols
+        } else {
+          imp_vars <- imp_df$variable
+        }
       }
       else {
         error <- simpleError("Variable importance requires two or more variables.")
@@ -572,6 +584,9 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     },
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
+      if (is.null(ret)) {
+        return(data.frame())
+      }
       ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
         dplyr::mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
           if (df$chart_type[[1]] == 'line') {
@@ -607,6 +622,9 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     },
     partial_dependence = {
       ret <- x$partial_dependence
+      if (is.null(ret)) {
+        return(data.frame())
+      }
       pred_survival_time <- x$pred_survival_time
       ret <- ret %>%
         dplyr::filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
