@@ -46,16 +46,20 @@ test_that("exp_xgboost(regression) evaluate training and test with FIRM importan
   expect_gt(nrow(train_ret), 3300)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
 
-  # Check result of variable importance 
+  # Check result of variable importance
   ret <- model_df %>% tidy_rowwise(model, type="importance")
-  expect_equal(as.character(ret$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
+  if (requireNamespace("mmpf", quietly=TRUE)) {
+    expect_equal(as.character(ret$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
+  }
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # retrieve partial dependence data.
-  ret <- model_df %>% rf_partial_dependence()
-  expect_equal(class(ret$conf_high), "numeric") # make sure that it is with conf int for actual binning data.
+  if (requireNamespace("mmpf", quietly=TRUE)) {
+    ret <- model_df %>% rf_partial_dependence()
+    expect_equal(class(ret$conf_high), "numeric") # make sure that it is with conf int for actual binning data.
+  }
 
   model_df <- flight %>%
                 exp_xgboost(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
@@ -69,6 +73,7 @@ test_that("exp_xgboost(regression) evaluate training and test with FIRM importan
 })
 
 test_that("exp_xgboost(regression) evaluate training and test with permutation importance", {
+  skip_if_not_installed("mmpf")
   set.seed(1) # For stability of result.
   model_df <- flight %>%
                 exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`, `FL DATE`,
