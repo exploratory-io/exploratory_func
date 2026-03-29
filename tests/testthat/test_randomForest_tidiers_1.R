@@ -77,8 +77,7 @@ test_that("test calc_feature_imp when there in only one predictor", {
   model_df <- sample_data %>%
     calc_feature_imp(y, num, importance_measure = "impurity")
   ret <- model_df %>% rf_importance()
-  # expect_equal(nrow(ret), 0) # Empty data frame should be returned.
-  expect_equal(ncol(ret), 0) # For some reason it is ncol rather than nrow that is 0.
+  expect_equal(nrow(ret), 0) # Empty data frame should be returned for single predictor.
 })
 
 test_that("test calc_feature_imp predicting multi-class", {
