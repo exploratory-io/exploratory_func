@@ -409,7 +409,8 @@ test_that("test build_xgboost with linear booster", {
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
   test_data[["weight"]] <- c(seq(nrow(test_data)-1), NA)
   test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
-  model_ret <- build_model(test_data, model_func = xgboost_reg, formula = DISTANCE ~ CANCELLED, nrounds = 5, booster = "gblinear", eval_metric = "map")
+  # xgboost 3.x: "map" eval_metric requires binary labels; use "rmse" for regression.
+  model_ret <- build_model(test_data, model_func = xgboost_reg, formula = DISTANCE ~ CANCELLED, nrounds = 5, booster = "gblinear", eval_metric = "rmse")
   coef_ret <- model_coef(model_ret)
   stats_ret <- model_stats(model_ret)
   expect_equal(nrow(stats_ret), 5)
@@ -559,8 +560,11 @@ test_that("new data prediction without response column", {
       sparse = FALSE
     )
 
+  # xgboost 3.x auto-computes base_score from label mean (~0.15 for this data),
+  # so predicted probabilities are lower than with the old default base_score=0.5.
+  # Use threshold=0.2 to ensure both TRUE and FALSE predictions appear.
   prediction_ret <- model_ret %>%
-    prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.4)
+    prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.2)
 
   expect_true(all(dplyr::between(prediction_ret$predicted_probability,0,1), na.rm=TRUE))
   expect_true(any(prediction_ret$predicted_label) && any(!prediction_ret$predicted_label))
@@ -588,6 +592,6 @@ test_that("new data prediction without response column", {
     )
 
   prediction_ret2 <- model_ret2 %>%
-    prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.4)
+    prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.2)
   expect_equal(as.integer(prediction_ret$predicted_label)+1, as.integer(prediction_ret2$predicted_label))
 })
