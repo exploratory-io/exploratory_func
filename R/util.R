@@ -129,14 +129,9 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
     # Basic behaviour of Matrix::sparseMatrix is sum.
     # If fun.aggregate is different, it should be aggregated by it.
     if(!identical(fun.aggregate, sum)){
-      # create a formula to aggregate duplicated row and col pairs
-      # ex: ~mean(val)
-      fml <- as.formula(paste0("~", as.character(substitute(fun.aggregate)), "(", val, ")"))
-
-      # execute the formula to each row and col pair
+      # aggregate duplicated row and col pairs using fun.aggregate
       data <- dplyr::group_by(data, !!!rlang::syms(c(row, col))) %>%
-        dplyr::summarise_(.dots=setNames(list(fml), val)) %>%
-        dplyr::ungroup()
+        dplyr::summarise(!!rlang::sym(val) := fun.aggregate(!!rlang::sym(val)), .groups = "drop")
     }
 
     row_fact <- as.factor(data[[row]])
