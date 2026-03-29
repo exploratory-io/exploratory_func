@@ -10,12 +10,11 @@ test_that("do_prophet with holiday country", {
   # verify the last date with forecasted_value
   expect_true("Christmas Day" %in% names(ret))
   # Test the Japanese holiday data we added.
-  # prophet 1.1.7+ dropped JP from generated_holidays; skip if not available.
-  if ("JP" %in% prophet::generated_holidays$country) {
-    ret <- raw_data %>%
-      do_prophet(timestamp, data, 10, time_unit = "day", holiday_country_names=c("US","JP"))
-    expect_true("Greenery Day" %in% names(ret))
-  }
+  # JP was dropped from prophet's generated_holidays at some point; we patch it back in
+  # by rebuilding sysdata from the GitHub version CSV (see tools/rebuild_prophet_sysdata.R).
+  ret <- raw_data %>%
+    do_prophet(timestamp, data, 10, time_unit = "day", holiday_country_names=c("US","JP"))
+  expect_true("Greenery Day" %in% names(ret))
 })
 
 test_that("do_prophet with group_by", {
