@@ -76,9 +76,11 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
       # xgboost 3.x renamed "watchlist" to "evals"
       xgboost::xgb.train(data = train_mat, evals = list(train = train_mat, validation = watch_mat), nrounds = nrounds, ...)
     } else {
-      # xgboost 3.x changed xgboost() API; use xgb.DMatrix + xgb.train for compatibility
+      # xgboost 3.x changed xgboost() API; use xgb.DMatrix + xgb.train for compatibility.
+      # Always pass evals with the training data so that evaluation_log is populated,
+      # restoring xgboost 2.x behavior and ensuring glance.xgb.Booster returns non-empty rows.
       dmat <- xgboost::xgb.DMatrix(data = md_mat, label = y, weight = weight)
-      xgboost::xgb.train(data = dmat, nrounds = nrounds, ...)
+      xgboost::xgb.train(data = dmat, evals = list(train = dmat), nrounds = nrounds, ...)
     }
     # xgboost 3.x returns an ALTLIST object that does not support $<- assignment.
     # Create a plain list with the booster's elements to allow metadata attachment

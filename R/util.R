@@ -587,14 +587,15 @@ as_numeric_matrix_ <- function(df, columns) {
 evaluate_select <- function(df, .dots, excluded = NULL) {
   loadNamespace("dplyr")
   tryCatch({
-    ret <- setdiff(colnames(dplyr::select_(df, .dots=.dots)), excluded)
+    exprs <- lapply(.dots, rlang::parse_expr)
+    ret <- setdiff(colnames(dplyr::select(df, !!!exprs)), excluded)
     if(length(ret) == 0){
       stop("no column selected")
     }
     ret
   }, error = function(e){
     loadNamespace("stringr")
-    if(stringr::str_detect(e$message, "not found")) {
+    if(any(stringr::str_detect(e$message, "not found"))) {
       stop("undefined columns selected")
     }
     stop(e$message)

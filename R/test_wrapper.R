@@ -1590,7 +1590,7 @@ gather_repeated_measures <- function(df, column_list, value_col_name) {
   }
   
   # filter out rows that have NA in the columns to gather
-  df <- df %>% filter(across(all_of(cols_to_gather), ~ !is.na(.)))
+  df <- df %>% filter(if_all(all_of(cols_to_gather), ~ !is.na(.)))
 
   df_transformed <- df %>%
     dplyr::select(if (length(column_list) > 1) all_of(cols_to_keep), all_of(cols_to_gather)) %>%
