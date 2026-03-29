@@ -194,7 +194,11 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
     ret <- dplyr::rowwise(ret)
     ret
   }, error = function(e){
-    stop(e$message)
+    # In dplyr 1.1+, errors inside mutate() are wrapped with context messages like
+    # "In argument: `model = purrr::map2(...)`." The root cause is in e$parent chain.
+    root <- e
+    while (!is.null(root$parent)) root <- root$parent
+    stop(root$message)
   })
   ret
 }
