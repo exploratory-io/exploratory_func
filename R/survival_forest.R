@@ -574,9 +574,8 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric()))
       }
       ret <- x$imp_df
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.

@@ -1609,9 +1609,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     permutation_importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(term=character(), importance=numeric()))
       }
       ret <- x$imp_df
       # Add p.value column.
@@ -1775,9 +1774,8 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     permutation_importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(term=character(), importance=numeric()))
       }
       ret <- x$imp_df
       # Add p.value column.
