@@ -161,11 +161,9 @@ do_cor.kv_ <- function(df,
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
   if (return_type == "data.frame") {
-    tmp_col <- avoid_conflict(grouped_col, "tmp")
     df %>%
-      dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
-      dplyr::ungroup() %>%
-      unnest_with_drop(!!rlang::sym(tmp_col))
+      dplyr::group_modify(~do_cor_each(.x), .keep = TRUE) %>%
+      dplyr::ungroup()
   }
   else {
     do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
@@ -246,9 +244,8 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 
   if (return_type == "data.frame") {
     df %>%
-      dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%
-      dplyr::ungroup() %>%
-      unnest_with_drop(!!rlang::sym(output_cols[[1]]))
+      dplyr::group_modify(~do_cor_each(.x), .keep = TRUE) %>%
+      dplyr::ungroup()
   }
   else {
     do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
@@ -430,9 +427,7 @@ do_cmdscale_ <- function(df,
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(grouped_col, "tmp")
   df %>%
-    dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~do_cmdscale_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 }

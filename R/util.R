@@ -1056,11 +1056,9 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~pivot_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {

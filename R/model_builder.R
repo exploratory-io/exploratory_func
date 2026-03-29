@@ -131,19 +131,22 @@ build_kmeans.kv_ <- function(df,
 
   if(keep.source & !augment){
     output <- df %>%
-      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
-    # Add a class for Exploratyry to recognize the type of .source.data
+      dplyr::summarize(
+        !!model_column := list(build_kmeans_each(dplyr::pick(dplyr::everything()))),
+        !!source_column := list(dplyr::pick(dplyr::everything())),
+        .groups = "keep"
+      )
     class(output[[source_column]]) <- c("list", ".source.data")
+    class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
+  } else if (augment) {
+    # build_kmeans_each returns a data frame when augment = TRUE
+    output <- df %>%
+      dplyr::group_modify(~build_kmeans_each(.x), .keep = TRUE) %>%
+      dplyr::ungroup()
   } else {
     output <- df %>%
-      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
-  }
-  # Add a class for Exploratyry to recognize the type of .model
-  if(augment){
-    output <- output %>%
-      dplyr::ungroup() %>%
-      unnest_with_drop(!!rlang::sym(model_column))
-  } else {
+      dplyr::summarize(!!model_column := list(build_kmeans_each(dplyr::pick(dplyr::everything()))),
+                       .groups = "keep")
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
   }
   output
@@ -242,18 +245,22 @@ build_kmeans.cols <- function(df, ...,
 
   if(keep.source & !augment){
     output <- df %>%
-        dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
-    # Add a class for Exploratyry to recognize the type of .source.data
+      dplyr::summarize(
+        !!model_column := list(build_kmeans_each(dplyr::pick(dplyr::everything()))),
+        !!source_column := list(dplyr::pick(dplyr::everything())),
+        .groups = "keep"
+      )
     class(output[[source_column]]) <- c("list", ".source.data")
+    class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
+  } else if (augment) {
+    # build_kmeans_each returns a data frame when augment = TRUE
+    output <- df %>%
+      dplyr::group_modify(~build_kmeans_each(.x), .keep = TRUE) %>%
+      dplyr::ungroup()
   } else {
     output <- df %>%
-      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
-  }
-  if(augment){
-    output <- output %>%
-      dplyr::ungroup() %>%
-      unnest_with_drop(!!rlang::sym(model_column))
-  } else {
+      dplyr::summarize(!!model_column := list(build_kmeans_each(dplyr::pick(dplyr::everything()))),
+                       .groups = "drop")
     # Pass on original group_by columns via rowwise().
     # tidy_rowwise() etc. expect this info.
     if (length(grouped_column) > 0) {

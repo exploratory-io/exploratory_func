@@ -270,11 +270,9 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_causal_impact_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    tidyr::unnest(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~do_causal_impact_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   # grouping should be kept
   if(length(grouped_col) != 0){

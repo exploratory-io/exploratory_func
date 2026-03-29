@@ -286,9 +286,8 @@ do_var.test <- function(df, value, key, ...){
   }
 
   df %>%
-    dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(model_col))
+    dplyr::group_modify(~do_var.test_each(df = .x, ...), .keep = TRUE) %>%
+    dplyr::ungroup()
 }
 
 #' Non standard evaluation version of do_chisq.test_
@@ -356,11 +355,9 @@ do_chisq.test_ <- function(df,
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "tmp")
   df %>%
-    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~chisq.test_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 }
 
 #' Chi-Square test wrapper for Analytics View

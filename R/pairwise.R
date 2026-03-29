@@ -57,18 +57,9 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
     df
   }
 
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
-
+    dplyr::group_modify(~calc_doc_sim_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 }
 
 #' integrated do_dist
@@ -210,16 +201,9 @@ do_dist.kv_ <- function(df,
     ret
   }
   # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~calc_dist_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 }
 
 do_kl_dist.kv_ <- function(df,
@@ -296,9 +280,8 @@ do_kl_dist.kv_ <- function(df,
     ret
   }
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(cnames[[1]]))
+    dplyr::group_modify(~calc_dist_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 }
 
 #' @param p The power of the Minkowski distance.
@@ -374,8 +357,7 @@ do_dist.cols <- function(df,
     ret
   }
   df %>%
-    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(cnames[[1]]))
+    dplyr::group_modify(~calc_dist_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 }
 

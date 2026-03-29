@@ -191,9 +191,8 @@ augment_kmeans <- function(df, model, data){
     }
 
     ret <- df %>%
-      dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
-      dplyr::ungroup() %>%
-      unnest_with_drop(!!rlang::sym(model_col))
+      dplyr::group_modify(~augment_each(.x), .keep = TRUE) %>%
+      dplyr::ungroup()
   }
   # update .cluster to cluster or cluster.new if it exists
   colnames(ret)[[ncol(ret)]] <- avoid_conflict(colnames(ret), "cluster")
@@ -1717,11 +1716,9 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
     df
   }
 
-  tmp_col <- avoid_conflict(colnames(ret), "tmp_col")
   ret <- ret %>%
-    dplyr::do_(.dots=setNames(list(~add_time_zero_row_each(.)), tmp_col)) %>%
+    dplyr::group_modify(~add_time_zero_row_each(.x), .keep = TRUE) %>%
     dplyr::ungroup()
-  ret <- ret %>%  unnest_with_drop(!!rlang::sym(tmp_col))
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
