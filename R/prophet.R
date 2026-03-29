@@ -812,11 +812,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
   if (output == "data") { # Pre-5.5 backward compatibility mode.
-    tmp_col <- avoid_conflict(colnames(df), "tmp_col")
     ret <- df %>%
-      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
+      dplyr::group_modify(~do_prophet_each(.x), .keep = TRUE) %>%
       dplyr::ungroup()
-    ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
     if (length(grouped_col) > 0) {
       ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
     }

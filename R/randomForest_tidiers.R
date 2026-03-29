@@ -1926,11 +1926,9 @@ exp_balance <- function(df,
     df_balanced
   }
 
-  tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    tidyr::unnest(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~each_func(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   # grouping should be kept
   if(length(grouped_col) != 0){
