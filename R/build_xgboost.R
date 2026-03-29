@@ -245,6 +245,8 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NUL
 
   data[[y_name]] <- as.numeric(data[[y_name]])
 
+  # "reg:linear" was renamed to "reg:squarederror" in xgboost 3.x
+  if (output_type == "linear") output_type <- "squarederror"
   objective <- paste0("reg:", output_type, sep = "")
 
   ret <- fml_xgboost(data = data,
