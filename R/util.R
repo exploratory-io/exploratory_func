@@ -3336,7 +3336,10 @@ separate_japanese_address <- function(df, address, prefecture_col = "prefecture"
   street_col <- avoid_conflict(colnames(df), street_col)
   new_names <- c(names(df), prefecture_col, city_col, street_col)
   # create a new column with a dummy column name and store the separated address elements.
-  df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = zipangu::separate_address(!!rlang::sym(address_col)))
+  # Use purrr::possibly to gracefully handle non-Japanese strings that cause zipangu to error.
+  # In R 4.5 / stringr 1.5, str_replace() now errors on NA patterns (previously returned NA silently).
+  safe_separate_address <- purrr::possibly(zipangu::separate_address, otherwise = list(prefecture = NA_character_, city = NA_character_, street = NA_character_))
+  df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = purrr::map(!!rlang::sym(address_col), safe_separate_address))
   # since the .exploratory_dummy_column_for_japanese_address column is a list that contains address elements,
   # call tidyr::unnest_wider so that each element becomes dedicated column like prefecture, city, and street.
   df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = ~new_names)
