@@ -197,8 +197,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   if(keep_cols) {
     count_col <- avoid_conflict(colnames(df), "count")
   }
-  # This is SE version of dplyr::mutate(df, doc_id = row_number())
-  df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
+  # Add document_id column with row numbers, using tidy evaluation for dynamic column name.
+  df <- dplyr::mutate(df, !!doc_id := row_number())
   orig_input_col <- col_name(substitute(text_col))
   textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
   # Create a corpus from the text column then tokenize.
@@ -485,19 +485,18 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
     # column name is gram number
     cname <- n
 
-    # Use following non-standard evaluation formulas to use token_col, prev_cname and cname variables
-
+    # Use tidy evaluation to dynamically reference token_col, prev_cname and cname variables.
     # lead the token to n-1 position
     # if n is 3 and a token is in 5th token in a group, it goes to 3rd row in the group
-    lead_fml <- lazyeval::interp(~dplyr::lead(x, y), x=as.symbol(token_col), y=n-1)
     # connect the lead token to the ngram created previously
     # if n is 3 and the token is 5th token in a group, the token is connected with 3rd and 4th token in the group
-    str_c_fml <- lazyeval::interp(~stringr::str_c(x, y, sep=z), x=as.symbol(prev_cname), y=as.symbol(cname), z=sep)
+    token_sym <- rlang::sym(token_col)
+    prev_sym <- rlang::sym(as.character(prev_cname))
+    cname_sym <- rlang::sym(as.character(cname))
 
-    # execute the formulas
     grouped <- (grouped %>%
-              dplyr::mutate_(.dots=setNames(list(lead_fml), cname)) %>%
-              dplyr::mutate_(.dots=setNames(list(str_c_fml), cname))
+              dplyr::mutate(!!cname_sym := dplyr::lead(!!token_sym, n-1)) %>%
+              dplyr::mutate(!!cname_sym := stringr::str_c(!!prev_sym, !!cname_sym, sep=sep))
               )
 
     # preserve the cname to be used in next iteration
