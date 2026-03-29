@@ -61,8 +61,10 @@ test_that("build_lm.fast (linear regression) evaluate training and test with per
 
   # Check order of variable importance result.
   ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
-  # unname() is necessary for the result to be equal to the expectation.
-  expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+  if (requireNamespace("mmpf", quietly=TRUE)) {
+    # unname() is necessary for the result to be equal to the expectation.
+    expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+  }
 
   # Test univariate case handling
   model_df <- flight %>%
@@ -89,8 +91,10 @@ test_that("build_lm.fast (linear regression) evaluate training and test with per
 
   # Check order of variable importance result.
   ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
-  # unname() is necessary for the result to be equal to the expectation.
-  expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+  if (requireNamespace("mmpf", quietly=TRUE)) {
+    # unname() is necessary for the result to be equal to the expectation.
+    expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+  }
 
   # Test univariate case handling
   model_df <- flight %>%
