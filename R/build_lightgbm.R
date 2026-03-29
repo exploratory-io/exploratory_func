@@ -2073,7 +2073,8 @@ tidy.lightgbm_exp <- function(x, type = "importance", pretty.name = FALSE, binar
   switch(type,
     importance = {
       if ("error" %in% class(x$imp_df)) {
-        return(data.frame())
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric()))
       }
       ret <- x$imp_df
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable])

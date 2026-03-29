@@ -73,16 +73,21 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
       watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
       train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
 
-      xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, ...)
+      # xgboost 3.x renamed "watchlist" to "evals"
+      xgboost::xgb.train(data = train_mat, evals = list(train = train_mat, validation = watch_mat), nrounds = nrounds, ...)
     } else {
-      xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
+      # xgboost 3.x changed xgboost() API; use xgb.DMatrix + xgb.train for compatibility
+      dmat <- xgboost::xgb.DMatrix(data = md_mat, label = y, weight = weight)
+      xgboost::xgb.train(data = dmat, nrounds = nrounds, ...)
     }
     # xgboost 3.x returns an ALTLIST object that does not support $<- assignment.
     # Create a plain list with the booster's elements to allow metadata attachment
     # while preserving the class for method dispatch (predict, xgb.importance, etc.).
     # - ptr: the C++ external pointer, used by xgb.get.handle() inside predict/importance
     # - params: training params stored as R attribute in 3.x, needed by predict_xgboost()
-    ret <- structure(list(ptr = ret$ptr, params = attr(ret, "params")), class = class(ret))
+    # - evaluation_log: stored as attribute in 3.x, preserved here as a list element
+    ret <- structure(list(ptr = ret$ptr, params = attr(ret, "params"),
+                          evaluation_log = attr(ret, "evaluation_log")), class = class(ret))
     ret$terms <- term
     # To avoid saving a huge environment when caching with RDS.
     attr(ret$terms,".Environment") <- NULL
@@ -792,6 +797,9 @@ predict_xgboost <- function(model, df) {
 
 # Calculates permutation importance for regression by xgboost.
 calc_permutation_importance_xgboost_regression <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -811,6 +819,9 @@ calc_permutation_importance_xgboost_regression <- function(fit, target, vars, da
 }
 
 calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -831,6 +842,9 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
 }
 
 calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -1591,9 +1605,8 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
     importance = {
       if ("error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric()))
       }
       ret <- x$imp_df
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
