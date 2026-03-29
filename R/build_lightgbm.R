@@ -1406,6 +1406,9 @@ importance_lightgbm <- function(model) {
 }
 
 calc_permutation_importance_lightgbm_regression <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -1426,6 +1429,9 @@ calc_permutation_importance_lightgbm_regression <- function(fit, target, vars, d
 }
 
 calc_permutation_importance_lightgbm_binary <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -1446,6 +1452,9 @@ calc_permutation_importance_lightgbm_binary <- function(fit, target, vars, data)
 }
 
 calc_permutation_importance_lightgbm_multiclass <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
