@@ -286,7 +286,7 @@ do_var.test <- function(df, value, key, ...){
   }
 
   df %>%
-    dplyr::group_modify(~do_var.test_each(df = .x, ...), .keep = TRUE) %>%
+    dplyr::group_modify(function(.x, .y, ...) do_var.test_each(df = .x, ...), .keep = TRUE) %>%
     dplyr::ungroup()
 }
 

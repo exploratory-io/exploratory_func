@@ -989,7 +989,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
       df
     }
 
-    target_df <- ret %>% group_by(is_test_data, add = TRUE)
+    target_df <- ret %>% group_by(is_test_data, .add = TRUE)
     do_on_each_group(target_df, each_mat_func, with_unnest = TRUE)
   } else {
     ret %>% dplyr::arrange(desc(is_test_data), .by_group = TRUE)
