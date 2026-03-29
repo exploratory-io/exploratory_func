@@ -2051,12 +2051,12 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
         if(force_data_type) {
           if(stringr::str_length(current_df_name) > 0) {
             if(i == 1) {  # for the first item, use current_df_name
-              dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+              dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], as.character)
             } else {
-              dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+              dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], as.character)
             }
           } else {
-            dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], as.character)
           }
         } else {
           # if we need to set data frame name to each row as a new column
@@ -2139,8 +2139,8 @@ bind_rows_safe <- function(df1, df2) {
 
 #'Wrapper function for dplyr's set operations to support ignoring data type difference.
 set_operation_with_force_character <- function(func, x, y, ...) {
-  x <- dplyr::mutate_all(x, funs(as.character))
-  y <- dplyr::mutate_all(y, funs(as.character))
+  x <- dplyr::mutate_all(x, as.character)
+  y <- dplyr::mutate_all(y, as.character)
   readr::type_convert(func(x, y, ...))
 }
 
