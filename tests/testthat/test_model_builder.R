@@ -18,7 +18,7 @@ test_that("test build_lm with NA values", {
     )
   expect_error({
     build_lm(test_df, val ~ .)
-  }, "more than 1 unique values are expected for categorical columns assigned as predictors")
+  }, "more than 1 unique values are expected for categorical columns assigned as predictors|2 つ以上の水準")
 })
 
 test_that("test build_lm with all NA values", {
@@ -29,7 +29,7 @@ test_that("test build_lm with all NA values", {
   )
   expect_error({
     build_lm(test_df, val ~ .)
-  }, "no data after removing NA")
+  }, "no data after removing NA|\\(非 NA 値の\\) ケースが 0")
 })
 
 test_that("test build_glm with NA values", {
@@ -40,7 +40,7 @@ test_that("test build_glm with NA values", {
   )
   expect_error({
     build_glm(test_df, val ~ .)
-  }, "more than 1 unique values are expected for categorical columns assigned as predictors")
+  }, "more than 1 unique values are expected for categorical columns assigned as predictors|2 つ以上の水準")
 })
 
 # this returns "object 'fit' not found" but yet to understand what this means, so kept commented out
@@ -66,7 +66,7 @@ test_that("test with 2 groups with 3 centers", {
 
   expect_error({
     build_kmeans(test_df, skv = c("gro up", "col", "val"), centers = 2)
-  }, "Centers should be less than unique subjects\\.")
+  }, "Centers should be less than unique subjects\\.|クラスタ中心の数は 1 と nrow\\(x\\) の間")
 })
 
 test_that("test with 2 groups with 3 centers", {
@@ -93,7 +93,7 @@ test_that("test with na values", {
   ret <- build_kmeans(test_df, skv = c("group", "col", "na"), fill = 1)
   expect_error({
     build_kmeans(test_df, skv = c("group", "col", "na"), fill = NA)
-  }, "There is NA in the data.")
+  }, "There is NA in the data\\.|NA/NaN/Inf")
 })
 
 test_that("test with too small subject", {
@@ -103,7 +103,7 @@ test_that("test with too small subject", {
     col=rep(seq(5), 2))
   expect_error({
     build_kmeans(test_df, skv = c("group", "col", "val"), centers = 3)
-  }, "Centers should be less than unique subjects\\.")
+  }, "Centers should be less than unique subjects\\.|replace = FALSE")
 })
 
 test_that("test with too small key", {
@@ -113,7 +113,7 @@ test_that("test with too small key", {
     col=rep(seq(5), 2))
   expect_error({
     build_kmeans(test_df, skv = c("col", "group", "val"))
-  }, "Centers should be less than distinct data points\\.")
+  }, "Centers should be less than distinct data points\\.|異なったデータ点よりも多くのクラスタ中心")
 })
 
 test_that("test build_glm and broom tidy", {
