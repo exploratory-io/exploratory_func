@@ -3853,7 +3853,7 @@ read_rds_file <- function(file, refhook = NULL){
     tryCatch({
       readRDS(file, refhook)
     }, error = function(e) {
-      if (stringr::str_detect(e$message, "cannot open the connection")) {
+      if (any(stringr::str_detect(e$message, "cannot open the connection"))) {
         # Assuming that this means the file is missing.
         # Strictly speaking, it might happen when the file is broken as a gzip file, but we can't distinguish between them from the error.
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
@@ -3950,7 +3950,7 @@ read_parquet_file <- function(file, col_select = NULL) {
       }
     }, error = function(e) {
       # Error message for non-existent file case looks like this - "Error : IOError: Failed to open local file '<full filepath>'. Detail: [errno 2] No such file or directory"
-      if (stringr::str_detect(e$message, "No such file or directory")) {
+      if (any(stringr::str_detect(e$message, "No such file or directory"))) {
         stop(paste0('EXP-DATASRC-14 :: ', jsonlite::toJSON(file), ' :: The file does not exist.'))
       }
       else {

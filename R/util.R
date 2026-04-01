@@ -1430,12 +1430,16 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   # This is a list of arguments in do clause
   args <- append(list(quote(.)), rlang::call_args(params))
   call <- rlang::new_call(func, as.pairlist(args))
+  eval_env <- parent.frame()
   ret <- df %>%
-    # UQ and UQ(get_expr()) evaluates those variables
-    dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
+    dplyr::group_modify(function(.x, .y) {
+      env <- rlang::new_environment(list(. = .x), parent = eval_env)
+      val <- eval(call, envir = env)
+      dplyr::tibble(!!rlang::sym(name) := list(val))
+    }, .keep = TRUE) %>%
+    dplyr::ungroup()
   if (with_unnest) {
     ret %>%
-      dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(name))
   } else {
     # Pass on original group_by columns via rowwise().
@@ -1460,9 +1464,15 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   args2 <- append(list(quote(.)), rlang::call_args(params2))
   call1 <- rlang::new_call(func1, as.pairlist(args1))
   call2 <- rlang::new_call(func2, as.pairlist(args2))
+  eval_env <- parent.frame()
   ret <- df %>%
-    # UQ and UQ(get_expr()) evaluates those variables
-    dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
+    dplyr::group_modify(function(.x, .y) {
+      env <- rlang::new_environment(list(. = .x), parent = eval_env)
+      val1 <- eval(call1, envir = env)
+      val2 <- eval(call2, envir = env)
+      dplyr::tibble(!!rlang::sym(name1) := list(val1), !!rlang::sym(name2) := list(val2))
+    }, .keep = TRUE) %>%
+    dplyr::ungroup()
   # Pass on original group_by columns via rowwise().
   # tidy_rowwise() etc. expect this info.
   grouped_cols <- grouped_by(df)

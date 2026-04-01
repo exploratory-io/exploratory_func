@@ -119,7 +119,7 @@ getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim
   tryCatch({
     filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
@@ -194,7 +194,7 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
     files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
       filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
@@ -219,7 +219,7 @@ getParquetFileFromS3 <- function(fileName, region, username, password, bucket, c
   tryCatch({
     filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
@@ -260,7 +260,7 @@ searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, pass
     files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
       filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
@@ -284,7 +284,7 @@ getExcelFileFromS3 <- function(fileName, region, username, password, bucket, she
   tryCatch({
     filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
@@ -310,7 +310,7 @@ searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, passwo
     files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
       filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+    if (any(stringr::str_detect(e$message, "(Not Found|Moved Permanently)"))) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.

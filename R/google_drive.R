@@ -195,7 +195,7 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
   tryCatch({
     items <- exploratory::listItemsInGoogleDrive(path = folderId, type =  c("csv", "tsv", "txt"), sharedWithMe = shared_with_me, teamDriveId = team_drive_id)
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "File not found")) {
+    if (any(stringr::str_detect(e$message, "File not found"))) {
       # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
       # This means the folder with the folderId does not exist.
       stop(paste0('EXP-DATASRC-6 :: [] :: The specified Google Drive folder does not exist.'))
@@ -260,7 +260,7 @@ searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword
   tryCatch({
     items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"), sharedWithMe = shared_with_me, teamDriveId = team_drive_id)
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "File not found")) {
+    if (any(stringr::str_detect(e$message, "File not found"))) {
       # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
       # This means the folder with the folderId does not exist.
       stop(paste0('EXP-DATASRC-6 :: [] :: The specified Google Drive folder does not exist.'))
@@ -346,7 +346,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
       tmp
     }
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "File not found")) {
+    if (any(stringr::str_detect(e$message, "File not found"))) {
       # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
       # This means the folder with the folderId does not exist.
       stop(paste0('EXP-DATASRC-9 :: [] :: The specified Google Drive file does not exist.'))

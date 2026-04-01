@@ -146,7 +146,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
                 params = params,
                 ...)
   }, error = function(e){
-    if(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples")){
+    if(any(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples"))) {
       stop("The target only contains positive or negative values")
     }
     stop(e)
