@@ -173,7 +173,12 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
     )
   } else {
     loadNamespace("dplyr")
-    dplyr::select_(df, .dots=select_dots) %>%  as.matrix()
+    # dplyr::select_() removed in dplyr 1.2; select column list via tidyeval
+    if (is.character(select_dots)) {
+      dplyr::select(df, dplyr::all_of(select_dots)) %>% as.matrix()
+    } else {
+      dplyr::select(df, !!!select_dots) %>% as.matrix()
+    }
   }
 }
 
