@@ -70,13 +70,28 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
       }
       # create validation data set
       index <- sample(seq(nrow(md_mat)), ceiling(nrow(md_mat) * watchlist_rate))
-      watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
-      train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
+      watch_weight <- if (!is.null(weight)) weight[index] else NULL
+      train_weight <- if (!is.null(weight)) weight[-index] else NULL
+      watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index], weight = watch_weight)
+      train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index], weight = train_weight)
 
-      xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, ...)
+      # xgboost 3.x renamed "watchlist" to "evals"
+      xgboost::xgb.train(data = train_mat, evals = list(train = train_mat, validation = watch_mat), nrounds = nrounds, ...)
     } else {
-      xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
+      # xgboost 3.x changed xgboost() API; use xgb.DMatrix + xgb.train for compatibility.
+      # Always pass evals with the training data so that evaluation_log is populated,
+      # restoring xgboost 2.x behavior and ensuring glance.xgb.Booster returns non-empty rows.
+      dmat <- xgboost::xgb.DMatrix(data = md_mat, label = y, weight = weight)
+      xgboost::xgb.train(data = dmat, evals = list(train = dmat), nrounds = nrounds, ...)
     }
+    # xgboost 3.x returns an ALTLIST object that does not support $<- assignment.
+    # Create a plain list with the booster's elements to allow metadata attachment
+    # while preserving the class for method dispatch (predict, xgb.importance, etc.).
+    # - ptr: the C++ external pointer, used by xgb.get.handle() inside predict/importance
+    # - params: training params stored as R attribute in 3.x, needed by predict_xgboost()
+    # - evaluation_log: stored as attribute in 3.x, preserved here as a list element
+    ret <- structure(list(ptr = ret$ptr, params = attr(ret, "params"),
+                          evaluation_log = attr(ret, "evaluation_log")), class = class(ret))
     ret$terms <- term
     # To avoid saving a huge environment when caching with RDS.
     attr(ret$terms,".Environment") <- NULL
@@ -133,7 +148,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
                 params = params,
                 ...)
   }, error = function(e){
-    if(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples")){
+    if(any(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples"))) {
       stop("The target only contains positive or negative values")
     }
     stop(e)
@@ -245,6 +260,8 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NUL
 
   data[[y_name]] <- as.numeric(data[[y_name]])
 
+  # "reg:linear" was renamed to "reg:squarederror" in xgboost 3.x
+  if (output_type == "linear") output_type <- "squarederror"
   objective <- paste0("reg:", output_type, sep = "")
 
   ret <- fml_xgboost(data = data,
@@ -784,6 +801,9 @@ predict_xgboost <- function(model, df) {
 
 # Calculates permutation importance for regression by xgboost.
 calc_permutation_importance_xgboost_regression <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -803,6 +823,9 @@ calc_permutation_importance_xgboost_regression <- function(fit, target, vars, da
 }
 
 calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -823,6 +846,9 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
 }
 
 calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -848,6 +874,10 @@ calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, da
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
+
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
 
   target = all.vars(fit$terms)[[1]]
 
@@ -1380,21 +1410,25 @@ exp_xgboost <- function(df,
 
       if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          pdp_target_col <- attr(model$partial_dependence, "target")
-          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
+          if (is.null(model$partial_dependence)) { # mmpf unavailable — partial_dependence returned NULL
+            model$imp_df <- simpleError("Package 'mmpf' is not available. FIRM importance cannot be calculated.")
+          } else {
+            pdp_target_col <- attr(model$partial_dependence, "target")
+            imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+            model$imp_df <- imp_df
+            imp_vars <- imp_df$variable
+
+            imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+            model$imp_vars <- imp_vars
+            # Shrink the partial dependence data keeping only the important variables.
+            model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+          }
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
           model$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
-
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        model$imp_vars <- imp_vars
-        # Shrink the partial dependence data keeping only the important variables.
-        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (length(imp_vars) > 0) {
@@ -1575,9 +1609,8 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
     importance = {
       if ("error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric()))
       }
       ret <- x$imp_df
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.

@@ -1926,11 +1926,9 @@ exp_balance <- function(df,
     df_balanced
   }
 
-  tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    tidyr::unnest(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~each_func(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   # grouping should be kept
   if(length(grouped_col) != 0){
@@ -2460,29 +2458,33 @@ calc_feature_imp <- function(df,
 
       if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          pdp_target_col <- if (classification_type == "binary") {
-            "TRUE"
+          if (is.null(model$partial_dependence)) { # mmpf unavailable — partial_dependence returned NULL
+            model$imp_df <- simpleError("Package 'mmpf' is not available. FIRM importance cannot be calculated.")
+          } else {
+            pdp_target_col <- if (classification_type == "binary") {
+              "TRUE"
+            }
+            else {
+              attr(model$partial_dependence, "target")
+            }
+            imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+            model$imp_df <- imp_df
+            imp_vars <- imp_df$variable
+
+            if (is.null(max_pd_vars)) {
+              max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+            }
+            imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+            model$imp_vars <- imp_vars
+            # Shrink the partial dependence data keeping only the important variables.
+            model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
           }
-          else {
-            attr(model$partial_dependence, "target")
-          }
-          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
           model$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
-
-        if (is.null(max_pd_vars)) {
-          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
-        }
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        model$imp_vars <- imp_vars
-        # Shrink the partial dependence data keeping only the important variables.
-        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (length(imp_vars) > 0) {
@@ -2728,9 +2730,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
     importance = {
       if ("error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric()))
       }
       else if (is.null(x$imp_df)) { # This means it is for Step, as opposed to Analytics View. TODO: We might want to separate function for Step and Analytics View.
         tryCatch({
@@ -2992,6 +2993,10 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
         nrow(data)), # entire given data is used by default, but this will override it when calling it.
   interaction = FALSE, uniform = TRUE, data, ...) {
 
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
+
   target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
 
   predict.fun = function(object, newdata) {
@@ -3057,6 +3062,10 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
 partial_dependence.rpart = function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
+
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
 
   predict.fun <- function(object, newdata) {
     # Within our use cases, rpart always returns numeric values or probability
@@ -3124,6 +3133,9 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
 
 # Calculates permutation importance for regression by rpart.
 calc_permutation_importance_rpart_regression <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -3143,6 +3155,9 @@ calc_permutation_importance_rpart_regression <- function(fit, target, vars, data
 }
 
 calc_permutation_importance_rpart_binary <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -3167,6 +3182,9 @@ calc_permutation_importance_rpart_binary <- function(fit, target, vars, data) {
 }
 
 calc_permutation_importance_rpart_multiclass <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     tryCatch({
@@ -3436,29 +3454,33 @@ exp_rpart <- function(df,
 
       if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          pdp_target_col <- if (classification_type == "binary") {
-            "TRUE"
+          if (is.null(model$partial_dependence)) { # mmpf unavailable — partial_dependence returned NULL
+            model$imp_df <- simpleError("Package 'mmpf' is not available. FIRM importance cannot be calculated.")
+          } else {
+            pdp_target_col <- if (classification_type == "binary") {
+              "TRUE"
+            }
+            else {
+              attr(model$partial_dependence, "target")
+            }
+            imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+            model$imp_df <- imp_df
+            imp_vars <- imp_df$variable
+
+            if (is.null(max_pd_vars)) {
+              max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+            }
+            imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+            model$imp_vars <- imp_vars
+            # Shrink the partial dependence data keeping only the important variables.
+            model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
           }
-          else {
-            attr(model$partial_dependence, "target")
-          }
-          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
           model$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
-
-        if (is.null(max_pd_vars)) {
-          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
-        }
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        model$imp_vars <- imp_vars
-        # Shrink the partial dependence data keeping only the important variables.
-        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (pd_with_bin_means && is_target_logical_or_numeric) {
@@ -3717,9 +3739,8 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
     importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric()))
       }
       ret <- x$imp_df
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.

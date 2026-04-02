@@ -21,6 +21,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 }
 
 test_that("exp_rpart(regression) evaluate training and test with permutation importance", {
+  skip_if_not_installed("mmpf")
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`,
                           test_rate = 0.3,
@@ -141,6 +142,7 @@ test_that("exp_rpart(regression) evaluate training and test with impurity import
 })
 
 test_that("exp_rpart evaluate training and test with permutation importance - logical", {
+  skip_if_not_installed("mmpf")
   set.seed(1)
   # Keep the test rate high (0.4) so that NA data goes to training part too.
   data <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`))
@@ -409,6 +411,7 @@ test_that("exp_rpart(binary) evaluate training and test with SMOTE", {
 })
 
 test_that("exp_rpart(multi) evaluate training and test with permutation importance", {
+  skip_if_not_installed("mmpf")
   model_df <- flight %>%
                 exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, importance_measure = "permutation")
 

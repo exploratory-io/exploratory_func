@@ -71,7 +71,9 @@ test_that("exp_lightgbm(regression) evaluate training and test with FIRM importa
 
   # Check result of variable importance
   ret <- model_df %>% tidy_rowwise(model, type = "importance")
-  expect_equal(as.character(ret$variable[[1]]), "DEP DELAY")
+  if (requireNamespace("mmpf", quietly=TRUE)) {
+    expect_equal(as.character(ret$variable[[1]]), "DEP DELAY")
+  }
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2)
@@ -83,8 +85,10 @@ test_that("exp_lightgbm(regression) evaluate training and test with FIRM importa
   expect_true(all(ret$`R Squared` <= 1))
   # Note: We no longer assert exact metric values here because the dataset can be synthetic/offline.
 
-  ret <- model_df %>% rf_partial_dependence()
-  expect_equal(class(ret$conf_high), "numeric")
+  if (requireNamespace("mmpf", quietly=TRUE)) {
+    ret <- model_df %>% rf_partial_dependence()
+    expect_equal(class(ret$conf_high), "numeric")
+  }
 
   model_df <- flight %>% exp_lightgbm(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data = "training_and_test")
@@ -96,6 +100,7 @@ test_that("exp_lightgbm(regression) evaluate training and test with FIRM importa
 })
 
 test_that("exp_lightgbm(regression) evaluate training and test with permutation importance", {
+  skip_if_not_installed("mmpf")
   set.seed(1)
   model_df <- flight %>%
     exp_lightgbm(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`, `FL DATE`,
@@ -191,6 +196,7 @@ test_that("exp_lightgbm(regression) evaluation_log includes test when test_rate>
 })
 
 test_that("exp_lightgbm(firm) rf_partial_dependence tolerates numeric target attribute", {
+  skip_if_not_installed("mmpf")
   set.seed(1)
   df <- tibble::tibble(
     y = rnorm(500),

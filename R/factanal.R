@@ -261,7 +261,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # If x$Phi is available, show its content in the pivot table.
       # TODO: print.psych.fa.R seems to have logic to calculate it even when x$Phi is not there. Should we do the same here?
       # But it seems x$Phi is there for most of the oblique rotations. #25435
-      res <- as.data.frame(x$Phi) %>% dplyr::add_rownames("factor1") %>% tidyr::pivot_longer(cols=starts_with(factor_score_prefix), names_to="factor2", values_to="correlation")
+      res <- as.data.frame(x$Phi) %>% tibble::rownames_to_column("factor1") %>% tidyr::pivot_longer(cols=starts_with(factor_score_prefix), names_to="factor2", values_to="correlation")
       res <- res %>% dplyr::mutate(factor1=stringr::str_replace(factor1, paste0("^", factor_correlation_prefix), "Factor "),
                                    factor2=stringr::str_replace(factor2, paste0("^", factor_score_prefix), "Factor "))
       # fct_relevel is to make order on chart right, e.g. Factor 2 before Factor 10

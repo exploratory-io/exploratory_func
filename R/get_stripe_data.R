@@ -101,7 +101,7 @@ get_stripe_data <- function(endpoint = "balance/history",
     data <- tryCatch({
       get_data(query, body)
     }, error = function(e){
-      if(stringr::str_detect(e$message, "^Error Response:")){
+      if(any(stringr::str_detect(e$message, "^Error Response:"))){
         stop(e)
       }
       NULL

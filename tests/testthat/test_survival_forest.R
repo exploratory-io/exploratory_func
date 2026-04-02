@@ -75,15 +75,19 @@ test_that("exp_survival_forest basic with start_time and end_time", {
     ret <- model_df %>% glance_rowwise(model)
     ret <- model_df %>% augment_rowwise(model)
 
-    ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
-    # Verify that period starts with 0. (If the input data does not, we add a data point for time 0.)
-    expect_equal(ret$period[1], 0)
+    if (requireNamespace("mmpf", quietly=TRUE)) {
+      ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
+      # Verify that period starts with 0. (If the input data does not, we add a data point for time 0.)
+      expect_equal(ret$period[1], 0)
+    }
     expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))
-    ret <- model_df %>% tidy_rowwise(model, type='importance')
-    ret2 <- model_df %>% tidy_rowwise(model, type='partial_dependence')
-    variables <- (ret %>% arrange(desc(importance)))$variable
-    names(variables) <- NULL
-    expect_equal(unique(ret2$variable), variables) # Factor order of the PDP should be the same as the importance.
+    if (requireNamespace("mmpf", quietly=TRUE)) {
+      ret <- model_df %>% tidy_rowwise(model, type='importance')
+      ret2 <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+      variables <- (ret %>% arrange(desc(importance)))$variable
+      names(variables) <- NULL
+      expect_equal(unique(ret2$variable), variables) # Factor order of the PDP should be the same as the importance.
+    }
   }
 })
 test_that("exp_survival_forest with group-by", {

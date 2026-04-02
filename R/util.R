@@ -129,14 +129,9 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
     # Basic behaviour of Matrix::sparseMatrix is sum.
     # If fun.aggregate is different, it should be aggregated by it.
     if(!identical(fun.aggregate, sum)){
-      # create a formula to aggregate duplicated row and col pairs
-      # ex: ~mean(val)
-      fml <- as.formula(paste0("~", as.character(substitute(fun.aggregate)), "(", val, ")"))
-
-      # execute the formula to each row and col pair
+      # aggregate duplicated row and col pairs using fun.aggregate
       data <- dplyr::group_by(data, !!!rlang::syms(c(row, col))) %>%
-        dplyr::summarise_(.dots=setNames(list(fml), val)) %>%
-        dplyr::ungroup()
+        dplyr::summarise(!!rlang::sym(val) := fun.aggregate(!!rlang::sym(val)), .groups = "drop")
     }
 
     row_fact <- as.factor(data[[row]])
@@ -178,7 +173,12 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
     )
   } else {
     loadNamespace("dplyr")
-    dplyr::select_(df, .dots=select_dots) %>%  as.matrix()
+    # dplyr::select_() removed in dplyr 1.2; select column list via tidyeval
+    if (is.character(select_dots)) {
+      dplyr::select(df, dplyr::all_of(select_dots)) %>% as.matrix()
+    } else {
+      dplyr::select(df, !!!select_dots) %>% as.matrix()
+    }
   }
 }
 
@@ -592,14 +592,15 @@ as_numeric_matrix_ <- function(df, columns) {
 evaluate_select <- function(df, .dots, excluded = NULL) {
   loadNamespace("dplyr")
   tryCatch({
-    ret <- setdiff(colnames(dplyr::select_(df, .dots=.dots)), excluded)
+    exprs <- lapply(.dots, rlang::parse_expr)
+    ret <- setdiff(colnames(dplyr::select(df, !!!exprs)), excluded)
     if(length(ret) == 0){
       stop("no column selected")
     }
     ret
   }, error = function(e){
     loadNamespace("stringr")
-    if(stringr::str_detect(e$message, "not found")) {
+    if(any(stringr::str_detect(e$message, "not found"))) {
       stop("undefined columns selected")
     }
     stop(e$message)
@@ -1056,11 +1057,9 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~pivot_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {
@@ -1436,12 +1435,16 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   # This is a list of arguments in do clause
   args <- append(list(quote(.)), rlang::call_args(params))
   call <- rlang::new_call(func, as.pairlist(args))
+  eval_env <- parent.frame()
   ret <- df %>%
-    # UQ and UQ(get_expr()) evaluates those variables
-    dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
+    dplyr::group_modify(function(.x, .y) {
+      env <- rlang::new_environment(list(. = .x), parent = eval_env)
+      val <- eval(call, envir = env)
+      dplyr::tibble(!!rlang::sym(name) := list(val))
+    }, .keep = TRUE) %>%
+    dplyr::ungroup()
   if (with_unnest) {
     ret %>%
-      dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(name))
   } else {
     # Pass on original group_by columns via rowwise().
@@ -1466,9 +1469,15 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   args2 <- append(list(quote(.)), rlang::call_args(params2))
   call1 <- rlang::new_call(func1, as.pairlist(args1))
   call2 <- rlang::new_call(func2, as.pairlist(args2))
+  eval_env <- parent.frame()
   ret <- df %>%
-    # UQ and UQ(get_expr()) evaluates those variables
-    dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
+    dplyr::group_modify(function(.x, .y) {
+      env <- rlang::new_environment(list(. = .x), parent = eval_env)
+      val1 <- eval(call1, envir = env)
+      val2 <- eval(call2, envir = env)
+      dplyr::tibble(!!rlang::sym(name1) := list(val1), !!rlang::sym(name2) := list(val2))
+    }, .keep = TRUE) %>%
+    dplyr::ungroup()
   # Pass on original group_by columns via rowwise().
   # tidy_rowwise() etc. expect this info.
   grouped_cols <- grouped_by(df)
@@ -2058,12 +2067,12 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
         if(force_data_type) {
           if(stringr::str_length(current_df_name) > 0) {
             if(i == 1) {  # for the first item, use current_df_name
-              dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+              dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], as.character)
             } else {
-              dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+              dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], as.character)
             }
           } else {
-            dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], as.character)
           }
         } else {
           # if we need to set data frame name to each row as a new column
@@ -2146,8 +2155,8 @@ bind_rows_safe <- function(df1, df2) {
 
 #'Wrapper function for dplyr's set operations to support ignoring data type difference.
 set_operation_with_force_character <- function(func, x, y, ...) {
-  x <- dplyr::mutate_all(x, funs(as.character))
-  y <- dplyr::mutate_all(y, funs(as.character))
+  x <- dplyr::mutate_all(x, as.character)
+  y <- dplyr::mutate_all(y, as.character)
   readr::type_convert(func(x, y, ...))
 }
 
@@ -3342,7 +3351,10 @@ separate_japanese_address <- function(df, address, prefecture_col = "prefecture"
   street_col <- avoid_conflict(colnames(df), street_col)
   new_names <- c(names(df), prefecture_col, city_col, street_col)
   # create a new column with a dummy column name and store the separated address elements.
-  df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = zipangu::separate_address(!!rlang::sym(address_col)))
+  # Use purrr::possibly to gracefully handle non-Japanese strings that cause zipangu to error.
+  # In R 4.5 / stringr 1.5, str_replace() now errors on NA patterns (previously returned NA silently).
+  safe_separate_address <- purrr::possibly(zipangu::separate_address, otherwise = list(prefecture = NA_character_, city = NA_character_, street = NA_character_))
+  df <- df %>% dplyr::mutate(.exploratory_dummy_column_for_japanese_address = purrr::map(!!rlang::sym(address_col), safe_separate_address))
   # since the .exploratory_dummy_column_for_japanese_address column is a list that contains address elements,
   # call tidyr::unnest_wider so that each element becomes dedicated column like prefecture, city, and street.
   df %>% tidyr::unnest_wider(.exploratory_dummy_column_for_japanese_address, names_repair = ~new_names)

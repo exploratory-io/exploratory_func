@@ -85,11 +85,9 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_roc_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~do_roc_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   ret
 }
@@ -167,11 +165,9 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~evaluate_binary_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~evaluate_binary_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   ret
 }
@@ -240,11 +236,9 @@ evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~evaluate_regression_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~evaluate_regression_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   ret
 }
@@ -339,11 +333,9 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop(!!rlang::sym(tmp_col))
+    dplyr::group_modify(~evaluate_multi_each(.x), .keep = TRUE) %>%
+    dplyr::ungroup()
 
   if (pretty.name){
     colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"

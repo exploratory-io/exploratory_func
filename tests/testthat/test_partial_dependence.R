@@ -18,6 +18,7 @@ cancer_data <- survival::cancer %>%
   mutate(sex_char = as.character(sex_category))
 
 test_that("Test partial dependence by character predictor with random forest", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% calc_feature_imp(`Temp`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% rf_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -25,6 +26,7 @@ test_that("Test partial dependence by character predictor with random forest", {
 })
 
 test_that("Test partial dependence by factor predictor with random forest", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% calc_feature_imp(`Temp`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% rf_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -34,6 +36,7 @@ test_that("Test partial dependence by factor predictor with random forest", {
 })
 
 test_that("Test partial dependence by character predictor with xgboost", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% exp_xgboost(`Temp`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% rf_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -41,6 +44,7 @@ test_that("Test partial dependence by character predictor with xgboost", {
 })
 
 test_that("Test partial dependence by factor predictor with xgboost", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% exp_xgboost(`Temp`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% rf_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -50,6 +54,7 @@ test_that("Test partial dependence by factor predictor with xgboost", {
 })
 
 test_that("Test partial dependence by character predictor with rpart", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% exp_rpart(`Temp`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% rf_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -57,6 +62,7 @@ test_that("Test partial dependence by character predictor with rpart", {
 })
 
 test_that("Test partial dependence by factor predictor with rpart", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% exp_rpart(`Temp`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), smote = FALSE, importance_measure = "permutation", pd_with_bin_means = TRUE, test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% rf_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -66,6 +72,7 @@ test_that("Test partial dependence by factor predictor with rpart", {
 })
 
 test_that("Test partial dependence by character predictor with linear regression", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% build_lm.fast(`Temp`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "lm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% lm_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -73,6 +80,7 @@ test_that("Test partial dependence by character predictor with linear regression
 })
 
 test_that("Test partial dependence by factor predictor with linear regression", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% build_lm.fast(`Temp`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "lm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1)
   res <- model_df %>% lm_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -82,6 +90,7 @@ test_that("Test partial dependence by factor predictor with linear regression", 
 })
 
 test_that("Test partial dependence by character predictor with logistic regression", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% build_lm.fast(`Temp_Over_80`, `Ozone_char`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "glm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1, smote=TRUE)
   res <- model_df %>% lm_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -89,6 +98,7 @@ test_that("Test partial dependence by character predictor with logistic regressi
 })
 
 test_that("Test partial dependence by factor predictor with logistic regression", {
+  skip_if_not_installed("mmpf")
   model_df <- aq_data %>% build_lm.fast(`Temp_Over_80`, `Ozone_category`, target_fun = "none", predictor_funs = list(`Ozone_char`="none"), model_type = "glm", importance_measure = "permutation", test_split_type = "random", test_rate = 0.1, smote=TRUE)
   res <- model_df %>% lm_partial_dependence()
   predicted_df <- res %>% filter(y_name=="Predicted")
@@ -98,6 +108,7 @@ test_that("Test partial dependence by factor predictor with logistic regression"
 })
 
 test_that("Test partial dependence by character predictor with Cox regression", {
+  skip_if_not_installed("mmpf")
   model_df <- cancer_data %>% build_coxph.fast(NULL, `status`, `age`, `sex_char`, predictor_funs = list(`age`="none", `sex`="none"), start_time = `Start_Date`, end_time = `End_Date`, time_unit = "day", test_split_type = "random")
   res <- model_df %>% tidy_rowwise(model, type='partial_dependence')
   predicted_df <- res %>% filter(type=="Prediction")
@@ -105,6 +116,7 @@ test_that("Test partial dependence by character predictor with Cox regression", 
 })
 
 test_that("Test partial dependence by factor predictor with Cox regression", {
+  skip_if_not_installed("mmpf")
   model_df <- cancer_data %>% build_coxph.fast(NULL, `status`, `age`, `sex_category`, predictor_funs = list(`age`="none", `sex`="none"), start_time = `Start_Date`, end_time = `End_Date`, time_unit = "day", test_split_type = "random")
   res <- model_df %>% tidy_rowwise(model, type='partial_dependence')
   predicted_df <- res %>% filter(type=="Prediction")
@@ -112,6 +124,7 @@ test_that("Test partial dependence by factor predictor with Cox regression", {
 })
 
 test_that("Test partial dependence by character predictor with survival forest", {
+  skip_if_not_installed("mmpf")
   model_df <- cancer_data %>% exp_survival_forest(NULL, `status`, `age`, `sex_char`, predictor_funs = list(`age`="none", `sex`="none"), start_time = `Start_Date`, end_time = `End_Date`, time_unit = "day", test_split_type = "random")
   res <- model_df %>% tidy_rowwise(model, type='partial_dependence')
   predicted_df <- res %>% filter(type=="Prediction")
@@ -119,6 +132,7 @@ test_that("Test partial dependence by character predictor with survival forest",
 })
 
 test_that("Test partial dependence by factor predictor with survival forest", {
+  skip_if_not_installed("mmpf")
   model_df <- cancer_data %>% exp_survival_forest(NULL, `status`, `age`, `sex_category`, predictor_funs = list(`age`="none", `sex`="none"), start_time = `Start_Date`, end_time = `End_Date`, time_unit = "day", test_split_type = "random")
   res <- model_df %>% tidy_rowwise(model, type='partial_dependence')
   predicted_df <- res %>% filter(type=="Prediction")

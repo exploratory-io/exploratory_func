@@ -1,5 +1,8 @@
 # Calculates permutation importance for binomial (including logistic) regression.
 calc_permutation_importance_binomial <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
@@ -14,6 +17,9 @@ calc_permutation_importance_binomial <- function(fit, target, vars, data) {
 
 # Calculates permutation importance for linear regression.
 calc_permutation_importance_linear <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
@@ -28,6 +34,9 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
 
 # Calculates permutation importance for GLM Gaussian regression.
 calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
@@ -43,6 +52,9 @@ calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
 
 # Calculates permutation importance for logistic regression.
 calc_permutation_importance_poisson <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
@@ -63,6 +75,10 @@ calc_permutation_importance_poisson <- function(fit, target, vars, data) {
 partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
+
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
 
   predict.fun <- function(object, newdata) {
     predict(object, newdata = newdata, type = "response")
@@ -1200,21 +1216,24 @@ build_lm.fast <- function(df,
 
       if (importance_measure == "firm") {
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
-          pdp_target_col <- attr(model$partial_dependence, "target")
-          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
-          model$imp_vars <- imp_vars
+          if (is.null(model$partial_dependence)) { # mmpf unavailable — partial_dependence.lm_exploratory returned NULL
+            model$imp_df <- simpleError("Package 'mmpf' is not available. FIRM importance cannot be calculated.")
+          } else {
+            pdp_target_col <- attr(model$partial_dependence, "target")
+            imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+            model$imp_df <- imp_df
+            imp_vars <- imp_df$variable
+            model$imp_vars <- imp_vars
+            imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+            model$imp_vars <- imp_vars
+            # Shrink the partial dependence data keeping only the important variables.
+            model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+          }
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
           model$imp_df <- error
         }
-
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        model$imp_vars <- imp_vars
-        # Shrink the partial dependence data keeping only the important variables.
-        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (!is.null(target_funs)) {
@@ -1568,9 +1587,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric(), p.value=numeric()))
       }
       ret <- x$imp_df
       # Add p.value column.
@@ -1591,9 +1609,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     permutation_importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(term=character(), importance=numeric()))
       }
       ret <- x$imp_df
       # Add p.value column.
@@ -1738,9 +1755,8 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(variable=character(), importance=numeric(), p.value=numeric()))
       }
       ret <- x$imp_df
       # Add p.value column.
@@ -1758,9 +1774,8 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     permutation_importance = {
       if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
-        # Return empty data.frame to avoid error.
-        ret <- data.frame()
-        return(ret)
+        # Return structured empty data.frame so callers can safely do arrange(desc(importance)).
+        return(data.frame(term=character(), importance=numeric()))
       }
       ret <- x$imp_df
       # Add p.value column.

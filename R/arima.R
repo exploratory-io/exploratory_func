@@ -682,16 +682,11 @@ exp_arima <- function(df, time, valueColumn,
   }
 
   # Calculation is executed in each group.
-  # Storing the result in this name_col and
-  # unnesting the result.
-  # name_col is not conflicting with grouping columns
-  # thanks to avoid_conflict that is used before,
-  # this doesn't overwrite grouping columns.
-  tmp_col <- avoid_conflict(colnames(df), "tmp_col")
+  # group_modify passes each group's data to do_arima_each and row-binds the results.
+  # .keep = TRUE passes group key columns to do_arima_each so it can include them in error messages.
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_arima_each(.)), tmp_col)) %>%
+    dplyr::group_modify(~do_arima_each(.x), .keep = TRUE) %>%
     dplyr::ungroup()
-  ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
 
   if (length(grouped_col) > 0) {
     ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
