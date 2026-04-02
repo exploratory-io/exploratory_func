@@ -124,6 +124,43 @@ test_that("test parse_html_tables with japanese shift_jis table",{
   expect_equal(length(result), 1)
 })
 
+test_that("getListOfColumnsPostgres uses 9.3-safe search_path query for unqualified tables", {
+  query <- NULL
+  testthat::local_mocked_bindings(
+    dbQuoteString = function(conn, x) paste0("'", x, "'"),
+    dbGetQuery = function(conn, sql) {
+      query <<- sql
+      data.frame(column_name = c("FL_DATE", "CARRIER"))
+    },
+    .package = "DBI"
+  )
+
+  cols <- exploratory:::getListOfColumnsPostgres(structure(list(), class = "dummy"), "flight")
+
+  expect_equal(cols, c("FL_DATE", "CARRIER"))
+  expect_match(query, "generate_subscripts\\(current_schemas\\(true\\), 1\\)")
+  expect_match(query, "WHERE c.table_name = 'flight'")
+})
+
+test_that("getListOfColumnsPostgres uses schema-qualified query when schema is provided", {
+  query <- NULL
+  testthat::local_mocked_bindings(
+    dbQuoteString = function(conn, x) paste0("'", x, "'"),
+    dbGetQuery = function(conn, sql) {
+      query <<- sql
+      data.frame(column_name = c("id", "value"))
+    },
+    .package = "DBI"
+  )
+
+  cols <- exploratory:::getListOfColumnsPostgres(structure(list(), class = "dummy"), 'public."flight"')
+
+  expect_equal(cols, c("id", "value"))
+  expect_match(query, "WHERE table_schema = 'public'")
+  expect_match(query, "AND table_name = 'flight'")
+  expect_false(grepl("generate_subscripts", query, fixed = TRUE))
+})
+
 if (FALSE) { # Disabled for now since this test is susceptible to webpage change and unstable.
   test_that("test scrape_html_table",{
     result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)

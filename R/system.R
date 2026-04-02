@@ -1811,7 +1811,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
   }
   else if (type %in% c("postgres", "redshift", "vertica")) {
     # they use common key "postgres"
-    key <- paste("postgres", host, port, databaseName, username, timezone, sep = ":")
+    key <- paste("postgres", host, port, databaseName, username, timezone, sslMode, sslCA, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({ # try to close connection and ignore error
@@ -1890,6 +1890,45 @@ isConnecitonPoolEnabled <- function(type){
   type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver", "snowflake", "teradata")
 }
 
+getListOfColumnsPostgres <- function(conn, table) {
+  table_name <- table
+  schema_name <- NULL
+
+  if (is.character(table) && length(table) == 1) {
+    parts <- stringr::str_split(table, "\\.", n = 2)[[1]]
+    if (length(parts) == 2) {
+      schema_name <- stringr::str_replace_all(parts[[1]], '^"|"$', "")
+      table_name <- stringr::str_replace_all(parts[[2]], '^"|"$', "")
+    }
+  }
+
+  if (!is.null(schema_name) && nzchar(schema_name)) {
+    query <- paste0(
+      "SELECT column_name ",
+      "FROM information_schema.columns ",
+      "WHERE table_schema = ", DBI::dbQuoteString(conn, schema_name), " ",
+      "AND table_name = ", DBI::dbQuoteString(conn, table_name), " ",
+      "ORDER BY ordinal_position"
+    )
+  } else {
+    # PostgreSQL 9.3 does not support WITH ORDINALITY, which recent RPostgres
+    # versions use internally for dbListFields(). Build an equivalent query
+    # using generate_subscripts() so older servers still work.
+    query <- paste0(
+      "SELECT c.column_name ",
+      "FROM information_schema.columns c ",
+      "JOIN (",
+      "  SELECT i AS idx, (current_schemas(true))[i] AS schema_name ",
+      "  FROM generate_subscripts(current_schemas(true), 1) g(i)",
+      ") sp ON c.table_schema = sp.schema_name ",
+      "WHERE c.table_name = ", DBI::dbQuoteString(conn, table_name), " ",
+      "ORDER BY sp.idx, c.ordinal_position"
+    )
+  }
+
+  DBI::dbGetQuery(conn, query)$column_name
+}
+
 getListOfTablesWithODBC <- function(conn){
   topLevels <- odbc::odbcListObjects(conn)
   schemas <- NULL
@@ -1949,10 +1988,14 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- getDBConnection(type, host, port, databaseName, username, password, sslMode = sslMode, sslCA = sslCA, role = role)
   tryCatch({
-    columns <- DBI::dbListFields(conn, table)
+    if (type == "postgres") {
+      columns <- getListOfColumnsPostgres(conn, table)
+    } else {
+      columns <- DBI::dbListFields(conn, table)
+    }
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username)
+    clearDBConnection(type, host, port, databaseName, username, sslMode = sslMode, sslCA = sslCA, role = role)
     if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
