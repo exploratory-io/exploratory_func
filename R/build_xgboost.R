@@ -70,8 +70,10 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
       }
       # create validation data set
       index <- sample(seq(nrow(md_mat)), ceiling(nrow(md_mat) * watchlist_rate))
-      watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
-      train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
+      watch_weight <- if (!is.null(weight)) weight[index] else NULL
+      train_weight <- if (!is.null(weight)) weight[-index] else NULL
+      watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index], weight = watch_weight)
+      train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index], weight = train_weight)
 
       # xgboost 3.x renamed "watchlist" to "evals"
       xgboost::xgb.train(data = train_mat, evals = list(train = train_mat, validation = watch_mat), nrounds = nrounds, ...)
