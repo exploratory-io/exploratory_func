@@ -4091,7 +4091,6 @@ select_and_friends <- c('arrange', 'select', 'rename', 'relocate', 'reorder_cols
   'do_dist',
   'do_cosine_sim.kv',
   'do_survfit',
-  'do_market_impact',
   'do_cmdscale',
   'do_svd',
   'exp_ts_cluster',
