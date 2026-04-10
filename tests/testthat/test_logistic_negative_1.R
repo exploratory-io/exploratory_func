@@ -3,7 +3,7 @@ context("logistic regression - handle failed model building")
 
 test_that("logistic regression can handle failed model building", {
   # TODO: optimize performance
-  df <- exploratory::read_delim_file("https://www.dropbox.com/s/nv3oxz7w9usnfu3/airline_2013_10.csv?dl=1" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>%
+  df <- exploratory::read_delim_file("https://exploratory-download.s3.us-west-2.amazonaws.com/test/airline_2013_10.csv" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>%
     exploratory::clean_data_frame() %>%
     mutate(delayed = ARR_DELAY > 30)
 
