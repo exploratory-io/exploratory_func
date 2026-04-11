@@ -58,19 +58,13 @@ test_that("build_lm.fast (GLM) with smote_keep_synthetic = TRUE includes synthes
   expect_true("source.data" %in% colnames(glm_keep_true))
 
   source_data <- glm_keep_true$source.data[[1]]
-  smote_was_applied <- "synthesized" %in% colnames(source_data)
-
-  if (smote_was_applied) {
-    expect_true(nrow(source_data) > n)
-    expect_type(source_data$synthesized, "logical")
-    expect_true(sum(source_data$synthesized) > 0)
-    expect_true(sum(!source_data$synthesized) > 0)
-    test_index <- glm_keep_true$.test_index[[1]]
-    expect_true(all(!source_data$synthesized[test_index]))
-  } else {
-    expect_equal(nrow(source_data), n)
-    skip("SMOTE was not applied - data conditions may not support it")
-  }
+  expect_true("synthesized" %in% colnames(source_data), info = "SMOTE should have been applied")
+  expect_true(nrow(source_data) > n)
+  expect_type(source_data$synthesized, "logical")
+  expect_true(sum(source_data$synthesized) > 0)
+  expect_true(sum(!source_data$synthesized) > 0)
+  test_index <- glm_keep_true$.test_index[[1]]
+  expect_true(all(!source_data$synthesized[test_index]))
 })
 
 test_that("exp_xgboost with smote_keep_synthetic = TRUE includes synthesized column", {
@@ -79,18 +73,12 @@ test_that("exp_xgboost with smote_keep_synthetic = TRUE includes synthesized col
   expect_true("source.data" %in% colnames(xgb_keep_true))
 
   source_data <- xgb_keep_true$source.data[[1]]
-  smote_was_applied <- "synthesized" %in% colnames(source_data)
-
-  if (smote_was_applied) {
-    expect_true(nrow(source_data) > n)
-    expect_type(source_data$synthesized, "logical")
-    expect_true(sum(source_data$synthesized) > 0)
-    test_index <- xgb_keep_true$.test_index[[1]]
-    expect_true(all(!source_data$synthesized[test_index]))
-  } else {
-    expect_equal(nrow(source_data), n)
-    skip("SMOTE was not applied - data conditions may not support it")
-  }
+  expect_true("synthesized" %in% colnames(source_data), info = "SMOTE should have been applied")
+  expect_true(nrow(source_data) > n)
+  expect_type(source_data$synthesized, "logical")
+  expect_true(sum(source_data$synthesized) > 0)
+  test_index <- xgb_keep_true$.test_index[[1]]
+  expect_true(all(!source_data$synthesized[test_index]))
 })
 
 test_that("exp_lightgbm with smote_keep_synthetic = TRUE includes synthesized column", {
@@ -99,17 +87,11 @@ test_that("exp_lightgbm with smote_keep_synthetic = TRUE includes synthesized co
   expect_true("source.data" %in% colnames(lgbm_keep_true))
 
   source_data <- lgbm_keep_true$source.data[[1]]
-  smote_was_applied <- "synthesized" %in% colnames(source_data)
-
-  if (smote_was_applied) {
-    expect_true(nrow(source_data) > n)
-    expect_type(source_data$synthesized, "logical")
-    test_index <- lgbm_keep_true$.test_index[[1]]
-    expect_true(all(!source_data$synthesized[test_index]))
-  } else {
-    expect_equal(nrow(source_data), n)
-    skip("SMOTE was not applied - data conditions may not support it")
-  }
+  expect_true("synthesized" %in% colnames(source_data), info = "SMOTE should have been applied")
+  expect_true(nrow(source_data) > n)
+  expect_type(source_data$synthesized, "logical")
+  test_index <- lgbm_keep_true$.test_index[[1]]
+  expect_true(all(!source_data$synthesized[test_index]))
 })
 
 test_that("calc_feature_imp (ranger) with smote_keep_synthetic = TRUE includes synthesized column", {
@@ -118,17 +100,11 @@ test_that("calc_feature_imp (ranger) with smote_keep_synthetic = TRUE includes s
   expect_true("source.data" %in% colnames(rf_keep_true))
 
   source_data <- rf_keep_true$source.data[[1]]
-  smote_was_applied <- "synthesized" %in% colnames(source_data)
-
-  if (smote_was_applied) {
-    expect_true(nrow(source_data) > n)
-    expect_type(source_data$synthesized, "logical")
-    test_index <- rf_keep_true$.test_index[[1]]
-    expect_true(all(!source_data$synthesized[test_index]))
-  } else {
-    expect_equal(nrow(source_data), n)
-    skip("SMOTE was not applied - data conditions may not support it")
-  }
+  expect_true("synthesized" %in% colnames(source_data), info = "SMOTE should have been applied")
+  expect_true(nrow(source_data) > n)
+  expect_type(source_data$synthesized, "logical")
+  test_index <- rf_keep_true$.test_index[[1]]
+  expect_true(all(!source_data$synthesized[test_index]))
 })
 
 # ── Tests: smote_keep_synthetic = FALSE ─────────────────────────────────────
