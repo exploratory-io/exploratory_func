@@ -533,19 +533,17 @@ test_that("read_delim_file with text data", {
 })
 
 test_that("case_when mixed data types error message", {
-  skip("dplyr 1.0.10 has an issue in reporting error in this case, but it is fixed in the latest main branch.")
   tryCatch({
     Global_Sales_1_source1 <- exploratory::read_excel_file("https://www.dropbox.com/s/t9ou9hmbqdxj75f/Global_Sales.xlsx?dl=1")
     Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
   }, error = function(e) {
+    # dplyr 1.0.x: "must be a double vector" or "must be the same length as the vector"
+    # dplyr 1.2.x: "Can't combine" (changed error format per https://github.com/tidyverse/dplyr/issues/6261)
+    error_pattern <- "must be a double vector|must be the same length as the vector|Can't combine"
     if (!is.null(e$parent)) {
-      # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
-      # Once the issue is fixed, we will update the test with the original condition.
-      expect_equal(stringr::str_detect(e$parent$message, "must be a double vector|must be the same length as the vector"),TRUE)
+      expect_equal(stringr::str_detect(e$parent$message, error_pattern), TRUE)
     } else {
-      # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
-      # Once the issue is fixed, we will update the test with the original condition.
-      expect_equal(stringr::str_detect(e$message, "must be a double vector|must be the same length as the vector"),TRUE)
+      expect_equal(stringr::str_detect(e$message, error_pattern), TRUE)
     }
   })
 })

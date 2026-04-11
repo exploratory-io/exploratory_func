@@ -136,7 +136,6 @@ test_that("exp_arima with short data", {
 })
 
 test_that("exp_arima with extra regressors", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -154,7 +153,6 @@ test_that("exp_arima with extra regressors", {
 })
 
 test_that("exp_arima with extra regressor with holiday column", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -172,7 +170,6 @@ test_that("exp_arima with extra regressor with holiday column", {
 })
 
 test_that("exp_arima with holiday column", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -187,7 +184,6 @@ test_that("exp_arima with holiday column", {
 })
 
 test_that("exp_arima with factor holiday column", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -202,7 +198,6 @@ test_that("exp_arima with factor holiday column", {
 })
 
 test_that("exp_arima with logical holiday column", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -216,7 +211,6 @@ test_that("exp_arima with logical holiday column", {
 })
 
 test_that("exp_arima with numeric holiday column", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -231,7 +225,6 @@ test_that("exp_arima with numeric holiday column", {
 })
 
 test_that("exp_arima with regressor with holiday column with monthly data", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="month")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="month")
@@ -248,7 +241,6 @@ test_that("exp_arima with regressor with holiday column with monthly data", {
 })
 
 test_that("exp_arima with holiday column with hourly data", {
-  skip("Skip extra regressor/holiday test")
   Sys.setenv(TZ="UTC") # set time zone for test stability.
   ts <- seq(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-15 00:00:00"), by="hour")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
@@ -265,7 +257,6 @@ test_that("exp_arima with holiday column with hourly data", {
 })
 
 test_that("exp_arima with extra regressor with cap/floor", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -280,7 +271,6 @@ test_that("exp_arima with extra regressor with cap/floor", {
 })
 
 test_that("exp_arima test mode with extra regressor", {
-  skip("Skip extra regressor/holiday test")
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   raw_data$data[[length(ts) - 2]] <- NA # inject NA near the end to test #9211
