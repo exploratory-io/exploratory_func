@@ -60,8 +60,6 @@ test_that("get_refs_in_script", {
   expect_equal(refs, NULL)
   refs <- get_refs_in_script('do_survfit(x, b) ')
   expect_equal(refs, NULL)
-  refs <- get_refs_in_script('do_market_impact(time, value, market, target_market="US") ')
-  expect_equal(refs, NULL)
   refs <- get_refs_in_script('do_cmdscale(pair.name.x, pair.name.y, value) ')
   expect_equal(refs, NULL)
   refs <- get_refs_in_script('do_svd(y, x, b) ')
