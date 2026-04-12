@@ -291,7 +291,6 @@ test_that("exp_arima test mode with extra regressor", {
   expect_true(is.na(last(ret$is_test_data)))
 })
 
-
 test_that("exp_arima wrong grouping case", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
