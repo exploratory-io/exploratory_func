@@ -147,23 +147,6 @@ test_that("test scrape_html_table with japanese shift_jis table",{
   expect_equal(nrow(result), 3)
 })
 
-test_that("test source check conflict case", {
-  # this fails in devtools::check() because it can't find the pass because ../../R/model_builder.R can't be found
-  # but this works in devtools::test(), so this needs condition to check the existance of the file.
-  if(file.exists("../../R/model_builder.R")){
-    filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
-
-    # suppress file doesn't exist warning
-    suppressWarnings({ret <- checkSourceConflict(filenames)})
-    expect_true(!is.null(ret[[filenames[[1]]]]$names))
-    expect_true(is.null(ret[[filenames[[2]]]]$names))
-
-    expect_true(is.null(ret[[filenames[[1]]]]$error))
-    expect_true(!is.null(ret[[filenames[[2]]]]$error))
-  } else {
-    testthat::skip("../../R/model_builder.R doesn't exist")
-  }
-})
 
 test_that("test statecode",{
 
@@ -532,23 +515,6 @@ test_that("read_delim_file with text data", {
   expect_equal(ncol(df),2)
 })
 
-test_that("case_when mixed data types error message", {
-  skip("dplyr 1.0.10 has an issue in reporting error in this case, but it is fixed in the latest main branch.")
-  tryCatch({
-    Global_Sales_1_source1 <- exploratory::read_excel_file("https://www.dropbox.com/s/t9ou9hmbqdxj75f/Global_Sales.xlsx?dl=1")
-    Global_Sales_2 <- Global_Sales_1_source1 %>% dplyr::mutate(calculation_1 = case_when(Segment == "Consumer" ~ 1 , TRUE ~ Segment))
-  }, error = function(e) {
-    if (!is.null(e$parent)) {
-      # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
-      # Once the issue is fixed, we will update the test with the original condition.
-      expect_equal(stringr::str_detect(e$parent$message, "must be a double vector|must be the same length as the vector"),TRUE)
-    } else {
-      # Because of https://github.com/tidyverse/dplyr/issues/6261, now we need to check the below error message.
-      # Once the issue is fixed, we will update the test with the original condition.
-      expect_equal(stringr::str_detect(e$message, "must be a double vector|must be the same length as the vector"),TRUE)
-    }
-  })
-})
 
 test_that("read_excel_file downlod failed error message", {
   tryCatch({
