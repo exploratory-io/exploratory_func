@@ -167,6 +167,9 @@ exp_arima <- function(df, time, valueColumn,
   # Internal column name for the converted holiday binary indicator (0/1).
   # Use a fixed name that is unlikely to conflict with user columns.
   holiday_indicator_col <- if (!is.null(holiday_col)) ".exp_holiday_ind" else NULL
+  if (!is.null(holiday_indicator_col) && holiday_indicator_col %in% colnames(df)) {
+    stop("Input data must not contain a column named '.exp_holiday_ind' (reserved for internal use).")
+  }
 
   # remove rows with NA time
   df <- df[!is.na(df[[time_col]]), ]
@@ -228,7 +231,7 @@ exp_arima <- function(df, time, valueColumn,
     # Build complete summarise args = user regressors + holiday indicator
     all_summarise_args <- summarise_args
     if (!is.null(holiday_indicator_col) && holiday_indicator_col %in% colnames(df)) {
-      all_summarise_args[[holiday_indicator_col]] <- rlang::quo(max(!!rlang::sym(holiday_indicator_col), na.rm = TRUE))
+      all_summarise_args[[holiday_indicator_col]] <- rlang::quo(as.integer(any(!!rlang::sym(holiday_indicator_col) > 0, na.rm = TRUE)))
     }
 
     aggregated_data <- if (!is.null(value_col)){ # TODO: Make aggregation logic a common function among time series analysis functions.
@@ -554,7 +557,7 @@ exp_arima <- function(df, time, valueColumn,
       return(ret_df)
     }
 
-    # Store forecast data as an attribute on the fit object so tidy.ARIMA_exploratory can return it.
+    # Store forecast data as an attribute on the fit object so tidy.ARIMA_exploratory_model can return it.
     attr(model_df$arima[[1]]$fit, "forecast_data") <- ret_df
 
     ret <- tibble(data = list(ret_df), model = list(model_df))
@@ -697,7 +700,7 @@ exp_arima <- function(df, time, valueColumn,
     # === Wrap the mable in ARIMA_exploratory_model so tidy/glance dispatch works ===
     # tidy_rowwise calls broom::tidy(x) where x is model[[1]].
     # If x is the raw fable mable, broom dispatches through fabletools/fable and returns
-    # ARIMA coefficients — our custom tidy.ARIMA_exploratory (on the inner fit) never fires.
+    # ARIMA coefficients — our custom tidy.ARIMA_exploratory_model (on the inner fit) never fires.
     # Wrapping in ARIMA_exploratory_model lets us intercept the dispatch at the top level.
     arima_exp_model <- list(
       mable = ret$model[[1]],
