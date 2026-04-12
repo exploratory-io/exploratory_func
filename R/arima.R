@@ -61,11 +61,24 @@ exp_arima <- function(df, time, valueColumn,
                       regressors_na_fill_type = NULL,
                       regressors_na_fill_value = 0,
                       conf_level = 0.8,
+                      output = NULL,
+                      holiday = NULL,
                       ...
                       ){
   validate_empty_data(df)
 
   time_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(time))
+
+  # Capture holiday column name (may reference a column with spaces via backtick)
+  holiday_quo <- rlang::enquo(holiday)
+  holiday_col <- if (!rlang::quo_is_null(holiday_quo)) {
+    tryCatch(
+      tidyselect::vars_pull(names(df), !!holiday_quo),
+      error = function(e) stop(paste0("Holiday column '", rlang::as_label(holiday_quo), "' not found in data."))
+    )
+  } else {
+    NULL
+  }
 
   # if valueColumns is not set (value is NULL by default)
   # dplyr::select_var occurs Error
@@ -151,6 +164,13 @@ exp_arima <- function(df, time, valueColumn,
     names(summarise_args) <- regressor_output_cols
   }
 
+  # Internal column name for the converted holiday binary indicator (0/1).
+  # Use a fixed name that is unlikely to conflict with user columns.
+  holiday_indicator_col <- if (!is.null(holiday_col)) ".exp_holiday_ind" else NULL
+  if (!is.null(holiday_indicator_col) && holiday_indicator_col %in% colnames(df)) {
+    stop("Input data must not contain a column named '.exp_holiday_ind' (reserved for internal use).")
+  }
+
   # remove rows with NA time
   df <- df[!is.na(df[[time_col]]), ]
 
@@ -183,25 +203,73 @@ exp_arima <- function(df, time, valueColumn,
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
+    # === Holiday column → binary indicator (0/1) ===
+    if (!is.null(holiday_col) && holiday_col %in% colnames(df)) {
+      holiday_vals <- df[[holiday_col]]
+      df[[holiday_indicator_col]] <- if (is.numeric(holiday_vals)) {
+        as.numeric(holiday_vals)
+      } else if (is.logical(holiday_vals)) {
+        as.numeric(holiday_vals)
+      } else {
+        # character / factor: 1 if non-NA, 0 if NA
+        as.numeric(!is.na(as.character(holiday_vals)))
+      }
+    }
+
+    # === Detect which time periods have actual y data (for training vs future separation) ===
+    # When regressors or holiday extend beyond the training period (via full_join), the combined
+    # data has NA y for future rows. After sum(na.rm=TRUE) aggregation those become y=0, which
+    # we must not train on.  Build a per-period has_y flag BEFORE aggregation.
+    has_y_df <- NULL
+    if (!is.null(value_col) && (!is.null(regressors) || !is.null(holiday_col))) {
+      has_y_df <- df %>%
+        dplyr::select(ds_tmp = !!rlang::sym(time_col), y_tmp = !!rlang::sym(value_col)) %>%
+        dplyr::group_by(ds_tmp) %>%
+        dplyr::summarise(has_y = any(!is.na(y_tmp)), .groups = "drop")
+    }
+
+    # Build complete summarise args = user regressors + holiday indicator
+    all_summarise_args <- summarise_args
+    if (!is.null(holiday_indicator_col) && holiday_indicator_col %in% colnames(df)) {
+      all_summarise_args[[holiday_indicator_col]] <- rlang::quo(as.integer(any(!!rlang::sym(holiday_indicator_col) > 0, na.rm = TRUE)))
+    }
+
     aggregated_data <- if (!is.null(value_col)){ # TODO: Make aggregation logic a common function among time series analysis functions.
-      grouped_df <- df %>% dplyr::select(ds=time_col, value=value_col, unname(regressors)) %>% # unname is necessary to avoid error when regressors is named vector.
+      grouped_df <- df %>% dplyr::select(
+        ds = time_col,
+        value = value_col,
+        dplyr::any_of(c(unname(regressors), holiday_indicator_col)) # unname is necessary to avoid error when regressors is named vector.
+      ) %>%
         dplyr::arrange(ds) %>%
         dplyr::group_by(ds)
       if (is_na_rm_func(fun.aggregate)) {
         grouped_df %>%
-          dplyr::summarise(y = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
+          dplyr::summarise(y = fun.aggregate(value, na.rm=TRUE), !!!all_summarise_args)
       }
       else {
         grouped_df %>%
-          dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+          dplyr::summarise(y = fun.aggregate(value), !!!all_summarise_args)
       }
     } else {
-      grouped_df <- df %>% dplyr::select(ds=time_col, unname(regressors)) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
+      grouped_df <- df %>% dplyr::select(ds=time_col, dplyr::any_of(c(unname(regressors), holiday_indicator_col))) %>%
+        dplyr::arrange(ds) %>% dplyr::group_by(ds)
 
       # TODO: implement the method that summarize count and summarize_each are executed at the same time
       count_df <- grouped_df %>% dplyr::summarise(y = n())
-      aggr_df <- grouped_df %>% dplyr::summarise(!!!summarise_args)
+      aggr_df <- grouped_df %>% dplyr::summarise(!!!all_summarise_args)
       count_df %>% dplyr::full_join(aggr_df, by=c("ds"="ds"))
+    }
+
+    # === Separate actual training rows from future regressor-only rows ===
+    # Rows where y data was NA in the original df (e.g. from full_join with future regressors)
+    # have has_y = FALSE and should not be trained on.
+    future_extra_data <- NULL
+    if (!is.null(has_y_df)) {
+      aggregated_data <- aggregated_data %>%
+        dplyr::left_join(has_y_df, by = c("ds" = "ds_tmp")) %>%
+        dplyr::mutate(has_y = ifelse(is.na(has_y), FALSE, has_y))
+      future_extra_data <- aggregated_data %>% dplyr::filter(!has_y) %>% dplyr::select(-has_y)
+      aggregated_data  <- aggregated_data %>% dplyr::filter( has_y) %>% dplyr::select(-has_y)
     }
 
     if (!is.null(na_fill_type)) {
@@ -446,13 +514,52 @@ exp_arima <- function(df, time, valueColumn,
     if (test_mode) {
       ret_df <- ret_df %>% dplyr::select(-is_test_data, is_test_data)
     }
-    attr(ret_df, "value_col") <- value_col # We need this into to read it later to evaluate it.
+
+    # === Append future regressor-only rows (y = NA, forecasted_value = NA) ===
+    # These rows come from regressors/holiday data that extends beyond the training (+ test) period.
+    # In non-test_mode: the first `periods` rows of future_extra_data coincide with the forecast
+    #   period (already in forecast_rows), so we skip those and only append the remainder.
+    # In test_mode: the forecast covers the held-out test period (within training range), so
+    #   future_extra_data has no overlap with forecast_rows — append all of it.
+    if (!is.null(future_extra_data) && nrow(future_extra_data) > 0) {
+      rows_to_skip <- if (test_mode) 0L else as.integer(periods)
+      remaining_future <- if (nrow(future_extra_data) > rows_to_skip) {
+        future_extra_data %>% dplyr::slice((rows_to_skip + 1L):dplyr::n())
+      } else {
+        NULL
+      }
+      if (!is.null(remaining_future) && nrow(remaining_future) > 0) {
+        future_rows <- remaining_future %>%
+          dplyr::select(ds, dplyr::any_of(c(regressor_output_cols, holiday_indicator_col)))
+        future_rows[[value_col]] <- NA_real_
+        future_rows[["forecasted_value"]] <- NA_real_
+        future_rows[["forecasted_value_low"]] <- NA_real_
+        future_rows[["forecasted_value_high"]] <- NA_real_
+        colnames(future_rows)[colnames(future_rows) == "ds"] <- time_col
+        ret_df <- dplyr::bind_rows(ret_df, future_rows)
+      }
+    }
+
+    attr(ret_df, "value_col") <- value_col # We need this info to read it later to evaluate it.
 
     class(model_df$arima[[1]]$fit) <- c("ARIMA_exploratory", class(model_df$arima[[1]]$fit))
     # Note that model column is mable, rather than model object.
     # It seems this is how fable is designed so that multiple models can be applied to a same data at once.
     # Applying tidy() etc. on a mable seems to in turn call tidy() on each model stored in mable.
     # Reference: https://github.com/tidyverts/fable/issues/91
+
+    # === When regressors/holiday are present and output != "model", return flat data frame ===
+    # Legacy callers (no regressors/holiday) always expect the nested tibble.
+    # Callers that supply regressors or holiday but don't set output="model" expect a flat frame
+    # so they can do e.g. ret %>% filter(!is.na(forecasted_value)) directly.
+    has_regressors_or_holiday <- (!is.null(regressors) && length(regressors) > 0) || !is.null(holiday_col)
+    if (has_regressors_or_holiday && (is.null(output) || output != "model")) {
+      return(ret_df)
+    }
+
+    # Store forecast data as an attribute on the fit object so tidy.ARIMA_exploratory_model can return it.
+    attr(model_df$arima[[1]]$fit, "forecast_data") <- ret_df
+
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
     tryCatch({
@@ -590,6 +697,27 @@ exp_arima <- function(df, time, valueColumn,
     # ret <- ret %>% mutate(residual_test = list(!!residual_test))
     attr(ret$model[[1]]$arima[[1]]$fit, "residual_test") <- residual_test
 
+    # === Wrap the mable in ARIMA_exploratory_model so tidy/glance dispatch works ===
+    # tidy_rowwise calls broom::tidy(x) where x is model[[1]].
+    # If x is the raw fable mable, broom dispatches through fabletools/fable and returns
+    # ARIMA coefficients — our custom tidy.ARIMA_exploratory_model (on the inner fit) never fires.
+    # Wrapping in ARIMA_exploratory_model lets us intercept the dispatch at the top level.
+    arima_exp_model <- list(
+      mable = ret$model[[1]],
+      forecast_data = ret$data[[1]]
+    )
+    # Extract regressor coefficient importance (non-AR/MA terms).
+    arima_exp_model$coef_importance <- tryCatch({
+      coef_tbl <- broom::tidy(ret$model[[1]])
+      coef_tbl %>%
+        dplyr::filter(!grepl("^(ar|ma|sar|sma|intercept|drift|constant)", .data$term, ignore.case = TRUE)) %>%
+        dplyr::select(Variable = .data$term, Importance = .data$estimate)
+    }, error = function(e) {
+      data.frame(Variable = character(0), Importance = numeric(0), stringsAsFactors = FALSE)
+    })
+    class(arima_exp_model) <- "ARIMA_exploratory_model"
+    ret <- ret %>% dplyr::mutate(model = list(arima_exp_model))
+
     if(F){ # Old code using forecast package. Will remove later.
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
@@ -720,6 +848,37 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
   }
   ts
  }
+
+#' tidy dispatch for ARIMA_exploratory_model wrapper objects.
+#' tidy_rowwise calls broom::tidy(model_col_value), where model_col_value is now an
+#' ARIMA_exploratory_model list (not the raw fable mable), so this method is properly dispatched.
+#'
+#' Default (no type): returns the stored forecast data frame.
+#' type = "coef": returns regressor coefficient importance as Variable / Importance columns.
+#' @export
+tidy.ARIMA_exploratory_model <- function(x, type = NULL, pretty.name = FALSE, ...) {
+  if (!is.null(type) && type == "coef") {
+    coef_df <- x$coef_importance
+    if (is.null(coef_df)) {
+      return(data.frame(Variable = character(0), Importance = numeric(0), stringsAsFactors = FALSE))
+    }
+    return(coef_df)
+  }
+  # Default: return the stored forecast data.
+  forecast_data <- x$forecast_data
+  if (!is.null(forecast_data)) {
+    return(forecast_data)
+  }
+  # Fall back: dispatch tidy on the underlying mable.
+  broom::tidy(x$mable, ...)
+}
+
+#' glance dispatch for ARIMA_exploratory_model wrapper objects.
+#' Forwards to the underlying fable mable so the existing glance.ARIMA_exploratory chain works.
+#' @export
+glance.ARIMA_exploratory_model <- function(x, pretty.name = FALSE, ...) {
+  broom::glance(x$mable, pretty.name = pretty.name, ...)
+}
 
 #' @export
 glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
