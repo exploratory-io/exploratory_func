@@ -1027,7 +1027,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 }
 
 #' augment for rpart model
-#' @export
+#' @exportS3Method broom::augment
 augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("rpart") # This is necessary for predict() to successfully figure out which function to call internally.
   if ("error" %in% class(x)) {
