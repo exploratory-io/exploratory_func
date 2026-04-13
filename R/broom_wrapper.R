@@ -681,9 +681,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::select(-.test_index) %>%
         # evaluate the formula of augment and "data" column will have it
         dplyr::mutate(source.data.training = purrr::map2(model, source.data.training, function(m, df){eval(parse(text=aug_fml_training))}),
-                      source.data.test = purrr::map2(model, source.data.test, function(m, df){eval(parse(text=aug_fml_test))}))
-      augmented <- augmented %>%
-        dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
+                      source.data.test = purrr::map2(model, source.data.test, function(m, df){eval(parse(text=aug_fml_test))})) %>%
         dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
           df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
           df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
