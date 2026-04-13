@@ -10,6 +10,7 @@ test_that("do_anomary_detection with aggregation", {
   raw_data <- dplyr::bind_rows(raw_data, first_ten)
   ret <- raw_data %>%
     do_anomaly_detection(`time stamp`, e_value=TRUE, time_unit = "hour")
+  expect_true(is.data.frame(ret))
 })
 
 test_that("do_anomary_detection", {
@@ -42,6 +43,7 @@ test_that("do_anomary_detection without value_col", {
   raw_data <- dplyr::bind_rows(raw_data, raw_data, raw_data)
   ret <- raw_data %>%
     do_anomaly_detection(timestamp, e_value=TRUE, time_unit = "hour")
+  expect_true(is.data.frame(ret))
 })
 
 test_that("do_anomary_detection with Date data", {

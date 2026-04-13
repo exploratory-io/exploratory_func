@@ -348,6 +348,7 @@ test_that("test build_xgboost with multi char", {
   prediction_ret <- prediction(model_ret)
   # TODO: This returns factor by now because of build_model behaviour but should return character
   # expect_true(is.character(prediction_ret$predicted_value))
+  expect_true(is.data.frame(prediction_ret))
 })
 
 test_that("test build_xgboost with multi", {

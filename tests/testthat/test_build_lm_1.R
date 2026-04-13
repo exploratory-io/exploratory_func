@@ -490,6 +490,7 @@ test_that("add_prediction with poisson regression", {
                                      family = "poisson",
                                      importance_measure="firm")
   ret <- test_data %>% select(-DISTANCE) %>% add_prediction(model_df=model_df)
+  expect_true(is.data.frame(ret))
 })
 
 test_that("GLM - poisson Destribution with test_rate", {

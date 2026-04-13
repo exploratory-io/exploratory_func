@@ -766,6 +766,7 @@ test_that("test ANCOVA with repeat-by", {
   ret <- model_df %>% tidy_rowwise(model, type="anova")
   ret <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_true(is.data.frame(ret))
 })
 
 test_that("test ANCOVA with exp_anova with some NAs in the data", {
@@ -823,12 +824,14 @@ test_that("test exp_anova with logical group column", {
   mtcars2 <- mtcars %>% mutate(`a m`=factor(as.logical(am)), `w t`=wt, `q sec`=qsec)
   model_df <- exp_anova(mtcars2, mpg, `a m`)
   res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
+  expect_true(is.data.frame(res))
 })
 
 test_that("test exp_anova with factor group column", {
   mtcars2 <- mtcars %>% mutate(`a m`=factor(am), `w t`=wt, `q sec`=qsec)
   model_df <- exp_anova(mtcars2, mpg, `a m`)
   res <- model_df %>% tidy_rowwise(model, type="data", sort_factor_levels=TRUE)
+  expect_true(is.data.frame(res))
 })
 
 test_that("test exp_anova with group-level error (lack of unique values)", {

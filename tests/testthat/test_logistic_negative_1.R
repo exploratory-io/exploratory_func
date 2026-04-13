@@ -20,4 +20,5 @@ test_that("logistic regression can handle failed model building", {
   filtered <- df1 %>%  filter(CARRIER %in% c("9E", "AA", "AS"))
   model_df <- filtered %>% dplyr::group_by(`CARRIER`) %>% build_lm.fast(`delayed`, `YEAR`, `MONTH`, `DAY_OF_MONTH`, `FL_DATE`, `FL_NUM`, `ORIGIN`, `ORIGIN_CITY_NAME`, `ORIGIN_STATE_ABR`, `DEST`, `DEST_CITY_NAME`, `DEST_STATE_ABR`, `DEP_TIME`, `DEP_DELAY`, `ARR_TIME`, `CANCELLED`, `CANCELLATION_CODE`, `AIR_TIME`, `DISTANCE`, `WEATHER_DELAY`, model_type = "glm", smote = TRUE, variable_metric = "ame", with_marginal_effects_confint = FALSE, test_rate = 0.3)
   res <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
+  expect_true(is.data.frame(res))
 })

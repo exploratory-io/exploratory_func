@@ -355,14 +355,14 @@ test_that("do_ngram", {
 })
 
 test_that("sentimentr", {
-  if(requireNamespace("sentimentr")){
-    sentences <- c(
-      "I feel bad.",
-      "I'm not so happy",
-      "You look very cheerful."
-    )
-    ret <- sentimentr::sentiment(sentences)
-  }
+  skip_if_not_installed("sentimentr")
+  sentences <- c(
+    "I feel bad.",
+    "I'm not so happy",
+    "You look very cheerful."
+  )
+  ret <- sentimentr::sentiment(sentences)
+  expect_true(is.data.frame(ret))
 })
 
 test_that("get_sentiment", {

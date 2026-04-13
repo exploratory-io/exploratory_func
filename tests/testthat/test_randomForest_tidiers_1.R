@@ -235,6 +235,7 @@ test_that("test calc_feature_imp with group_by where a group has only TRUE rows 
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from multiclass classification
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="boruta")
+  expect_true(is.data.frame(ret))
 })
 
 test_that("test randomForest with multinomial classification", {
@@ -256,6 +257,7 @@ test_that("test randomForest with multinomial classification", {
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER))
+  expect_true(is.data.frame(pred_test_ret))
 })
 
 test_that("test randomForest with binary classification", {
@@ -277,6 +279,7 @@ test_that("test randomForest with binary classification", {
   pred_train_ret <- prediction_binary(model_ret, data = "training", threshold = "f_score") # test f_score which had issue with target column name with space once.
   pred_test_ret <- prediction_binary(model_ret, data = "test")
   pred_test_ret <- prediction_binary(model_ret, data = "newdata", data_frame = test_data)
+  expect_true(is.data.frame(pred_test_ret))
 })
 
 test_that("test randomForest with regression without localImp", {
@@ -299,6 +302,7 @@ test_that("test randomForest with regression without localImp", {
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  expect_true(is.data.frame(pred_test_ret))
 })
 
 test_that("test randomForest with regression", {
@@ -321,6 +325,7 @@ test_that("test randomForest with regression", {
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  expect_true(is.data.frame(pred_test_ret))
 })
 
 test_that("test randomForest with unsupervised", {
@@ -339,6 +344,7 @@ test_that("test randomForest with unsupervised", {
 
   coef_ret <- model_coef(model_ret)
   prediction_ret <- prediction(model_ret)
+  expect_true(is.data.frame(prediction_ret))
 })
 
 test_that("test randomForest with unsupervied by 3 classes", {
@@ -358,6 +364,7 @@ test_that("test randomForest with unsupervied by 3 classes", {
 
   coef_ret <- model_coef(model_ret)
   prediction_ret <- prediction(model_ret)
+  expect_true(is.data.frame(prediction_ret))
 })
 
 test_that("test randomForest with multinomial classification", {
@@ -380,6 +387,7 @@ test_that("test randomForest with multinomial classification", {
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  expect_true(is.data.frame(pred_test_ret))
 })
 
 test_that("test randomForest with multinomial classification", {
@@ -402,6 +410,7 @@ test_that("test randomForest with multinomial classification", {
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  expect_true(is.data.frame(pred_test_ret))
 })
 
 test_that("test evaluate_classification", {
@@ -417,6 +426,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
   ret <- rf_evaluation_training_and_test(model_df)
   ret <- model_df %>% prediction_training_and_test()
+  expect_true(is.data.frame(ret))
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
@@ -428,6 +438,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
   ret <- model_df %>% prediction_training_and_test()
+  expect_true(is.data.frame(ret))
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
@@ -438,6 +449,7 @@ test_that("calc_feature_map(multi) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
   ret <- model_df %>% prediction_training_and_test()
+  expect_true(is.data.frame(ret))
 })
 
 test_that("calc_feature_map() error handling for predictor with single unique value", {
@@ -490,9 +502,7 @@ test_that("glance.ranger shows no note when no Inf values", {
   glance_result <- glance(result$model[[1]])
 
   # Should not have Note column or Note should be empty/NA
-  if ("Note" %in% colnames(glance_result)) {
-    expect_true(is.na(glance_result$Note) || glance_result$Note == "" || !stringr::str_detect(glance_result$Note, "Inf values"))
-  }
+  expect_false("Note" %in% colnames(glance_result))
 })
 
 test_that("tidy.ranger shows Inf removal message for classification", {

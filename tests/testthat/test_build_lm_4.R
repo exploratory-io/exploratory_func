@@ -31,6 +31,7 @@ test_that("build_lm.fast (logistic regression) with marginal effect with NA Date
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
   ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
   ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
+  expect_true(is.data.frame(ret))
 })
 
 test_that("build_lm.fast (linear regression) with single predictor should skip relative importance", {
