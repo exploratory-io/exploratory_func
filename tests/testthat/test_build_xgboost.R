@@ -417,7 +417,7 @@ test_that("test build_xgboost with linear booster", {
   expect_equal(nrow(stats_ret), 5)
 })
 
-test_that("test build_xgboost with linear booster", {
+test_that("test xgboost_binary with linear booster and single-class target", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -431,6 +431,8 @@ test_that("test build_xgboost with linear booster", {
   model_ret <- build_model(test_data, model_func = xgboost_binary, formula = CANCELLED ~ DISTANCE, nrounds = 5, booster = "gblinear")
   coef_ret <- model_coef(model_ret)
   stats_ret <- model_stats(model_ret)
+  expect_true(!is.null(coef_ret))
+  expect_equal(nrow(stats_ret), 5)
 })
 
 test_that("test build_xgboost prediction with optimized threshold", {
