@@ -679,11 +679,49 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
           safe_slice(df, index, remove = FALSE)
         })) %>%
         dplyr::select(-.test_index) %>%
+        # Store original row counts before augment
+        dplyr::mutate(source.data.training.nrow_before = purrr::map_dbl(source.data.training, nrow),
+                      source.data.training.orig = source.data.training) %>%
         # evaluate the formula of augment and "data" column will have it
         dplyr::mutate(source.data.training = purrr::map2(model, source.data.training, function(m, df){eval(parse(text=aug_fml_training))}),
                       source.data.test = purrr::map2(model, source.data.test, function(m, df){eval(parse(text=aug_fml_test))}))
+
+      # Restore NA rows that were dropped by augment for training data
       augmented <- augmented %>%
-        dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
+        dplyr::ungroup() %>%
+        dplyr::mutate(source.data.training = purrr::pmap(list(source.data.training, model, source.data.training.orig, source.data.training.nrow_before),
+                                                          function(augmented_df, m, orig_df, orig_nrow) {
+          # Check if augment dropped rows (for rpart models with NAs)
+          if (!is.null(m) && "rpart" %in% class(m) && nrow(augmented_df) < orig_nrow) {
+            # Some rows were dropped due to NAs - restore them
+            na_row_indices <- as.numeric(m$na.action)
+            if (length(na_row_indices) > 0) {
+              # Create NA rows for the dropped indices
+              na_row_df <- orig_df[c(), ]  # Empty df with same structure
+
+              # Determine which columns are predictions vs original data
+              pred_cols <- colnames(augmented_df)[colnames(augmented_df) %in% c(".fitted", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid", "predicted_value", "residuals", "standard_error")]
+              orig_cols <- colnames(orig_df)
+
+              # For each NA row, create a row with original data and NA predictions
+              for (idx in na_row_indices) {
+                na_row <- orig_df[idx, ]
+                # Set prediction columns to NA
+                for (col in pred_cols) {
+                  if (col %in% colnames(na_row)) {
+                    na_row[[col]] <- NA
+                  }
+                }
+                na_row_df <- bind_rows_safe(na_row_df, na_row)
+              }
+
+              # Combine original augmented results with NA rows
+              augmented_df <- bind_rows_safe(augmented_df, na_row_df)
+            }
+          }
+          augmented_df
+        })) %>%
+        dplyr::select(-source.data.training.nrow_before, -source.data.training.orig) %>%
         dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
           df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
           df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
