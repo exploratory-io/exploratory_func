@@ -145,7 +145,7 @@ test_that("test evaluate_regression", {
   expect_true(is.data.frame(ret))
 })
 
-test_that("test evaluate_multi", {
+test_that("test evaluate_regression (second instance)", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
