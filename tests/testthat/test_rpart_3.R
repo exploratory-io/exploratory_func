@@ -41,6 +41,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   ret <- model_df %>% prediction_training_and_test()
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 5000) Fails for now
+  expect_true(is.data.frame(ret))
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
@@ -61,6 +62,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- model_df %>% prediction_training_and_test()
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 5000) Fails for now
+  expect_true(is.data.frame(ret))
 })
 
 test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
@@ -81,6 +83,7 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
   ret <- model_df %>% prediction_training_and_test()
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 5000) Fails for now
+  expect_true(is.data.frame(ret))
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
@@ -99,5 +102,6 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   ret <- model_df %>% prediction_training_and_test()
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 5000) Fails for now
+  expect_true(is.data.frame(ret))
 })
 

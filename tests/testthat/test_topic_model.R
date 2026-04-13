@@ -83,6 +83,7 @@ test_that("exp_topic_model with pre-parsed data", {
     "And", "Jill", "came", "tumbling", "after"),
     doc = c(rep("one",13), rep("two",1), rep("three",1), rep("four", 12)))
   model_df <- df %>% exp_topic_model(text=NULL, word=word, document_id=doc)
+  expect_true(is.data.frame(model_df))
 })
 
 test_that("exp_topic_model with pre-parsed data with category", {

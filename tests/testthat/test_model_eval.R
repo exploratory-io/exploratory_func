@@ -142,9 +142,10 @@ test_that("test evaluate_regression", {
   predicted <- prediction(model_data, data = "test")
 
   ret <- evaluate_regression(predicted, predicted_value, CANCELLED)
+  expect_true(is.data.frame(ret))
 })
 
-test_that("test evaluate_multi", {
+test_that("test evaluate_regression (second instance)", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
@@ -164,6 +165,7 @@ test_that("test evaluate_multi", {
   predicted <- prediction(model_data, data = "test")
 
   ret <- evaluate_regression(predicted, predicted_value, CANCELLED)
+  expect_true(is.data.frame(ret))
 })
 
 test_that("eval multi", {

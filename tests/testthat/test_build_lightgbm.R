@@ -270,9 +270,7 @@ test_that("glance.lightgbm_exp shows no note when no Inf values", {
   glance_result <- glance(result$model[[1]])
 
   # Should not have Note column or Note should be empty/NA
-  if ("Note" %in% colnames(glance_result)) {
-    expect_true(is.na(glance_result$Note) || glance_result$Note == "" || !stringr::str_detect(glance_result$Note, "Inf values"))
-  }
+  expect_false("Note" %in% colnames(glance_result))
 })
 
 test_that("tidy.lightgbm_exp shows Inf removal message for classification", {

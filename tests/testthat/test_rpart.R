@@ -15,6 +15,7 @@ test_that("exp_rpart regression", {
   res <- model_df %>% tidy_rowwise(model, type="importance")
   res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
   res <- model_df %>% tidy_rowwise(model, type="scatter")
+  expect_true(is.data.frame(res))
 })
 
 test_that("exp_rpart binary classification", {
@@ -24,6 +25,7 @@ test_that("exp_rpart binary classification", {
   res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
   res <- model_df %>% tidy_rowwise(model, type="evaluation_by_class", pretty.name=TRUE)
   res <- model_df %>% tidy_rowwise(model, type="conf_mat")
+  expect_true(is.data.frame(res))
 })
 
 test_that("exp_rpart binary classification with logical", {
@@ -32,6 +34,7 @@ test_that("exp_rpart binary classification with logical", {
   res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
   res <- model_df %>% tidy_rowwise(model, type="evaluation_by_class", pretty.name=TRUE)
   res <- model_df %>% tidy_rowwise(model, type="conf_mat")
+  expect_true(is.data.frame(res))
 })
 
 test_that("exp_rpart multiclass classification", {
@@ -41,6 +44,7 @@ test_that("exp_rpart multiclass classification", {
   res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
   res <- model_df %>% tidy_rowwise(model, type="evaluation_by_class", pretty.name=TRUE)
   res <- model_df %>% tidy_rowwise(model, type="conf_mat")
+  expect_true(is.data.frame(res))
 })
 
 test_that("exp_rpart regression", {
@@ -63,6 +67,7 @@ test_that("exp_rpart prediction", {
   ret <- model_df %>% prediction(.)
   test_ret <- model_df %>% prediction(., data = "test")
   ret_all <- prediction_training_and_test(model_df)
+  expect_true(is.data.frame(ret_all))
 })
 
 test_that("exp_rpart() error handling for predictor with single unique value", {

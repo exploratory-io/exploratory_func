@@ -379,4 +379,5 @@ test_that("do_prophet without value_col", {
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   ret <- raw_data %>%
     do_prophet(timestamp, NULL, 10)
+  expect_true(is.data.frame(ret))
 })
