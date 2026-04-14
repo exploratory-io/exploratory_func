@@ -171,7 +171,10 @@ test_that("test nnet build_model", {
   # these should work without error to 2 class classification
   prediction_train_ret <- prediction(model_df, data = "training")
   prediction_test_ret <- prediction(model_df, data = "test")
-
+  expect_true(is.data.frame(prediction_train_ret))
+  expect_true(nrow(prediction_train_ret) > 0)
+  expect_true(is.data.frame(prediction_test_ret))
+  expect_true(nrow(prediction_test_ret) > 0)
 })
 
 test_that("test group error message", {
