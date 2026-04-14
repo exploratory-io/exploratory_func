@@ -788,13 +788,13 @@ predict_xgboost <- function(model, df) {
   else if (obj == "multi:softmax") {
     predicted <- model$y_levels[predicted+1]
     # fill rows with NA
-    predicted <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(df))
+    predicted <- fill_vec_NA(seq_len(nrow(mat_data)), predicted, nrow(df))
   }
   else { # TODO: Here we assume all other cases returns vector prediction result.
     # model.matrix removes rows with NA and stats::predict returns a matrix
     # whose number of rows is the same with its size,
     # so the result should be filled by NA
-    predicted <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(df))
+    predicted <- fill_vec_NA(seq_len(nrow(mat_data)), predicted, nrow(df))
   }
   predicted
 }
