@@ -787,13 +787,13 @@ predict_xgboost <- function(model, df) {
   }
   else if (obj == "multi:softmax") {
     predicted <- model$y_levels[predicted+1]
-    # fill rows with NA
+    # na.action=na.pass keeps all rows, so this is a no-op in normal cases.
+    # Kept as a safety net in case nrow(mat_data) < nrow(df).
     predicted <- fill_vec_NA(seq_len(nrow(mat_data)), predicted, nrow(df))
   }
   else { # TODO: Here we assume all other cases returns vector prediction result.
-    # model.matrix removes rows with NA and stats::predict returns a matrix
-    # whose number of rows is the same with its size,
-    # so the result should be filled by NA
+    # na.action=na.pass keeps all rows so nrow(mat_data) == nrow(df) and
+    # fill_vec_NA is a no-op in normal cases. Kept as a safety net.
     predicted <- fill_vec_NA(seq_len(nrow(mat_data)), predicted, nrow(df))
   }
   predicted
