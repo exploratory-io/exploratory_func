@@ -6,6 +6,7 @@ if (!exists("flight")) {
   # To skip repeated data loading, run the following outside of the context of the test,
   # so that it stays even after the test.
   flight <- exploratory::read_delim_file("https://exploratory-download.s3.us-west-2.amazonaws.com/test/airline_2013_10_tricky_v3.csv", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+  set.seed(1) # Stable fixture across CI machines and test order (slice_sample is RNG-dependent).
   flight <- flight %>% slice_sample(n=5000)
 }
 

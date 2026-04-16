@@ -490,6 +490,7 @@ test_that("test exp_ttest with alternative = greater", {
 
 test_that("test exp_ttest with paired = TRUE", {
   # Make sample size equal between groups for paired t-test.
+  set.seed(1) # slice_sample is RNG-dependent.
   mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
   model_df <- exp_ttest(mtcars2, mpg, am, paired = TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="model")
@@ -518,6 +519,7 @@ test_that("test exp_ttest with power", {
 
 test_that("test exp_ttest with power with paired = TRUE", {
   # Make sample size equal between groups for paired t-test.
+  set.seed(1) # slice_sample is RNG-dependent.
   mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
   model_df <- exp_ttest(mtcars2, mpg, am, paired = TRUE, power = 0.8)
   ret <- model_df %>% tidy_rowwise(model, type="model")
