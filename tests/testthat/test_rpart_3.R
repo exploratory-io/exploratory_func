@@ -22,6 +22,7 @@ if (!exists("flight_downloaded")) {
 }
 
 # Add group_by. Cases without group_by is covered in test_randomForest_tidiers_3.R.
+set.seed(1) # Stable subsample across CI machines and test order (slice_sample is RNG-dependent).
 flight <- flight %>% slice_sample(n=5000) %>% group_by(`CAR RIER`)
 
 

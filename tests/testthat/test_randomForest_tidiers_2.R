@@ -13,6 +13,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  set.seed(1) # Stable fixture across CI machines and test order (slice_sample is RNG-dependent).
   flight <- flight %>% slice_sample(n=5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
@@ -384,6 +385,7 @@ test_that("in the case of a unkown target variable of predictiton ranger with mu
 })
 
 test_that("calc imp negative test", { #TODO: What was this case for?
+  set.seed(1) # slice_sample(n=4000) is RNG-dependent.
   model_df <- flight %>% slice_sample(n=4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`, smote = FALSE)
   res_importance <- model_df %>% rf_importance()
   expect_equal(colnames(res_importance), c("variable", "importance"))
@@ -396,6 +398,7 @@ test_that("calc imp negative test", { #TODO: What was this case for?
 })
 
 test_that("calc imp - variables for edarf should correspond to variables decided to be Confirmed or Tentative by Boruta", {
+  set.seed(1) # slice_sample(n=4000) is RNG-dependent.
   model_df <- flight %>% slice_sample(n=4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`,
                                                                     smote = FALSE, with_boruta = TRUE)
 
