@@ -2219,7 +2219,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
     bigrquery::bq_auth(path = service_account_file)
   } else {
     token <- getGoogleTokenForBigQuery(tokenFileId)
-    bigrquery::set_access_cred(token)
+    bigrquery::bq_auth(token = token)
   }
   sqlquery <- convertUserInputToUtf8(sqlquery)
   # pass desitiona_table to support large data
@@ -2260,11 +2260,11 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
       bigrquery::bq_auth(path = service_account_file)
     } else {
       token <- getGoogleTokenForBigQuery(tokenFileId)
-      bigrquery::set_access_cred(token)
+      bigrquery::bq_auth(token = token)
     }
     tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
     # Since Exploratory Desktop does not handle int64, convert int64 to numeric by passing bigint = "numeric" ref: https://bigrquery.r-dbi.org/reference/bq_table_download.html
-    bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, bigint = "numeric", quiet = TRUE, max_connections = max_connections)
+    bigrquery::bq_table_download(tb,  page_size = page_size, n_max = max_page, bigint = "numeric", quiet = TRUE, max_connections = max_connections)
   }, finally = {
     # Set original scipen
     options(scipen = original_scipen)
@@ -2282,7 +2282,7 @@ extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table,
     bigrquery::bq_auth(path = service_account_file)
   } else {
     token <- getGoogleTokenForBigQuery(tokenFileId)
-    bigrquery::set_access_cred(token)
+    bigrquery::bq_auth(token = token)
   }
   # call forked bigrquery for submitting extract job
   table <- bigrquery::bq_table(project, dataset, table = table)
@@ -2374,12 +2374,12 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
     bigrquery::bq_auth(path = service_account_file)
   } else {
     token <- getGoogleTokenForBigQuery(tokenFileId)
-    bigrquery::set_access_cred(token)
+    bigrquery::bq_auth(token = token)
   }
 
-  src <- list(project_id = projectId, dataset_id = sourceDatasetId, table_id = sourceTableId)
-  dest <- list(project_id = targetProjectId, dataset_id = targetDatasetId, table_id = targetTableId)
-  bigrquery::copy_table(src, dest)
+  src <- bigrquery::bq_table(project = projectId, dataset = sourceDatasetId, table = sourceTableId)
+  dest <- bigrquery::bq_table(project = targetProjectId, dataset = targetDatasetId, table = targetTableId)
+  bigrquery::bq_table_copy(src, dest)
 }
 
 generate_random_string <- function(length) {
@@ -2457,9 +2457,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     } else {
       # direct import case (for refresh data frame case)
 
-      # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
-      # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
-      # so for now, stick to bigrquery::set_access_cred
+      # bq_auth() is now safe: bigrquery is forked at exploratory-io/bigrquery (>=1.6.1.1) with bq_token() patched
+      # to send the access token as a static Bearer header, bypassing httr's auto-refresh path. (#35107)
       if(Sys.info()["sysname"] == "Linux" && !is.null(service_account_file) && Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE") != ""){
          service_account_file <- Sys.getenv("GOOGLE_BIGQUERY_SERVICE_ACCOUNT_FILE")
       }
@@ -2467,7 +2466,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
         bigrquery::bq_auth(path = service_account_file)
       } else {
         token <- getGoogleTokenForBigQuery(tokenFileId)
-        bigrquery::set_access_cred(token)
+        bigrquery::bq_auth(token = token)
       }
       # check if the query contains special key word for standardSQL
       # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
@@ -2481,7 +2480,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
       tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
       # Since Exploratory Desktop does not handle int64, convert int64 to numeric by passing bigint = "numeric" ref: https://bigrquery.r-dbi.org/reference/bq_table_download.html
-      df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, bigint = "numeric", max_connections = max_connections, quiet = TRUE)
+      df <- bigrquery::bq_table_download(x = tb, n_max = Inf, page_size = pageSize, bigint = "numeric", max_connections = max_connections, quiet = TRUE)
     }
     df
   }, finally = {
@@ -2518,7 +2517,7 @@ getGoogleBigQueryProjects <- function(tokenFileId="", service = "bigquery", serv
       } else if (service == "bigquery") {
         token <- getGoogleTokenForBigQuery(tokenFileId);
       }
-      bigrquery::set_access_cred(token)
+      bigrquery::bq_auth(token = token)
     }
     bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
   }
@@ -2550,7 +2549,7 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId="", service_account_f
       bigrquery::bq_auth(path = service_account_file)
     } else {
       token <- getGoogleTokenForBigQuery(tokenFileId);
-      bigrquery::set_access_cred(token)
+      bigrquery::bq_auth(token = token)
     }
     # make sure to pass max_pages as Inf to get all the datasets
     resultdatasets <- bigrquery::bq_project_datasets(project, page_size=1000, max_pages=Inf);
@@ -2584,7 +2583,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId="", service_ac
       bigrquery::bq_auth(path = service_account_file)
     } else {
       token <- getGoogleTokenForBigQuery(tokenFileId);
-      bigrquery::set_access_cred(token)
+      bigrquery::bq_auth(token = token)
     }
     # if we do not pass max_results (via page_size argument), it only returnss 50 items. so explicitly set it.
     # See https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list for max_results
@@ -2624,7 +2623,7 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId="", serv
       bigrquery::bq_auth(path = service_account_file)
     } else {
       token <- getGoogleTokenForBigQuery(tokenFileId);
-      bigrquery::set_access_cred(token)
+      bigrquery::bq_auth(token = token)
     }
     table <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
     bigrquery::bq_table_meta(table);
@@ -2650,9 +2649,9 @@ deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId="", s
     bigrquery::bq_auth(path = service_account_file)
   } else {
     token <- getGoogleTokenForBigQuery(tokenFileId);
-    bigrquery::set_access_cred(token)
+    bigrquery::bq_auth(token = token)
   }
-  bigrquery::delete_table(project, dataset, table);
+  bigrquery::bq_table_delete(bigrquery::bq_table(project, dataset, table));
 }
 
 #' Parses all the 'scrapable' html tables from the web page.
