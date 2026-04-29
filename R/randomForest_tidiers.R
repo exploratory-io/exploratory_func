@@ -2169,6 +2169,12 @@ calc_feature_imp <- function(df,
   # this evaluates select arguments like starts_with
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
+  # Validate mtry up front. ranger reports this through stderr and aborts
+  # in a way that surfaces as "User interrupt or internal error." in the UI.
+  if (!is.null(mtry) && mtry > length(orig_selected_cols)) {
+    stop(paste0("mtry (", mtry, ") cannot be larger than the number of predictor variables (", length(orig_selected_cols), ")."))
+  }
+
   target_funs <- NULL
   if (!is.null(target_fun)) {
     target_funs <- list(target_fun)

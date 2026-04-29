@@ -602,6 +602,21 @@ test_that("calc_feature_imp defaults leave mtry/max.depth as ranger auto-default
   expect_equal(result$model[[1]]$max.depth, 0)
 })
 
+test_that("calc_feature_imp errors clearly when mtry exceeds the number of predictors", {
+  set.seed(1)
+  test_data <- data.frame(
+    y  = rnorm(50),
+    x1 = rnorm(50),
+    x2 = rnorm(50),
+    x3 = rnorm(50)
+  )
+
+  expect_error(
+    test_data %>% calc_feature_imp(y, x1, x2, x3, ntree = 5, mtry = 10, smote = FALSE),
+    "mtry \\(10\\) cannot be larger than the number of predictor variables \\(3\\)\\."
+  )
+})
+
 test_that("calc_feature_imp forwards mtry/max.depth through Boruta path", {
   set.seed(1)
   test_data <- data.frame(
