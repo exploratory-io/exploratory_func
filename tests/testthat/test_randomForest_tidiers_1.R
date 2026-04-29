@@ -535,3 +535,93 @@ test_that("calc_feature_imp handles all rows removed due to Inf values", {
     "All rows were removed due to Inf values"
   )
 })
+
+test_that("calc_feature_imp forwards mtry to ranger", {
+  set.seed(1)
+  test_data <- data.frame(
+    y  = rnorm(200),
+    x1 = rnorm(200),
+    x2 = rnorm(200),
+    x3 = rnorm(200),
+    x4 = rnorm(200),
+    x5 = rnorm(200)
+  )
+
+  result <- test_data %>% calc_feature_imp(y, x1, x2, x3, x4, x5, ntree = 10, mtry = 2, smote = FALSE)
+  expect_false("error" %in% class(result$model[[1]]))
+  expect_equal(result$model[[1]]$mtry, 2)
+})
+
+test_that("calc_feature_imp forwards max.depth to ranger", {
+  set.seed(1)
+  test_data <- data.frame(
+    y  = rnorm(200),
+    x1 = rnorm(200),
+    x2 = rnorm(200),
+    x3 = rnorm(200)
+  )
+
+  result <- test_data %>% calc_feature_imp(y, x1, x2, x3, ntree = 10, max.depth = 3, smote = FALSE)
+  expect_false("error" %in% class(result$model[[1]]))
+  expect_equal(result$model[[1]]$max.depth, 3)
+})
+
+test_that("calc_feature_imp forwards mtry and max.depth together", {
+  set.seed(1)
+  test_data <- data.frame(
+    y  = rnorm(200),
+    x1 = rnorm(200),
+    x2 = rnorm(200),
+    x3 = rnorm(200),
+    x4 = rnorm(200),
+    x5 = rnorm(200)
+  )
+
+  result <- test_data %>% calc_feature_imp(y, x1, x2, x3, x4, x5, ntree = 10, mtry = 3, max.depth = 5, smote = FALSE)
+  expect_false("error" %in% class(result$model[[1]]))
+  expect_equal(result$model[[1]]$mtry, 3)
+  expect_equal(result$model[[1]]$max.depth, 5)
+})
+
+test_that("calc_feature_imp defaults leave mtry/max.depth as ranger auto-default", {
+  set.seed(1)
+  test_data <- data.frame(
+    y  = rnorm(200),
+    x1 = rnorm(200),
+    x2 = rnorm(200),
+    x3 = rnorm(200),
+    x4 = rnorm(200),
+    x5 = rnorm(200)
+  )
+
+  # No mtry / max.depth specified: ranger picks its own default for mtry,
+  # and max.depth = 0 (no limit).
+  result <- test_data %>% calc_feature_imp(y, x1, x2, x3, x4, x5, ntree = 10, smote = FALSE)
+  expect_false("error" %in% class(result$model[[1]]))
+  expect_true(result$model[[1]]$mtry >= 1 && result$model[[1]]$mtry <= 5)
+  expect_equal(result$model[[1]]$max.depth, 0)
+})
+
+test_that("calc_feature_imp forwards mtry/max.depth through Boruta path", {
+  set.seed(1)
+  test_data <- data.frame(
+    y  = rnorm(200),
+    x1 = rnorm(200),
+    x2 = rnorm(200),
+    x3 = rnorm(200),
+    x4 = rnorm(200),
+    x5 = rnorm(200)
+  )
+
+  result <- test_data %>% calc_feature_imp(
+    y, x1, x2, x3, x4, x5,
+    ntree = 10, mtry = 2, max.depth = 4,
+    smote = FALSE,
+    with_boruta = TRUE, boruta_max_runs = 11
+  )
+  expect_false("error" %in% class(result$model[[1]]))
+  expect_equal(result$model[[1]]$mtry, 2)
+  expect_equal(result$model[[1]]$max.depth, 4)
+  # Boruta-built ranger should also have received the params.
+  expect_true(!is.null(result$model[[1]]$boruta))
+})
