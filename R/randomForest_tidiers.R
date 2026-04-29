@@ -2125,8 +2125,10 @@ calc_feature_imp <- function(df,
                              predictor_funs = NULL,
                              max_nrow = 50000, # Down from 200000 when we added partial dependence
                              max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
-                             ntree = 20,
+                             ntree = 200,
                              nodesize = 12,
+                             mtry = NULL, # ranger default: floor(sqrt(p)) for classification, floor(p/3) for regression.
+                             max.depth = NULL, # ranger default: NULL (no limit).
                              target_n = 20,
                              predictor_n = 12, # So that at least months can fit in it.
                              smote = FALSE,
@@ -2166,6 +2168,12 @@ calc_feature_imp <- function(df,
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  # Validate mtry up front. ranger reports this through stderr and aborts
+  # in a way that surfaces as "User interrupt or internal error." in the UI.
+  if (!is.null(mtry) && mtry > length(orig_selected_cols)) {
+    stop(paste0("mtry (", mtry, ") cannot be larger than the number of predictor variables (", length(orig_selected_cols), ")."))
+  }
 
   target_funs <- NULL
   if (!is.null(target_fun)) {
@@ -2357,6 +2365,8 @@ calc_feature_imp <- function(df,
         importance = ranger_importance_measure,
         num.trees = ntree,
         min.node.size = nodesize,
+        mtry = mtry,
+        max.depth = max.depth,
         keep.inbag=TRUE,
         sample.fraction = sample.fraction,
         probability = (classification_type %in% c("multi", "binary"))
@@ -2407,6 +2417,8 @@ calc_feature_imp <- function(df,
           # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
           num.trees = ntree,
           min.node.size = nodesize,
+          mtry = mtry,
+          max.depth = max.depth,
           sample.fraction = sample.fraction,
           probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
         )

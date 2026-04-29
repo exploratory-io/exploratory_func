@@ -5,3 +5,4 @@
 man
 # Exclude intermediate testcases for the development purpose.
 tests/testthat/test-dev*.R
+.positai
