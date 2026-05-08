@@ -118,11 +118,13 @@ uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetNam
   if (type == "newSpreadSheet") {
     sheetsList <- list(df)
     names(sheetsList) <- c(workSheet)
-    googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList)
+    return(googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList))
   } else if (type %in% c("overrideSpreadSheet", "newWorkSheet")) {
     googlesheets4::sheet_write(df, spreadSheetName, sheet = workSheet)
+    return(spreadSheetName)
   } else if (type == "appendToWorkSheet") {
     googlesheets4::sheet_append(spreadSheetName, df, sheet = workSheet)
+    return(spreadSheetName)
   } else {
     stop("Invalid 'type' parameter provided.")
   }
@@ -134,13 +136,14 @@ normalizeDataForGoogleSheetsExport <- function (df) {
   requireNamespace("dplyr")
   requireNamespace("lubridate")
   requireNamespace("bit64")
-  df <- df %>%
-   mutate(
-     across(where(is.numeric), ~ifelse(is.infinite(.), as.numeric(NA), .)),
-     across(where(lubridate::is.difftime), ~ as.numeric(.)),
-     across(where(lubridate::is.period), ~ as.numeric(.)),
-     across(where(bit64::is.integer64), ~ as.numeric(.))
-   )
+  df <- dplyr::mutate(
+    df,
+    dplyr::across(dplyr::where(is.numeric), ~ifelse(is.infinite(.), as.numeric(NA), .)),
+    dplyr::across(dplyr::where(lubridate::is.difftime), ~ as.numeric(.)),
+    dplyr::across(dplyr::where(lubridate::is.period), ~ as.numeric(.)),
+    dplyr::across(dplyr::where(bit64::is.integer64), ~ as.numeric(.)),
+    dplyr::across(dplyr::where(is.character), ~ substr(.x, 1, 50000))
+  )
   df
 }
 

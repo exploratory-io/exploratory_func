@@ -34,3 +34,12 @@ test_that("normalizeDataForGoogleSheetsExport with local data", {
   # integer64 should become numeric
   expect_equal(class(result$int64_col), "numeric")
 })
+
+test_that("normalizeDataForGoogleSheetsExport truncates cells to Google Sheets limit", {
+  long_text <- paste(rep("x", 50001), collapse = "")
+  df <- data.frame(text_col = long_text, stringsAsFactors = FALSE)
+
+  result <- exploratory::normalizeDataForGoogleSheetsExport(df)
+
+  expect_equal(nchar(result$text_col), 50000)
+})
