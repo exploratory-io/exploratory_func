@@ -36,7 +36,7 @@ test_that("normalizeDataForGoogleSheetsExport with local data", {
 })
 
 test_that("normalizeDataForGoogleSheetsExport truncates cells to Google Sheets limit", {
-  long_text <- paste(rep("x", 50001), collapse = "")
+  long_text <- strrep("x", 50001)
   df <- data.frame(text_col = long_text, stringsAsFactors = FALSE)
 
   result <- exploratory::normalizeDataForGoogleSheetsExport(df)

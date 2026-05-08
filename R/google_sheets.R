@@ -133,16 +133,25 @@ uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetNam
 #' @param df - data frame
 #
 normalizeDataForGoogleSheetsExport <- function (df) {
-  requireNamespace("dplyr")
-  requireNamespace("lubridate")
-  requireNamespace("bit64")
+  if (!requireNamespace("dplyr", quietly = TRUE)) {
+    stop("The 'dplyr' package must be installed.")
+  }
+  if (!requireNamespace("lubridate", quietly = TRUE)) {
+    stop("The 'lubridate' package must be installed.")
+  }
+  if (!requireNamespace("bit64", quietly = TRUE)) {
+    stop("The 'bit64' package must be installed.")
+  }
+
+  GOOGLE_SHEETS_CELL_CHAR_LIMIT <- 50000
+
   df <- dplyr::mutate(
     df,
     dplyr::across(dplyr::where(is.numeric), ~ifelse(is.infinite(.), as.numeric(NA), .)),
     dplyr::across(dplyr::where(lubridate::is.difftime), ~ as.numeric(.)),
     dplyr::across(dplyr::where(lubridate::is.period), ~ as.numeric(.)),
     dplyr::across(dplyr::where(bit64::is.integer64), ~ as.numeric(.)),
-    dplyr::across(dplyr::where(is.character), ~ substr(.x, 1, 50000))
+    dplyr::across(dplyr::where(is.character), ~ substr(.x, 1, GOOGLE_SHEETS_CELL_CHAR_LIMIT))
   )
   df
 }
