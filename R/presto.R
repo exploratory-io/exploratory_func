@@ -9,7 +9,6 @@ splitPrestoStatements <- function(sql) {
   chars <- strsplit(sql, "", fixed = TRUE)[[1]]
   n <- length(chars)
   state <- "normal" # normal | sq | dq | lc | bc
-  buf <- character(0)
   out <- character(0)
   i <- 1L
   start <- 1L
@@ -86,7 +85,11 @@ prestoStatementReturnsRows <- function(sql) {
       next
     }
     if (startsWith(s, "/*")) {
-      s <- sub("^/\\*.*?\\*/", "", s, perl = TRUE)
+      s_before <- s
+      s <- sub("^/\\*(?s).*?\\*/", "", s, perl = TRUE)
+      if (identical(s, s_before)) {
+        return(FALSE)
+      }
       next
     }
     if (startsWith(s, "(")) {
@@ -138,11 +141,11 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
     return(data.frame())
   }
   if (total == 1L) {
-    # single-statement fast path: preserve byte-for-byte the original behavior
+    # single-statement fast path: uses trimmed statement from splitPrestoStatements
     df <- tryCatch({
       .queryPrestoSingle(conn, statements[[1L]], numOfRows)
     }, error = function(err) {
-      clearDBConnection("presto", host, port, "", username)
+      clearDBConnection("presto", host, port, catalog, schema, username)
       stop(err)
     })
     return(df)
@@ -154,7 +157,7 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
       tryCatch({
         RPresto::dbExecute(conn, statements[[i]])
       }, error = function(err) {
-        clearDBConnection("presto", host, port, "", username)
+        clearDBConnection("presto", host, port, catalog, schema, username)
         stop(sprintf("Statement %d of %d failed: %s", i, total, conditionMessage(err)))
       })
     }
@@ -165,7 +168,7 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
     df <- tryCatch({
       .queryPrestoSingle(conn, last, numOfRows)
     }, error = function(err) {
-      clearDBConnection("presto", host, port, "", username)
+      clearDBConnection("presto", host, port, catalog, schema, username)
       stop(sprintf("Statement %d of %d failed: %s", total, total, conditionMessage(err)))
     })
     return(df)
@@ -173,7 +176,7 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
     tryCatch({
       RPresto::dbExecute(conn, last)
     }, error = function(err) {
-      clearDBConnection("presto", host, port, "", username)
+      clearDBConnection("presto", host, port, catalog, schema, username)
       stop(sprintf("Statement %d of %d failed: %s", total, total, conditionMessage(err)))
     })
     return(data.frame())
