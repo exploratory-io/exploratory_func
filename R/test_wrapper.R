@@ -1775,8 +1775,11 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         if (!with_interaction) {
           formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`+`', paste(covariates, collapse="`+`"), '`'))
         }
-        else { # Calculating interaction only with the first covariate for simplicity for now.
-          formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`*`', covariates[1], '`'))
+        else {
+          # Include all covariates and their interactions with the explanatory variable.
+          # `group * (cov1 + cov2)` expands to `group + cov1 + cov2 + group:cov1 + group:cov2`.
+          formula <- as.formula(paste0('`', var1_col, '`~`', var2_col, '`*(`',
+                                       paste(covariates, collapse = "`+`"), '`)'))
         }
       }
 
@@ -2258,8 +2261,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       }
       # Map the variable names in the term column back to the original.
       terms_mapping <- x$terms_mapping
-      # Add mapping for interaction term
-      terms_mapping <- c(terms_mapping,c(`c2_:c3_`=paste0(terms_mapping["c2_"], " * ", terms_mapping["c3_"])))
+      # Add mapping for interaction term(s). For ANCOVA with multiple covariates and
+      # with_interaction=TRUE, add a mapping for every covariate interaction (c2_:c3_,
+      # c2_:c4_, ...). For 2-way ANOVA the loop runs once and produces c2_:c3_.
+      {
+        n_covariates <- if (!is.null(x$covariates)) length(x$covariates) else 1L
+        for (i in seq_len(n_covariates)) {
+          cov_key <- paste0("c", i + 2L, "_")
+          int_key <- paste0("c2_:", cov_key)
+          terms_mapping[int_key] <- paste0(terms_mapping["c2_"], " * ", terms_mapping[cov_key])
+        }
+      }
       orig_term <- terms_mapping[ret$term]
       orig_term[is.na(orig_term)] <- ret$term[is.na(orig_term)] # Fill the element that did not have a matching mapping. (Should be "Residual")
       ret$term <- orig_term
@@ -2426,7 +2438,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       if (!x$with_interaction) {
         formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
       } else {
-        formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+        # Include every covariate main effect and every group:covariate interaction in the by-clause,
+        # mirroring the single-covariate pattern. All terms are backtick-quoted so non-ASCII
+        # column names (e.g. `bu syo`, `kinzoku nen`) parse correctly.
+        cov_main <- paste0('`', paste(x$covariates, collapse = '`+`'), '`')
+        cov_interactions <- paste(paste0('`', x$var2, '`:`', x$covariates, '`'), collapse = '+')
+        formula <- as.formula(paste0('~`', x$var2, '`|', cov_main, '+', cov_interactions))
       }
     } else { # 2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
@@ -2499,7 +2516,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       if (!x$with_interaction) {
         formula <- as.formula(paste0('~`', x$var2, '`|`', paste(x$covariates, collapse='`+`'), '`'))
       } else {
-        formula <- as.formula(paste0('~`', x$var2, '`|`', x$covariates[1], '`+', x$var2, ':', x$covariates[1]))
+        # Include every covariate main effect and every group:covariate interaction in the by-clause,
+        # mirroring the single-covariate pattern. All terms are backtick-quoted so non-ASCII
+        # column names (e.g. `bu syo`, `kinzoku nen`) parse correctly.
+        cov_main <- paste0('`', paste(x$covariates, collapse = '`+`'), '`')
+        cov_interactions <- paste(paste0('`', x$var2, '`:`', x$covariates, '`'), collapse = '+')
+        formula <- as.formula(paste0('~`', x$var2, '`|', cov_main, '+', cov_interactions))
       }
     } else { # 1-way/2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
