@@ -207,7 +207,15 @@ test_that("prestoStatementReturnsRows: SHOW family", {
   expect_true(prestoStatementReturnsRows("SHOW FUNCTIONS"))
   expect_true(prestoStatementReturnsRows("SHOW SESSION"))
   expect_true(prestoStatementReturnsRows("SHOW STATS FOR t"))
+  expect_true(prestoStatementReturnsRows("SHOW STATS FOR TABLE t"))
   expect_true(prestoStatementReturnsRows("SHOW CREATE TABLE t"))
+  expect_true(prestoStatementReturnsRows("SHOW CREATE VIEW v"))
+  expect_true(prestoStatementReturnsRows("SHOW CREATE SCHEMA s"))
+  expect_true(prestoStatementReturnsRows("SHOW CREATE FUNCTION f"))
+  expect_true(prestoStatementReturnsRows("SHOW CREATE MATERIALIZED VIEW mv"))
+  expect_true(prestoStatementReturnsRows("SHOW GRANTS ON TABLE t"))
+  expect_true(prestoStatementReturnsRows("SHOW ROLES"))
+  expect_true(prestoStatementReturnsRows("SHOW ROLE GRANTS"))
 })
 
 test_that("prestoStatementReturnsRows: DESCRIBE / DESC / EXPLAIN", {
@@ -246,12 +254,22 @@ test_that("prestoStatementReturnsRows: DDL is not row-returning", {
   expect_false(prestoStatementReturnsRows("CREATE OR REPLACE VIEW v AS SELECT 1"))
   expect_false(prestoStatementReturnsRows("CREATE SCHEMA s"))
   expect_false(prestoStatementReturnsRows("CREATE MATERIALIZED VIEW mv AS SELECT 1"))
+  expect_false(prestoStatementReturnsRows("CREATE FUNCTION f(x INT) RETURNS INT RETURN x + 1"))
+  expect_false(prestoStatementReturnsRows("CREATE VECTOR INDEX ON t (c)"))
+  expect_false(prestoStatementReturnsRows("CREATE ROLE admin"))
   expect_false(prestoStatementReturnsRows("DROP TABLE foo"))
   expect_false(prestoStatementReturnsRows("DROP TABLE IF EXISTS foo"))
   expect_false(prestoStatementReturnsRows("DROP VIEW v"))
   expect_false(prestoStatementReturnsRows("DROP SCHEMA s"))
+  expect_false(prestoStatementReturnsRows("DROP MATERIALIZED VIEW mv"))
+  expect_false(prestoStatementReturnsRows("DROP FUNCTION f"))
+  expect_false(prestoStatementReturnsRows("DROP ROLE admin"))
   expect_false(prestoStatementReturnsRows("ALTER TABLE foo ADD COLUMN x INT"))
   expect_false(prestoStatementReturnsRows("ALTER TABLE foo RENAME TO bar"))
+  expect_false(prestoStatementReturnsRows("ALTER SCHEMA s RENAME TO s2"))
+  expect_false(prestoStatementReturnsRows("ALTER VIEW v RENAME TO v2"))
+  expect_false(prestoStatementReturnsRows("ALTER FUNCTION f RETURNS NULL ON NULL INPUT"))
+  expect_false(prestoStatementReturnsRows("REFRESH MATERIALIZED VIEW mv"))
   expect_false(prestoStatementReturnsRows("COMMENT ON TABLE foo IS 'note'"))
 })
 
@@ -274,15 +292,17 @@ test_that("prestoStatementReturnsRows: session / transaction / admin are not row
   expect_false(prestoStatementReturnsRows("COMMIT"))
   expect_false(prestoStatementReturnsRows("ROLLBACK"))
   expect_false(prestoStatementReturnsRows("GRANT SELECT ON t TO u"))
+  expect_false(prestoStatementReturnsRows("GRANT ROLES admin TO u"))
   expect_false(prestoStatementReturnsRows("REVOKE SELECT ON t FROM u"))
-  expect_false(prestoStatementReturnsRows("DENY SELECT ON t TO u"))
+  expect_false(prestoStatementReturnsRows("REVOKE ROLES admin FROM u"))
   expect_false(prestoStatementReturnsRows("CALL system.runtime.kill_query('q')"))
   expect_false(prestoStatementReturnsRows("ANALYZE t"))
   expect_false(prestoStatementReturnsRows("PREPARE my_query FROM SELECT 1"))
   expect_false(prestoStatementReturnsRows("DEALLOCATE PREPARE my_query"))
-  # EXECUTE may return rows when the prepared statement is a SELECT, but the
-  # keyword whitelist does not include it -- classified as non-row-returning.
+  # EXECUTE returns rows when the prepared statement is SELECT, but the keyword
+  # whitelist does not include EXECUTE -- classified conservatively as non-row-returning.
   expect_false(prestoStatementReturnsRows("EXECUTE my_query"))
+  expect_false(prestoStatementReturnsRows("EXECUTE my_query USING 1, 'foo'"))
 })
 
 test_that("prestoStatementReturnsRows: keyword-prefixed words must not false-positive", {
