@@ -684,9 +684,10 @@ test_that("test ANCOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="levene", levene_test_center="mean")
   ret <- model_df %>% tidy_rowwise(model, type="emmeans", pairs_adjust="tukey")
 
+  # With 2 covariates + with_interaction=TRUE, both covariate columns appear in emmeans output.
   expect_equal(colnames(ret),
-    c("a m", "w t", "Rows", "Mean", "Std Deviation", "Std Error", 
-    "Conf Low", "Conf High", "Mean (Adj)", "Std Error (Adj)", 
+    c("a m", "w t", "q sec", "Rows", "Mean", "Std Deviation", "Std Error",
+    "Conf Low", "Conf High", "Mean (Adj)", "Std Error (Adj)",
     "Conf Low (Adj)", "Conf High (Adj)", "DF", "Minimum", "Maximum"))
 
   ret <- model_df %>% tidy_rowwise(model, type="pairs", pairs_adjust="tukey")
@@ -711,6 +712,71 @@ test_that("test ANCOVA with exp_anova", {
   ret <- broom::tidy(shapiro.test(x$residuals))
   expect_equal(colnames(ret),
                c("statistic", "p.value", "method"))
+
+  # Issue #35347 regression: with_interaction=TRUE + multiple covariates must include
+  # every covariate's main effect AND every group:covariate interaction in the output.
+  # type="model" returns renamed Variable column; ss3$term uses internal encoded names.
+  ret_model <- model_df %>% tidy_rowwise(model, type = "model")
+  expect_true("w t" %in% ret_model$Variable)
+  expect_true("q sec" %in% ret_model$Variable)
+  expect_true("a m * w t" %in% ret_model$Variable)
+  expect_true("a m * q sec" %in% ret_model$Variable)
+})
+
+test_that("ANCOVA with multi-covariates and with_interaction=FALSE includes all covariates", {
+  mtcars2 <- mtcars %>% mutate(`a m` = factor(am), `w t` = wt, `q sec` = qsec)
+  model_df <- mtcars2 %>% exp_anova(mpg, `a m`,
+                                    covariates = c("w t", "q sec"),
+                                    covariate_funs = list("w t" = "none", "q sec" = "none"),
+                                    with_interaction = FALSE)
+  ret_model <- model_df %>% tidy_rowwise(model, type = "model")
+  expect_true("w t" %in% ret_model$Variable)
+  expect_true("q sec" %in% ret_model$Variable)
+  # No interaction terms should appear.
+  expect_false(any(grepl("\\*", ret_model$Variable)))
+
+  ret_emmeans <- model_df %>% tidy_rowwise(model, type = "emmeans", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_emmeans))
+  ret_pairs <- model_df %>% tidy_rowwise(model, type = "pairs", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_pairs))
+})
+
+test_that("ANCOVA with single covariate is unchanged after multi-covariate fix (#35347)", {
+  mtcars2 <- mtcars %>% mutate(`a m` = factor(am), `w t` = wt)
+  model_df <- mtcars2 %>% exp_anova(mpg, `a m`,
+                                    covariates = c("w t"),
+                                    covariate_funs = list("w t" = "none"),
+                                    with_interaction = TRUE)
+  ret_model <- model_df %>% tidy_rowwise(model, type = "model")
+  expect_true("w t" %in% ret_model$Variable)
+  expect_true("a m * w t" %in% ret_model$Variable)
+  # The 2-covariate-only rows must NOT appear.
+  expect_false("q sec" %in% ret_model$Variable)
+})
+
+test_that("ANCOVA handles multi-covariate interaction with complex column names (#35347)", {
+  # Multibyte + space; keep simple to avoid touching unrelated bugs in factor coercion.
+  df <- mtcars %>% mutate(`分 類` = factor(am),
+                          `航空 会社 表` = wt,
+                          `到着 遅れ表` = qsec)
+  model_df <- df %>% exp_anova(mpg, `分 類`,
+                               covariates = c("航空 会社 表", "到着 遅れ表"),
+                               covariate_funs = list("航空 会社 表" = "none",
+                                                     "到着 遅れ表" = "none"),
+                               with_interaction = TRUE)
+  ret_model <- model_df %>% tidy_rowwise(model, type = "model")
+  expect_true("航空 会社 表" %in% ret_model$Variable)
+  expect_true("到着 遅れ表" %in% ret_model$Variable)
+  expect_true(any(grepl("航空 会社 表", ret_model$Variable) & grepl("分 類", ret_model$Variable)))
+  expect_true(any(grepl("到着 遅れ表", ret_model$Variable) & grepl("分 類", ret_model$Variable)))
+
+  # Downstream paths must still succeed end-to-end.
+  ret_emmeans <- model_df %>% tidy_rowwise(model, type = "emmeans", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_emmeans))
+  ret_pairs <- model_df %>% tidy_rowwise(model, type = "pairs", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_pairs))
+  ret_anova <- model_df %>% tidy_rowwise(model, type = "anova")
+  expect_true(is.data.frame(ret_anova))
 })
 
 test_that("test ANCOVA with exp_anova with NA and others in the variable.", {
