@@ -2448,8 +2448,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
-    # emmeans seems to work even with afex_aov objects, as well as car::Anova objects or aov objects.
-    ret <- emmeans::emmeans(x, formula)
+    # For 1-way ANOVA (oneway.test -> htest), emmeans cannot dispatch recover_data.htest,
+    # so use the stored lm model instead, mirroring get_pairwise_contrast_df.
+    if (!is.null(x$lm.model)) {
+      if (isTRUE(x$var.equal)) {
+        ret <- emmeans::emmeans(x$lm.model, formula)
+      } else {
+        ret <- emmeans::emmeans(x$lm.model, formula, vcov = sandwich::vcovHC)
+      }
+    } else {
+      # emmeans works for afex_aov (2-way ANOVA) and lm (ANCOVA).
+      ret <- emmeans::emmeans(x, formula)
+    }
     ret <- tibble::as.tibble(ret)
     if (!is.null(x$covariates)) { # ANCOVA case
       conf_threshold = 1 - (1 - conf_level)/2
