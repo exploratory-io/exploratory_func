@@ -331,89 +331,90 @@ test_that("prestoStatementReturnsRows: empty / comment-only / non-alpha / unterm
 
 # ---------------------------------------------------------------------------
 # Complex real-world Presto / Treasure Data patterns
-# (fictional schema: sandbox_retail, l1_web, l1_crm, l1_store, l0_segment)
+# (fictional music-streaming domain: dev_music schema, raw_streams / acct_data /
+#  catalog_db / billing_data source schemas)
 # ---------------------------------------------------------------------------
 
 test_that("splitPrestoStatements: inline -- comment with non-ASCII text sits before semicolon", {
   # Pattern: WHERE ... -- 期間変更箇所\n; next-statement
   sql <- paste0(
-    "SELECT user_id, COUNT(1) AS sessions\n",
-    "FROM l1_web.session_log\n",
-    "WHERE TD_TIME_RANGE(time, '2025-12-01', '2026-02-01', 'JST') -- 期間変更箇所\n",
-    "  AND hostname = 'shop.example.com'\n",
+    "SELECT listener_id, COUNT(1) AS play_cnt\n",
+    "FROM raw_streams.play_events\n",
+    "WHERE TD_TIME_RANGE(played_at, '2025-12-01', '2026-02-01', 'JST') -- 期間変更箇所\n",
+    "  AND app_platform = 'ios'\n",
     "GROUP BY 1;\n",
-    "SELECT COUNT(DISTINCT user_id) AS dau FROM l1_web.session_log"
+    "SELECT COUNT(DISTINCT listener_id) AS dau FROM raw_streams.play_events"
   )
   stmts <- splitPrestoStatements(sql)
   expect_equal(length(stmts), 2)
   expect_true(grepl("-- 期間変更箇所", stmts[[1]]))
   expect_true(grepl("TD_TIME_RANGE", stmts[[1]]))
-  expect_equal(stmts[[2]], "SELECT COUNT(DISTINCT user_id) AS dau FROM l1_web.session_log")
+  expect_equal(stmts[[2]], "SELECT COUNT(DISTINCT listener_id) AS dau FROM raw_streams.play_events")
 })
 
 test_that("splitPrestoStatements: REGEXP_LIKE patterns with | inside string literals don't split", {
   sql <- paste(
-    "SELECT user_id,",
+    "SELECT listener_id,",
     "  CASE",
-    "    WHEN REGEXP_LIKE(category, 'shoes|bags|apparel') THEN 'fashion'",
-    "    WHEN REGEXP_LIKE(category, 'tv|laptop|phone') THEN 'electronics'",
+    "    WHEN REGEXP_LIKE(genre_tag, 'pop|rock|jazz') THEN 'mainstream'",
+    "    WHEN REGEXP_LIKE(genre_tag, 'classical|opera|ambient') THEN 'niche'",
     "    ELSE 'other'",
-    "  END AS segment",
-    "FROM l1_crm.purchase_log",
-    "WHERE TD_TIME_RANGE(time, '2026-01-01', NULL, 'JST');",
-    "SELECT segment, COUNT(DISTINCT user_id) AS users FROM l1_crm.purchase_log GROUP BY 1",
+    "  END AS taste_segment",
+    "FROM acct_data.listening_history",
+    "WHERE TD_TIME_RANGE(played_at, '2026-01-01', NULL, 'JST');",
+    "SELECT taste_segment, COUNT(DISTINCT listener_id) AS listeners FROM acct_data.listening_history GROUP BY 1",
     sep = "\n"
   )
   stmts <- splitPrestoStatements(sql)
   expect_equal(length(stmts), 2)
   expect_true(grepl("REGEXP_LIKE", stmts[[1]]))
-  expect_true(grepl("'shoes\\|bags\\|apparel'", stmts[[1]]))
+  expect_true(grepl("'pop\\|rock\\|jazz'", stmts[[1]]))
 })
 
 test_that("splitPrestoStatements: VALUES inline table with many literals inside a CTE", {
-  # Pattern: excluded IDs defined as inline VALUES, semicolon must not fire inside literals
+  # Pattern: excluded test-account IDs defined as inline VALUES
   sql <- paste(
-    "WITH excluded_ids AS (",
-    "  SELECT user_id FROM (",
+    "WITH excluded_accounts AS (",
+    "  SELECT account_id FROM (",
     "    VALUES",
-    "    ('uid-aaa-001'), ('uid-bbb-002'), ('uid-ccc-003'),",
-    "    ('uid-ddd-004'), ('uid-eee-005'), ('uid-fff-006'),",
-    "    ('uid-ggg-007'), ('uid-hhh-008')",
-    "  ) AS t (user_id)",
+    "    ('acct-001-test'), ('acct-002-test'), ('acct-003-test'),",
+    "    ('acct-004-demo'), ('acct-005-demo'), ('acct-006-demo'),",
+    "    ('acct-007-internal'), ('acct-008-internal')",
+    "  ) AS t (account_id)",
     ")",
-    "SELECT m.user_id, m.email",
-    "FROM l1_crm.members AS m",
-    "WHERE m.user_id NOT IN (SELECT user_id FROM excluded_ids)",
-    "  AND m.status = 'active';",
-    "SELECT COUNT(*) FROM l1_crm.members WHERE status = 'active'",
+    "SELECT p.account_id, p.plan_type",
+    "FROM billing_data.subscriptions AS p",
+    "WHERE p.account_id NOT IN (SELECT account_id FROM excluded_accounts)",
+    "  AND p.plan_type = 'premium';",
+    "SELECT COUNT(*) FROM billing_data.subscriptions WHERE plan_type = 'premium'",
     sep = "\n"
   )
   stmts <- splitPrestoStatements(sql)
   expect_equal(length(stmts), 2)
   expect_true(grepl("VALUES", stmts[[1]]))
-  expect_true(grepl("'uid-hhh-008'", stmts[[1]]))
-  expect_equal(stmts[[2]], "SELECT COUNT(*) FROM l1_crm.members WHERE status = 'active'")
+  expect_true(grepl("'acct-008-internal'", stmts[[1]]))
+  expect_equal(stmts[[2]], "SELECT COUNT(*) FROM billing_data.subscriptions WHERE plan_type = 'premium'")
 })
 
 test_that("splitPrestoStatements: CROSS JOIN UNNEST + UNION ALL is a single statement", {
   # Pattern: REGEXP_EXTRACT_ALL produces array, UNNEST expands it,
   # UNION ALL re-attaches rows where array was empty
   sql <- paste(
-    "WITH raw_events AS (",
-    "  SELECT user_id,",
-    "    REGEXP_EXTRACT_ALL(tag_string, '[a-z_]+') AS tag_array",
-    "  FROM l1_web.event_log",
-    "  WHERE TD_TIME_RANGE(time, '2026-01-01', NULL, 'JST') -- 期間変更箇所",
+    "WITH raw_tags AS (",
+    "  SELECT listener_id,",
+    "    REGEXP_EXTRACT_ALL(mood_tags, '[a-z_]+') AS tag_array",
+    "  FROM raw_streams.play_events",
+    "  WHERE TD_TIME_RANGE(played_at, '2026-01-01', NULL, 'JST') -- 期間変更箇所",
     "),",
     "expanded AS (",
-    "  SELECT user_id, tag",
-    "  FROM raw_events CROSS JOIN UNNEST(tag_array) AS t(tag)",
+    "  SELECT listener_id, tag",
+    "  FROM raw_tags CROSS JOIN UNNEST(tag_array) AS t(tag)",
     "  UNION ALL",
-    "  SELECT user_id, '' AS tag",
-    "  FROM raw_events",
+    "  SELECT listener_id, '' AS tag",
+    "  FROM raw_tags",
     "  WHERE ARRAY_JOIN(tag_array, ',') = ''",
     ")",
-    "SELECT user_id, tag, COUNT(1) AS cnt",
+    "SELECT listener_id, tag, COUNT(1) AS cnt",
     "FROM expanded",
     "GROUP BY 1, 2",
     sep = "\n"
@@ -428,245 +429,240 @@ test_that("splitPrestoStatements: CROSS JOIN UNNEST + UNION ALL is a single stat
 test_that("splitPrestoStatements: nested WITH (CTE inside outer CTE subquery)", {
   # Presto allows WITH inside a subquery — the inner WITH is not a statement separator
   sql <- paste(
-    "WITH outer_cte AS (",
-    "  WITH inner_agg AS (",
-    "    SELECT user_id, MAX(score) AS top_score",
-    "    FROM l1_crm.user_scores",
+    "WITH top_listeners AS (",
+    "  WITH monthly_plays AS (",
+    "    SELECT listener_id, MAX(play_count) AS peak_plays",
+    "    FROM acct_data.monthly_stats",
     "    GROUP BY 1",
     "  ),",
-    "  inner_filter AS (",
-    "    SELECT user_id FROM inner_agg WHERE top_score > 80",
+    "  qualified AS (",
+    "    SELECT listener_id FROM monthly_plays WHERE peak_plays > 500",
     "  )",
-    "  SELECT user_id, top_score FROM inner_agg",
-    "  WHERE user_id IN (SELECT user_id FROM inner_filter)",
+    "  SELECT listener_id, peak_plays FROM monthly_plays",
+    "  WHERE listener_id IN (SELECT listener_id FROM qualified)",
     ")",
-    "SELECT user_id, top_score FROM outer_cte ORDER BY top_score DESC",
+    "SELECT listener_id, peak_plays FROM top_listeners ORDER BY peak_plays DESC",
     sep = "\n"
   )
   stmts <- splitPrestoStatements(sql)
   expect_equal(length(stmts), 1)
-  expect_true(grepl("WITH inner_agg AS", stmts[[1]]))
-  expect_true(grepl("ORDER BY top_score DESC", stmts[[1]]))
+  expect_true(grepl("WITH monthly_plays AS", stmts[[1]]))
+  expect_true(grepl("ORDER BY peak_plays DESC", stmts[[1]]))
 })
 
 test_that("splitPrestoStatements: MAX_BY / MIN_BY / TD functions preserved across 3 statements", {
-  # Pattern: aggregate using TD-specific MAX_BY / MIN_BY, split into 3 statements
   sql <- paste(
-    "DROP TABLE IF EXISTS sandbox_retail.latest_purchase;",
-    "CREATE TABLE sandbox_retail.latest_purchase AS",
+    "DROP TABLE IF EXISTS dev_music.recent_track_per_listener;",
+    "CREATE TABLE dev_music.recent_track_per_listener AS",
     "WITH base AS (",
     "  SELECT",
-    "    user_id,",
-    "    MAX_BY(product_id, purchase_time) AS last_product,",
-    "    MIN_BY(product_id, purchase_time) AS first_product,",
-    "    COUNT(1) AS purchase_cnt",
-    "  FROM l1_store.purchase_log",
-    "  WHERE TD_TIME_RANGE(purchase_time, '2025-12-01', '2026-03-01', 'JST') -- 期間変更箇所",
+    "    listener_id,",
+    "    MAX_BY(track_id, played_at) AS last_track,",
+    "    MIN_BY(track_id, played_at) AS first_track,",
+    "    COUNT(1) AS total_plays",
+    "  FROM raw_streams.play_events",
+    "  WHERE TD_TIME_RANGE(played_at, '2025-12-01', '2026-03-01', 'JST') -- 期間変更箇所",
     "  GROUP BY 1",
     ")",
-    "SELECT user_id, last_product, first_product, purchase_cnt",
+    "SELECT listener_id, last_track, first_track, total_plays",
     "FROM base",
-    "WHERE purchase_cnt >= 2;",
-    "SELECT user_id, last_product FROM sandbox_retail.latest_purchase LIMIT 100",
+    "WHERE total_plays >= 10;",
+    "SELECT listener_id, last_track FROM dev_music.recent_track_per_listener LIMIT 100",
     sep = "\n"
   )
   stmts <- splitPrestoStatements(sql)
   expect_equal(length(stmts), 3)
-  expect_equal(stmts[[1]], "DROP TABLE IF EXISTS sandbox_retail.latest_purchase")
-  expect_true(startsWith(stmts[[2]], "CREATE TABLE sandbox_retail.latest_purchase AS"))
+  expect_equal(stmts[[1]], "DROP TABLE IF EXISTS dev_music.recent_track_per_listener")
+  expect_true(startsWith(stmts[[2]], "CREATE TABLE dev_music.recent_track_per_listener AS"))
   expect_true(grepl("MAX_BY", stmts[[2]]))
   expect_true(grepl("MIN_BY", stmts[[2]]))
   expect_true(grepl("TD_TIME_RANGE", stmts[[2]]))
-  expect_equal(stmts[[3]], "SELECT user_id, last_product FROM sandbox_retail.latest_purchase LIMIT 100")
+  expect_equal(stmts[[3]], "SELECT listener_id, last_track FROM dev_music.recent_track_per_listener LIMIT 100")
 })
 
 test_that("splitPrestoStatements: 5-stmt pipeline with step comments embedded in statements", {
   # Mirrors the real-world 3-step pattern: DROP+CREATE, DROP+CREATE, final SELECT
-  # The step-header comments (--) are attached to the following DROP statement
+  # The step-header -- comment is attached to the DROP statement that follows it
   sql <- paste(
-    "-- Step 1: build campaign user list",
-    "DROP TABLE IF EXISTS sandbox_retail.kpi_user_list;",
-    "CREATE TABLE sandbox_retail.kpi_user_list AS",
-    "WITH uid_map AS (",
-    "  SELECT user_hash AS uid, member_id",
-    "  FROM l1_member.uid_member_mapping",
-    "  WHERE is_latest = 1 AND member_id IS NOT NULL",
+    "-- Step 1: build target listener list",
+    "DROP TABLE IF EXISTS dev_music.campaign_listener_list;",
+    "CREATE TABLE dev_music.campaign_listener_list AS",
+    "WITH device_map AS (",
+    "  SELECT device_token AS token, account_id",
+    "  FROM acct_data.device_account_mapping",
+    "  WHERE is_active = 1 AND account_id IS NOT NULL",
     "  GROUP BY 1, 2",
     "),",
-    "web_access AS (",
-    "  SELECT m.member_id",
-    "  FROM l1_web.session_log AS s",
-    "  LEFT JOIN l1_web.user_id_map AS m USING(session_uid)",
-    "  WHERE TD_TIME_RANGE(s.access_time, '2025-12-01', '2026-02-01', 'JST') -- 期間変更箇所",
-    "    AND s.hostname = 'shop.example.com'",
-    "    AND m.member_id IS NOT NULL",
+    "app_sessions AS (",
+    "  SELECT m.account_id",
+    "  FROM raw_streams.device_sessions AS s",
+    "  LEFT JOIN acct_data.device_account_mapping AS m USING(device_token)",
+    "  WHERE TD_TIME_RANGE(s.session_start, '2025-12-01', '2026-02-01', 'JST') -- 期間変更箇所",
+    "    AND s.app_version >= '3.0'",
+    "    AND m.account_id IS NOT NULL",
     "  GROUP BY 1",
     ")",
-    "SELECT t1.member_id,",
-    "  IF(t2.member_id IS NOT NULL, 1, 0) AS is_priority",
-    "FROM l1_crm.registered_members AS t1",
-    "LEFT JOIN web_access AS t2 ON t1.member_id = t2.member_id",
-    "WHERE t1.status = 'active';",
+    "SELECT t1.account_id,",
+    "  IF(t2.account_id IS NOT NULL, 1, 0) AS is_high_value",
+    "FROM billing_data.subscribers AS t1",
+    "LEFT JOIN app_sessions AS t2 ON t1.account_id = t2.account_id",
+    "WHERE t1.plan_type = 'premium';",
     "",
-    "-- Step 2: build action log",
-    "DROP TABLE IF EXISTS sandbox_retail.kpi_action_list;",
-    "CREATE TABLE sandbox_retail.kpi_action_list AS",
-    "WITH actions AS (",
-    "  SELECT user_id, event_type,",
-    "    MIN(event_time) AS first_time, COUNT(1) AS cnt",
-    "  FROM l1_web.event_log",
-    "  WHERE TD_TIME_RANGE(event_time, '2026-01-01', NULL, 'JST') -- 期間変更箇所",
-    "    AND event_type IS NOT NULL",
+    "-- Step 2: build listening-action log",
+    "DROP TABLE IF EXISTS dev_music.campaign_action_log;",
+    "CREATE TABLE dev_music.campaign_action_log AS",
+    "WITH plays AS (",
+    "  SELECT listener_id, content_type,",
+    "    MIN(played_at) AS first_play, COUNT(1) AS play_cnt",
+    "  FROM raw_streams.play_events",
+    "  WHERE TD_TIME_RANGE(played_at, '2026-01-01', NULL, 'JST') -- 期間変更箇所",
+    "    AND content_type IS NOT NULL",
     "  GROUP BY 1, 2",
     ")",
-    "SELECT * FROM actions;",
+    "SELECT * FROM plays;",
     "",
     "-- Step 3: final aggregation",
-    "SELECT u.member_id,",
-    "  COALESCE(a.cnt, 0) AS action_cnt,",
-    "  u.is_priority",
-    "FROM sandbox_retail.kpi_user_list AS u",
-    "LEFT JOIN sandbox_retail.kpi_action_list AS a USING(member_id)",
+    "SELECT u.account_id,",
+    "  COALESCE(a.play_cnt, 0) AS total_plays,",
+    "  u.is_high_value",
+    "FROM dev_music.campaign_listener_list AS u",
+    "LEFT JOIN dev_music.campaign_action_log AS a ON u.account_id = a.listener_id",
     "ORDER BY 2 DESC",
     sep = "\n"
   )
   stmts <- splitPrestoStatements(sql)
   expect_equal(length(stmts), 5)
-  # step comment is part of the DROP statement that follows it
-  expect_true(grepl("DROP TABLE IF EXISTS sandbox_retail.kpi_user_list", stmts[[1]]))
-  expect_true(startsWith(stmts[[2]], "CREATE TABLE sandbox_retail.kpi_user_list AS"))
-  expect_true(grepl("MAX_BY\\|MIN_BY\\|IF\\|TD_TIME_RANGE\\|web_access", stmts[[2]]) ||
-              grepl("IF\\(t2", stmts[[2]]))
-  expect_true(grepl("DROP TABLE IF EXISTS sandbox_retail.kpi_action_list", stmts[[3]]))
-  expect_true(startsWith(stmts[[4]], "CREATE TABLE sandbox_retail.kpi_action_list AS"))
-  expect_true(grepl("SELECT u.member_id", stmts[[5]]))
+  expect_true(grepl("DROP TABLE IF EXISTS dev_music.campaign_listener_list", stmts[[1]]))
+  expect_true(startsWith(stmts[[2]], "CREATE TABLE dev_music.campaign_listener_list AS"))
+  expect_true(grepl("IF\\(t2", stmts[[2]]))
+  expect_true(grepl("DROP TABLE IF EXISTS dev_music.campaign_action_log", stmts[[3]]))
+  expect_true(startsWith(stmts[[4]], "CREATE TABLE dev_music.campaign_action_log AS"))
+  expect_true(grepl("SELECT u.account_id", stmts[[5]]))
   expect_true(grepl("ORDER BY 2 DESC", stmts[[5]]))
 })
 
 test_that("prestoStatementReturnsRows: complex WITH + nested WITH + UNION ALL + ORDER BY is row-returning", {
-  # Mirrors Step 4 in the real-world script: final SELECT-only with
-  # outer CTEs each containing inner WITH, joined by UNION ALL, ORDER BY at end
+  # Mirrors Step 4 in the real-world script: final SELECT-only with outer CTEs
+  # each containing their own inner WITH, joined by UNION ALL, ORDER BY at end
   sql <- paste(
-    "WITH prev_stage AS (",
-    "  WITH stage_scores AS (",
-    "    SELECT user_id,",
+    "WITH prev_engagement AS (",
+    "  WITH engagement_scores AS (",
+    "    SELECT listener_id,",
     "      CASE",
-    "        WHEN COUNT(DISTINCT stage || behavior) >= 3 THEN 2",
-    "        WHEN COUNT(DISTINCT stage || behavior) >= 1 THEN 1",
+    "        WHEN COUNT(DISTINCT content_type || genre_tag) >= 3 THEN 2",
+    "        WHEN COUNT(DISTINCT content_type || genre_tag) >= 1 THEN 1",
     "        ELSE 0",
-    "      END AS stage_lvl",
-    "    FROM sandbox_retail.kpi_action_list",
-    "    WHERE TD_TIME_RANGE(action_time, '2026-01-01', '2026-02-01', 'JST') -- 期間変更箇所",
-    "      AND stage IN ('awareness', 'interest')",
+    "      END AS eng_lvl",
+    "    FROM dev_music.campaign_action_log",
+    "    WHERE TD_TIME_RANGE(first_play, '2026-01-01', '2026-02-01', 'JST') -- 期間変更箇所",
+    "      AND content_type IN ('track', 'album')",
     "    GROUP BY 1",
     "  )",
-    "  SELECT user_id, MAX(stage_lvl) AS start_stage FROM stage_scores GROUP BY 1",
+    "  SELECT listener_id, MAX(eng_lvl) AS start_eng FROM engagement_scores GROUP BY 1",
     "),",
-    "curr_stage AS (",
-    "  WITH stage_scores AS (",
-    "    SELECT user_id,",
+    "curr_engagement AS (",
+    "  WITH engagement_scores AS (",
+    "    SELECT listener_id,",
     "      CASE",
-    "        WHEN COUNT(DISTINCT stage || behavior) >= 3 THEN 2",
-    "        WHEN COUNT(DISTINCT stage || behavior) >= 1 THEN 1",
+    "        WHEN COUNT(DISTINCT content_type || genre_tag) >= 3 THEN 2",
+    "        WHEN COUNT(DISTINCT content_type || genre_tag) >= 1 THEN 1",
     "        ELSE 0",
-    "      END AS stage_lvl",
-    "    FROM sandbox_retail.kpi_action_list",
-    "    WHERE TD_TIME_RANGE(action_time, '2026-02-01', NULL, 'JST') -- 期間変更箇所",
-    "      AND stage IN ('awareness', 'interest')",
+    "      END AS eng_lvl",
+    "    FROM dev_music.campaign_action_log",
+    "    WHERE TD_TIME_RANGE(first_play, '2026-02-01', NULL, 'JST') -- 期間変更箇所",
+    "      AND content_type IN ('track', 'album')",
     "    GROUP BY 1",
     "  )",
-    "  SELECT user_id, MAX(stage_lvl) AS latest_stage FROM stage_scores GROUP BY 1",
+    "  SELECT listener_id, MAX(eng_lvl) AS latest_eng FROM engagement_scores GROUP BY 1",
     "),",
-    "ai_chat_users AS (",
-    "  SELECT DISTINCT user_id FROM sandbox_retail.kpi_action_list",
-    "  WHERE type = 'AI chat'",
-    "    AND TD_TIME_RANGE(action_time, '2026-02-01', NULL, 'JST')",
+    "rec_engine_users AS (",
+    "  SELECT DISTINCT listener_id FROM dev_music.campaign_action_log",
+    "  WHERE content_type = 'recommendation'",
+    "    AND TD_TIME_RANGE(first_play, '2026-02-01', NULL, 'JST')",
     ")",
-    "-- group A: AI chat users",
-    "SELECT 'A: AI chat users' AS cohort,",
-    "  CASE t2.start_stage WHEN 3 THEN '3:purchase' WHEN 2 THEN '2:visit'",
-    "    WHEN 1 THEN '1:interest' ELSE '0:none' END AS start_stage,",
-    "  CASE WHEN COALESCE(t3.latest_stage, 0) >= t2.start_stage",
-    "    THEN CASE t3.latest_stage WHEN 3 THEN '3:purchase' WHEN 2 THEN '2:visit'",
-    "           WHEN 1 THEN '1:interest' ELSE '0:none' END",
-    "    ELSE CASE t2.start_stage WHEN 3 THEN '3:purchase' WHEN 2 THEN '2:visit'",
-    "           WHEN 1 THEN '1:interest' ELSE '0:none' END",
+    "-- cohort A: used recommendation engine",
+    "SELECT 'A: used recommendations' AS cohort,",
+    "  CASE t2.start_eng WHEN 3 THEN '3:converted' WHEN 2 THEN '2:engaged'",
+    "    WHEN 1 THEN '1:aware' ELSE '0:none' END AS start_stage,",
+    "  CASE WHEN COALESCE(t3.latest_eng, 0) >= t2.start_eng",
+    "    THEN CASE t3.latest_eng WHEN 3 THEN '3:converted' WHEN 2 THEN '2:engaged'",
+    "           WHEN 1 THEN '1:aware' ELSE '0:none' END",
+    "    ELSE CASE t2.start_eng WHEN 3 THEN '3:converted' WHEN 2 THEN '2:engaged'",
+    "           WHEN 1 THEN '1:aware' ELSE '0:none' END",
     "  END AS latest_stage,",
-    "  COUNT(DISTINCT t1.user_id) AS cnt",
-    "FROM sandbox_retail.kpi_user_list AS t1",
-    "LEFT JOIN prev_stage AS t2 ON t1.user_id = t2.user_id",
-    "LEFT JOIN curr_stage AS t3 ON t1.user_id = t3.user_id",
-    "INNER JOIN ai_chat_users AS t4 ON t1.user_id = t4.user_id",
-    "WHERE t3.latest_stage IS NOT NULL",
+    "  COUNT(DISTINCT t1.account_id) AS cnt",
+    "FROM dev_music.campaign_listener_list AS t1",
+    "LEFT JOIN prev_engagement AS t2 ON t1.account_id = t2.listener_id",
+    "LEFT JOIN curr_engagement AS t3 ON t1.account_id = t3.listener_id",
+    "INNER JOIN rec_engine_users AS t4 ON t1.account_id = t4.listener_id",
+    "WHERE t3.latest_eng IS NOT NULL",
     "GROUP BY 1, 2, 3",
     "UNION ALL",
-    "-- group B: no AI chat",
-    "SELECT 'B: no AI chat' AS cohort,",
-    "  CASE t2.start_stage WHEN 3 THEN '3:purchase' WHEN 2 THEN '2:visit'",
-    "    WHEN 1 THEN '1:interest' ELSE '0:none' END AS start_stage,",
-    "  CASE WHEN COALESCE(t3.latest_stage, 0) >= t2.start_stage",
-    "    THEN CASE t3.latest_stage WHEN 3 THEN '3:purchase' WHEN 2 THEN '2:visit'",
-    "           WHEN 1 THEN '1:interest' ELSE '0:none' END",
-    "    ELSE CASE t2.start_stage WHEN 3 THEN '3:purchase' WHEN 2 THEN '2:visit'",
-    "           WHEN 1 THEN '1:interest' ELSE '0:none' END",
+    "-- cohort B: did not use recommendation engine",
+    "SELECT 'B: no recommendations' AS cohort,",
+    "  CASE t2.start_eng WHEN 3 THEN '3:converted' WHEN 2 THEN '2:engaged'",
+    "    WHEN 1 THEN '1:aware' ELSE '0:none' END AS start_stage,",
+    "  CASE WHEN COALESCE(t3.latest_eng, 0) >= t2.start_eng",
+    "    THEN CASE t3.latest_eng WHEN 3 THEN '3:converted' WHEN 2 THEN '2:engaged'",
+    "           WHEN 1 THEN '1:aware' ELSE '0:none' END",
+    "    ELSE CASE t2.start_eng WHEN 3 THEN '3:converted' WHEN 2 THEN '2:engaged'",
+    "           WHEN 1 THEN '1:aware' ELSE '0:none' END",
     "  END AS latest_stage,",
-    "  COUNT(DISTINCT t1.user_id) AS cnt",
-    "FROM sandbox_retail.kpi_user_list AS t1",
-    "LEFT JOIN prev_stage AS t2 ON t1.user_id = t2.user_id",
-    "LEFT JOIN curr_stage AS t3 ON t1.user_id = t3.user_id",
-    "LEFT JOIN ai_chat_users AS t4 ON t1.user_id = t4.user_id",
-    "WHERE t3.latest_stage IS NOT NULL",
-    "  AND t4.user_id IS NULL",
+    "  COUNT(DISTINCT t1.account_id) AS cnt",
+    "FROM dev_music.campaign_listener_list AS t1",
+    "LEFT JOIN prev_engagement AS t2 ON t1.account_id = t2.listener_id",
+    "LEFT JOIN curr_engagement AS t3 ON t1.account_id = t3.listener_id",
+    "LEFT JOIN rec_engine_users AS t4 ON t1.account_id = t4.listener_id",
+    "WHERE t3.latest_eng IS NOT NULL",
+    "  AND t4.listener_id IS NULL",
     "GROUP BY 1, 2, 3",
     "ORDER BY 1, 2",
     sep = "\n"
   )
-  # the statement starts with WITH → row-returning
   expect_true(prestoStatementReturnsRows(sql))
-  # it is one unsplit statement
   stmts <- splitPrestoStatements(sql)
   expect_equal(length(stmts), 1)
 })
 
 test_that("prestoStatementReturnsRows: CREATE TABLE AS WITH multi-CTE is not row-returning", {
   sql <- paste(
-    "CREATE TABLE sandbox_retail.kpi_action_list AS",
-    "WITH web_log AS (",
-    "  SELECT m.user_id, 'Web' AS channel,",
+    "CREATE TABLE dev_music.campaign_action_log AS",
+    "WITH app_play_log AS (",
+    "  SELECT m.account_id, 'app' AS channel,",
     "    CASE",
-    "      WHEN REGEXP_LIKE(cat, 'pricing|specs|compare') THEN 'consideration'",
-    "      WHEN REGEXP_LIKE(cat, 'brand|campaign') THEN 'awareness'",
-    "    END AS stage,",
-    "    TD_TIME_STRING(MIN(s.event_time), 'M!', 'JST') AS report_month,",
-    "    MIN(s.event_time) AS action_time,",
-    "    COUNT(1) AS cnt",
-    "  FROM l1_web.event_log AS s",
-    "  LEFT JOIN l1_web.user_id_map AS m USING(session_uid)",
-    "  WHERE TD_TIME_RANGE(s.event_time, '2025-12-01', NULL, 'JST') -- 期間変更箇所",
-    "    AND s.hostname = 'shop.example.com'",
-    "    AND m.user_id IS NOT NULL",
-    "    AND cat IS NOT NULL",
+    "      WHEN REGEXP_LIKE(genre_tag, 'pop|rock|hiphop') THEN 'mainstream'",
+    "      WHEN REGEXP_LIKE(genre_tag, 'classical|jazz|ambient') THEN 'niche'",
+    "    END AS taste_segment,",
+    "    TD_TIME_STRING(MIN(s.played_at), 'M!', 'JST') AS report_month,",
+    "    MIN(s.played_at) AS action_time,",
+    "    COUNT(1) AS play_cnt",
+    "  FROM raw_streams.play_events AS s",
+    "  LEFT JOIN acct_data.device_account_mapping AS m USING(device_token)",
+    "  WHERE TD_TIME_RANGE(s.played_at, '2025-12-01', NULL, 'JST') -- 期間変更箇所",
+    "    AND s.app_platform IN ('ios', 'android')",
+    "    AND m.account_id IS NOT NULL",
+    "    AND genre_tag IS NOT NULL",
     "  GROUP BY 1, 2, 3, 4",
     "),",
-    "chat_log AS (",
-    "  SELECT user_id, 'AI chat' AS channel,",
+    "rec_chat_log AS (",
+    "  SELECT account_id, 'rec_chat' AS channel,",
     "    CASE",
-    "      WHEN REGEXP_LIKE(intent_tags, 'price|discount|budget') THEN 'consideration'",
-    "      WHEN REGEXP_LIKE(intent_tags, 'brand|model') THEN 'awareness'",
-    "      WHEN conversation_completed IS NULL THEN 'no conversation'",
+    "      WHEN REGEXP_LIKE(query_text, 'similar|more like|recommend') THEN 'discovery'",
+    "      WHEN REGEXP_LIKE(query_text, 'chart|top|popular') THEN 'mainstream'",
+    "      WHEN conversation_ended IS NULL THEN 'no response'",
     "      ELSE 'other'",
-    "    END AS stage,",
-    "    TD_TIME_STRING(TD_TIME_PARSE(session_date, 'JST'), 'M!', 'JST') AS report_month,",
-    "    MIN(TD_TIME_PARSE(session_date, 'JST')) AS action_time,",
-    "    COUNT(1) AS cnt",
-    "  FROM l1_store.ai_chat_sessions",
-    "  WHERE TD_TIME_RANGE(TD_TIME_PARSE(session_date, 'JST'), '2026-01-01', NULL, 'JST')",
-    "    AND user_id IS NOT NULL",
+    "    END AS taste_segment,",
+    "    TD_TIME_STRING(TD_TIME_PARSE(chat_date, 'JST'), 'M!', 'JST') AS report_month,",
+    "    MIN(TD_TIME_PARSE(chat_date, 'JST')) AS action_time,",
+    "    COUNT(1) AS chat_cnt",
+    "  FROM catalog_db.rec_chat_sessions",
+    "  WHERE TD_TIME_RANGE(TD_TIME_PARSE(chat_date, 'JST'), '2026-01-01', NULL, 'JST')",
+    "    AND account_id IS NOT NULL",
     "  GROUP BY 1, 2, 3, 4",
     ")",
-    "SELECT * FROM web_log",
+    "SELECT * FROM app_play_log",
     "UNION ALL",
-    "SELECT * FROM chat_log",
+    "SELECT * FROM rec_chat_log",
     sep = "\n"
   )
   expect_false(prestoStatementReturnsRows(sql))
@@ -675,21 +671,21 @@ test_that("prestoStatementReturnsRows: CREATE TABLE AS WITH multi-CTE is not row
 test_that("prestoStatementReturnsRows: SELECT with CASE, REGEXP_LIKE, TD functions is row-returning", {
   sql <- paste(
     "SELECT",
-    "  user_id,",
+    "  listener_id,",
     "  CASE",
-    "    WHEN REGEXP_LIKE(behavior_tags, 'purchase|checkout|payment') THEN 'converted'",
-    "    WHEN REGEXP_LIKE(behavior_tags, 'wishlist|cart|compare') THEN 'considering'",
-    "    WHEN REGEXP_LIKE(behavior_tags, 'view|search|browse') THEN 'browsing'",
+    "    WHEN REGEXP_LIKE(action_tags, 'subscribe|upgrade|purchase') THEN 'converted'",
+    "    WHEN REGEXP_LIKE(action_tags, 'playlist|save|follow') THEN 'engaged'",
+    "    WHEN REGEXP_LIKE(action_tags, 'play|search|browse') THEN 'exploring'",
     "    ELSE 'unknown'",
     "  END AS funnel_stage,",
-    "  TD_TIME_STRING(MIN(event_time), 'yyyy-MM-dd', 'JST') AS first_event_date,",
-    "  TD_TIME_STRING(MAX(event_time), 'yyyy-MM-dd', 'JST') AS last_event_date,",
+    "  TD_TIME_STRING(MIN(played_at), 'yyyy-MM-dd', 'JST') AS first_action_date,",
+    "  TD_TIME_STRING(MAX(played_at), 'yyyy-MM-dd', 'JST') AS last_action_date,",
     "  COUNT(DISTINCT session_id) AS session_cnt,",
     "  COUNT(1) AS event_cnt",
-    "FROM l1_web.event_log",
-    "WHERE TD_TIME_RANGE(event_time, '2026-01-01', NULL, 'JST') -- 期間変更箇所",
-    "  AND hostname = 'shop.example.com'",
-    "  AND user_id IS NOT NULL",
+    "FROM raw_streams.play_events",
+    "WHERE TD_TIME_RANGE(played_at, '2026-01-01', NULL, 'JST') -- 期間変更箇所",
+    "  AND app_platform = 'ios'",
+    "  AND listener_id IS NOT NULL",
     "GROUP BY 1, 2",
     "ORDER BY session_cnt DESC",
     sep = "\n"
