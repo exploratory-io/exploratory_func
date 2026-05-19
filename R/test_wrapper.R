@@ -2448,8 +2448,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
     } else { # 2-way ANOVA case. The separator (*, :, or +) should not matter.
       formula <- as.formula(paste0('~`', paste(x$var2, collapse='`*`'), '`'))
     }
-    # For 1-way ANOVA (oneway.test -> htest), emmeans cannot dispatch recover_data.htest,
-    # so use the stored lm model instead, mirroring get_pairwise_contrast_df.
+    # x$lm.model is set only for 1-way ANOVA (oneway.test() stores its result as htest,
+    # which emmeans cannot dispatch recover_data for). For 2-way ANOVA and ANCOVA, the
+    # model itself is an lm object and x$lm.model is NULL. So this check reliably
+    # identifies the 1-way ANOVA case without affecting other branches.
     if (!is.null(x$lm.model)) {
       if (isTRUE(x$var.equal)) {
         ret <- emmeans::emmeans(x$lm.model, formula)
