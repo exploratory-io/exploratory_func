@@ -1072,3 +1072,14 @@ test_that("wilcox_norm_dist_sd returns positive numeric", {
   expect_true(is.numeric(sd_paired))
   expect_true(sd_paired > 0)
 })
+
+test_that("1-way ANOVA with complex column names works for type='emmeans' and type='pairs'", {
+  # Regression test: oneway.test() returns htest class; emmeans cannot handle htest directly.
+  # The fix uses x$lm.model instead of x (the anova_exploratory/htest object).
+  df <- mtcars %>% dplyr::mutate(`航空 会社 !` = factor(am), `出発 遅れ |` = mpg)
+  model_df <- df %>% exp_anova(`出発 遅れ |`, `航空 会社 !`)
+  ret_emmeans <- model_df %>% tidy_rowwise(model, type = "emmeans", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_emmeans))
+  ret_pairs <- model_df %>% tidy_rowwise(model, type = "pairs", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_pairs))
+})
