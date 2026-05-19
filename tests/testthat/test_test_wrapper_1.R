@@ -723,6 +723,24 @@ test_that("test ANCOVA with exp_anova", {
   expect_true("a m * q sec" %in% ret_model$Variable)
 })
 
+test_that("ANCOVA with multi-covariates and with_interaction=FALSE includes all covariates", {
+  mtcars2 <- mtcars %>% mutate(`a m` = factor(am), `w t` = wt, `q sec` = qsec)
+  model_df <- mtcars2 %>% exp_anova(mpg, `a m`,
+                                    covariates = c("w t", "q sec"),
+                                    covariate_funs = list("w t" = "none", "q sec" = "none"),
+                                    with_interaction = FALSE)
+  ret_model <- model_df %>% tidy_rowwise(model, type = "model")
+  expect_true("w t" %in% ret_model$Variable)
+  expect_true("q sec" %in% ret_model$Variable)
+  # No interaction terms should appear.
+  expect_false(any(grepl("\\*", ret_model$Variable)))
+
+  ret_emmeans <- model_df %>% tidy_rowwise(model, type = "emmeans", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_emmeans))
+  ret_pairs <- model_df %>% tidy_rowwise(model, type = "pairs", pairs_adjust = "tukey")
+  expect_true(is.data.frame(ret_pairs))
+})
+
 test_that("ANCOVA with single covariate is unchanged after multi-covariate fix (#35347)", {
   mtcars2 <- mtcars %>% mutate(`a m` = factor(am), `w t` = wt)
   model_df <- mtcars2 %>% exp_anova(mpg, `a m`,
