@@ -155,7 +155,7 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
   if (total > 1L) {
     for (i in seq_len(total - 1L)) {
       tryCatch({
-        RPresto::dbExecute(conn, statements[[i]])
+        DBI::dbExecute(conn, statements[[i]])
       }, error = function(err) {
         clearDBConnection("presto", host, port, catalog, schema, username)
         stop(sprintf("Statement %d of %d failed: %s", i, total, conditionMessage(err)))
@@ -174,7 +174,7 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
     return(df)
   } else {
     tryCatch({
-      RPresto::dbExecute(conn, last)
+      DBI::dbExecute(conn, last)
     }, error = function(err) {
       clearDBConnection("presto", host, port, catalog, schema, username)
       stop(sprintf("Statement %d of %d failed: %s", total, total, conditionMessage(err)))
