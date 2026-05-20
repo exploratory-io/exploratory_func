@@ -555,6 +555,92 @@ test_that("read_parquet_file should be to read the parquet file with an invalid 
   expect_equal(TRUE, is.data.frame(df))
 })
 
+# Issue #35740 — skip_nul argument lets the user opt into arrow.skip_nul = TRUE so the
+# Arrow -> R data.frame conversion strips NUL bytes from string columns instead of
+# throwing "embedded nul in string". The R-side contract is that getOption("arrow.skip_nul")
+# is restored to its prior value after the call, success or failure.
+
+test_that("read_parquet_file restores arrow.skip_nul option to NULL after successful skip_nul = TRUE call", {
+  loadNamespace("arrow")
+  tmp <- tempfile(fileext = ".parquet")
+  on.exit(unlink(tmp))
+  arrow::write_parquet(tibble::tibble(x = c("a", "b", "c")), tmp)
+
+  # Establish a known starting state: option unset.
+  prior_holder <- options(arrow.skip_nul = NULL)
+  on.exit(options(prior_holder), add = TRUE)
+  expect_null(getOption("arrow.skip_nul"))
+
+  df <- exploratory::read_parquet_file(tmp, skip_nul = TRUE)
+  expect_true(is.data.frame(df))
+  # Restored.
+  expect_null(getOption("arrow.skip_nul"))
+})
+
+test_that("read_parquet_file preserves prior arrow.skip_nul = TRUE when call uses skip_nul = FALSE", {
+  loadNamespace("arrow")
+  tmp <- tempfile(fileext = ".parquet")
+  on.exit(unlink(tmp))
+  arrow::write_parquet(tibble::tibble(x = c("a", "b", "c")), tmp)
+
+  prior_holder <- options(arrow.skip_nul = TRUE)
+  on.exit(options(prior_holder), add = TRUE)
+  expect_true(isTRUE(getOption("arrow.skip_nul")))
+
+  df <- exploratory::read_parquet_file(tmp, skip_nul = FALSE)
+  expect_true(is.data.frame(df))
+  # Prior TRUE preserved — call does NOT flip it to FALSE.
+  expect_true(isTRUE(getOption("arrow.skip_nul")))
+})
+
+test_that("read_parquet_file_internal default skip_nul is FALSE (back-compat for old callers)", {
+  loadNamespace("arrow")
+  tmp <- tempfile(fileext = ".parquet")
+  on.exit(unlink(tmp))
+  arrow::write_parquet(tibble::tibble(x = c("a", "b", "c")), tmp)
+
+  prior_holder <- options(arrow.skip_nul = NULL)
+  on.exit(options(prior_holder), add = TRUE)
+
+  # Call internal directly with default args to verify the parameter default.
+  df <- exploratory:::read_parquet_file_internal(tmp)
+  expect_true(is.data.frame(df))
+  expect_null(getOption("arrow.skip_nul"))
+})
+
+test_that("read_parquet_files forwards skip_nul to read_parquet_file (option restored after multi-file call)", {
+  loadNamespace("arrow")
+  tmp1 <- tempfile(fileext = ".parquet")
+  tmp2 <- tempfile(fileext = ".parquet")
+  on.exit(unlink(c(tmp1, tmp2)))
+  arrow::write_parquet(tibble::tibble(x = c("a", "b")), tmp1)
+  arrow::write_parquet(tibble::tibble(x = c("c", "d")), tmp2)
+
+  prior_holder <- options(arrow.skip_nul = NULL)
+  on.exit(options(prior_holder), add = TRUE)
+
+  df <- exploratory::read_parquet_files(c(tmp1, tmp2), skip_nul = TRUE)
+  expect_true(is.data.frame(df))
+  expect_equal(nrow(df), 4L)
+  expect_null(getOption("arrow.skip_nul"))
+})
+
+test_that("read_parquet_file_internal restores arrow.skip_nul on error path", {
+  # Hand a non-existent file to arrow::read_parquet so it throws. The on.exit() restore
+  # must still fire — otherwise a failed import would leak arrow.skip_nul = TRUE into
+  # the user's R session.
+  loadNamespace("arrow")
+  prior_holder <- options(arrow.skip_nul = NULL)
+  on.exit(options(prior_holder), add = TRUE)
+  expect_null(getOption("arrow.skip_nul"))
+
+  expect_error(
+    exploratory:::read_parquet_file_internal("/tmp/__nonexistent_parquet_35740__.parquet", skip_nul = TRUE)
+  )
+  # Option must be restored even though the call errored.
+  expect_null(getOption("arrow.skip_nul"))
+})
+
 test_that("test filter_cascade",{
   library(stringr)
   df <- readRDS(url("https://www.dropbox.com/s/p2vmd79ly1zugh9/airbnb_nyc_filter_7.rds?dl=1"))
