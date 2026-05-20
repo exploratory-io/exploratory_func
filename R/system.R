@@ -3866,7 +3866,7 @@ read_rds_file <- function(file, refhook = NULL){
 
 #'API that search and imports multiple same structure parquet files and merge it to a single data frame
 #'@export
-searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files, col_select = NULL){
+searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files, col_select = NULL, skip_nul = FALSE){
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
@@ -3889,7 +3889,7 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  read_parquet_files(as.character(files), forPreview = forPreview, col_select = col_select)
+  read_parquet_files(as.character(files), forPreview = forPreview, col_select = col_select, skip_nul = skip_nul)
 }
 
 #'API that imports multiple same structure parquet files and merge it to a single data frame
