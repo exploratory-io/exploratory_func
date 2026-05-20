@@ -3894,14 +3894,14 @@ searchAndReadParquetFiles <- function(folder, forPreview = FALSE, pattern, files
 
 #'API that imports multiple same structure parquet files and merge it to a single data frame
 #'@export
-read_parquet_files <- function(files, forPreview = FALSE, col_select = NULL) {
+read_parquet_files <- function(files, forPreview = FALSE, col_select = NULL, skip_nul = FALSE) {
   # for preview mode, just use the first file.
   if (forPreview & length(files) > 0) {
     files <- files[1]
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
-  df <- purrr::map_dfr(files, exploratory::read_parquet_file, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  df <- purrr::map_dfr(files, read_parquet_file, col_select = col_select, skip_nul = skip_nul, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
@@ -3912,7 +3912,7 @@ read_parquet_files <- function(files, forPreview = FALSE, col_select = NULL) {
 
 #' Wrapper for read_parquet to support remote file.
 #' @export
-read_parquet_file <- function(file, col_select = NULL) {
+read_parquet_file <- function(file, col_select = NULL, skip_nul = FALSE) {
   loadNamespace("arrow")
   tf <- NULL
   res <- NULL
@@ -3933,9 +3933,9 @@ read_parquet_file <- function(file, col_select = NULL) {
     # Read the local parquet file.
     tryCatch({
       if (is.null(col_select)) {
-        res <- read_parquet_file_internal(tf)
+        res <- read_parquet_file_internal(tf, skip_nul = skip_nul)
       } else {
-        res <- read_parquet_file_internal(tf, col_select = col_select)
+        res <- read_parquet_file_internal(tf, col_select = col_select, skip_nul = skip_nul)
       }
     }, error = function(e) {
       stop(paste0('EXP-DATASRC-13 :: ', jsonlite::toJSON(c(file, e$message)), ' :: Failed to import file.'))
@@ -3943,9 +3943,9 @@ read_parquet_file <- function(file, col_select = NULL) {
   } else {
     tryCatch({
       if (is.null(col_select)) {
-        res <- read_parquet_file_internal(file)
+        res <- read_parquet_file_internal(file, skip_nul = skip_nul)
       } else {
-        res <- read_parquet_file_internal(file, col_select = col_select)
+        res <- read_parquet_file_internal(file, col_select = col_select, skip_nul = skip_nul)
       }
     }, error = function(e) {
       # Error message for non-existent file case looks like this - "Error : IOError: Failed to open local file '<full filepath>'. Detail: [errno 2] No such file or directory"
@@ -3963,7 +3963,15 @@ read_parquet_file <- function(file, col_select = NULL) {
 # Wrapper around arrow::read_parquet to work around https://issues.apache.org/jira/browse/ARROW-13860 by applying group_by column stored in the parquet file
 # as one of the class names.
 # To avoid the resource lock issue, set mmap as FALSE by default.
-read_parquet_file_internal <- function(filepath, col_select = NULL, mmap = FALSE) {
+# When skip_nul is TRUE, arrow::read_parquet strips NUL bytes from string columns during R conversion
+# via the arrow.skip_nul global option. The prior value of the option is restored on exit so the
+# call does not leak state into the user's R session.
+read_parquet_file_internal <- function(filepath, col_select = NULL, mmap = FALSE, skip_nul = FALSE) {
+  prior_skip_nul <- getOption("arrow.skip_nul")
+  on.exit(options(arrow.skip_nul = prior_skip_nul), add = TRUE)
+  if (isTRUE(skip_nul) && !isTRUE(prior_skip_nul)) {
+    options(arrow.skip_nul = TRUE)
+  }
   res <- NULL
   if (is.null(col_select)) {
     res <- arrow::read_parquet(filepath, mmap = mmap)
