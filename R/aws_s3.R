@@ -215,7 +215,7 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
 
 #'API that imports a Parquet file from AWS S3.
 #'@export
-getParquetFileFromS3 <- function(fileName, region, username, password, bucket, col_select = NULL) {
+getParquetFileFromS3 <- function(fileName, region, username, password, bucket, col_select = NULL, skip_nul = FALSE) {
   tryCatch({
     filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
   }, error = function(e) {
@@ -229,20 +229,20 @@ getParquetFileFromS3 <- function(fileName, region, username, password, bucket, c
       stop(e)
     }
   })
-  exploratory::read_parquet_file(filePath, col_select = col_select)
+  exploratory::read_parquet_file(filePath, col_select = col_select, skip_nul = skip_nul)
 }
 
 #'API that imports multiple same structure Parquet files and merge it to a single data frame
 #'
 #'@export
-getParquetFilesFromS3 <- function(files, region, username, password, bucket, forPreview = FALSE, col_select = NULL) {
+getParquetFilesFromS3 <- function(files, region, username, password, bucket, forPreview = FALSE, col_select = NULL, skip_nul = FALSE) {
   # for preview mode, just use the first file.
   if (forPreview & length(files) > 0) {
     files <- files[1]
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
-  df <- purrr::map_dfr(files, exploratory::getParquetFileFromS3, region = region, username = username, password = password, bucket = bucket, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  df <- purrr::map_dfr(files, exploratory::getParquetFileFromS3, region = region, username = username, password = password, bucket = bucket, col_select = col_select, skip_nul = skip_nul, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
@@ -253,7 +253,7 @@ getParquetFilesFromS3 <- function(files, region, username, password, bucket, for
 #'API that search files by search keyword then imports multiple same structure Parquet files and merge it to a single data frame
 #'
 #'@export
-searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, password, bucket, forPreview = FALSE, col_select = NULL) {
+searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, password, bucket, forPreview = FALSE, col_select = NULL, skip_nul = FALSE) {
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -273,7 +273,7 @@ searchAndGetParquetFilesFromS3 <- function(searchKeyword, region, username, pass
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getParquetFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, forPreview = forPreview, col_select = col_select)
+  getParquetFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, forPreview = forPreview, col_select = col_select, skip_nul = skip_nul)
 
 }
 
