@@ -379,4 +379,52 @@ clearGoogleDriveCacheFile <- function(fileId, type = "csv"){
   })
 }
 
+#'API that imports a Parquet file from Google Drive.
+#'@export
+getParquetFileFromGoogleDrive <- function(fileId, col_select = NULL, skip_nul = FALSE) {
+  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "parquet")
+  exploratory::read_parquet_file(filePath, col_select = col_select, skip_nul = skip_nul)
+}
+
+#'API that imports multiple same structure Parquet files from Google Drive and merge into a single data frame.
+#'@export
+getParquetFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, col_select = NULL, skip_nul = FALSE) {
+  # for preview mode, just use the first file.
+  if (forPreview & length(fileNames) > 0 & length(fileIds) > 0) {
+    fileNames <- fileNames[1]
+    fileIds <- fileIds[1]
+  }
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(fileIds), fileNames)
+  df <- purrr::map_dfr(files, exploratory::getParquetFileFromGoogleDrive, col_select = col_select, skip_nul = skip_nul, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  df[[id_col]] <- df[["exp.file.id"]]
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+#'API that searches files by keyword then imports multiple same structure Parquet files from Google Drive.
+#'@export
+searchAndGetParquetFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", forPreview = FALSE, col_select = NULL, skip_nul = FALSE, shared_with_me = FALSE, team_drive_id = NULL) {
+  # Use NULL type to list all files (googledrive has no built-in parquet MIME type),
+  # then filter by .parquet extension and optional search keyword.
+  tryCatch({
+    items <- exploratory::listItemsInGoogleDrive(path = folderId, type = NULL, sharedWithMe = shared_with_me, teamDriveId = team_drive_id)
+  }, error = function(e) {
+    if (any(stringr::str_detect(e$message, "File not found"))) {
+      stop(paste0('EXP-DATASRC-6 :: [] :: The specified Google Drive folder does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  # Always filter to .parquet files first.
+  items <- items %>% filter(stringr::str_detect(name, "(?i)\\.parquet$"))
+  if (searchKeyword != "") {
+    items <- items %>% filter(stringr::str_detect(name, stringr::str_c("(?i)", searchKeyword)))
+  }
+  if (nrow(items) == 0) {
+    stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
+  }
+  exploratory::getParquetFilesFromGoogleDrive(items$id, items$name, forPreview = forPreview, col_select = col_select, skip_nul = skip_nul)
+}
 
