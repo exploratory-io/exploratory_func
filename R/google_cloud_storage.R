@@ -632,7 +632,7 @@ getExcelSheetsFromGoogleCloudStorageExcelFile <- function(file, bucket){
 
 #'API that imports a Parquet file from Google Cloud Storage.
 #'@export
-getParquetFileFromGoogleCloudStorage <- function(file, bucket, col_select = NULL) {
+getParquetFileFromGoogleCloudStorage <- function(file, bucket, col_select = NULL, skip_nul = FALSE) {
   tryCatch({
     filePath <- downloadDataFileFromGoogleCloudStorage(bucket = bucket, file = file)
   },  error = function(e) {
@@ -649,20 +649,20 @@ getParquetFileFromGoogleCloudStorage <- function(file, bucket, col_select = NULL
       stop(e)
     }
   })
-  exploratory::read_parquet_file(filePath, col_select = col_select)
+  exploratory::read_parquet_file(filePath, col_select = col_select, skip_nul = skip_nul)
 }
 
 #'API that imports multiple same structure Parquet files and merge it to a single data frame
 #'
 #'@export
-getParquetFilesFromGoogleCloudStorage <- function(files, bucket, for_preview = FALSE, col_select = NULL) {
+getParquetFilesFromGoogleCloudStorage <- function(files, bucket, for_preview = FALSE, col_select = NULL, skip_nul = FALSE) {
   # for preview mode, just use the first file.
   if (for_preview & length(files) > 0) {
     files <- files[1]
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
-  df <- purrr::map_dfr(files, exploratory::getParquetFileFromGoogleCloudStorage, bucket = bucket, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  df <- purrr::map_dfr(files, exploratory::getParquetFileFromGoogleCloudStorage, bucket = bucket, col_select = col_select, skip_nul = skip_nul, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
@@ -673,7 +673,7 @@ getParquetFilesFromGoogleCloudStorage <- function(files, bucket, for_preview = F
 #'API that search files by search keyword then imports multiple same structure Parquet files and merge it to a single data frame
 #'
 #'@export
-searchAndGetParquetFilesFromGoogleCloudStorage <- function(bucket = '', folder = '', search_keyword, for_preview = FALSE, col_select = NULL) {
+searchAndGetParquetFilesFromGoogleCloudStorage <- function(bucket = '', folder = '', search_keyword, for_preview = FALSE, col_select = NULL, skip_nul = FALSE) {
   # set token before calling googleCloudStorageR API.
   token <- exploratory:::getGoogleTokenForCloudStorage()
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
@@ -699,7 +699,7 @@ searchAndGetParquetFilesFromGoogleCloudStorage <- function(bucket = '', folder =
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getParquetFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, for_preview = for_preview, col_select = col_select)
+  getParquetFilesFromGoogleCloudStorage(files = files$name, bucket = bucket, for_preview = for_preview, col_select = col_select, skip_nul = skip_nul)
 
 }
 

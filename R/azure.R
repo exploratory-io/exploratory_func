@@ -185,7 +185,7 @@ searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, co
 
 #'API that imports a Parquet file from Azure.
 #'@export
-getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = "", container = "",  col_select = NULL) {
+getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = "", container = "",  col_select = NULL, skip_nul = FALSE) {
   tryCatch({
     filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
@@ -198,18 +198,18 @@ getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = ""
       stop(e)
     }
   })
-  exploratory::read_parquet_file(filePath, col_select = col_select)
+  exploratory::read_parquet_file(filePath, col_select = col_select, skip_nul = skip_nul)
 }
 
 #'API that imports Parquet Files from Azure.
 #'@export
-getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", container = "", forPreview = FALSE, col_select = NULL) {
+getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", container = "", forPreview = FALSE, col_select = NULL, skip_nul = FALSE) {
   # for preview mode, just use the first file.
   if (forPreview & length(files) > 0) {
     files <- files[1]
   }
   files <- setNames(as.list(files), files)
-  df <- purrr::map_dfr(files, exploratory::getParquetFileFromAzure, host = host, securityToken = securityToken, container = container, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  df <- purrr::map_dfr(files, exploratory::getParquetFileFromAzure, host = host, securityToken = securityToken, container = container, col_select = col_select, skip_nul = skip_nul, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
@@ -218,7 +218,7 @@ getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", 
 }
 
 #'@export
-searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", securityToken = "", container = "", folder = "", forPreview = FALSE, col_select = NULL) {
+searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", securityToken = "", container = "", folder = "", forPreview = FALSE, col_select = NULL, skip_nul = FALSE) {
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -239,7 +239,7 @@ searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", sec
   if (nrow(files) == 0) {
     stop(paste0('EXP-DATASRC-10 :: ', jsonlite::toJSON(container), ' :: There is no file in the Azure container that matches with the specified condition.')) # TODO: escape bucket name.
   }
-  getParquetFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, forPreview = forPreview, col_select = col_select)
+  getParquetFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, forPreview = forPreview, col_select = col_select, skip_nul = skip_nul)
 
 }
 
