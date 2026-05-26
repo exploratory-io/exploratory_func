@@ -1,6 +1,6 @@
-context("test xgboost model serialization round-trip (#35943)")
+context("test xgboost model serialization round-trip")
 
-# Regression tests for #35943: xgboost 3.x stores the model behind a bare external
+# Regression tests: xgboost 3.x stores the model behind a bare external
 # pointer ($ptr) that does NOT survive saveRDS/readRDS. Exploratory persists model
 # data frames with saveRDS (_tam_saveRObjectOnSession) and restores them with readRDS
 # on project re-open, so after a re-open the booster's $ptr is blank and any consume
@@ -17,7 +17,7 @@ round_trip_rds <- function(obj) {
   readRDS(tmp)
 }
 
-test_that("xgboost_reg prediction survives saveRDS/readRDS round-trip (#35943)", {
+test_that("xgboost_reg prediction survives saveRDS/readRDS round-trip", {
   set.seed(1)
   train_data <- data.frame(y = rnorm(100), x1 = runif(100), x2 = runif(100))
   model <- xgboost_reg(train_data, formula = y ~ x1 + x2, nrounds = 5)
@@ -29,7 +29,7 @@ test_that("xgboost_reg prediction survives saveRDS/readRDS round-trip (#35943)",
   expect_equal(length(predicted), nrow(train_data))
 })
 
-test_that("xgboost_binary prediction survives saveRDS/readRDS round-trip (#35943)", {
+test_that("xgboost_binary prediction survives saveRDS/readRDS round-trip", {
   set.seed(1)
   train_data <- data.frame(
     label = rep(c(TRUE, FALSE, FALSE), 100),
@@ -45,7 +45,7 @@ test_that("xgboost_binary prediction survives saveRDS/readRDS round-trip (#35943
   expect_equal(length(predicted), nrow(train_data))
 })
 
-test_that("xgboost_multi prediction survives saveRDS/readRDS round-trip (#35943)", {
+test_that("xgboost_multi prediction survives saveRDS/readRDS round-trip", {
   set.seed(1)
   train_data <- data.frame(
     label = rep(c(5, 10, 15), 100),
@@ -61,7 +61,7 @@ test_that("xgboost_multi prediction survives saveRDS/readRDS round-trip (#35943)
   expect_equal(nrow(predicted), nrow(train_data))
 })
 
-test_that("xgboost variable importance survives saveRDS/readRDS round-trip (#35943)", {
+test_that("xgboost variable importance survives saveRDS/readRDS round-trip", {
   set.seed(1)
   train_data <- data.frame(y = rnorm(100), x1 = runif(100), x2 = runif(100))
   model <- xgboost_reg(train_data, formula = y ~ x1 + x2, nrounds = 5)
@@ -75,7 +75,7 @@ test_that("xgboost variable importance survives saveRDS/readRDS round-trip (#359
   expect_true(nrow(imp) > 0)
 })
 
-test_that("xgboost predictions are numerically identical before and after round-trip (#35943)", {
+test_that("xgboost predictions are numerically identical before and after round-trip", {
   set.seed(1)
   train_data <- data.frame(y = rnorm(100), x1 = runif(100), x2 = runif(100))
   model <- xgboost_reg(train_data, formula = y ~ x1 + x2, nrounds = 5)
@@ -88,7 +88,7 @@ test_that("xgboost predictions are numerically identical before and after round-
 })
 
 if (Sys.info()["sysname"] != "Windows") {
-  test_that("xgboost prediction with multibyte column names survives round-trip (#35943)", {
+  test_that("xgboost prediction with multibyte column names survives round-trip", {
     set.seed(1)
     train_data <- data.frame(y = rnorm(100), age = runif(100), sex = runif(100))
     colnames(train_data) <- c("結果", "年齢", "性別")
@@ -102,7 +102,7 @@ if (Sys.info()["sysname"] != "Windows") {
   })
 }
 
-test_that("legacy xgboost model without $raw fails gracefully without retry loop (#35943)", {
+test_that("legacy xgboost model without $raw fails gracefully without retry loop", {
   set.seed(1)
   train_data <- data.frame(y = rnorm(100), x1 = runif(100), x2 = runif(100))
   model <- xgboost_reg(train_data, formula = y ~ x1 + x2, nrounds = 5)
