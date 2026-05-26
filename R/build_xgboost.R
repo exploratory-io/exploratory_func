@@ -91,10 +91,16 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     # - raw: a serializable copy of the model. The bare $ptr does NOT survive
     #   saveRDS/readRDS (it is written out as a null pointer), so without this the model
     #   is unusable after a project re-open (which restores the model df via readRDS).
-    #   _restore_xgb_handle() rebuilds the handle from these bytes when $ptr is blank. (#35943)
+    #   .restore_xgb_handle() rebuilds the handle from these bytes when $ptr is blank. (#35943)
     # - params: training params stored as R attribute in 3.x, needed by predict_xgboost()
     # - evaluation_log: stored as attribute in 3.x, preserved here as a list element
-    model_raw <- tryCatch(xgboost::xgb.save.raw(ret), error = function(e) NULL)
+    model_raw <- tryCatch(xgboost::xgb.save.raw(ret), error = function(e) {
+      # Should not happen for a freshly trained booster, but warn rather than fail
+      # silently: a NULL $raw means the model cannot be restored after a project re-open.
+      warning(paste0("Failed to serialize xgboost model for persistence; it will work in ",
+                     "this session but not after a project re-open: ", conditionMessage(e)))
+      NULL
+    })
     ret <- structure(list(ptr = ret$ptr, raw = model_raw, params = attr(ret, "params"),
                           evaluation_log = attr(ret, "evaluation_log")), class = class(ret))
     ret$terms <- term
@@ -635,7 +641,7 @@ tidy.xgb.Booster <- function(x, type="weight", pretty.name = FALSE, ...){
       xgboost::xgb.importance(feature_names = x$x_names, model = x),
       error = function(e) {
         if (!is.null(x$raw) && grepl("externalptr", conditionMessage(e))) {
-          xgboost::xgb.importance(feature_names = x$x_names, model = `_restore_xgb_handle`(x))
+          xgboost::xgb.importance(feature_names = x$x_names, model = .restore_xgb_handle(x))
         } else stop(e)
       }
     ) %>% as.data.frame()
@@ -770,7 +776,7 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
 
 # Rebuild the xgboost C++ handle from the stored raw bytes when $ptr is blank
 # (e.g. after the model df was restored across a project re-open via readRDS). (#35943)
-`_restore_xgb_handle` <- function(model) {
+.restore_xgb_handle <- function(model) {
   if (is.null(model$raw)) return(model) # legacy model (built before the fix): nothing to restore from
   model$ptr <- xgboost::xgb.load.raw(model$raw)$ptr
   model
@@ -798,7 +804,7 @@ predict_xgboost <- function(model, df) {
     stats::predict(model, mat_data),
     error = function(e) {
       if (!is.null(model$raw) && grepl("externalptr", conditionMessage(e))) {
-        stats::predict(`_restore_xgb_handle`(model), mat_data)
+        stats::predict(.restore_xgb_handle(model), mat_data)
       } else stop(e)
     }
   )
