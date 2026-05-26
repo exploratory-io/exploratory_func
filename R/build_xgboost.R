@@ -88,9 +88,14 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     # Create a plain list with the booster's elements to allow metadata attachment
     # while preserving the class for method dispatch (predict, xgb.importance, etc.).
     # - ptr: the C++ external pointer, used by xgb.get.handle() inside predict/importance
+    # - raw: a serializable copy of the model. The bare $ptr does NOT survive
+    #   saveRDS/readRDS (it is written out as a null pointer), so without this the model
+    #   is unusable after a project re-open (which restores the model df via readRDS).
+    #   _restore_xgb_handle() rebuilds the handle from these bytes when $ptr is blank. (#35943)
     # - params: training params stored as R attribute in 3.x, needed by predict_xgboost()
     # - evaluation_log: stored as attribute in 3.x, preserved here as a list element
-    ret <- structure(list(ptr = ret$ptr, params = attr(ret, "params"),
+    model_raw <- tryCatch(xgboost::xgb.save.raw(ret), error = function(e) NULL)
+    ret <- structure(list(ptr = ret$ptr, raw = model_raw, params = attr(ret, "params"),
                           evaluation_log = attr(ret, "evaluation_log")), class = class(ret))
     ret$terms <- term
     # To avoid saving a huge environment when caching with RDS.
@@ -624,8 +629,16 @@ tidy.xgb.Booster <- function(x, type="weight", pretty.name = FALSE, ...){
                          class(x)!="xgboost_reg" &
                          class(x) != "fml_xgboost"]
   ret <- tryCatch({
-    ret <- xgboost::xgb.importance(feature_names = x$x_names,
-                                   model=x) %>% as.data.frame()
+    # Retry once if the booster handle is blank after a project re-open: restore it from
+    # the stored raw bytes ($raw) and recompute importance. Happy path has no overhead. (#35943)
+    ret <- tryCatch(
+      xgboost::xgb.importance(feature_names = x$x_names, model = x),
+      error = function(e) {
+        if (!is.null(x$raw) && grepl("externalptr", conditionMessage(e))) {
+          xgboost::xgb.importance(feature_names = x$x_names, model = `_restore_xgb_handle`(x))
+        } else stop(e)
+      }
+    ) %>% as.data.frame()
     if (pretty.name) {
       colnames(ret)[colnames(ret)=="Gain"] <- "Importance"
       colnames(ret)[colnames(ret)=="Cover"] <- "Coverage"
@@ -755,6 +768,14 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# Rebuild the xgboost C++ handle from the stored raw bytes when $ptr is blank
+# (e.g. after the model df was restored across a project re-open via readRDS). (#35943)
+`_restore_xgb_handle` <- function(model) {
+  if (is.null(model$raw)) return(model) # legacy model (built before the fix): nothing to restore from
+  model$ptr <- xgboost::xgb.load.raw(model$raw)$ptr
+  model
+}
+
 # XGBoost prediction function that takes data frame rather than matrix.
 predict_xgboost <- function(model, df) {
   y_name <- all.vars(model$terms)[[1]]
@@ -771,7 +792,16 @@ predict_xgboost <- function(model, df) {
     model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
   }
 
-  predicted <- stats::predict(model, mat_data)
+  # Retry once if the booster handle is blank after a project re-open: restore it from
+  # the stored raw bytes ($raw) and predict again. Happy path has zero overhead. (#35943)
+  predicted <- tryCatch(
+    stats::predict(model, mat_data),
+    error = function(e) {
+      if (!is.null(model$raw) && grepl("externalptr", conditionMessage(e))) {
+        stats::predict(`_restore_xgb_handle`(model), mat_data)
+      } else stop(e)
+    }
+  )
 
   obj <- model$params$objective
 
