@@ -73,6 +73,52 @@ test_that("exp_kmeans elbow method mode", {
   expect_equal(nrow(res), 8)
 })
 
+test_that("exp_kmeans silhouette method mode", {
+  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+
+  # silhouette_result is attached with correct columns and value ranges
+  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode = "silhouette")
+  res <- model_df$model[[1]]$silhouette_result
+  expect_equal(colnames(res), c("center", "avg_silhouette", "min_silhouette", "pct_negative"))
+  expect_true(min(res$center) == 2)
+  expect_true(all(res$avg_silhouette >= -1 & res$avg_silhouette <= 1))
+  expect_true(all(res$min_silhouette >= -1 & res$min_silhouette <= 1))
+  expect_true(all(res$pct_negative >= 0 & res$pct_negative <= 1))
+  # elbow_result should NOT be attached when silhouette mode is used
+  expect_null(model_df$model[[1]]$elbow_result)
+})
+
+test_that("exp_kmeans elbow_method_mode = 'elbow' attaches elbow_result only", {
+  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode = "elbow")
+  expect_false(is.null(model_df$model[[1]]$elbow_result))
+  expect_null(model_df$model[[1]]$silhouette_result)
+})
+
+test_that("exp_kmeans elbow_method_mode = 'none' attaches neither", {
+  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode = "none")
+  expect_null(model_df$model[[1]]$elbow_result)
+  expect_null(model_df$model[[1]]$silhouette_result)
+})
+
+test_that("exp_kmeans elbow_method_mode backward compatibility: logical TRUE/FALSE", {
+  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+
+  # TRUE should behave the same as "elbow"
+  model_df_logical <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode = TRUE, seed = 42)
+  model_df_enum   <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode = "elbow", seed = 42)
+  expect_false(is.null(model_df_logical$model[[1]]$elbow_result))
+  expect_null(model_df_logical$model[[1]]$silhouette_result)
+  expect_equal(model_df_logical$model[[1]]$elbow_result,
+               model_df_enum$model[[1]]$elbow_result)
+
+  # FALSE should behave the same as "none"
+  model_df_false <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode = FALSE)
+  expect_null(model_df_false$model[[1]]$elbow_result)
+  expect_null(model_df_false$model[[1]]$silhouette_result)
+})
+
 # group_by for elbow method is not currently supported. Revive this test when it is.
 #test_that("exp_kmeans elbow method mode with group_by", {
 #  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))

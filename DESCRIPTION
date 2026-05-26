@@ -40,7 +40,8 @@ Imports:
     zoo,
     snakecase,
     textshape,
-    V8
+    V8,
+    cluster
 Suggests:
     testthat,
     twitteR,
