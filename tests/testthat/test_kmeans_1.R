@@ -88,6 +88,18 @@ test_that("exp_kmeans silhouette method mode", {
   expect_null(model_df$model[[1]]$elbow_result)
 })
 
+test_that("exp_kmeans silhouette mode caps k by distinct data points", {
+  # Only 3 distinct rows across many duplicates; max_centers default is 10.
+  # k must be capped at distinct points - 1 so stats::kmeans() does not error.
+  df <- data.frame(
+    x = rep(c(1, 2, 3), times = 20),
+    y = rep(c(10, 20, 30), times = 20)
+  )
+  model_df <- exp_kmeans(df, x, y, elbow_method_mode = "silhouette")
+  res <- model_df$model[[1]]$silhouette_result
+  expect_true(max(res$center) <= 2) # distinct points (3) - 1
+})
+
 test_that("exp_kmeans elbow_method_mode = 'elbow' attaches elbow_result only", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
   model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode = "elbow")

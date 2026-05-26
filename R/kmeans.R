@@ -46,7 +46,10 @@ iterate_silhouette <- function(df, max_centers = 10,
     mat <- scale(mat)
     mat[is.nan(mat)] <- 0
   }
-  upper <- min(max_centers, nrow(mat) - 1)
+  # Cap k by the number of distinct data points, not just the row count:
+  # stats::kmeans() errors with "more cluster centers than distinct data points"
+  # when centers exceed distinct points (same constraint build_kmeans.cols() guards against).
+  upper <- min(max_centers, nrow(unique(mat)) - 1)
   if (upper < 2) {
     return(data.frame(center = integer(0), avg_silhouette = numeric(0),
                       min_silhouette = numeric(0), pct_negative = numeric(0)))
@@ -56,8 +59,14 @@ iterate_silhouette <- function(df, max_centers = 10,
     if (!is.null(seed)) {
       set.seed(seed)
     }
-    km <- stats::kmeans(mat, centers = k, iter.max = iter.max,
-                        nstart = nstart, algorithm = algorithm, trace = trace)
+    km <- tryCatch({
+      stats::kmeans(mat, centers = k, iter.max = iter.max,
+                    nstart = nstart, algorithm = algorithm, trace = trace)
+    }, error = function(e) {
+      # Surface a clear error that names the offending k, mirroring iterate_kmeans().
+      stop(paste0(e$message, " (while computing silhouette with centers=", k, ")"),
+           call. = FALSE)
+    })
     sil <- cluster::silhouette(km$cluster, d)
     widths <- sil[, "sil_width"]
     data.frame(
@@ -157,7 +166,7 @@ exp_kmeans <- function(df, ...,
                                    algorithm = algorithm,
                                    trace = trace,
                                    normalize_data = normalize_data,
-                                   seed = NULL) # Seed is already done in do_prcomp. Skip it.
+                                   seed = NULL) # Seed is already set once at the top of exp_kmeans(). Skip it.
   } else if (optimal_method == "silhouette") {
     kmeans_df <- df %>% dplyr::select(!!!rlang::syms(selected_cols))
     silhouette_result <- iterate_silhouette(kmeans_df,
@@ -167,7 +176,7 @@ exp_kmeans <- function(df, ...,
                                             algorithm = algorithm,
                                             trace = trace,
                                             normalize_data = normalize_data,
-                                            seed = NULL) # Seed is already done in do_prcomp. Skip it.
+                                            seed = NULL) # Seed is already set once at the top of exp_kmeans(). Skip it.
   }
 
   ret <- ret %>% dplyr::mutate(model = purrr::imap(model, function(x, idx) {
