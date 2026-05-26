@@ -33,6 +33,51 @@ iterate_kmeans <- function(df, max_centers = 10,
   ret %>% rowwise(center) %>% glance_rowwise(model)
 }
 
+# internal function to iterate number of centers (k) from 2 to max_centers for silhouette method to find optimal k.
+iterate_silhouette <- function(df, max_centers = 10,
+                               iter.max = 10,
+                               nstart = 1,
+                               algorithm = "Hartigan-Wong",
+                               trace = FALSE,
+                               normalize_data = TRUE,
+                               seed = NULL) {
+  mat <- as_numeric_matrix_(df, columns = colnames(df))
+  if (normalize_data) {
+    mat <- scale(mat)
+    mat[is.nan(mat)] <- 0
+  }
+  # Cap k by the number of distinct data points, not just the row count:
+  # stats::kmeans() errors with "more cluster centers than distinct data points"
+  # when centers exceed distinct points (same constraint build_kmeans.cols() guards against).
+  upper <- min(max_centers, nrow(unique(mat)) - 1)
+  if (upper < 2) {
+    return(data.frame(center = integer(0), avg_silhouette = numeric(0),
+                      min_silhouette = numeric(0), pct_negative = numeric(0)))
+  }
+  d <- stats::dist(mat)
+  purrr::map_dfr(seq(2, upper), function(k) {
+    if (!is.null(seed)) {
+      set.seed(seed)
+    }
+    km <- tryCatch({
+      stats::kmeans(mat, centers = k, iter.max = iter.max,
+                    nstart = nstart, algorithm = algorithm, trace = trace)
+    }, error = function(e) {
+      # Surface a clear error that names the offending k, mirroring iterate_kmeans().
+      stop(paste0(e$message, " (while computing silhouette with centers=", k, ")"),
+           call. = FALSE)
+    })
+    sil <- cluster::silhouette(km$cluster, d)
+    widths <- sil[, "sil_width"]
+    data.frame(
+      center = k,
+      avg_silhouette = mean(widths, na.rm = TRUE),
+      min_silhouette = min(widths, na.rm = TRUE),
+      pct_negative = mean(widths < 0, na.rm = TRUE)
+    )
+  })
+}
+
 #' analytics function for K-means view
 #' @export
 exp_kmeans <- function(df, ...,
@@ -51,6 +96,13 @@ exp_kmeans <- function(df, ...,
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
+
+  # Normalize elbow_method_mode: accept logical (legacy) or character enum.
+  optimal_method <- if (is.logical(elbow_method_mode)) {
+    if (isTRUE(elbow_method_mode)) "elbow" else "none"
+  } else {
+    match.arg(as.character(elbow_method_mode), c("none", "silhouette", "elbow"))
+  }
 
   # Set seed just once.
   if(!is.null(seed)) { # Set seed before starting to call sample_n.
@@ -102,9 +154,10 @@ exp_kmeans <- function(df, ...,
                    !!!rlang::syms(selected_cols))
   ret <- dplyr::ungroup(ret) # ungroup once so that the following mutate with purrr::map2 works.
 
-  # If elbow_method_mode is TRUE, also compute the elbow method results and attach to model
+  # Compute elbow or silhouette results depending on optimal_method.
   elbow_result <- NULL
-  if (elbow_method_mode) {
+  silhouette_result <- NULL
+  if (optimal_method == "elbow") {
     kmeans_df <- df %>% dplyr::select(!!!rlang::syms(selected_cols))
     elbow_result <- iterate_kmeans(kmeans_df,
                                    max_centers = max_centers,
@@ -113,7 +166,17 @@ exp_kmeans <- function(df, ...,
                                    algorithm = algorithm,
                                    trace = trace,
                                    normalize_data = normalize_data,
-                                   seed=NULL) # Seed is already done in do_prcomp. Skip it.
+                                   seed = NULL) # Seed is already set once at the top of exp_kmeans(). Skip it.
+  } else if (optimal_method == "silhouette") {
+    kmeans_df <- df %>% dplyr::select(!!!rlang::syms(selected_cols))
+    silhouette_result <- iterate_silhouette(kmeans_df,
+                                            max_centers = max_centers,
+                                            iter.max = iter.max,
+                                            nstart = nstart,
+                                            algorithm = algorithm,
+                                            trace = trace,
+                                            normalize_data = normalize_data,
+                                            seed = NULL) # Seed is already set once at the top of exp_kmeans(). Skip it.
   }
 
   ret <- ret %>% dplyr::mutate(model = purrr::imap(model, function(x, idx) {
@@ -124,6 +187,9 @@ exp_kmeans <- function(df, ...,
       x$excluded_nrow <- excluded_nrow
       if (!is.null(elbow_result)) {
         x$elbow_result <- elbow_result
+      }
+      if (!is.null(silhouette_result)) {
+        x$silhouette_result <- silhouette_result
       }
       x
     }, error = function(e) {
