@@ -3165,3 +3165,167 @@ tidy.ttest_power_exploratory <- function(x, type="summary") {
   }
   ret
 }
+
+#' Two-sample (two independent groups) proportion test (prop.test / fisher.test).
+#'
+#' Tests whether the proportions of successes in two independent groups are equal.
+#' Uses \code{prop.test} (approximate) or \code{fisher.test} (exact) depending on the method argument.
+#' The Auto method selects Fisher's Exact Test when any expected cell count in the 2x2 table is < 5,
+#' otherwise uses the approximate test.
+#'
+#' @param df A data frame.
+#' @param var A logical column representing the binary outcome (success = TRUE).
+#' @param explanatory A column with exactly two unique values identifying the two groups.
+#' @param func2 Optional function to transform the explanatory column (date/numeric).
+#' @param alternative Direction of the test: "two.sided", "greater" (group A > group B), or "less".
+#' @param method Test method: "auto", "exact" (Fisher's), or "approximate" (prop.test).
+#' @param sig.level Significance level (default 0.05).
+#' @param ... Additional arguments (ignored).
+#' @return A data frame with a list-column "model" of class prop_test_2groups_exploratory.
+#' @export
+exp_prop_test_2groups <- function(df, var, explanatory, func2 = NULL,
+                                  alternative = "two.sided", method = "auto",
+                                  sig.level = 0.05, ...) {
+  var_col <- col_name(substitute(var))
+  exp_col <- col_name(substitute(explanatory))
+  grouped_cols <- grouped_by(df)
+
+  # func2 transform on explanatory (date/numeric)
+  if (!is.null(func2)) {
+    if (lubridate::is.Date(df[[exp_col]]) || lubridate::is.POSIXct(df[[exp_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(exp_col) := extract_from_date(!!rlang::sym(exp_col), type = !!func2))
+    } else if (is.numeric(df[[exp_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(exp_col) := extract_from_numeric(!!rlang::sym(exp_col), type = !!func2))
+    }
+  }
+
+  # Group ordering: logical explanatory -> factor with stable levels
+  if (is.logical(df[[exp_col]])) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(exp_col) := factor(!!rlang::sym(exp_col), levels = c("TRUE", "FALSE")))
+  }
+
+  # Validate exactly 2 unique values, auto-filtering NA as a 3rd category
+  n_distinct_res <- n_distinct(df[[exp_col]])
+  if (n_distinct_res != 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[exp_col]]))) {
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(exp_col)))
+    } else {
+      stop("The explanatory variable needs to have 2 unique values.")
+    }
+  }
+
+  prop_test_2groups_each <- function(df) {
+    tryCatch({
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var_col)))
+      if (nrow(df) == 0) stop("There is no data left after removing NA.")
+      if (length(grouped_cols) > 0 && n_distinct(df[[exp_col]]) != 2) {
+        stop("The explanatory variable needs to have 2 unique values.")
+      }
+
+      vec <- as.logical(df[[var_col]])
+      grp <- df[[exp_col]]
+      lv  <- if (is.factor(grp)) levels(forcats::fct_drop(grp)) else sort(unique(as.character(grp)))
+      gA <- lv[1]; gB <- lv[2]
+      isA <- as.character(grp) == gA; isB <- as.character(grp) == gB
+      xA <- sum(vec[isA], na.rm = TRUE); nA <- sum(isA)
+      xB <- sum(vec[isB], na.rm = TRUE); nB <- sum(isB)
+      if (nA < 1 || nB < 1) stop("Not enough data in one of the groups.")
+      pA <- xA / nA; pB <- xB / nB
+
+      tbl <- matrix(c(xA, nA - xA, xB, nB - xB), nrow = 2, byrow = TRUE)
+      expected <- outer(rowSums(tbl), colSums(tbl)) / sum(tbl)
+      small_expected <- any(expected < 5)
+
+      use_exact <- switch(method, "exact" = TRUE, "approximate" = FALSE, small_expected)
+      conf_level <- 1 - sig.level
+
+      if (use_exact) {
+        res <- fisher.test(tbl, alternative = alternative, conf.level = conf_level)
+        method_used <- "Fisher's Exact Test"
+        odds_ratio <- unname(res$estimate); or_low <- res$conf.int[1]; or_high <- res$conf.int[2]
+        diff_low <- NA_real_; diff_high <- NA_real_
+      } else {
+        res <- prop.test(x = c(xA, xB), n = c(nA, nB), alternative = alternative,
+                        correct = FALSE, conf.level = conf_level)
+        method_used <- "Approximate Test (Normal)"
+        diff_low <- res$conf.int[1]; diff_high <- res$conf.int[2]
+        odds_ratio <- NA_real_; or_low <- NA_real_; or_high <- NA_real_
+      }
+
+      ciA <- if (use_exact) binom.test(xA, nA)$conf.int else prop.test(xA, nA, correct = FALSE)$conf.int
+      ciB <- if (use_exact) binom.test(xB, nB)$conf.int else prop.test(xB, nB, correct = FALSE)$conf.int
+
+      cohens_h <- pwr::ES.h(pA, pB)
+      power <- tryCatch(
+        (pwr::pwr.2p2n.test(h = cohens_h, n1 = nA, n2 = nB, sig.level = sig.level, alternative = alternative))$power,
+        error = function(e) NA_real_)
+
+      model <- list(
+        htest = res, gA = gA, gB = gB,
+        xA = xA, nA = nA, pA = pA, ciA = ciA,
+        xB = xB, nB = nB, pB = pB, ciB = ciB,
+        difference = pA - pB, diff_low = diff_low, diff_high = diff_high,
+        odds_ratio = odds_ratio, or_low = or_low, or_high = or_high,
+        p_value = res$p.value, method_used = method_used, alternative = alternative,
+        cohens_h = cohens_h, power = power, sig.level = sig.level,
+        var_col = var_col, exp_col = exp_col)
+      class(model) <- c("prop_test_2groups_exploratory", class(model))
+      model
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) { class(e) <- c("prop_test_2groups_exploratory", class(e)); e }
+      else stop(e)
+    })
+  }
+
+  do_on_each_group(df, prop_test_2groups_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.prop_test_2groups_exploratory <- function(x, type = "model") {
+  if ("error" %in% class(x)) {
+    return(tibble::tibble(Note = x$message))
+  }
+  if (type == "model") {
+    direction <- switch(x$alternative,
+      "two.sided" = "Different between the two groups",
+      "greater"   = "Group A is greater than Group B",
+      "less"      = "Group A is less than Group B")
+    result_label <- if (!is.na(x$p_value) && x$p_value < x$sig.level)
+      "Statistically significant." else "Not statistically significant."
+    tibble::tibble(
+      `Group A`                  = x$gA,
+      `Successes A`              = x$xA,
+      `Total A`                  = x$nA,
+      `Proportion A`             = x$pA,
+      `Group B`                  = x$gB,
+      `Successes B`              = x$xB,
+      `Total B`                  = x$nB,
+      `Proportion B`             = x$pB,
+      `Difference`               = x$difference,
+      `Difference Conf Low`      = x$diff_low,
+      `Difference Conf High`     = x$diff_high,
+      `Odds Ratio`               = x$odds_ratio,
+      `Odds Ratio Conf Low`      = x$or_low,
+      `Odds Ratio Conf High`     = x$or_high,
+      `P Value`                  = x$p_value,
+      `Cohen's h`                = x$cohens_h,
+      `Power`                    = x$power,
+      `Test Direction`           = direction,
+      `Method`                   = x$method_used,
+      `Result`                   = result_label
+    )
+  } else {
+    tibble::tibble(
+      `Group`          = c(x$gA, x$gB),
+      `Proportion (%)`  = c(x$pA * 100, x$pB * 100),
+      `Conf Low (%)`   = c(x$ciA[1] * 100, x$ciB[1] * 100),
+      `Conf High (%)`  = c(x$ciA[2] * 100, x$ciB[2] * 100)
+    )
+  }
+}
+
+#' @export
+glance.prop_test_2groups_exploratory <- function(x) {
+  if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
+  broom:::glance.htest(x$htest)
+}
