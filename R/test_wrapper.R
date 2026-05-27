@@ -3165,3 +3165,118 @@ tidy.ttest_power_exploratory <- function(x, type="summary") {
   }
   ret
 }
+
+#' One-sample proportion test (binom.test / prop.test).
+#'
+#' Tests whether an observed proportion differs from a known benchmark proportion.
+#' Uses \code{binom.test} (exact) when n*p < 5 or n*(1-p) < 5 (auto mode),
+#' otherwise uses \code{prop.test(correct = FALSE)} (approximate).
+#'
+#' @param df A data frame.
+#' @param var A logical column (success = TRUE).
+#' @param p Benchmark proportion (between 0 and 1). Default 0.5.
+#' @param alternative Direction: "two.sided", "greater", or "less".
+#' @param method Test method: "auto", "exact" (binom.test), or "approximate" (prop.test).
+#' @param sig.level Significance level. Default 0.05.
+#' @param ... Additional arguments (ignored).
+#' @return A data frame with a list-column "model" of class prop_test_exploratory.
+#' @export
+exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
+                          method = "auto", sig.level = 0.05, ...) {
+  var_col <- col_name(substitute(var))
+  grouped_cols <- grouped_by(df)
+
+  prop_test_each <- function(df) {
+    tryCatch({
+      vec <- df[[var_col]]
+      x <- sum(vec, na.rm = TRUE)
+      n <- sum(!is.na(vec))
+      if (n == 0) stop("There is no valid (non-NA) data in the selected column.")
+
+      use_exact <- switch(method,
+        "exact" = TRUE,
+        "approximate" = FALSE,
+        (n * p < 5 || n * (1 - p) < 5))
+      conf_level <- 1 - sig.level
+
+      if (use_exact) {
+        res <- binom.test(x = x, n = n, p = p, alternative = alternative,
+                          conf.level = conf_level)
+        method_used <- "Exact Binomial Test"
+      } else {
+        res <- prop.test(x = x, n = n, p = p, alternative = alternative,
+                        conf.level = conf_level, correct = FALSE)
+        method_used <- "Approximate Test (Normal)"
+      }
+
+      observed_prop <- x / n
+      cohens_h <- pwr::ES.h(observed_prop, p)
+      power <- tryCatch(
+        (pwr::pwr.p.test(h = cohens_h, n = n, sig.level = sig.level,
+                        alternative = alternative))$power,
+        error = function(e) NA_real_)
+
+      model <- list(htest = res, x = x, n = n, p = p, observed_prop = observed_prop,
+                    success_value = "TRUE", alternative = alternative,
+                    method_used = method_used, conf_level = conf_level,
+                    cohens_h = cohens_h, power = power, var_col = var_col,
+                    sig.level = sig.level)
+      class(model) <- c("prop_test_exploratory", class(model))
+      model
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) {
+        class(e) <- c("prop_test_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  do_on_each_group(df, prop_test_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.prop_test_exploratory <- function(x, type = "model") {
+  if ("error" %in% class(x)) {
+    return(tibble::tibble(Note = x$message))
+  }
+  if (type == "model") {
+    diff <- x$observed_prop - x$p
+    direction <- switch(x$alternative,
+      "two.sided" = "Different from benchmark",
+      "greater"   = "Greater than benchmark",
+      "less"      = "Less than benchmark")
+    result_label <- if (!is.na(x$htest$p.value) && x$htest$p.value < x$sig.level)
+      "Statistically significant." else "Not statistically significant."
+    tibble::tibble(
+      `Success Value`        = x$success_value,
+      `Number of Successes`  = x$x,
+      `Total Observations`   = x$n,
+      `Observed Proportion`  = x$observed_prop,
+      `Benchmark Proportion` = x$p,
+      `Difference`           = diff,
+      `Conf Low`             = x$htest$conf.int[1],
+      `Conf High`            = x$htest$conf.int[2],
+      `P Value`              = x$htest$p.value,
+      `Cohen's h`            = x$cohens_h,
+      `Power`                = x$power,
+      `Test Direction`       = direction,
+      `Method`               = x$method_used,
+      `Result`               = result_label
+    )
+  } else {
+    tibble::tibble(
+      `Measure`                 = "Observed Proportion",
+      `Observed Proportion (%)` = x$observed_prop * 100,
+      `Conf Low (%)`            = x$htest$conf.int[1] * 100,
+      `Conf High (%)`           = x$htest$conf.int[2] * 100
+    )
+  }
+}
+
+#' @export
+glance.prop_test_exploratory <- function(x) {
+  if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
+  broom:::glance.htest(x$htest)
+}
