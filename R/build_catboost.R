@@ -256,7 +256,11 @@ catboost_read_metric_file <- function(path, prefix) {
   }
   colnames(ret)[[1]] <- "iter"
   metric_cols <- setdiff(colnames(ret), "iter")
-  colnames(ret)[colnames(ret) %in% metric_cols] <- paste0(prefix, "_", metric_cols)
+  # CatBoost TSV headers are uppercase (e.g. "RMSE", "AUC") but the preprocessor
+  # in exp_catboost.json calls expand_lightgbm_metric_aliases() which compares
+  # in lowercase. Normalise metric names to lowercase so the filter matches.
+  metric_cols_lower <- tolower(metric_cols)
+  colnames(ret)[colnames(ret) %in% metric_cols] <- paste0(prefix, "_", metric_cols_lower)
   ret
 }
 
