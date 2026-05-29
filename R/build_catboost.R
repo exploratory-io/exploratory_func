@@ -33,7 +33,7 @@ catboost_load_pool <- function(data, label = NULL, cat_features = NULL, weight =
   if (!is.null(label)) {
     args$label <- label
   }
-  if (!is.null(cat_features)) {
+  if (!is.null(cat_features) && !is.data.frame(data)) {
     args$cat_features <- cat_features
   }
   if (!is.null(weight)) {
@@ -109,6 +109,35 @@ catboost_build_params <- function(classification_type,
   score_function <- match.arg(score_function, c("Cosine", "L2", "NewtonL2", "NewtonCosine"))
 
   warning_messages <- character()
+  loss_function <- catboost_resolve_loss_function(
+    classification_type,
+    output_type_regression,
+    output_type_binary,
+    output_type_multiclass
+  )
+  loss_function_base <- strsplit(as.character(loss_function), ":", fixed = TRUE)[[1]][[1]]
+
+  if (identical(task_type, "CPU") && score_function %in% c("NewtonL2", "NewtonCosine")) {
+    warning_messages <- c(
+      warning_messages,
+      paste0(
+        "`score_function = '", score_function, "'` is not supported on CPU; ",
+        "coercing `score_function` to 'Cosine'."
+      )
+    )
+    score_function <- "Cosine"
+  }
+
+  if (identical(task_type, "GPU") &&
+      loss_function_base %in% c("MultiClass", "MultiClassOneVsAll") &&
+      identical(boosting_type, "Ordered")) {
+    warning_messages <- c(
+      warning_messages,
+      "`boosting_type = 'Ordered'` is not supported for MultiClass on GPU; coercing `boosting_type` to 'Plain'."
+    )
+    boosting_type <- "Plain"
+  }
+
   if (identical(boosting_type, "Ordered") && rsm < 1) {
     warning_messages <- c(
       warning_messages,
@@ -150,12 +179,7 @@ catboost_build_params <- function(classification_type,
     random_strength = random_strength,
     leaf_estimation_method = leaf_estimation_method,
     score_function = score_function,
-    loss_function = catboost_resolve_loss_function(
-      classification_type,
-      output_type_regression,
-      output_type_binary,
-      output_type_multiclass
-    ),
+    loss_function = loss_function,
     eval_metric = catboost_resolve_eval_metric(
       classification_type,
       eval_metric_regression,
@@ -241,6 +265,30 @@ catboost_update_valid_data_target <- function(valid_data, y_name, convert_fun) {
     return(lapply(valid_data, update_one))
   }
   valid_data
+}
+
+catboost_restore_model_target <- function(model, y_name, original_y) {
+  if (is.null(model$df) || nrow(model$df) == 0) {
+    return(model)
+  }
+
+  restored <- NULL
+  row_ids <- rownames(model$df)
+  if (!is.null(names(original_y)) && !is.null(row_ids) && all(row_ids %in% names(original_y))) {
+    restored <- original_y[row_ids]
+  } else {
+    original_y <- original_y[!is.na(original_y)]
+    if (length(original_y) >= nrow(model$df)) {
+      restored <- original_y[seq_len(nrow(model$df))]
+    }
+  }
+
+  if (!is.null(restored) && length(restored) == nrow(model$df)) {
+    names(restored) <- NULL
+    model$df[[y_name]] <- restored
+  }
+
+  model
 }
 
 catboost_read_metric_file <- function(path, prefix) {
@@ -417,6 +465,8 @@ catboost_binary <- function(data, formula, output_type = "probability", eval_met
   vars <- all.vars(formula)
   y_name <- vars[[1]]
   y_vals <- data[[y_name]]
+  original_y_vals <- y_vals
+  names(original_y_vals) <- rownames(data)
 
   label_levels <- c(0, 1)
   if (is.logical(y_vals)) {
@@ -453,9 +503,13 @@ catboost_binary <- function(data, formula, output_type = "probability", eval_met
 
   ret <- do.call(fml_catboost, c(list(data = data, formula = formula, params = params), dots))
   class(ret) <- c("catboost_binary", "catboost_exp", setdiff(class(ret), "catboost_exp"))
+  ret <- catboost_restore_model_target(ret, y_name, original_y_vals)
   ret$y_levels <- label_levels
   ret$output_type <- output_type
   ret$terms_mapping <- stats::setNames(colnames(data), colnames(data))
+  ret$classification_type <- "binary"
+  ret$orig_target_col <- y_name
+  ret$prediction_training <- predict_catboost(ret, ret$df)
   ret
 }
 
@@ -467,6 +521,8 @@ catboost_multi <- function(data, formula, output_type = "softprob", eval_metric 
   vars <- all.vars(formula)
   y_name <- vars[[1]]
   y_vals <- data[[y_name]]
+  original_y_vals <- y_vals
+  names(original_y_vals) <- rownames(data)
 
   label_levels <- if (is.logical(y_vals)) {
     c(FALSE, TRUE)
@@ -507,9 +563,13 @@ catboost_multi <- function(data, formula, output_type = "softprob", eval_metric 
 
   ret <- do.call(fml_catboost, c(list(data = data, formula = formula, params = params), dots))
   class(ret) <- c("catboost_multi", "catboost_exp", setdiff(class(ret), "catboost_exp"))
+  ret <- catboost_restore_model_target(ret, y_name, original_y_vals)
   ret$y_levels <- label_levels
   ret$output_type <- output_type
   ret$terms_mapping <- stats::setNames(colnames(data), colnames(data))
+  ret$classification_type <- "multi"
+  ret$orig_target_col <- y_name
+  ret$prediction_training <- predict_catboost(ret, ret$df)
   ret
 }
 
@@ -535,6 +595,9 @@ catboost_reg <- function(data, formula, output_type = "regression", eval_metric 
   class(ret) <- c("catboost_reg", "catboost_exp", setdiff(class(ret), "catboost_exp"))
   ret$output_type <- output_type
   ret$terms_mapping <- stats::setNames(colnames(data), colnames(data))
+  ret$classification_type <- "regression"
+  ret$orig_target_col <- y_name
+  ret$prediction_training <- predict_catboost(ret, ret$df)
   ret
 }
 
@@ -1376,9 +1439,9 @@ tidy.catboost_exp <- function(x, type = "importance", pretty.name = FALSE, binar
         return(glance(x, pretty.name = pretty.name, ...))
       }
       actual <- extract_actual(x)
-      if (is.numeric(actual)) {
+      if ("catboost_reg" %in% class(x) || identical(x$classification_type, "regression")) {
         ret <- glance(x, pretty.name = pretty.name, ...)
-      } else if (x$classification_type == "binary") {
+      } else if ("catboost_binary" %in% class(x) || identical(x$classification_type, "binary")) {
         predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
         predicted_probability <- extract_predicted(x)
         ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
@@ -1423,6 +1486,9 @@ tidy.catboost_exp <- function(x, type = "importance", pretty.name = FALSE, binar
       catboost_prediction_training_and_test(x, binary_classification_threshold = binary_classification_threshold)
     },
     roc = {
+      if (!("catboost_binary" %in% class(x)) && !identical(x$classification_type, "binary")) {
+        return(data.frame())
+      }
       actual <- extract_actual(x)
       predicted_probability <- extract_predicted(x)
       do_roc_(data.frame(actual = actual, predicted_probability = predicted_probability), "actual", "predicted_probability")
