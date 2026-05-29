@@ -21,6 +21,27 @@ catboost_prepare_predictor_frame <- function(df, predictor_cols) {
   )
 }
 
+catboost_extract_model_frame_parts <- function(df_for_model, y_name) {
+  list(
+    predictor_cols = setdiff(colnames(df_for_model), c(y_name, "(weights)")),
+    weights = stats::model.weights(df_for_model)
+  )
+}
+
+catboost_load_pool <- function(data, label = NULL, cat_features = NULL, weight = NULL) {
+  args <- list(data = data)
+  if (!is.null(label)) {
+    args$label <- label
+  }
+  if (!is.null(cat_features)) {
+    args$cat_features <- cat_features
+  }
+  if (!is.null(weight)) {
+    args$weight <- weight
+  }
+  do.call(catboost::catboost.load_pool, args)
+}
+
 catboost_resolve_loss_function <- function(classification_type,
                                            output_type_regression,
                                            output_type_binary,
@@ -159,6 +180,26 @@ catboost_build_params <- function(classification_type,
   params
 }
 
+catboost_regression_loss_functions <- function() {
+  c(
+    "rmse", "mae", "mape", "poisson", "quantile", "loglinquantile",
+    "tweedie", "huber", "expectile", "rmsewithuncertainty", "cox",
+    "survival:aft", "regression"
+  )
+}
+
+catboost_is_regression_model <- function(model) {
+  if ("catboost_reg" %in% class(model)) {
+    return(TRUE)
+  }
+  loss_function <- model$params$loss_function
+  if (is.null(loss_function)) {
+    return(FALSE)
+  }
+  loss_function <- strsplit(tolower(as.character(loss_function[[1]])), ":", fixed = TRUE)[[1]][[1]]
+  loss_function %in% catboost_regression_loss_functions()
+}
+
 catboost_train_with_gpu_guard <- function(learn_pool, test_pool, params) {
   tryCatch(
     catboost::catboost.train(
@@ -278,19 +319,23 @@ fml_catboost <- function(data,
   }
 
   y <- model.response(df_for_model)
-  df_for_model <- df_for_model[!is.na(y), , drop = FALSE]
-  y <- y[!is.na(y)]
+  keep_idx <- !is.na(y)
+  df_for_model <- df_for_model[keep_idx, , drop = FALSE]
+  y <- y[keep_idx]
 
   if (nrow(df_for_model) == 0) {
     stop("No valid data to create catboost model after removing NA in target.")
   }
 
   y_name <- all.vars(term)[[1]]
-  predictor_cols <- setdiff(colnames(df_for_model), y_name)
+  model_frame_parts <- catboost_extract_model_frame_parts(df_for_model, y_name)
+  predictor_cols <- model_frame_parts$predictor_cols
+  weight <- model_frame_parts$weights
   prepared <- catboost_prepare_predictor_frame(df_for_model, predictor_cols)
 
   validation_pool <- NULL
   validation_data <- NULL
+  validation_weight <- NULL
   if (!is.null(valid_data)) {
     if (is.data.frame(valid_data)) {
       validation_data <- valid_data
@@ -300,15 +345,18 @@ fml_catboost <- function(data,
   } else if (watchlist_rate > 0 && nrow(df_for_model) > 1) {
     validation_index <- sample_df_index(df_for_model, rate = watchlist_rate, ordered = FALSE)
     validation_data <- safe_slice(df_for_model, validation_index, remove = FALSE)
+    validation_weight <- if (!is.null(weight)) weight[validation_index] else NULL
     df_for_model <- safe_slice(df_for_model, validation_index, remove = TRUE)
+    weight <- if (!is.null(weight)) weight[-validation_index] else NULL
     y <- df_for_model[[y_name]]
     prepared <- catboost_prepare_predictor_frame(df_for_model, predictor_cols)
   }
 
-  learn_pool <- catboost::catboost.load_pool(
+  learn_pool <- catboost_load_pool(
     data = prepared$data,
     label = y,
-    cat_features = prepared$cat_features
+    cat_features = prepared$cat_features,
+    weight = weight
   )
 
   if (!is.null(validation_data) && nrow(validation_data) > 0) {
@@ -316,11 +364,16 @@ fml_catboost <- function(data,
       model.frame(term, data = validation_data, na.action = na.pass)
     }, error = function(e) validation_data)
     validation_y <- validation_model_frame[[y_name]]
+    validation_parts <- catboost_extract_model_frame_parts(validation_model_frame, y_name)
+    if (is.null(validation_weight)) {
+      validation_weight <- validation_parts$weights
+    }
     validation_prepared <- catboost_prepare_predictor_frame(validation_model_frame, predictor_cols)
-    validation_pool <- catboost::catboost.load_pool(
+    validation_pool <- catboost_load_pool(
       data = validation_prepared$data,
       label = validation_y,
-      cat_features = validation_prepared$cat_features
+      cat_features = validation_prepared$cat_features,
+      weight = validation_weight
     )
   }
 
@@ -348,6 +401,7 @@ fml_catboost <- function(data,
     train_pool = learn_pool,
     validation_pool = validation_pool,
     cat_features = prepared$cat_features,
+    weights = weight,
     train_dir = train_dir
   )
   class(ret) <- c("fml_catboost", "catboost_exp")
@@ -486,7 +540,7 @@ catboost_reg <- function(data, formula, output_type = "regression", eval_metric 
 
 catboost_prediction_type <- function(model, type = c("prob", "class", "raw", "response")) {
   type <- match.arg(type)
-  if ("catboost_reg" %in% class(model)) {
+  if (catboost_is_regression_model(model)) {
     return("RawFormulaVal")
   }
   switch(type,
@@ -509,7 +563,7 @@ predict_catboost <- function(model, df, type = c("prob", "class", "raw", "respon
   model_frame <- model.frame(model$terms, data = df, na.action = na.pass, xlev = model$xlevels)
   predictor_cols <- model$x_names
   prepared <- catboost_prepare_predictor_frame(model_frame, predictor_cols)
-  pool <- catboost::catboost.load_pool(
+  pool <- catboost_load_pool(
     data = prepared$data,
     cat_features = prepared$cat_features
   )

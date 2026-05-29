@@ -84,6 +84,34 @@ test_that("catboost helper routes bootstrap parameters", {
   expect_null(bernoulli$bagging_temperature)
 })
 
+test_that("catboost helper extracts weights without treating them as predictors", {
+  df <- data.frame(
+    y = c(1, 2, 3),
+    x = c(4, 5, 6),
+    w = c(0.5, 1.0, 2.0)
+  )
+  mf <- do.call(
+    model.frame,
+    list(terms(y ~ x), data = df, weights = substitute(w), na.action = na.pass)
+  )
+
+  ret <- exploratory:::catboost_extract_model_frame_parts(mf, "y")
+
+  expect_equal(ret$predictor_cols, "x")
+  expect_equal(ret$weights, df$w)
+})
+
+test_that("catboost prediction type infers direct fml regression models from loss function", {
+  model <- list(params = list(loss_function = "RMSE"))
+  class(model) <- c("fml_catboost", "catboost_exp")
+
+  expect_equal(exploratory:::catboost_prediction_type(model, type = "prob"), "RawFormulaVal")
+  expect_equal(exploratory:::catboost_prediction_type(model, type = "response"), "RawFormulaVal")
+
+  model$params$loss_function <- "RMSE:use_weights=false"
+  expect_equal(exploratory:::catboost_prediction_type(model, type = "prob"), "RawFormulaVal")
+})
+
 test_that("catboost helper guards incompatible ordered rsm and score function settings", {
   params <- expect_warning(
     exploratory:::catboost_build_params(
