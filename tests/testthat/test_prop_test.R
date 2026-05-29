@@ -59,6 +59,54 @@ test_that("repeat-by: one model per group", {
   expect_equal(nrow(result), 2)
 })
 
+test_that("repeat-by: grouped approximate output is numerically valid per group", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 30), rep(FALSE, 70),   # A: 30/100
+                rep(TRUE, 60), rep(FALSE, 40),    # B: 60/100
+                rep(TRUE, 5),  rep(FALSE, 95)),   # C: 5/100
+    g = c(rep("A", 100), rep("B", 100), rep("C", 100))
+  ) %>% dplyr::group_by(g)
+  result <- exp_prop_test(df, outcome, p = 0.5, method = "approximate")
+  expect_equal(nrow(result), 3)
+
+  expected_counts <- list(A = 30, B = 60, C = 5)
+  for (grp in names(expected_counts)) {
+    model <- result$model[[which(result$g == grp)]]
+    x <- expected_counts[[grp]]
+    expected <- prop.test(x, 100, p = 0.5, correct = FALSE)
+    expect_equal(model$x, x)
+    expect_equal(model$n, 100)
+    expect_equal(model$observed_prop, x / 100)
+    expect_equal(model$htest$p.value, expected$p.value)
+    expect_equal(model$htest$conf.int[1], expected$conf.int[1])
+    expect_equal(model$htest$conf.int[2], expected$conf.int[2])
+    expect_equal(model$method_used, "Approximate Test (Normal)")
+  }
+})
+
+test_that("repeat-by: grouped exact test with alternative = greater per group", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 30), rep(FALSE, 70),
+                rep(TRUE, 60), rep(FALSE, 40),
+                rep(TRUE, 5),  rep(FALSE, 95)),
+    g = c(rep("A", 100), rep("B", 100), rep("C", 100))
+  ) %>% dplyr::group_by(g)
+  result <- exp_prop_test(df, outcome, p = 0.1, method = "exact", alternative = "greater")
+  expect_equal(nrow(result), 3)
+
+  expected_counts <- list(A = 30, B = 60, C = 5)
+  for (grp in names(expected_counts)) {
+    model <- result$model[[which(result$g == grp)]]
+    x <- expected_counts[[grp]]
+    expected <- binom.test(x, 100, p = 0.1, alternative = "greater")
+    expect_equal(model$htest$p.value, expected$p.value)
+    expect_equal(model$htest$conf.int[1], expected$conf.int[1])
+    expect_equal(model$htest$conf.int[2], expected$conf.int[2])
+    expect_equal(model$method_used, "Exact Binomial Test")
+    expect_equal(model$alternative, "greater")
+  }
+})
+
 test_that("tidy model type returns correct columns", {
   df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
   result <- exp_prop_test(df, outcome, p = 0.4, method = "approximate")
