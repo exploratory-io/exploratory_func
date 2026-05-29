@@ -3182,7 +3182,8 @@ tidy.ttest_power_exploratory <- function(x, type="summary") {
 #' @return A data frame with a list-column "model" of class prop_test_exploratory.
 #' @export
 exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
-                          method = "auto", sig.level = 0.05, ...) {
+                          method = "auto", sig.level = 0.05,
+                          conf.level = 1 - sig.level, ...) {
   var_col <- col_name(substitute(var))
   grouped_cols <- grouped_by(df)
 
@@ -3197,7 +3198,9 @@ exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
         "exact" = TRUE,
         "approximate" = FALSE,
         (n * p < 5 || n * (1 - p) < 5))
-      conf_level <- 1 - sig.level
+      # conf.level defaults to 1 - sig.level (backward compatible) but can be
+      # set independently from the significance level via the UI.
+      conf_level <- conf.level
 
       if (use_exact) {
         res <- binom.test(x = x, n = n, p = p, alternative = alternative,

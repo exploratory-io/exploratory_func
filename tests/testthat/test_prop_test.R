@@ -167,6 +167,27 @@ test_that("tidy data type percentages match the model CI", {
   expect_equal(ci_data$`Conf High (%)`, model$htest$conf.int[2] * 100)
 })
 
+test_that("conf.level controls the CI independently of sig.level", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  # conf.level explicitly set to 0.99 while sig.level stays 0.05.
+  model <- exp_prop_test(df, outcome, p = 0.4, method = "approximate", conf.level = 0.99)$model[[1]]
+  expected <- prop.test(50, 100, p = 0.4, conf.level = 0.99, correct = FALSE)
+  expect_equal(model$conf_level, 0.99)
+  expect_equal(model$htest$conf.int[1], expected$conf.int[1])
+  expect_equal(model$htest$conf.int[2], expected$conf.int[2])
+  # sig.level still drives the power / significance calculation.
+  expect_equal(model$sig.level, 0.05)
+})
+
+test_that("conf.level defaults to 1 - sig.level when not specified", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  model <- exp_prop_test(df, outcome, p = 0.4, method = "approximate", sig.level = 0.01)$model[[1]]
+  expected <- prop.test(50, 100, p = 0.4, conf.level = 0.99, correct = FALSE)
+  expect_equal(model$conf_level, 0.99)
+  expect_equal(model$htest$conf.int[1], expected$conf.int[1])
+  expect_equal(model$htest$conf.int[2], expected$conf.int[2])
+})
+
 test_that("glance returns htest statistics", {
   df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
   model <- exp_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
