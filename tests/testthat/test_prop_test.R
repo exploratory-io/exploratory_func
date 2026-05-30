@@ -118,15 +118,16 @@ test_that("tidy model type returns correct columns", {
   expect_true("Result" %in% names(tidied))
 })
 
-test_that("tidy data type returns single row with percentages", {
+test_that("tidy data type returns the raw data with the target column", {
   df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
   result <- exp_prop_test(df, outcome, p = 0.4, method = "approximate")
   model <- result$model[[1]]
-  ci_data <- tidy(model, type = "data")
-  expect_equal(nrow(ci_data), 1)
-  expect_true("Observed Proportion (%)" %in% names(ci_data))
-  expect_true("Conf Low (%)" %in% names(ci_data))
-  expect_true("Conf High (%)" %in% names(ci_data))
+  data_out <- tidy(model, type = "data")
+  # The data-level charts (Error Bar Plot, Data Distribution) reference the
+  # original target column, so it must be present with all original rows.
+  expect_true("outcome" %in% names(data_out))
+  expect_equal(nrow(data_out), 100)
+  expect_equal(sum(data_out$outcome), 50)
 })
 
 test_that("stress test with complex column name", {
@@ -136,6 +137,11 @@ test_that("stress test with complex column name", {
   result <- exp_prop_test(df, `航空 会社 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`, p = 0.5, method = "approximate")
   expect_true(!is.null(result))
   expect_equal(result$model[[1]]$var_col, complex_name)
+  # tidy(type = "data") must round-trip the complex column name so the
+  # data-level charts can map ___TARGET_COLUMN_NAME___ to it.
+  data_out <- tidy(result$model[[1]], type = "data")
+  expect_true(complex_name %in% names(data_out))
+  expect_equal(nrow(data_out), 5)
 })
 
 # --- numeric correctness of derived/exposed outputs ---
@@ -206,13 +212,13 @@ test_that("tidy model Result reflects significance against sig.level", {
   expect_equal(tidy(ns_model, type = "model")$Result, "Not statistically significant.")
 })
 
-test_that("tidy data type percentages match the model CI", {
-  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
-  model <- exp_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
-  ci_data <- tidy(model, type = "data")
-  expect_equal(ci_data$`Observed Proportion (%)`, model$observed_prop * 100)
-  expect_equal(ci_data$`Conf Low (%)`, model$htest$conf.int[1] * 100)
-  expect_equal(ci_data$`Conf High (%)`, model$htest$conf.int[2] * 100)
+test_that("tidy data type preserves the raw observations for the chart", {
+  df <- data.frame(outcome = c(rep(TRUE, 12), rep(FALSE, 88)))
+  model <- exp_prop_test(df, outcome, p = 0.1, method = "exact")$model[[1]]
+  data_out <- tidy(model, type = "data")
+  expect_equal(nrow(data_out), 100)
+  # mean of the logical column equals the observed proportion the chart plots.
+  expect_equal(mean(data_out$outcome), model$observed_prop)
 })
 
 test_that("conf.level controls the CI independently of sig.level", {

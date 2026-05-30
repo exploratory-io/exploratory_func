@@ -3225,6 +3225,10 @@ exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
                     cohens_h = cohens_h, power = power, var_col = var_col,
                     sig.level = sig.level)
       class(model) <- c("prop_test_exploratory", class(model))
+      # Keep the original (per-group) data so that tidy(type = "data") can
+      # return it for the data-level charts (Error Bar Plot, Data Distribution),
+      # mirroring how exp_ttest stores model$data for its "Means" chart.
+      model$data <- df
       model
     }, error = function(e) {
       if (length(grouped_cols) > 0) {
@@ -3268,13 +3272,13 @@ tidy.prop_test_exploratory <- function(x, type = "model") {
       `Method`               = x$method_used,
       `Result`               = result_label
     )
-  } else {
-    tibble::tibble(
-      `Measure`                 = "Observed Proportion",
-      `Observed Proportion (%)` = x$observed_prop * 100,
-      `Conf Low (%)`            = x$htest$conf.int[1] * 100,
-      `Conf High (%)`           = x$htest$conf.int[2] * 100
-    )
+  } else { # type == "data"
+    # Return the original data so that the data-level charts (Error Bar Plot,
+    # Data Distribution) can map to the target column. The chart templates
+    # reference the original column name (___TARGET_COLUMN_NAME___), so the
+    # raw data frame must contain that column. The exact-test CI is still
+    # available via type = "model" (used by the Summary table).
+    x$data
   }
 }
 
