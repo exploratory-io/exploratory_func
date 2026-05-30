@@ -3263,13 +3263,22 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
         (pwr::pwr.2p2n.test(h = cohens_h, n1 = nA, n2 = nB, sig.level = sig.level, alternative = alternative))$power,
         error = function(e) NA_real_)
 
+      # Standardized two-sample z statistic using the pooled proportion. This
+      # matches prop.test's chi-square (X-squared = z^2) and is the value marked
+      # on the probability distribution chart. Fisher's exact test has no z of
+      # its own, so we derive z the same (pooled) way for every method to keep
+      # the summary and the chart consistent.
+      p_pool <- (xA + xB) / (nA + nB)
+      se_pooled <- sqrt(p_pool * (1 - p_pool) * (1 / nA + 1 / nB))
+      z <- if (!is.na(se_pooled) && se_pooled > 0) (pA - pB) / se_pooled else 0
+
       model <- list(
         htest = res, gA = gA, gB = gB,
         xA = xA, nA = nA, pA = pA, ciA = ciA,
         xB = xB, nB = nB, pB = pB, ciB = ciB,
         difference = pA - pB, diff_low = diff_low, diff_high = diff_high,
         odds_ratio = odds_ratio, or_low = or_low, or_high = or_high,
-        p_value = res$p.value, method_used = method_used, alternative = alternative,
+        z = z, p_value = res$p.value, method_used = method_used, alternative = alternative,
         cohens_h = cohens_h, power = power, sig.level = sig.level, conf_level = conf_level,
         var_col = var_col, exp_col = exp_col)
       class(model) <- c("two_sample_prop_test_exploratory", class(model))
@@ -3310,6 +3319,7 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
       `Odds Ratio`               = x$odds_ratio,
       `Odds Ratio Conf Low`      = x$or_low,
       `Odds Ratio Conf High`     = x$or_high,
+      `Z Value`                  = x$z,
       `P Value`                  = x$p_value,
       `Cohen's h`                = x$cohens_h,
       `Power`                    = x$power,
@@ -3321,14 +3331,8 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
     # Data for the probability distribution (line) chart. Regardless of the
     # method actually used (approximate normal or Fisher's exact), we always
     # display the standard normal distribution and mark the standardized two
-    # sample z statistic z = (pA - pB) / sqrt(p_pool*(1-p_pool)*(1/nA + 1/nB))
-    # on it. This pooled-proportion z matches prop.test's chi-square (z^2). The
-    # exact test has no z statistic of its own, so we derive z the same way for
-    # every method to keep this chart consistent.
-    p_pool <- (x$xA + x$xB) / (x$nA + x$nB)
-    se <- sqrt(p_pool * (1 - p_pool) * (1 / x$nA + 1 / x$nB))
-    z <- if (!is.na(se) && se > 0) (x$pA - x$pB) / se else 0
-    generate_norm_density_data(z, p.value = x$p_value, mu = 0, sigma = 1,
+    # sample z statistic (x$z, the same value shown in the summary table) on it.
+    generate_norm_density_data(x$z, p.value = x$p_value, mu = 0, sigma = 1,
                                sig_level = x$sig.level, alternative = x$alternative)
   } else { # type == "data"
     tibble::tibble(

@@ -162,6 +162,24 @@ test_that("power matches pwr::pwr.2p2n.test", {
   expect_equal(model$power, expected)
 })
 
+test_that("Z Value is the pooled two-sample z and is exposed before P Value", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  model <- exp_two_sample_prop_test(df, outcome, group, method = "approximate")$model[[1]]
+  p_pool <- (23 + 12) / (50 + 40)
+  z <- (23 / 50 - 12 / 40) / sqrt(p_pool * (1 - p_pool) * (1 / 50 + 1 / 40))
+  expect_equal(model$z, z)
+  # prop.test's X-squared equals z^2 for the 2x2 (correct = FALSE) case.
+  expected <- prop.test(x = c(23, 12), n = c(50, 40), correct = FALSE)
+  expect_equal(model$z^2, unname(expected$statistic))
+  # The summary table surfaces Z Value immediately before P Value.
+  tidied <- tidy(model, type = "model")
+  expect_equal(tidied$`Z Value`, z)
+  expect_equal(which(names(tidied) == "Z Value") + 1, which(names(tidied) == "P Value"))
+})
+
 test_that("approximate difference CI matches prop.test", {
   df <- data.frame(
     outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
