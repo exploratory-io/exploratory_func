@@ -50,6 +50,19 @@ test_that("alternative = less", {
   expect_equal(model$htest$p.value, expected$p.value)
 })
 
+test_that("exact alternative = less matches binom.test", {
+  # Exact method paired with a directional alternative (the approximate paths
+  # cover greater/less above; this fills the exact x less cell of the matrix).
+  df <- data.frame(outcome = c(rep(TRUE, 12), rep(FALSE, 88)))
+  result <- exp_one_sample_prop_test(df, outcome, p = 0.1, alternative = "less", method = "exact")
+  model <- result$model[[1]]
+  expected <- binom.test(12, 100, p = 0.1, alternative = "less")
+  expect_equal(model$htest$p.value, expected$p.value)
+  expect_equal(model$htest$conf.int[1], expected$conf.int[1])
+  expect_equal(model$htest$conf.int[2], expected$conf.int[2])
+  expect_equal(model$method_used, "Exact Binomial Test")
+})
+
 test_that("repeat-by: one model per group", {
   df <- data.frame(
     outcome = c(rep(TRUE, 10), rep(FALSE, 10), rep(TRUE, 8), rep(FALSE, 12)),
@@ -205,6 +218,20 @@ test_that("tidy model exposes correct observed proportion, difference and CI val
   expect_equal(tidied$`Conf High`, expected$conf.int[2])
 })
 
+test_that("Z Value is the standardized statistic and is exposed before P Value", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  model <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
+  z <- (0.5 - 0.4) / sqrt(0.4 * 0.6 / 100)
+  expect_equal(model$z, z)
+  # prop.test's X-squared equals z^2 for the one-sample (correct = FALSE) case.
+  expected <- prop.test(50, 100, p = 0.4, correct = FALSE)
+  expect_equal(model$z^2, unname(expected$statistic))
+  # The summary table surfaces Z Value immediately before P Value.
+  tidied <- tidy(model, type = "model")
+  expect_equal(tidied$`Z Value`, z)
+  expect_equal(which(names(tidied) == "Z Value") + 1, which(names(tidied) == "P Value"))
+})
+
 test_that("tidy model maps Test Direction from alternative", {
   df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
   two   <- tidy(exp_one_sample_prop_test(df, outcome, p = 0.4, alternative = "two.sided", method = "approximate")$model[[1]], type = "model")
@@ -256,6 +283,18 @@ test_that("conf.level defaults to 1 - sig.level when not specified", {
   expect_equal(model$conf_level, 0.99)
   expect_equal(model$htest$conf.int[1], expected$conf.int[1])
   expect_equal(model$htest$conf.int[2], expected$conf.int[2])
+})
+
+test_that("sig.level flips the significance Result on the same data", {
+  # obs 0.5 vs p 0.4, n=100 -> p approx 0.041. The identical model is
+  # significant at sig.level 0.05 but not at 0.01, isolating sig.level's effect.
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  sig_model <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate", sig.level = 0.05)$model[[1]]
+  ns_model  <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate", sig.level = 0.01)$model[[1]]
+  # Same underlying p-value, only sig.level differs.
+  expect_equal(sig_model$htest$p.value, ns_model$htest$p.value)
+  expect_equal(tidy(sig_model, type = "model")$Result, "Statistically significant.")
+  expect_equal(tidy(ns_model, type = "model")$Result, "Not statistically significant.")
 })
 
 test_that("glance returns htest statistics", {
