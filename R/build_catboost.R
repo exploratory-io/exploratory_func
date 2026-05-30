@@ -328,10 +328,29 @@ catboost_build_evaluation_log <- function(model) {
     return(test_log)
   }
   if (is.null(test_log)) {
-    return(learn_log)
+    log <- learn_log
+  } else {
+    log <- merge(learn_log, test_log, by = "iter", all = TRUE)
   }
 
-  merge(learn_log, test_log, by = "iter", all = TRUE)
+  # CatBoost writes the loss_function metric to learn_error.tsv and the
+  # eval_metric to test_error.tsv. When no validation pool is provided
+  # (test_error.tsv absent) the eval_metric column (e.g. train_auc) is
+  # missing, so the learning curve preprocessor filter returns 0 rows.
+  # Add a train_<eval_metric> alias pointing at train_<loss_function> so
+  # the filter always finds something to plot.
+  eval_metric  <- tolower(strsplit(model$params$eval_metric  %||% "", ":", fixed = TRUE)[[1]][[1]])
+  loss_fn      <- tolower(strsplit(model$params$loss_function %||% "", ":", fixed = TRUE)[[1]][[1]])
+
+  if (nzchar(eval_metric) && nzchar(loss_fn) && eval_metric != loss_fn) {
+    train_loss_col <- paste0("train_", loss_fn)
+    train_eval_col <- paste0("train_", eval_metric)
+    if (train_loss_col %in% colnames(log) && !train_eval_col %in% colnames(log)) {
+      log[[train_eval_col]] <- log[[train_loss_col]]
+    }
+  }
+
+  log
 }
 
 #' Formula version of CatBoost.
