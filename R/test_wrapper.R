@@ -3300,3 +3300,94 @@ glance.one_sample_prop_test_exploratory <- function(x) {
   if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
   broom:::glance.htest(x$htest)
 }
+
+#' One-sample t-test.
+#'
+#' Tests whether a sample mean differs from a hypothesized mean (mu).
+#' @param df A data frame.
+#' @param var A numeric column.
+#' @param mu Hypothesized mean. Default 0.
+#' @param alternative "two.sided", "greater", or "less".
+#' @param sig.level Significance level. Default 0.05.
+#' @param conf.level Confidence level. Defaults to 1 - sig.level.
+#' @export
+exp_one_sample_t_test <- function(df, var, mu = 0, alternative = "two.sided",
+                                  sig.level = 0.05, conf.level = 1 - sig.level, ...) {
+  var_col <- col_name(substitute(var))
+  grouped_cols <- grouped_by(df)
+
+  t_test_each <- function(df) {
+    tryCatch({
+      vec <- df[[var_col]]
+      vec <- vec[!is.na(vec)]
+      n <- length(vec)
+      if (n < 2) stop("There are not enough valid (non-NA) values in the selected column.")
+
+      res <- t.test(vec, mu = mu, alternative = alternative, conf.level = conf.level)
+
+      observed_mean <- mean(vec)
+      sample_sd     <- sd(vec)
+      stderr        <- sample_sd / sqrt(n)
+      cohens_d      <- if (!is.na(sample_sd) && sample_sd > 0) (observed_mean - mu) / sample_sd else NA_real_
+      power <- tryCatch(
+        (pwr::pwr.t.test(n = n, d = cohens_d, sig.level = sig.level,
+                         type = "one.sample", alternative = alternative))$power,
+        error = function(e) NA_real_)
+
+      model <- list(htest = res, mu = mu, n = n, observed_mean = observed_mean,
+                    sample_sd = sample_sd, stderr = stderr, cohens_d = cohens_d,
+                    power = power, var_col = var_col, alternative = alternative,
+                    sig.level = sig.level, conf_level = conf.level)
+      class(model) <- c("one_sample_t_test_exploratory", class(model))
+      model$data <- df
+      model
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) { class(e) <- c("one_sample_t_test_exploratory", class(e)); e }
+      else stop(e)
+    })
+  }
+  do_on_each_group(df, t_test_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.one_sample_t_test_exploratory <- function(x, type = "model") {
+  if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
+  if (type == "model") {
+    diff <- x$observed_mean - x$mu
+    direction <- switch(x$alternative,
+      "two.sided" = "Different from benchmark",
+      "greater"   = "Greater than benchmark",
+      "less"      = "Less than benchmark")
+    result_label <- if (!is.na(x$htest$p.value) && x$htest$p.value < x$sig.level)
+      "Statistically significant." else "Not statistically significant."
+    tibble::tibble(
+      `Number of Rows`    = x$n,
+      `Mean`              = x$observed_mean,
+      `Std Deviation`     = x$sample_sd,
+      `Std Error`         = x$stderr,
+      `Hypothesized Mean` = x$mu,
+      `Difference`        = diff,
+      `t Value`           = unname(x$htest$statistic),
+      `DF`                = unname(x$htest$parameter),
+      `P Value`           = x$htest$p.value,
+      `Conf Low`          = x$htest$conf.int[1],
+      `Conf High`         = x$htest$conf.int[2],
+      `Cohen's d`         = x$cohens_d,
+      `Power`             = x$power,
+      `Test Direction`    = direction,
+      `Result`            = result_label
+    )
+  } else if (type == "prob_dist") {
+    generate_ttest_density_data(t = unname(x$htest$statistic), p.value = x$htest$p.value,
+                                df = unname(x$htest$parameter), sig_level = x$sig.level,
+                                alternative = x$alternative)
+  } else { # type == "data"
+    x$data
+  }
+}
+
+#' @export
+glance.one_sample_t_test_exploratory <- function(x) {
+  if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
+  broom:::glance.htest(x$htest)
+}
