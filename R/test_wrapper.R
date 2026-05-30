@@ -3279,7 +3279,7 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
         xB = xB, nB = nB, pB = pB, ciB = ciB,
         difference = pA - pB, diff_low = diff_low, diff_high = diff_high,
         odds_ratio = odds_ratio, or_low = or_low, or_high = or_high,
-        z = z, p_value = res$p.value, method_used = method_used, alternative = alternative,
+        z = z, se = se_pooled, p_value = res$p.value, method_used = method_used, alternative = alternative,
         cohens_h = cohens_h, power = power, sig.level = sig.level, conf_level = conf_level,
         var_col = var_col, exp_col = exp_col)
       class(model) <- c("two_sample_prop_test_exploratory", class(model))
@@ -3335,6 +3335,20 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
     # sample z statistic (x$z, the same value shown in the summary table) on it.
     generate_norm_density_data(x$z, p.value = x$p_value, mu = 0, sigma = 1,
                                sig_level = x$sig.level, alternative = x$alternative)
+  } else if (type == "prob_dist_diff") {
+    # Data for the probability distribution (line) chart on the DIFFERENCE scale.
+    # This is the sampling distribution of the proportion difference (pA - pB)
+    # under H0 "no difference": a normal distribution centered at 0 with standard
+    # deviation equal to the pooled standard error. We mark the observed
+    # difference (x$difference, the same value shown in the summary table) on it.
+    # The shaded critical region matches the Z value chart (sig.level based), so
+    # both probability distribution charts read the same way.
+    if (is.na(x$se) || x$se <= 0) {
+      tibble::tibble(x = numeric(0), y = numeric(0))
+    } else {
+      generate_norm_density_data(x$difference, p.value = x$p_value, mu = 0, sigma = x$se,
+                                 sig_level = x$sig.level, alternative = x$alternative)
+    }
   } else { # type == "data"
     tibble::tibble(
       `Group`          = c(x$gA, x$gB),

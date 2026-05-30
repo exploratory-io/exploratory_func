@@ -443,3 +443,42 @@ test_that("tidy prob_dist critical region follows the alternative direction", {
   ts <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "two.sided", method = "approximate")$model[[1]], type = "prob_dist")
   expect_true(any(ts$x[which(ts$critical)] > 0) && any(ts$x[which(ts$critical)] < 0))
 })
+
+test_that("tidy prob_dist_diff returns the difference-scale normal centered at 0 with sd = pooled SE", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  model <- exp_two_sample_prop_test(df, outcome, group, method = "approximate")$model[[1]]
+  pd <- tidy(model, type = "prob_dist_diff")
+  expect_true(all(c("x", "y", "statistic", "critical", "p.value") %in% names(pd)))
+  # Pooled SE = sqrt(p_pool*(1-p_pool)*(1/nA + 1/nB)); observed difference = pA - pB.
+  p_pool <- (23 + 12) / (50 + 40)
+  se <- sqrt(p_pool * (1 - p_pool) * (1 / 50 + 1 / 40))
+  diff <- 23 / 50 - 12 / 40
+  # The marked point sits at the observed difference (NOT the standardized z).
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  expect_equal(marked$x, diff)
+  expect_equal(marked$p.value, model$p_value)
+  # Normal centered at 0 with sd = pooled SE: peak density is dnorm(0, sd = se).
+  expect_equal(unique(pd$mean), 0)
+  expect_equal(unique(pd$sd), se)
+  expect_true(max(pd$y, na.rm = TRUE) <= dnorm(0, sd = se) + 1e-9)
+})
+
+test_that("tidy prob_dist_diff critical region follows the alternative direction", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  # greater -> rejection region is the upper tail only.
+  gt <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "greater", method = "approximate")$model[[1]], type = "prob_dist_diff")
+  expect_true(all(gt$x[which(gt$critical)] > 0))
+  # less -> rejection region is the lower tail only.
+  lt <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "less", method = "approximate")$model[[1]], type = "prob_dist_diff")
+  expect_true(all(lt$x[which(lt$critical)] < 0))
+  # two.sided -> both tails are flagged.
+  ts <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "two.sided", method = "approximate")$model[[1]], type = "prob_dist_diff")
+  expect_true(any(ts$x[which(ts$critical)] > 0) && any(ts$x[which(ts$critical)] < 0))
+})
