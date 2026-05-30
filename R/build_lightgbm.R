@@ -49,9 +49,9 @@ expand_lightgbm_metric_aliases <- function(metric_names) {
 
   expanded <- unique(unlist(lapply(metric_names, function(m) {
     key <- tolower(m)
-    # Return aliases if known; otherwise return lowercased name so CatBoost
-    # metrics (e.g. "MultiClass", "AUC", "Logloss") match the lowercased
-    # column names produced by catboost_read_metric_file.
+    # Return known aliases, or the lowercased metric name for unknown metrics.
+    # Returning key (lowercase) ensures case-insensitive matching when this
+    # function is used as a filter against lowercased column names.
     if (!is.null(alias_map[[key]])) alias_map[[key]] else key
   }), use.names = FALSE))
 
