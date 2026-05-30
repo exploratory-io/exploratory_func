@@ -133,6 +133,29 @@ test_that("repeat-by: one model per group", {
   expect_equal(nrow(result), 2)
 })
 
+test_that("repeat-by: grouped one-sided test is numerically correct per group", {
+  # Combines repeat-by with a directional alternative (the ungrouped tests
+  # cover greater/less; this fills the grouped x one-sided cell of the matrix).
+  set.seed(3)
+  vec_A <- rnorm(30, mean = 6, sd = 1)
+  vec_B <- rnorm(30, mean = 4, sd = 1)
+  df <- data.frame(
+    x = c(vec_A, vec_B),
+    g = c(rep("A", 30), rep("B", 30))
+  ) %>% dplyr::group_by(g)
+  result <- exp_one_sample_t_test(df, x, mu = 5, alternative = "greater")
+  expect_equal(nrow(result), 2)
+
+  model_A <- result$model[[which(result$g == "A")]]
+  model_B <- result$model[[which(result$g == "B")]]
+  exp_A <- t.test(vec_A, mu = 5, alternative = "greater")
+  exp_B <- t.test(vec_B, mu = 5, alternative = "greater")
+  expect_equal(model_A$htest$p.value, exp_A$p.value)
+  expect_equal(model_B$htest$p.value, exp_B$p.value)
+  expect_equal(model_A$alternative, "greater")
+  expect_equal(tidy(model_A, type = "model")$`Test Direction`, "Greater than benchmark")
+})
+
 test_that("repeat-by: grouped results are numerically correct per group", {
   set.seed(1)
   vec_A <- rnorm(30, mean = 5, sd = 1)
@@ -245,6 +268,48 @@ test_that("tidy model Result reflects significance against sig.level", {
   expect_gte(ns_model$htest$p.value, 0.05)
   expect_equal(tidy(sig_model, type = "model")$Result, "Statistically significant.")
   expect_equal(tidy(ns_model, type = "model")$Result, "Not statistically significant.")
+})
+
+test_that("sig.level flips the significance Result on the same data", {
+  # set.seed(42) rnorm(50, 5, 2) vs mu = 4.2 -> p approx 0.030. The identical
+  # model is significant at sig.level 0.05 but not at 0.01, isolating the
+  # effect of sig.level from the data and p-value.
+  set.seed(42)
+  vec <- rnorm(50, mean = 5, sd = 2)
+  df <- data.frame(x = vec)
+  sig_model <- exp_one_sample_t_test(df, x, mu = 4.2, sig.level = 0.05)$model[[1]]
+  ns_model  <- exp_one_sample_t_test(df, x, mu = 4.2, sig.level = 0.01)$model[[1]]
+  # Same underlying p-value, only sig.level differs.
+  expect_equal(sig_model$htest$p.value, ns_model$htest$p.value)
+  expect_gt(sig_model$htest$p.value, 0.01)
+  expect_lt(sig_model$htest$p.value, 0.05)
+  expect_equal(tidy(sig_model, type = "model")$Result, "Statistically significant.")
+  expect_equal(tidy(ns_model, type = "model")$Result, "Not statistically significant.")
+})
+
+test_that("mu defaults to 0 when not specified", {
+  set.seed(5)
+  vec <- rnorm(40, mean = 2, sd = 1)
+  df <- data.frame(x = vec)
+  model <- exp_one_sample_t_test(df, x)$model[[1]]
+  expected <- t.test(vec, mu = 0)
+  expect_equal(model$mu, 0)
+  expect_equal(model$htest$p.value, expected$p.value)
+  expect_equal(tidy(model, type = "model")$`Hypothesized Mean`, 0)
+})
+
+# --- error handling (ungrouped) ---
+
+test_that("ungrouped input with all-NA values raises an error", {
+  # No grouping -> the per-group error is re-raised via stop(), not captured.
+  df <- data.frame(x = as.numeric(c(NA, NA, NA)))
+  expect_error(exp_one_sample_t_test(df, x, mu = 0))
+})
+
+test_that("ungrouped input with a single non-NA value raises an error", {
+  # n = 1 < 2 -> not enough valid values; ungrouped so the error propagates.
+  df <- data.frame(x = c(42, NA, NA))
+  expect_error(exp_one_sample_t_test(df, x, mu = 0))
 })
 
 # --- tidy(type = "prob_dist") ---
