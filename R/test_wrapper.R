@@ -3272,6 +3272,17 @@ tidy.prop_test_exploratory <- function(x, type = "model") {
       `Method`               = x$method_used,
       `Result`               = result_label
     )
+  } else if (type == "prob_dist") {
+    # Data for the probability distribution (line) chart. Regardless of the
+    # method actually used (exact binomial or normal approximation), we always
+    # display the standard normal distribution and mark the standardized test
+    # statistic z = (phat - p0) / sqrt(p0 * (1 - p0) / n) on it. The exact test
+    # has no z statistic of its own, so we derive z the same way for every
+    # method to keep this chart consistent.
+    se <- sqrt(x$p * (1 - x$p) / x$n)
+    z <- if (!is.na(se) && se > 0) (x$observed_prop - x$p) / se else 0
+    generate_norm_density_data(z, p.value = x$htest$p.value, mu = 0, sigma = 1,
+                               sig_level = x$sig.level, alternative = x$alternative)
   } else { # type == "data"
     # Return the original data so that the data-level charts (Error Bar Plot,
     # Data Distribution) can map to the target column. The chart templates

@@ -277,3 +277,47 @@ test_that("repeat-by: a failing group is captured and tidied as a Note", {
   note_tidied <- tidy(result$model[[2]], type = "model")
   expect_true("Note" %in% names(note_tidied))
 })
+
+# --- probability distribution (line) chart data ---
+
+test_that("tidy prob_dist returns standard normal density with the marked z statistic", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  model <- exp_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
+  pd <- tidy(model, type = "prob_dist")
+  expect_true(all(c("x", "y", "statistic", "critical", "p.value") %in% names(pd)))
+  # The standardized statistic z = (phat - p0) / sqrt(p0 * (1 - p0) / n).
+  z <- (0.5 - 0.4) / sqrt(0.4 * 0.6 / 100)
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  expect_equal(marked$x, z)
+  expect_equal(marked$p.value, model$htest$p.value)
+  # It is the standard normal N(0, 1): centered at 0, peak density is dnorm(0).
+  expect_equal(unique(pd$mean), 0)
+  expect_equal(unique(pd$sd), 1)
+  expect_true(max(pd$y, na.rm = TRUE) <= dnorm(0) + 1e-9)
+})
+
+test_that("tidy prob_dist always uses the normal distribution even for the exact method", {
+  df <- data.frame(outcome = c(rep(TRUE, 12), rep(FALSE, 88)))
+  model <- exp_prop_test(df, outcome, p = 0.1, method = "exact")$model[[1]]
+  expect_equal(model$method_used, "Exact Binomial Test")
+  pd <- tidy(model, type = "prob_dist")
+  # z is still derived the same way regardless of the method actually used.
+  z <- (0.12 - 0.1) / sqrt(0.1 * 0.9 / 100)
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  expect_equal(marked$x, z)
+})
+
+test_that("tidy prob_dist critical region follows the alternative direction", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  # greater -> rejection region is the upper tail only.
+  gt <- tidy(exp_prop_test(df, outcome, p = 0.4, alternative = "greater", method = "approximate")$model[[1]], type = "prob_dist")
+  expect_true(all(gt$x[which(gt$critical)] > 0))
+  # less -> rejection region is the lower tail only.
+  lt <- tidy(exp_prop_test(df, outcome, p = 0.4, alternative = "less", method = "approximate")$model[[1]], type = "prob_dist")
+  expect_true(all(lt$x[which(lt$critical)] < 0))
+  # two.sided -> both tails are flagged.
+  ts <- tidy(exp_prop_test(df, outcome, p = 0.4, alternative = "two.sided", method = "approximate")$model[[1]], type = "prob_dist")
+  expect_true(any(ts$x[which(ts$critical)] > 0) && any(ts$x[which(ts$critical)] < 0))
+})
