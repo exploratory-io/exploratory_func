@@ -482,3 +482,32 @@ test_that("tidy prob_dist_diff critical region follows the alternative direction
   ts <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "two.sided", method = "approximate")$model[[1]], type = "prob_dist_diff")
   expect_true(any(ts$x[which(ts$critical)] > 0) && any(ts$x[which(ts$critical)] < 0))
 })
+
+test_that("tidy prob_dist_diff always uses the difference-scale normal even for the exact method", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 3), rep(FALSE, 7), rep(TRUE, 1), rep(FALSE, 4)),
+    group = c(rep("A", 10), rep("B", 5))
+  )
+  model <- exp_two_sample_prop_test(df, outcome, group, method = "exact")$model[[1]]
+  expect_equal(model$method_used, "Fisher's Exact Test")
+  pd <- tidy(model, type = "prob_dist_diff")
+  # The pooled SE and observed difference are derived the same way regardless of method.
+  p_pool <- (3 + 1) / (10 + 5)
+  se <- sqrt(p_pool * (1 - p_pool) * (1 / 10 + 1 / 5))
+  diff <- 3 / 10 - 1 / 5
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  expect_equal(marked$x, diff)
+  expect_equal(unique(pd$mean), 0)
+  expect_equal(unique(pd$sd), se)
+})
+
+test_that("tidy prob_dist_diff returns an empty tibble when the pooled SE is 0/NA", {
+  # All outcomes identical -> p_pool is 0 -> pooled SE is 0, so the difference-scale
+  # normal is degenerate and the chart should no-op (empty tibble) rather than error.
+  df <- data.frame(outcome = rep(FALSE, 60), group = c(rep("A", 30), rep("B", 30)))
+  model <- suppressWarnings(exp_two_sample_prop_test(df, outcome, group, method = "approximate")$model[[1]])
+  expect_equal(model$se, 0)
+  pd <- tidy(model, type = "prob_dist_diff")
+  expect_equal(nrow(pd), 0)
+})
