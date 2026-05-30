@@ -3180,12 +3180,13 @@ tidy.ttest_power_exploratory <- function(x, type="summary") {
 #' @param alternative Direction of the test: "two.sided", "greater" (group A > group B), or "less".
 #' @param method Test method: "auto", "exact" (Fisher's), or "approximate" (prop.test).
 #' @param sig.level Significance level (default 0.05).
+#' @param conf.level Confidence level for the interval. Defaults to 1 - sig.level.
 #' @param ... Additional arguments (ignored).
-#' @return A data frame with a list-column "model" of class prop_test_2groups_exploratory.
+#' @return A data frame with a list-column "model" of class two_sample_prop_test_exploratory.
 #' @export
-exp_prop_test_2groups <- function(df, var, explanatory, func2 = NULL,
-                                  alternative = "two.sided", method = "auto",
-                                  sig.level = 0.05, ...) {
+exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
+                                     alternative = "two.sided", method = "auto",
+                                     sig.level = 0.05, conf.level = 1 - sig.level, ...) {
   var_col <- col_name(substitute(var))
   exp_col <- col_name(substitute(explanatory))
   grouped_cols <- grouped_by(df)
@@ -3214,7 +3215,7 @@ exp_prop_test_2groups <- function(df, var, explanatory, func2 = NULL,
     }
   }
 
-  prop_test_2groups_each <- function(df) {
+  two_sample_prop_test_each <- function(df) {
     tryCatch({
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var_col)))
       if (nrow(df) == 0) stop("There is no data left after removing NA.")
@@ -3237,7 +3238,9 @@ exp_prop_test_2groups <- function(df, var, explanatory, func2 = NULL,
       small_expected <- any(expected < 5)
 
       use_exact <- switch(method, "exact" = TRUE, "approximate" = FALSE, small_expected)
-      conf_level <- 1 - sig.level
+      # conf.level defaults to 1 - sig.level (backward compatible) but can be
+      # set independently from the significance level via the UI.
+      conf_level <- conf.level
 
       if (use_exact) {
         res <- fisher.test(tbl, alternative = alternative, conf.level = conf_level)
@@ -3252,8 +3255,8 @@ exp_prop_test_2groups <- function(df, var, explanatory, func2 = NULL,
         odds_ratio <- NA_real_; or_low <- NA_real_; or_high <- NA_real_
       }
 
-      ciA <- if (use_exact) binom.test(xA, nA)$conf.int else prop.test(xA, nA, correct = FALSE)$conf.int
-      ciB <- if (use_exact) binom.test(xB, nB)$conf.int else prop.test(xB, nB, correct = FALSE)$conf.int
+      ciA <- if (use_exact) binom.test(xA, nA, conf.level = conf_level)$conf.int else prop.test(xA, nA, correct = FALSE, conf.level = conf_level)$conf.int
+      ciB <- if (use_exact) binom.test(xB, nB, conf.level = conf_level)$conf.int else prop.test(xB, nB, correct = FALSE, conf.level = conf_level)$conf.int
 
       cohens_h <- pwr::ES.h(pA, pB)
       power <- tryCatch(
@@ -3267,21 +3270,21 @@ exp_prop_test_2groups <- function(df, var, explanatory, func2 = NULL,
         difference = pA - pB, diff_low = diff_low, diff_high = diff_high,
         odds_ratio = odds_ratio, or_low = or_low, or_high = or_high,
         p_value = res$p.value, method_used = method_used, alternative = alternative,
-        cohens_h = cohens_h, power = power, sig.level = sig.level,
+        cohens_h = cohens_h, power = power, sig.level = sig.level, conf_level = conf_level,
         var_col = var_col, exp_col = exp_col)
-      class(model) <- c("prop_test_2groups_exploratory", class(model))
+      class(model) <- c("two_sample_prop_test_exploratory", class(model))
       model
     }, error = function(e) {
-      if (length(grouped_cols) > 0) { class(e) <- c("prop_test_2groups_exploratory", class(e)); e }
+      if (length(grouped_cols) > 0) { class(e) <- c("two_sample_prop_test_exploratory", class(e)); e }
       else stop(e)
     })
   }
 
-  do_on_each_group(df, prop_test_2groups_each, name = "model", with_unnest = FALSE)
+  do_on_each_group(df, two_sample_prop_test_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
-tidy.prop_test_2groups_exploratory <- function(x, type = "model") {
+tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
   if ("error" %in% class(x)) {
     return(tibble::tibble(Note = x$message))
   }
@@ -3314,7 +3317,20 @@ tidy.prop_test_2groups_exploratory <- function(x, type = "model") {
       `Method`                   = x$method_used,
       `Result`                   = result_label
     )
-  } else {
+  } else if (type == "prob_dist") {
+    # Data for the probability distribution (line) chart. Regardless of the
+    # method actually used (approximate normal or Fisher's exact), we always
+    # display the standard normal distribution and mark the standardized two
+    # sample z statistic z = (pA - pB) / sqrt(p_pool*(1-p_pool)*(1/nA + 1/nB))
+    # on it. This pooled-proportion z matches prop.test's chi-square (z^2). The
+    # exact test has no z statistic of its own, so we derive z the same way for
+    # every method to keep this chart consistent.
+    p_pool <- (x$xA + x$xB) / (x$nA + x$nB)
+    se <- sqrt(p_pool * (1 - p_pool) * (1 / x$nA + 1 / x$nB))
+    z <- if (!is.na(se) && se > 0) (x$pA - x$pB) / se else 0
+    generate_norm_density_data(z, p.value = x$p_value, mu = 0, sigma = 1,
+                               sig_level = x$sig.level, alternative = x$alternative)
+  } else { # type == "data"
     tibble::tibble(
       `Group`          = c(x$gA, x$gB),
       `Proportion (%)`  = c(x$pA * 100, x$pB * 100),
@@ -3325,7 +3341,7 @@ tidy.prop_test_2groups_exploratory <- function(x, type = "model") {
 }
 
 #' @export
-glance.prop_test_2groups_exploratory <- function(x) {
+glance.two_sample_prop_test_exploratory <- function(x) {
   if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
   broom:::glance.htest(x$htest)
 }
