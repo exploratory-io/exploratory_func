@@ -3180,16 +3180,16 @@ tidy.ttest_power_exploratory <- function(x, type="summary") {
 #' @param sig.level Significance level. Default 0.05.
 #' @param conf.level Confidence level for the interval. Defaults to 1 - sig.level.
 #' @param ... Additional arguments (ignored).
-#' @return A data frame with a list-column "model" of class prop_test_exploratory.
+#' @return A data frame with a list-column "model" of class one_sample_prop_test_exploratory.
 #' @export
-exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
-                          method = "auto", sig.level = 0.05,
-                          conf.level = 1 - sig.level, ...) {
+exp_one_sample_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
+                                     method = "auto", sig.level = 0.05,
+                                     conf.level = 1 - sig.level, ...) {
   var_col <- col_name(substitute(var))
   grouped_cols <- grouped_by(df)
   method <- match.arg(method, c("auto", "exact", "approximate"))
 
-  prop_test_each <- function(df) {
+  one_sample_prop_test_each <- function(df) {
     tryCatch({
       vec <- df[[var_col]]
       x <- sum(vec, na.rm = TRUE)
@@ -3226,7 +3226,7 @@ exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
                     method_used = method_used, conf_level = conf_level,
                     cohens_h = cohens_h, power = power, var_col = var_col,
                     sig.level = sig.level)
-      class(model) <- c("prop_test_exploratory", class(model))
+      class(model) <- c("one_sample_prop_test_exploratory", class(model))
       # Keep the original (per-group) data so that tidy(type = "data") can
       # return it for the data-level charts (Error Bar Plot, Data Distribution),
       # mirroring how exp_ttest stores model$data for its "Means" chart.
@@ -3234,7 +3234,7 @@ exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
       model
     }, error = function(e) {
       if (length(grouped_cols) > 0) {
-        class(e) <- c("prop_test_exploratory", class(e))
+        class(e) <- c("one_sample_prop_test_exploratory", class(e))
         e
       } else {
         stop(e)
@@ -3242,11 +3242,11 @@ exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
     })
   }
 
-  do_on_each_group(df, prop_test_each, name = "model", with_unnest = FALSE)
+  do_on_each_group(df, one_sample_prop_test_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
-tidy.prop_test_exploratory <- function(x, type = "model") {
+tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
   if ("error" %in% class(x)) {
     return(tibble::tibble(Note = x$message))
   }
@@ -3296,7 +3296,7 @@ tidy.prop_test_exploratory <- function(x, type = "model") {
 }
 
 #' @export
-glance.prop_test_exploratory <- function(x) {
+glance.one_sample_prop_test_exploratory <- function(x) {
   if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
   broom:::glance.htest(x$htest)
 }
