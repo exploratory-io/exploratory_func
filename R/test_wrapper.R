@@ -3165,3 +3165,341 @@ tidy.ttest_power_exploratory <- function(x, type="summary") {
   }
   ret
 }
+
+#' Two-sample (two independent groups) proportion test (prop.test / fisher.test).
+#'
+#' Tests whether the proportions of successes in two independent groups are equal.
+#' Uses \code{prop.test} (approximate) or \code{fisher.test} (exact) depending on the method argument.
+#' The Auto method selects Fisher's Exact Test when any expected cell count in the 2x2 table is < 5,
+#' otherwise uses the approximate test.
+#'
+#' @param df A data frame.
+#' @param var A logical column representing the binary outcome (success = TRUE).
+#' @param explanatory A column with exactly two unique values identifying the two groups.
+#' @param func2 Optional function to transform the explanatory column (date/numeric).
+#' @param alternative Direction of the test: "two.sided", "greater" (group A > group B), or "less".
+#' @param method Test method: "auto", "exact" (Fisher's), or "approximate" (prop.test).
+#' @param sig.level Significance level (default 0.05).
+#' @param conf.level Confidence level for the interval. Defaults to 1 - sig.level.
+#' @param ... Additional arguments (ignored).
+#' @return A data frame with a list-column "model" of class two_sample_prop_test_exploratory.
+#' @export
+exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
+                                     alternative = "two.sided", method = "auto",
+                                     sig.level = 0.05, conf.level = 1 - sig.level, ...) {
+  var_col <- col_name(substitute(var))
+  exp_col <- col_name(substitute(explanatory))
+  grouped_cols <- grouped_by(df)
+  method <- match.arg(method, c("auto", "exact", "approximate"))
+
+  # func2 transform on explanatory (date/numeric)
+  if (!is.null(func2)) {
+    if (lubridate::is.Date(df[[exp_col]]) || lubridate::is.POSIXct(df[[exp_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(exp_col) := extract_from_date(!!rlang::sym(exp_col), type = !!func2))
+    } else if (is.numeric(df[[exp_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(exp_col) := extract_from_numeric(!!rlang::sym(exp_col), type = !!func2))
+    }
+  }
+
+  # Group ordering: logical explanatory -> factor with stable levels
+  if (is.logical(df[[exp_col]])) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(exp_col) := factor(!!rlang::sym(exp_col), levels = c("TRUE", "FALSE")))
+  }
+
+  # Validate exactly 2 unique values, auto-filtering NA as a 3rd category
+  n_distinct_res <- n_distinct(df[[exp_col]])
+  if (n_distinct_res != 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[exp_col]]))) {
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(exp_col)))
+    } else {
+      stop("The explanatory variable needs to have 2 unique values.")
+    }
+  }
+
+  two_sample_prop_test_each <- function(df) {
+    tryCatch({
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var_col)))
+      if (nrow(df) == 0) stop("There is no data left after removing NA.")
+      if (length(grouped_cols) > 0 && n_distinct(df[[exp_col]]) != 2) {
+        stop("The explanatory variable needs to have 2 unique values.")
+      }
+
+      vec <- as.logical(df[[var_col]])
+      grp <- df[[exp_col]]
+      lv  <- if (is.factor(grp)) levels(forcats::fct_drop(grp)) else sort(unique(as.character(grp)))
+      gA <- lv[1]; gB <- lv[2]
+      isA <- as.character(grp) == gA; isB <- as.character(grp) == gB
+      xA <- sum(vec[isA], na.rm = TRUE); nA <- sum(isA)
+      xB <- sum(vec[isB], na.rm = TRUE); nB <- sum(isB)
+      if (nA < 1 || nB < 1) stop("Not enough data in one of the groups.")
+      pA <- xA / nA; pB <- xB / nB
+
+      tbl <- matrix(c(xA, nA - xA, xB, nB - xB), nrow = 2, byrow = TRUE)
+      expected <- outer(rowSums(tbl), colSums(tbl)) / sum(tbl)
+      small_expected <- any(expected < 5)
+
+      use_exact <- switch(method, "exact" = TRUE, "approximate" = FALSE, small_expected)
+      # conf.level defaults to 1 - sig.level (backward compatible) but can be
+      # set independently from the significance level via the UI.
+      conf_level <- conf.level
+
+      if (use_exact) {
+        res <- fisher.test(tbl, alternative = alternative, conf.level = conf_level)
+        method_used <- "Fisher's Exact Test"
+        odds_ratio <- unname(res$estimate); or_low <- res$conf.int[1]; or_high <- res$conf.int[2]
+        diff_low <- NA_real_; diff_high <- NA_real_
+      } else {
+        res <- prop.test(x = c(xA, xB), n = c(nA, nB), alternative = alternative,
+                        correct = FALSE, conf.level = conf_level)
+        method_used <- "Approximate Test (Normal)"
+        diff_low <- res$conf.int[1]; diff_high <- res$conf.int[2]
+        odds_ratio <- NA_real_; or_low <- NA_real_; or_high <- NA_real_
+      }
+
+      ciA <- if (use_exact) binom.test(xA, nA, conf.level = conf_level)$conf.int else prop.test(xA, nA, correct = FALSE, conf.level = conf_level)$conf.int
+      ciB <- if (use_exact) binom.test(xB, nB, conf.level = conf_level)$conf.int else prop.test(xB, nB, correct = FALSE, conf.level = conf_level)$conf.int
+
+      cohens_h <- pwr::ES.h(pA, pB)
+      power <- tryCatch(
+        (pwr::pwr.2p2n.test(h = cohens_h, n1 = nA, n2 = nB, sig.level = sig.level, alternative = alternative))$power,
+        error = function(e) NA_real_)
+
+      # Standardized two-sample z statistic using the pooled proportion. This
+      # matches prop.test's chi-square (X-squared = z^2) and is the value marked
+      # on the probability distribution chart. Fisher's exact test has no z of
+      # its own, so we derive z the same (pooled) way for every method to keep
+      # the summary and the chart consistent.
+      p_pool <- (xA + xB) / (nA + nB)
+      se_pooled <- sqrt(p_pool * (1 - p_pool) * (1 / nA + 1 / nB))
+      z <- if (!is.na(se_pooled) && se_pooled > 0) (pA - pB) / se_pooled else 0
+
+      model <- list(
+        htest = res, gA = gA, gB = gB,
+        xA = xA, nA = nA, pA = pA, ciA = ciA,
+        xB = xB, nB = nB, pB = pB, ciB = ciB,
+        difference = pA - pB, diff_low = diff_low, diff_high = diff_high,
+        odds_ratio = odds_ratio, or_low = or_low, or_high = or_high,
+        z = z, se = se_pooled, p_value = res$p.value, method_used = method_used, alternative = alternative,
+        cohens_h = cohens_h, power = power, sig.level = sig.level, conf_level = conf_level,
+        var_col = var_col, exp_col = exp_col)
+      class(model) <- c("two_sample_prop_test_exploratory", class(model))
+      model
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) { class(e) <- c("two_sample_prop_test_exploratory", class(e)); e }
+      else stop(e)
+    })
+  }
+
+  do_on_each_group(df, two_sample_prop_test_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
+  if ("error" %in% class(x)) {
+    return(tibble::tibble(Note = x$message))
+  }
+  if (type == "model") {
+    direction <- switch(x$alternative,
+      "two.sided" = "Different between the two groups",
+      "greater"   = "Group A is greater than Group B",
+      "less"      = "Group A is less than Group B")
+    result_label <- if (!is.na(x$p_value) && x$p_value < x$sig.level)
+      "Statistically significant." else "Not statistically significant."
+    tibble::tibble(
+      `Group A`                  = x$gA,
+      `Successes A`              = x$xA,
+      `Total A`                  = x$nA,
+      `Proportion A`             = x$pA,
+      `Group B`                  = x$gB,
+      `Successes B`              = x$xB,
+      `Total B`                  = x$nB,
+      `Proportion B`             = x$pB,
+      `Difference`               = x$difference,
+      `Difference Conf Low`      = x$diff_low,
+      `Difference Conf High`     = x$diff_high,
+      `Odds Ratio`               = x$odds_ratio,
+      `Odds Ratio Conf Low`      = x$or_low,
+      `Odds Ratio Conf High`     = x$or_high,
+      `Z Value`                  = x$z,
+      `P Value`                  = x$p_value,
+      `Cohen's h`                = x$cohens_h,
+      `Power`                    = x$power,
+      `Test Direction`           = direction,
+      `Method`                   = x$method_used,
+      `Result`                   = result_label
+    )
+  } else if (type == "prob_dist") {
+    # Data for the probability distribution (line) chart. Regardless of the
+    # method actually used (approximate normal or Fisher's exact), we always
+    # display the standard normal distribution and mark the standardized two
+    # sample z statistic (x$z, the same value shown in the summary table) on it.
+    generate_norm_density_data(x$z, p.value = x$p_value, mu = 0, sigma = 1,
+                               sig_level = x$sig.level, alternative = x$alternative)
+  } else if (type == "prob_dist_diff") {
+    # Data for the probability distribution (line) chart on the DIFFERENCE scale.
+    # This is the sampling distribution of the proportion difference (pA - pB)
+    # under H0 "no difference": a normal distribution centered at 0 with standard
+    # deviation equal to the pooled standard error. We mark the observed
+    # difference (x$difference, the same value shown in the summary table) on it.
+    # The shaded critical region matches the Z value chart (sig.level based), so
+    # both probability distribution charts read the same way.
+    if (is.na(x$se) || x$se <= 0) {
+      tibble::tibble(x = numeric(0), y = numeric(0))
+    } else {
+      generate_norm_density_data(x$difference, p.value = x$p_value, mu = 0, sigma = x$se,
+                                 sig_level = x$sig.level, alternative = x$alternative)
+    }
+  } else { # type == "data"
+    tibble::tibble(
+      `Group`          = c(x$gA, x$gB),
+      `Proportion (%)`  = c(x$pA * 100, x$pB * 100),
+      `Conf Low (%)`   = c(x$ciA[1] * 100, x$ciB[1] * 100),
+      `Conf High (%)`  = c(x$ciA[2] * 100, x$ciB[2] * 100)
+    )
+  }
+}
+
+#' @export
+glance.two_sample_prop_test_exploratory <- function(x) {
+  if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
+  broom:::glance.htest(x$htest)
+}
+
+#' One-sample proportion test (binom.test / prop.test).
+#'
+#' Tests whether an observed proportion differs from a known benchmark proportion.
+#' Uses \code{binom.test} (exact) when n*p < 5 or n*(1-p) < 5 (auto mode),
+#' otherwise uses \code{prop.test(correct = FALSE)} (approximate).
+#'
+#' @param df A data frame.
+#' @param var A logical column (success = TRUE).
+#' @param p Benchmark proportion (between 0 and 1). Default 0.5.
+#' @param alternative Direction: "two.sided", "greater", or "less".
+#' @param method Test method: "auto", "exact" (binom.test), or "approximate" (prop.test).
+#' @param sig.level Significance level. Default 0.05.
+#' @param conf.level Confidence level for the interval. Defaults to 1 - sig.level.
+#' @param ... Additional arguments (ignored).
+#' @return A data frame with a list-column "model" of class one_sample_prop_test_exploratory.
+#' @export
+exp_one_sample_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
+                                     method = "auto", sig.level = 0.05,
+                                     conf.level = 1 - sig.level, ...) {
+  var_col <- col_name(substitute(var))
+  grouped_cols <- grouped_by(df)
+  method <- match.arg(method, c("auto", "exact", "approximate"))
+
+  one_sample_prop_test_each <- function(df) {
+    tryCatch({
+      vec <- df[[var_col]]
+      x <- sum(vec, na.rm = TRUE)
+      n <- sum(!is.na(vec))
+      if (n == 0) stop("There is no valid (non-NA) data in the selected column.")
+
+      use_exact <- switch(method,
+        "exact" = TRUE,
+        "approximate" = FALSE,
+        (n * p < 5 || n * (1 - p) < 5))
+      # conf.level defaults to 1 - sig.level (backward compatible) but can be
+      # set independently from the significance level via the UI.
+      conf_level <- conf.level
+
+      if (use_exact) {
+        res <- binom.test(x = x, n = n, p = p, alternative = alternative,
+                          conf.level = conf_level)
+        method_used <- "Exact Binomial Test"
+      } else {
+        res <- prop.test(x = x, n = n, p = p, alternative = alternative,
+                        conf.level = conf_level, correct = FALSE)
+        method_used <- "Approximate Test (Normal)"
+      }
+
+      observed_prop <- x / n
+      cohens_h <- pwr::ES.h(observed_prop, p)
+      power <- tryCatch(
+        (pwr::pwr.p.test(h = cohens_h, n = n, sig.level = sig.level,
+                        alternative = alternative))$power,
+        error = function(e) NA_real_)
+
+      # Standardized test statistic z = (phat - p0) / sqrt(p0 * (1 - p0) / n).
+      # This is the value marked on the probability distribution chart. The
+      # exact (binomial) test has no z of its own, so we derive z the same way
+      # for every method to keep the summary and the chart consistent.
+      se <- sqrt(p * (1 - p) / n)
+      z <- if (!is.na(se) && se > 0) (observed_prop - p) / se else 0
+
+      model <- list(htest = res, x = x, n = n, p = p, observed_prop = observed_prop,
+                    success_value = "TRUE", alternative = alternative,
+                    method_used = method_used, conf_level = conf_level, z = z,
+                    cohens_h = cohens_h, power = power, var_col = var_col,
+                    sig.level = sig.level)
+      class(model) <- c("one_sample_prop_test_exploratory", class(model))
+      # Keep the original (per-group) data so that tidy(type = "data") can
+      # return it for the data-level charts (Error Bar Plot, Data Distribution),
+      # mirroring how exp_ttest stores model$data for its "Means" chart.
+      model$data <- df
+      model
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) {
+        class(e) <- c("one_sample_prop_test_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  do_on_each_group(df, one_sample_prop_test_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
+  if ("error" %in% class(x)) {
+    return(tibble::tibble(Note = x$message))
+  }
+  if (type == "model") {
+    diff <- x$observed_prop - x$p
+    direction <- switch(x$alternative,
+      "two.sided" = "Different from benchmark",
+      "greater"   = "Greater than benchmark",
+      "less"      = "Less than benchmark")
+    result_label <- if (!is.na(x$htest$p.value) && x$htest$p.value < x$sig.level)
+      "Statistically significant." else "Not statistically significant."
+    tibble::tibble(
+      `Success Value`        = x$success_value,
+      `Number of Successes`  = x$x,
+      `Total Observations`   = x$n,
+      `Observed Proportion`  = x$observed_prop,
+      `Benchmark Proportion` = x$p,
+      `Difference`           = diff,
+      `Conf Low`             = x$htest$conf.int[1],
+      `Conf High`            = x$htest$conf.int[2],
+      `Z Value`              = x$z,
+      `P Value`              = x$htest$p.value,
+      `Cohen's h`            = x$cohens_h,
+      `Power`                = x$power,
+      `Test Direction`       = direction,
+      `Method`               = x$method_used,
+      `Result`               = result_label
+    )
+  } else if (type == "prob_dist") {
+    # Data for the probability distribution (line) chart. Regardless of the
+    # method actually used (exact binomial or normal approximation), we always
+    # display the standard normal distribution and mark the standardized test
+    # statistic (x$z, the same value shown in the summary table) on it.
+    generate_norm_density_data(x$z, p.value = x$htest$p.value, mu = 0, sigma = 1,
+                               sig_level = x$sig.level, alternative = x$alternative)
+  } else { # type == "data"
+    # Return the original data so that the data-level charts (Error Bar Plot,
+    # Data Distribution) can map to the target column. The chart templates
+    # reference the original column name (___TARGET_COLUMN_NAME___), so the
+    # raw data frame must contain that column. The exact-test CI is still
+    # available via type = "model" (used by the Summary table).
+    x$data
+  }
+}
+
+#' @export
+glance.one_sample_prop_test_exploratory <- function(x) {
+  if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
+  broom:::glance.htest(x$htest)
+}
