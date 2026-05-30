@@ -3405,9 +3405,16 @@ exp_one_sample_prop_test <- function(df, var, p = 0.5, alternative = "two.sided"
                         alternative = alternative))$power,
         error = function(e) NA_real_)
 
+      # Standardized test statistic z = (phat - p0) / sqrt(p0 * (1 - p0) / n).
+      # This is the value marked on the probability distribution chart. The
+      # exact (binomial) test has no z of its own, so we derive z the same way
+      # for every method to keep the summary and the chart consistent.
+      se <- sqrt(p * (1 - p) / n)
+      z <- if (!is.na(se) && se > 0) (observed_prop - p) / se else 0
+
       model <- list(htest = res, x = x, n = n, p = p, observed_prop = observed_prop,
                     success_value = "TRUE", alternative = alternative,
-                    method_used = method_used, conf_level = conf_level,
+                    method_used = method_used, conf_level = conf_level, z = z,
                     cohens_h = cohens_h, power = power, var_col = var_col,
                     sig.level = sig.level)
       class(model) <- c("one_sample_prop_test_exploratory", class(model))
@@ -3451,6 +3458,7 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
       `Difference`           = diff,
       `Conf Low`             = x$htest$conf.int[1],
       `Conf High`            = x$htest$conf.int[2],
+      `Z Value`              = x$z,
       `P Value`              = x$htest$p.value,
       `Cohen's h`            = x$cohens_h,
       `Power`                = x$power,
@@ -3462,12 +3470,8 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
     # Data for the probability distribution (line) chart. Regardless of the
     # method actually used (exact binomial or normal approximation), we always
     # display the standard normal distribution and mark the standardized test
-    # statistic z = (phat - p0) / sqrt(p0 * (1 - p0) / n) on it. The exact test
-    # has no z statistic of its own, so we derive z the same way for every
-    # method to keep this chart consistent.
-    se <- sqrt(x$p * (1 - x$p) / x$n)
-    z <- if (!is.na(se) && se > 0) (x$observed_prop - x$p) / se else 0
-    generate_norm_density_data(z, p.value = x$htest$p.value, mu = 0, sigma = 1,
+    # statistic (x$z, the same value shown in the summary table) on it.
+    generate_norm_density_data(x$z, p.value = x$htest$p.value, mu = 0, sigma = 1,
                                sig_level = x$sig.level, alternative = x$alternative)
   } else { # type == "data"
     # Return the original data so that the data-level charts (Error Bar Plot,

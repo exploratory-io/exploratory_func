@@ -205,6 +205,20 @@ test_that("tidy model exposes correct observed proportion, difference and CI val
   expect_equal(tidied$`Conf High`, expected$conf.int[2])
 })
 
+test_that("Z Value is the standardized statistic and is exposed before P Value", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  model <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
+  z <- (0.5 - 0.4) / sqrt(0.4 * 0.6 / 100)
+  expect_equal(model$z, z)
+  # prop.test's X-squared equals z^2 for the one-sample (correct = FALSE) case.
+  expected <- prop.test(50, 100, p = 0.4, correct = FALSE)
+  expect_equal(model$z^2, unname(expected$statistic))
+  # The summary table surfaces Z Value immediately before P Value.
+  tidied <- tidy(model, type = "model")
+  expect_equal(tidied$`Z Value`, z)
+  expect_equal(which(names(tidied) == "Z Value") + 1, which(names(tidied) == "P Value"))
+})
+
 test_that("tidy model maps Test Direction from alternative", {
   df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
   two   <- tidy(exp_one_sample_prop_test(df, outcome, p = 0.4, alternative = "two.sided", method = "approximate")$model[[1]], type = "model")
