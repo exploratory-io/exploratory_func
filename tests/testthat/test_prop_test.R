@@ -107,6 +107,22 @@ test_that("repeat-by: grouped exact test with alternative = greater per group", 
   }
 })
 
+test_that("NA values in the target column are excluded before evaluation", {
+  # 30 TRUE, 20 FALSE, 50 NA -> only the 50 non-NA rows are evaluated.
+  df <- data.frame(outcome = c(rep(TRUE, 30), rep(FALSE, 20), rep(NA, 50)))
+  model <- exp_prop_test(df, outcome, p = 0.5, method = "approximate")$model[[1]]
+  # Total Observations / Successes / Observed Proportion are all NA-excluded.
+  expect_equal(model$n, 50)
+  expect_equal(model$x, 30)
+  expect_equal(model$observed_prop, 0.6)
+  # The test statistic must match prop.test run on the NA-removed counts (30/50).
+  expected <- prop.test(30, 50, p = 0.5, correct = FALSE)
+  expect_equal(model$htest$p.value, expected$p.value)
+  # The tidied model surfaces the NA-excluded Total Observations, not nrow(df).
+  tidied <- tidy(model, type = "model")
+  expect_equal(tidied$`Total Observations`, 50)
+})
+
 test_that("tidy model type returns correct columns", {
   df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
   result <- exp_prop_test(df, outcome, p = 0.4, method = "approximate")
