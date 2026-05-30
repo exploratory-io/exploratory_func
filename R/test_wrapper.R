@@ -3329,3 +3329,138 @@ glance.prop_test_2groups_exploratory <- function(x) {
   if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
   broom:::glance.htest(x$htest)
 }
+
+#' One-sample proportion test (binom.test / prop.test).
+#'
+#' Tests whether an observed proportion differs from a known benchmark proportion.
+#' Uses \code{binom.test} (exact) when n*p < 5 or n*(1-p) < 5 (auto mode),
+#' otherwise uses \code{prop.test(correct = FALSE)} (approximate).
+#'
+#' @param df A data frame.
+#' @param var A logical column (success = TRUE).
+#' @param p Benchmark proportion (between 0 and 1). Default 0.5.
+#' @param alternative Direction: "two.sided", "greater", or "less".
+#' @param method Test method: "auto", "exact" (binom.test), or "approximate" (prop.test).
+#' @param sig.level Significance level. Default 0.05.
+#' @param conf.level Confidence level for the interval. Defaults to 1 - sig.level.
+#' @param ... Additional arguments (ignored).
+#' @return A data frame with a list-column "model" of class one_sample_prop_test_exploratory.
+#' @export
+exp_one_sample_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
+                                     method = "auto", sig.level = 0.05,
+                                     conf.level = 1 - sig.level, ...) {
+  var_col <- col_name(substitute(var))
+  grouped_cols <- grouped_by(df)
+  method <- match.arg(method, c("auto", "exact", "approximate"))
+
+  one_sample_prop_test_each <- function(df) {
+    tryCatch({
+      vec <- df[[var_col]]
+      x <- sum(vec, na.rm = TRUE)
+      n <- sum(!is.na(vec))
+      if (n == 0) stop("There is no valid (non-NA) data in the selected column.")
+
+      use_exact <- switch(method,
+        "exact" = TRUE,
+        "approximate" = FALSE,
+        (n * p < 5 || n * (1 - p) < 5))
+      # conf.level defaults to 1 - sig.level (backward compatible) but can be
+      # set independently from the significance level via the UI.
+      conf_level <- conf.level
+
+      if (use_exact) {
+        res <- binom.test(x = x, n = n, p = p, alternative = alternative,
+                          conf.level = conf_level)
+        method_used <- "Exact Binomial Test"
+      } else {
+        res <- prop.test(x = x, n = n, p = p, alternative = alternative,
+                        conf.level = conf_level, correct = FALSE)
+        method_used <- "Approximate Test (Normal)"
+      }
+
+      observed_prop <- x / n
+      cohens_h <- pwr::ES.h(observed_prop, p)
+      power <- tryCatch(
+        (pwr::pwr.p.test(h = cohens_h, n = n, sig.level = sig.level,
+                        alternative = alternative))$power,
+        error = function(e) NA_real_)
+
+      model <- list(htest = res, x = x, n = n, p = p, observed_prop = observed_prop,
+                    success_value = "TRUE", alternative = alternative,
+                    method_used = method_used, conf_level = conf_level,
+                    cohens_h = cohens_h, power = power, var_col = var_col,
+                    sig.level = sig.level)
+      class(model) <- c("one_sample_prop_test_exploratory", class(model))
+      # Keep the original (per-group) data so that tidy(type = "data") can
+      # return it for the data-level charts (Error Bar Plot, Data Distribution),
+      # mirroring how exp_ttest stores model$data for its "Means" chart.
+      model$data <- df
+      model
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) {
+        class(e) <- c("one_sample_prop_test_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  do_on_each_group(df, one_sample_prop_test_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
+  if ("error" %in% class(x)) {
+    return(tibble::tibble(Note = x$message))
+  }
+  if (type == "model") {
+    diff <- x$observed_prop - x$p
+    direction <- switch(x$alternative,
+      "two.sided" = "Different from benchmark",
+      "greater"   = "Greater than benchmark",
+      "less"      = "Less than benchmark")
+    result_label <- if (!is.na(x$htest$p.value) && x$htest$p.value < x$sig.level)
+      "Statistically significant." else "Not statistically significant."
+    tibble::tibble(
+      `Success Value`        = x$success_value,
+      `Number of Successes`  = x$x,
+      `Total Observations`   = x$n,
+      `Observed Proportion`  = x$observed_prop,
+      `Benchmark Proportion` = x$p,
+      `Difference`           = diff,
+      `Conf Low`             = x$htest$conf.int[1],
+      `Conf High`            = x$htest$conf.int[2],
+      `P Value`              = x$htest$p.value,
+      `Cohen's h`            = x$cohens_h,
+      `Power`                = x$power,
+      `Test Direction`       = direction,
+      `Method`               = x$method_used,
+      `Result`               = result_label
+    )
+  } else if (type == "prob_dist") {
+    # Data for the probability distribution (line) chart. Regardless of the
+    # method actually used (exact binomial or normal approximation), we always
+    # display the standard normal distribution and mark the standardized test
+    # statistic z = (phat - p0) / sqrt(p0 * (1 - p0) / n) on it. The exact test
+    # has no z statistic of its own, so we derive z the same way for every
+    # method to keep this chart consistent.
+    se <- sqrt(x$p * (1 - x$p) / x$n)
+    z <- if (!is.na(se) && se > 0) (x$observed_prop - x$p) / se else 0
+    generate_norm_density_data(z, p.value = x$htest$p.value, mu = 0, sigma = 1,
+                               sig_level = x$sig.level, alternative = x$alternative)
+  } else { # type == "data"
+    # Return the original data so that the data-level charts (Error Bar Plot,
+    # Data Distribution) can map to the target column. The chart templates
+    # reference the original column name (___TARGET_COLUMN_NAME___), so the
+    # raw data frame must contain that column. The exact-test CI is still
+    # available via type = "model" (used by the Summary table).
+    x$data
+  }
+}
+
+#' @export
+glance.one_sample_prop_test_exploratory <- function(x) {
+  if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
+  broom:::glance.htest(x$htest)
+}
