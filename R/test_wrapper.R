@@ -3190,6 +3190,7 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
   var_col <- col_name(substitute(var))
   exp_col <- col_name(substitute(explanatory))
   grouped_cols <- grouped_by(df)
+  method <- match.arg(method, c("auto", "exact", "approximate"))
 
   # func2 transform on explanatory (date/numeric)
   if (!is.null(func2)) {

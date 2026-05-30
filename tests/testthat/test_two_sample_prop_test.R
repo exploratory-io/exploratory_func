@@ -102,6 +102,17 @@ test_that("alternative = less", {
   expect_equal(model$p_value, expected$p.value)
 })
 
+test_that("invalid method is rejected via match.arg", {
+  # Unknown method values must error rather than silently fall back to auto,
+  # matching the one-sample exp_one_sample_prop_test convention.
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  expect_error(exp_two_sample_prop_test(df, outcome, group, method = "fisher"))
+  expect_error(exp_two_sample_prop_test(df, outcome, group, method = "Auto"))
+})
+
 test_that("error when explanatory has 3+ unique values (no NA)", {
   df <- data.frame(
     outcome = c(TRUE, FALSE, TRUE, FALSE, TRUE),
