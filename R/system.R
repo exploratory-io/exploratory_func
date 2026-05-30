@@ -3216,7 +3216,26 @@ clear_cache_file <- function(url){
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed url is assigned to the path given by tempfile.
 #' @param url
+normalize_dropbox_download_url <- function(url) {
+  if (stringr::str_detect(url, "^https?://www[.]dropbox[.]com/(s|scl)/")) {
+    return(stringr::str_replace(url, "^https?://www[.]dropbox[.]com/", "https://dl.dropboxusercontent.com/"))
+  }
+  url
+}
+
+validate_downloaded_data_file <- function(response, type) {
+  httr::stop_for_status(response)
+
+  content_type <- httr::headers(response)[["content-type"]]
+  if (!is.null(content_type) &&
+      type %in% c("csv", "excel", "rdata", "log") &&
+      stringr::str_detect(stringr::str_to_lower(content_type), "text/html|application/xhtml")) {
+    stop("Downloaded content is HTML, not a data file.", call. = FALSE)
+  }
+}
+
 download_data_file <- function(url, type){
+  download_url <- normalize_dropbox_download_url(url)
   shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
   hash <- digest::digest(url, "md5", serialize = FALSE)
@@ -3261,7 +3280,8 @@ download_data_file <- function(url, type){
 
     tryCatch({
       # Download file to temporary location
-      httr::GET(url, httr::write_disk(tmp, overwrite = TRUE), httr::timeout(600))
+      response <- httr::GET(download_url, httr::write_disk(tmp, overwrite = TRUE), httr::timeout(600))
+      validate_downloaded_data_file(response, type)
     }, error = function(cond){
        stop(cond)
     })

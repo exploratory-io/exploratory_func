@@ -462,6 +462,21 @@ test_that("read_delim_file downlod failed error message", {
   })
 })
 
+test_that("Dropbox shared links are normalized to direct download links", {
+  expect_equal(
+    exploratory:::normalize_dropbox_download_url("https://www.dropbox.com/s/f47baw5f3v0xoll/airline.csv?dl=1"),
+    "https://dl.dropboxusercontent.com/s/f47baw5f3v0xoll/airline.csv?dl=1"
+  )
+  expect_equal(
+    exploratory:::normalize_dropbox_download_url("https://www.dropbox.com/scl/fi/o3vuqea89mp6t24e61cmg/one-col.csv?rlkey=abc&dl=1"),
+    "https://dl.dropboxusercontent.com/scl/fi/o3vuqea89mp6t24e61cmg/one-col.csv?rlkey=abc&dl=1"
+  )
+  expect_equal(
+    exploratory:::normalize_dropbox_download_url("https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv"),
+    "https://dummy.dropbox.com/s/sjkgk9gj0vemq36/sample.csv"
+  )
+})
+
 test_that("read_delim_file with guess delimiter error handling and retry with default comma delimiter", {
   df <- exploratory::read_delim_file("https://www.dropbox.com/scl/fi/o3vuqea89mp6t24e61cmg/one-col.csv?rlkey=6ko09im7w4bn5x0yrj9kjduzv&dl=1", delim = NULL)
   expect_equal(colnames(df), c("a"))
