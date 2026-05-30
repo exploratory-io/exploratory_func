@@ -41,7 +41,8 @@ Imports:
     snakecase,
     textshape,
     V8,
-    cluster
+    cluster,
+    pwr
 Suggests:
     testthat,
     twitteR,

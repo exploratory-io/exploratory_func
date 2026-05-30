@@ -5,7 +5,7 @@ test_that("exact path matches binom.test", {
   result <- exp_prop_test(df, outcome, p = 0.1, method = "exact")
   model <- result$model[[1]]
   expected <- binom.test(12, 100, p = 0.1)
-  expect_equal(model$p_value %||% model$htest$p.value, expected$p.value)
+  expect_equal(model$htest$p.value, expected$p.value)
   expect_equal(model$method_used, "Exact Binomial Test")
 })
 

@@ -3178,6 +3178,7 @@ tidy.ttest_power_exploratory <- function(x, type="summary") {
 #' @param alternative Direction: "two.sided", "greater", or "less".
 #' @param method Test method: "auto", "exact" (binom.test), or "approximate" (prop.test).
 #' @param sig.level Significance level. Default 0.05.
+#' @param conf.level Confidence level for the interval. Defaults to 1 - sig.level.
 #' @param ... Additional arguments (ignored).
 #' @return A data frame with a list-column "model" of class prop_test_exploratory.
 #' @export
@@ -3186,6 +3187,7 @@ exp_prop_test <- function(df, var, p = 0.5, alternative = "two.sided",
                           conf.level = 1 - sig.level, ...) {
   var_col <- col_name(substitute(var))
   grouped_cols <- grouped_by(df)
+  method <- match.arg(method, c("auto", "exact", "approximate"))
 
   prop_test_each <- function(df) {
     tryCatch({
