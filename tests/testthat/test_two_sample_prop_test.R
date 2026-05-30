@@ -26,6 +26,37 @@ test_that("exact path matches fisher.test", {
   expect_equal(model$method_used, "Fisher's Exact Test")
 })
 
+test_that("exact path exposes the fisher.test odds ratio and its CI", {
+  # The summary surfaces Odds Ratio (+ CI) only on the exact path; validate the
+  # exposed values against fisher.test directly.
+  df <- data.frame(
+    outcome = c(rep(TRUE, 3), rep(FALSE, 7), rep(TRUE, 1), rep(FALSE, 4)),
+    group = c(rep("A", 10), rep("B", 5))
+  )
+  model <- exp_two_sample_prop_test(df, outcome, group, method = "exact")$model[[1]]
+  expected <- fisher.test(matrix(c(3, 7, 1, 4), nrow = 2, byrow = TRUE))
+  expect_equal(model$odds_ratio, unname(expected$estimate))
+  expect_equal(model$or_low, expected$conf.int[1])
+  expect_equal(model$or_high, expected$conf.int[2])
+  # The approximate-only difference CI is not produced on the exact path.
+  expect_true(is.na(model$diff_low))
+  expect_true(is.na(model$diff_high))
+})
+
+test_that("exact path with directional alternative matches fisher.test", {
+  # Fisher x greater/less fills the exact x directional cell of the matrix
+  # (the directional tests above only cover the approximate path).
+  df <- data.frame(
+    outcome = c(rep(TRUE, 3), rep(FALSE, 7), rep(TRUE, 1), rep(FALSE, 4)),
+    group = c(rep("A", 10), rep("B", 5))
+  )
+  tbl <- matrix(c(3, 7, 1, 4), nrow = 2, byrow = TRUE)
+  gt <- exp_two_sample_prop_test(df, outcome, group, alternative = "greater", method = "exact")$model[[1]]
+  lt <- exp_two_sample_prop_test(df, outcome, group, alternative = "less", method = "exact")$model[[1]]
+  expect_equal(gt$p_value, fisher.test(tbl, alternative = "greater")$p.value)
+  expect_equal(lt$p_value, fisher.test(tbl, alternative = "less")$p.value)
+})
+
 test_that("auto method selects fisher when expected cell < 5", {
   # Small counts -> some expected cells will be < 5
   df <- data.frame(
@@ -100,6 +131,34 @@ test_that("repeat-by: one model per group", {
   expect_equal(nrow(result), 2)
 })
 
+test_that("repeat-by: grouped approximate output is numerically valid per group", {
+  # Each repeat-by group is an independent A-vs-B comparison; verify the counts
+  # and the p-value of every group against prop.test on that group's slice.
+  df <- data.frame(
+    outcome = c(rep(TRUE, 20), rep(FALSE, 10), rep(TRUE, 8),  rep(FALSE, 22),   # X: A 20/30, B 8/30
+                rep(TRUE, 5),  rep(FALSE, 25), rep(TRUE, 18), rep(FALSE, 12)),  # Y: A 5/30,  B 18/30
+    group = rep(c(rep("A", 30), rep("B", 30)), 2),
+    repeat_col = c(rep("X", 60), rep("Y", 60))
+  ) %>% dplyr::group_by(repeat_col)
+  result <- exp_two_sample_prop_test(df, outcome, group, method = "approximate")
+  expect_equal(nrow(result), 2)
+
+  expected_counts <- list(X = c(20, 8), Y = c(5, 18))
+  for (grp in names(expected_counts)) {
+    model <- result$model[[which(result$repeat_col == grp)]]
+    xA <- expected_counts[[grp]][1]; xB <- expected_counts[[grp]][2]
+    expected <- prop.test(x = c(xA, xB), n = c(30, 30), correct = FALSE)
+    expect_equal(model$xA, xA)
+    expect_equal(model$xB, xB)
+    expect_equal(model$nA, 30)
+    expect_equal(model$nB, 30)
+    expect_equal(model$p_value, expected$p.value)
+    expect_equal(model$diff_low, expected$conf.int[1])
+    expect_equal(model$diff_high, expected$conf.int[2])
+    expect_equal(model$method_used, "Approximate Test (Normal)")
+  }
+})
+
 test_that("tidy model type returns summary data frame", {
   df <- data.frame(
     outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
@@ -112,6 +171,50 @@ test_that("tidy model type returns summary data frame", {
   expect_true("Group A" %in% names(tidied))
   expect_true("Group B" %in% names(tidied))
   expect_true("Result" %in% names(tidied))
+})
+
+test_that("tidy model maps Test Direction from alternative", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  two <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "two.sided", method = "approximate")$model[[1]], type = "model")
+  gt  <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "greater",   method = "approximate")$model[[1]], type = "model")
+  lt  <- tidy(exp_two_sample_prop_test(df, outcome, group, alternative = "less",       method = "approximate")$model[[1]], type = "model")
+  expect_equal(two$`Test Direction`, "Different between the two groups")
+  expect_equal(gt$`Test Direction`, "Group A is greater than Group B")
+  expect_equal(lt$`Test Direction`, "Group A is less than Group B")
+})
+
+test_that("tidy model Result reflects significance against sig.level", {
+  # A=30/50 vs B=15/50 -> p approx 0.0026 -> significant
+  sig_model <- exp_two_sample_prop_test(
+    data.frame(outcome = c(rep(TRUE, 30), rep(FALSE, 20), rep(TRUE, 15), rep(FALSE, 35)),
+               group = c(rep("A", 50), rep("B", 50))),
+    outcome, group, method = "approximate")$model[[1]]
+  # A=25/50 vs B=22/50 -> p approx 0.55 -> not significant
+  ns_model <- exp_two_sample_prop_test(
+    data.frame(outcome = c(rep(TRUE, 25), rep(FALSE, 25), rep(TRUE, 22), rep(FALSE, 28)),
+               group = c(rep("A", 50), rep("B", 50))),
+    outcome, group, method = "approximate")$model[[1]]
+  expect_lt(sig_model$p_value, 0.05)
+  expect_gt(ns_model$p_value, 0.05)
+  expect_equal(tidy(sig_model, type = "model")$Result, "Statistically significant.")
+  expect_equal(tidy(ns_model, type = "model")$Result, "Not statistically significant.")
+})
+
+test_that("sig.level flips the significance Result on the same data", {
+  # A=30/60 vs B=20/60 -> p approx 0.064. The identical model is not significant
+  # at sig.level 0.05 but is at 0.10, isolating sig.level's effect.
+  df <- data.frame(
+    outcome = c(rep(TRUE, 30), rep(FALSE, 30), rep(TRUE, 20), rep(FALSE, 40)),
+    group = c(rep("A", 60), rep("B", 60))
+  )
+  ns_model  <- exp_two_sample_prop_test(df, outcome, group, method = "approximate", sig.level = 0.05)$model[[1]]
+  sig_model <- exp_two_sample_prop_test(df, outcome, group, method = "approximate", sig.level = 0.10)$model[[1]]
+  expect_equal(ns_model$p_value, sig_model$p_value)
+  expect_equal(tidy(ns_model, type = "model")$Result, "Not statistically significant.")
+  expect_equal(tidy(sig_model, type = "model")$Result, "Statistically significant.")
 })
 
 test_that("tidy data type returns two-row CI data", {
