@@ -231,3 +231,38 @@ test_that("test exp_wilcox with group-level error", {
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })
+
+# --- tidy(type = "prob_dist_diff") for two-sample t-test ---
+
+test_that("exp_ttest tidy prob_dist_diff marks the observed difference on the difference scale", {
+  # Two clearly separated groups so the mean difference is non-trivial.
+  test_df <- data.frame(
+    cat = c(rep("cat1", 20), rep("cat2", 20)),
+    val = c(seq(1, 20), seq(4, 23))
+  )
+  model_df <- test_df %>% exp_ttest(val, cat)
+  pd <- model_df %>% tidy_rowwise(model, type = "prob_dist_diff")
+  expect_true(all(c("x", "y", "statistic", "critical", "p.value") %in% names(pd)))
+  diff <- (model_df %>% tidy_rowwise(model, type = "model"))$Difference
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  # The marked point sits at the observed mean difference, NOT the standardized t.
+  expect_equal(marked$x, diff, tolerance = 1e-6)
+  # The difference-scale distribution is centered at 0 (H0: no difference): the density
+  # peak (the curve rows, excluding the marked statistic point) is at x = 0.
+  curve <- pd[!is.na(pd$y) & is.na(pd$statistic), ]
+  expect_equal(curve$x[which.max(curve$y)], 0, tolerance = 1e-6)
+})
+
+test_that("exp_ttest tidy prob_dist_diff critical region follows the alternative direction", {
+  test_df <- data.frame(
+    cat = c(rep("cat1", 20), rep("cat2", 20)),
+    val = c(seq(1, 20), seq(4, 23))
+  )
+  gt <- test_df %>% exp_ttest(val, cat, alternative = "greater") %>% tidy_rowwise(model, type = "prob_dist_diff")
+  expect_true(all(gt$x[which(gt$critical)] > 0))
+  lt <- test_df %>% exp_ttest(val, cat, alternative = "less") %>% tidy_rowwise(model, type = "prob_dist_diff")
+  expect_true(all(lt$x[which(lt$critical)] < 0))
+  ts <- test_df %>% exp_ttest(val, cat, alternative = "two.sided") %>% tidy_rowwise(model, type = "prob_dist_diff")
+  expect_true(any(ts$x[which(ts$critical)] > 0) && any(ts$x[which(ts$critical)] < 0))
+})

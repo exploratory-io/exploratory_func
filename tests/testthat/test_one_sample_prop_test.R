@@ -360,3 +360,60 @@ test_that("tidy prob_dist critical region follows the alternative direction", {
   ts <- tidy(exp_one_sample_prop_test(df, outcome, p = 0.4, alternative = "two.sided", method = "approximate")$model[[1]], type = "prob_dist")
   expect_true(any(ts$x[which(ts$critical)] > 0) && any(ts$x[which(ts$critical)] < 0))
 })
+
+# --- tidy(type = "prob_dist_prop") ---
+
+test_that("tidy prob_dist_prop marks the observed proportion on the proportion scale", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  model <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
+  pd <- tidy(model, type = "prob_dist_prop")
+  expect_true(all(c("x", "y", "statistic", "critical", "p.value") %in% names(pd)))
+  # SE = sqrt(p0*(1-p0)/n); the marked point sits at the observed proportion (NOT z).
+  se <- sqrt(0.4 * 0.6 / 100)
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  expect_equal(marked$x, 0.5)
+  expect_equal(marked$p.value, model$htest$p.value)
+  # Normal centered at the benchmark proportion p0 with sd = SE.
+  expect_equal(unique(pd$mean), 0.4)
+  expect_equal(unique(pd$sd), se)
+  expect_true(max(pd$y, na.rm = TRUE) <= dnorm(0.4, mean = 0.4, sd = se) + 1e-9)
+})
+
+test_that("tidy prob_dist_prop always uses the proportion-scale normal even for the exact method", {
+  df <- data.frame(outcome = c(rep(TRUE, 12), rep(FALSE, 88)))
+  model <- exp_one_sample_prop_test(df, outcome, p = 0.1, method = "exact")$model[[1]]
+  expect_equal(model$method_used, "Exact Binomial Test")
+  pd <- tidy(model, type = "prob_dist_prop")
+  se <- sqrt(0.1 * 0.9 / 100)
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  expect_equal(marked$x, 0.12)
+  expect_equal(unique(pd$mean), 0.1)
+  expect_equal(unique(pd$sd), se)
+})
+
+test_that("tidy prob_dist_prop critical region follows the alternative direction", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  p0 <- 0.4
+  # greater -> rejection region is the upper tail only (above the benchmark proportion).
+  gt <- tidy(exp_one_sample_prop_test(df, outcome, p = p0, alternative = "greater", method = "approximate")$model[[1]], type = "prob_dist_prop")
+  expect_true(all(gt$x[which(gt$critical)] > p0))
+  # less -> rejection region is the lower tail only.
+  lt <- tidy(exp_one_sample_prop_test(df, outcome, p = p0, alternative = "less", method = "approximate")$model[[1]], type = "prob_dist_prop")
+  expect_true(all(lt$x[which(lt$critical)] < p0))
+  # two.sided -> both tails relative to the benchmark proportion.
+  ts <- tidy(exp_one_sample_prop_test(df, outcome, p = p0, alternative = "two.sided", method = "approximate")$model[[1]], type = "prob_dist_prop")
+  expect_true(any(ts$x[which(ts$critical)] > p0) && any(ts$x[which(ts$critical)] < p0))
+})
+
+test_that("tidy prob_dist_prop returns an empty tibble when the SE is 0/NA", {
+  # n*p0 produces a valid SE normally; build a degenerate model object directly to
+  # exercise the guard (the benchmark SE is 0 only for a degenerate p0).
+  model <- structure(
+    list(htest = list(p.value = NA_real_), p = 0.4, observed_prop = 0.5,
+         se = 0, sig.level = 0.05, alternative = "two.sided"),
+    class = c("one_sample_prop_test_exploratory", "list"))
+  pd <- tidy(model, type = "prob_dist_prop")
+  expect_equal(nrow(pd), 0)
+})
