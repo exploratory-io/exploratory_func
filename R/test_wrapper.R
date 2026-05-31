@@ -3513,6 +3513,7 @@ glance.one_sample_prop_test_exploratory <- function(x) {
 #' @param alternative "two.sided", "greater", or "less".
 #' @param sig.level Significance level. Default 0.05.
 #' @param conf.level Confidence level. Defaults to 1 - sig.level.
+#' @param ... Additional arguments (ignored).
 #' @export
 exp_one_sample_t_test <- function(df, var, mu = 0, alternative = "two.sided",
                                   sig.level = 0.05, conf.level = 1 - sig.level, ...) {
