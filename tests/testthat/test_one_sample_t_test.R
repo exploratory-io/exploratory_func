@@ -353,6 +353,65 @@ test_that("tidy prob_dist uses t-distribution (df column present)", {
   expect_equal(unique(pd$df[!is.na(pd$df)]), unname(model$htest$parameter))
 })
 
+# --- tidy(type = "prob_dist_mean") ---
+
+test_that("tidy prob_dist_mean marks the observed mean on the mean scale", {
+  set.seed(42)
+  vec <- rnorm(50, mean = 5, sd = 2)
+  df <- data.frame(x = vec)
+  model <- exp_one_sample_t_test(df, x, mu = 4.5)$model[[1]]
+  pd <- tidy(model, type = "prob_dist_mean")
+  expect_true(all(c("x", "y", "statistic", "critical", "p.value") %in% names(pd)))
+  marked <- pd[which(pd$statistic), ]
+  expect_equal(nrow(marked), 1)
+  # The marked point sits at the observed mean (mu0 + t*stderr), NOT the t statistic.
+  expect_equal(marked$x, model$observed_mean)
+  expect_equal(marked$p.value, model$htest$p.value)
+})
+
+test_that("tidy prob_dist_mean curve is centered at the hypothesized mean", {
+  set.seed(42)
+  vec <- rnorm(50, mean = 5, sd = 2)
+  df <- data.frame(x = vec)
+  model <- exp_one_sample_t_test(df, x, mu = 4.5)$model[[1]]
+  pd <- tidy(model, type = "prob_dist_mean")
+  # The peak density of the t-curve is at t = 0, which maps to mean = mu0.
+  curve <- pd[!is.na(pd$y) & is.na(pd$statistic), ]
+  peak_x <- curve$x[which.max(curve$y)]
+  expect_equal(peak_x, model$mu, tolerance = model$stderr / 10)
+})
+
+test_that("tidy prob_dist_mean critical region follows the alternative direction", {
+  set.seed(42)
+  vec <- rnorm(50, mean = 5, sd = 2)
+  df <- data.frame(x = vec)
+  # greater -> upper tail only (above the hypothesized mean).
+  gt_model <- exp_one_sample_t_test(df, x, mu = 4, alternative = "greater")$model[[1]]
+  gt <- tidy(gt_model, type = "prob_dist_mean")
+  expect_true(all(gt$x[which(gt$critical)] > gt_model$mu))
+  # less -> lower tail only (below the hypothesized mean).
+  lt_model <- exp_one_sample_t_test(df, x, mu = 6, alternative = "less")$model[[1]]
+  lt <- tidy(lt_model, type = "prob_dist_mean")
+  expect_true(all(lt$x[which(lt$critical)] < lt_model$mu))
+  # two.sided -> both tails relative to the hypothesized mean.
+  ts_model <- exp_one_sample_t_test(df, x, mu = 4.5, alternative = "two.sided")$model[[1]]
+  ts <- tidy(ts_model, type = "prob_dist_mean")
+  expect_true(any(ts$x[which(ts$critical)] > ts_model$mu) &&
+              any(ts$x[which(ts$critical)] < ts_model$mu))
+})
+
+test_that("tidy prob_dist_mean no-ops (0-row tibble) when stderr is degenerate", {
+  # stderr can only be 0/NA for a degenerate (constant) sample; build such a model object
+  # directly since t.test() itself rejects a zero-variance vector before a model is formed.
+  model <- structure(
+    list(htest = list(statistic = c(t = NA_real_), parameter = c(df = 0),
+                      p.value = NA_real_),
+         mu = 5, stderr = 0, sig.level = 0.05, alternative = "two.sided"),
+    class = c("one_sample_t_test_exploratory", "list"))
+  pd <- tidy(model, type = "prob_dist_mean")
+  expect_equal(nrow(pd), 0)
+})
+
 # --- tidy(type = "data") ---
 
 test_that("tidy data type returns the raw data with the target column", {

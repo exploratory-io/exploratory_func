@@ -3584,6 +3584,25 @@ tidy.one_sample_t_test_exploratory <- function(x, type = "model") {
     generate_ttest_density_data(t = unname(x$htest$statistic), p.value = x$htest$p.value,
                                 df = unname(x$htest$parameter), sig_level = x$sig.level,
                                 alternative = x$alternative)
+  } else if (type == "prob_dist_mean") {
+    # Data for the probability distribution (line) chart on the MEAN scale. This is the
+    # sampling distribution of the sample mean under H0, i.e. the t-value distribution
+    # relocated/rescaled onto the mean axis via mean = mu0 + t * stderr. We reuse the
+    # t-value generator and remap its x column so the shading semantics (critical region,
+    # sig.level based) stay identical to the t-value tab. The marked statistic point lands
+    # at mu0 + t*stderr = observed_mean, and the curve peaks at the hypothesized mean.
+    # Capture mu/stderr into locals before mutate: the model object is also named x, which
+    # would collide with the data-frame column x inside dplyr.
+    mu_val <- x$mu
+    se_val <- x$stderr
+    if (is.na(se_val) || se_val <= 0) {
+      tibble::tibble(x = numeric(0), y = numeric(0)) # degenerate input -> chart no-ops
+    } else {
+      generate_ttest_density_data(t = unname(x$htest$statistic), p.value = x$htest$p.value,
+                                  df = unname(x$htest$parameter), sig_level = x$sig.level,
+                                  alternative = x$alternative) %>%
+        dplyr::mutate(x = mu_val + x * se_val)
+    }
   } else { # type == "data"
     x$data
   }
