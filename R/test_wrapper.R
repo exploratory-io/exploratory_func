@@ -1294,6 +1294,33 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- generate_ttest_density_data(x$statistic, p.value=x$p.value, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
     ret
   }
+  else if (type == "prob_dist_diff") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
+    # Data for the probability distribution (line) chart on the DIFFERENCE scale. This is
+    # the sampling distribution of the difference of means under H0 "no difference", i.e.
+    # the t-value distribution relocated/rescaled onto the difference axis via
+    # difference = 0 + t * stderr. We reuse the t-value generator and remap its x column
+    # so the shading semantics (critical region, sig.level based) stay identical to the
+    # t-value tab. The marked statistic point lands at t * stderr = the observed
+    # difference, and the curve peaks at 0 (the hypothesized difference).
+    # estimate is c(mean of group1, mean of group2) for an unpaired test, or a single
+    # value (mean of the differences) for a paired test; stderr = difference / t.
+    est <- unname(x$estimate)
+    difference <- if (length(est) >= 2) est[1] - est[2] else est[1]
+    t_stat <- unname(x$statistic)
+    se_val <- if (!is.na(t_stat) && t_stat != 0) abs(difference / t_stat) else NA_real_
+    if (is.na(se_val) || se_val == 0) {
+      ret <- tibble::tibble(x = numeric(0), y = numeric(0)) # degenerate input -> chart no-ops
+    } else {
+      ret <- generate_ttest_density_data(t = t_stat, p.value = x$p.value, df = unname(x$parameter),
+                                         sig_level = x$test_sig_level, alternative = x$alternative) %>%
+        dplyr::mutate(x = x * se_val)
+    }
+    ret
+  }
   else { # type == "data"
     if ("error" %in% class(x)) {
       ret <- tibble::tibble()
@@ -3429,7 +3456,7 @@ exp_one_sample_prop_test <- function(df, var, p = 0.5, alternative = "two.sided"
 
       model <- list(htest = res, x = x, n = n, p = p, observed_prop = observed_prop,
                     success_value = "TRUE", alternative = alternative,
-                    method_used = method_used, conf_level = conf_level, z = z,
+                    method_used = method_used, conf_level = conf_level, z = z, se = se,
                     cohens_h = cohens_h, power = power, var_col = var_col,
                     sig.level = sig.level)
       class(model) <- c("one_sample_prop_test_exploratory", class(model))
@@ -3488,6 +3515,22 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
     # statistic (x$z, the same value shown in the summary table) on it.
     generate_norm_density_data(x$z, p.value = x$htest$p.value, mu = 0, sigma = 1,
                                sig_level = x$sig.level, alternative = x$alternative)
+  } else if (type == "prob_dist_prop") {
+    # Data for the probability distribution (line) chart on the PROPORTION scale.
+    # This is the sampling distribution of the sample proportion under H0
+    # "the proportion equals the benchmark": a normal distribution centered at the
+    # benchmark proportion (x$p) with standard deviation equal to the standard error
+    # sqrt(p0 * (1 - p0) / n). We mark the observed proportion (x$observed_prop, the
+    # same value shown in the summary table) on it. The shaded critical region matches
+    # the Z value chart (sig.level based), so both probability distribution charts read
+    # the same way.
+    if (is.na(x$se) || x$se <= 0) {
+      tibble::tibble(x = numeric(0), y = numeric(0)) # degenerate input -> chart no-ops
+    } else {
+      generate_norm_density_data(x$observed_prop, p.value = x$htest$p.value, mu = x$p, sigma = x$se,
+                                 sig_level = x$sig.level, alternative = x$alternative) %>%
+        dplyr::filter(x >= 0 & x <= 1)
+    }
   } else { # type == "data"
     # Return the original data so that the data-level charts (Error Bar Plot,
     # Data Distribution) can map to the target column. The chart templates

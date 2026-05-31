@@ -141,6 +141,9 @@ test_that("test exp_ttest_aggregated", {
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   expect_true("p.value" %in% colnames(ret))
+  # Difference-scale probability distribution (shares the ttest_exploratory tidy branch).
+  ret_diff <- model_df %>% tidy_rowwise(model, type="prob_dist_diff")
+  expect_true(all(c("x", "y", "statistic", "critical", "p.value") %in% colnames(ret_diff)))
 })
 
 test_that("test two sample t-test with column name", {
