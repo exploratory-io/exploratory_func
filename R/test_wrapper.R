@@ -1311,8 +1311,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     est <- unname(x$estimate)
     difference <- if (length(est) >= 2) est[1] - est[2] else est[1]
     t_stat <- unname(x$statistic)
-    se_val <- if (!is.na(t_stat) && t_stat != 0) difference / t_stat else NA_real_
-    if (is.na(se_val) || se_val <= 0) {
+    se_val <- if (!is.na(t_stat) && t_stat != 0) abs(difference / t_stat) else NA_real_
+    if (is.na(se_val) || se_val == 0) {
       ret <- tibble::tibble(x = numeric(0), y = numeric(0)) # degenerate input -> chart no-ops
     } else {
       ret <- generate_ttest_density_data(t = t_stat, p.value = x$p.value, df = unname(x$parameter),
@@ -3528,7 +3528,8 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
       tibble::tibble(x = numeric(0), y = numeric(0)) # degenerate input -> chart no-ops
     } else {
       generate_norm_density_data(x$observed_prop, p.value = x$htest$p.value, mu = x$p, sigma = x$se,
-                                 sig_level = x$sig.level, alternative = x$alternative)
+                                 sig_level = x$sig.level, alternative = x$alternative) %>%
+        dplyr::filter(x >= 0 & x <= 1)
     }
   } else { # type == "data"
     # Return the original data so that the data-level charts (Error Bar Plot,
