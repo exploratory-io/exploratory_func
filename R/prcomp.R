@@ -181,9 +181,10 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
         dplyr::mutate(.cluster_key = as.character(x$kmeans$cluster)) %>%
         dplyr::group_by(.cluster_key) %>%
         dplyr::summarise(
-          avg_silhouette = mean(silhouette_score, na.rm = TRUE),
-          min_silhouette = suppressWarnings(min(silhouette_score, na.rm = TRUE)),
-          pct_negative = mean(silhouette_score < 0, na.rm = TRUE),
+          # Guard the degenerate all-NA case so it yields NA (not NaN/Inf) consistently.
+          avg_silhouette = if (all(is.na(silhouette_score))) NA_real_ else mean(silhouette_score, na.rm = TRUE),
+          min_silhouette = if (all(is.na(silhouette_score))) NA_real_ else min(silhouette_score, na.rm = TRUE),
+          pct_negative = if (all(is.na(silhouette_score))) NA_real_ else mean(silhouette_score < 0, na.rm = TRUE),
           .groups = "drop"
         )
       res <- res %>%
