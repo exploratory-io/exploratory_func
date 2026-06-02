@@ -211,6 +211,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       res <- res %>% dplyr::mutate(dplyr::across(dplyr::all_of(column_names), exploratory::normalize))
     }
 
+    if (type == "data" && !is.null(x$silhouette)) {
+      # Bind per-row silhouette (aligned positionally to x$df, same as the cluster column above).
+      res <- res %>% dplyr::bind_cols(x$silhouette)
+    }
+
     if (!is.null(n_sample)) { # default is no sampling.
       # limit n_sample so that no more dots are created than the max that can be plotted on scatter plot, which is 5000.
       n_sample <- min(n_sample, floor(5000 / length(column_names)))

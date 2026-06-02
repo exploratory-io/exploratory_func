@@ -200,3 +200,24 @@ test_that("tidy_rowwise summary includes per-cluster silhouette aggregates", {
   expect_true(all(non_excluded$pct_negative >= 0 & non_excluded$pct_negative <= 1))
   expect_true(all(non_excluded$avg_silhouette >= non_excluded$min_silhouette))
 })
+
+test_that("tidy_rowwise data includes per-row silhouette columns", {
+  df <- mtcars
+  model_df <- exp_kmeans(df, cyl, mpg, hp, centers = 3, max_nrow = 30)
+  res <- model_df %>% tidy_rowwise(model, type = "data")
+  expect_true(all(c("silhouette_score", "nearest_cluster", "cluster_width") %in% colnames(res)))
+  expect_true(all(res$silhouette_score >= -1 & res$silhouette_score <= 1))
+  # gathered_data must NOT carry the per-row silhouette columns (charts select their own cols).
+  g <- model_df %>% tidy_rowwise(model, type = "gathered_data")
+  expect_false("silhouette_score" %in% colnames(g))
+})
+
+test_that("exp_kmeans with strange column name still yields silhouette columns", {
+  df <- mtcars
+  df <- df %>% dplyr::rename(`Cy l !#$%` = cyl)
+  model_df <- exp_kmeans(df, `Cy l !#$%`, mpg, hp, centers = 3, max_nrow = 30)
+  res <- model_df %>% tidy_rowwise(model, type = "data")
+  expect_true("silhouette_score" %in% colnames(res))
+  smry <- model_df %>% tidy_rowwise(model, type = "summary")
+  expect_true("avg_silhouette" %in% colnames(smry))
+})
