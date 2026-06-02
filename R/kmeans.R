@@ -78,6 +78,45 @@ iterate_silhouette <- function(df, max_centers = 10,
   })
 }
 
+# Compute per-row silhouette widths for an already-built clustering.
+#
+# cluster_ids: integer cluster assignment vector (length n, aligned to mat rows).
+#              For K-Means this is x$kmeans$cluster (integer 1..k).
+# mat:         normalized numeric matrix used for clustering (n rows).
+# d:           optional precomputed stats::dist(mat) to reuse. Computed when NULL.
+#
+# Returns a tibble with n rows and columns silhouette_score, nearest_cluster, cluster_width.
+# Returns all-NA columns (no error) when silhouette is undefined
+# (fewer than 2 clusters, or fewer than 2 distinct points).
+compute_silhouette_per_row <- function(cluster_ids, mat, d = NULL) {
+  n <- length(cluster_ids)
+  na_result <- tibble::tibble(
+    silhouette_score = rep(NA_real_, n),
+    nearest_cluster = rep(NA_integer_, n),
+    cluster_width = rep(NA_real_, n)
+  )
+  ids <- as.integer(cluster_ids)
+  if (length(unique(ids)) < 2 || nrow(unique(mat)) < 2) {
+    return(na_result)
+  }
+  if (is.null(d)) {
+    d <- stats::dist(mat)
+  }
+  sil <- cluster::silhouette(ids, d)
+  if (!inherits(sil, "silhouette")) {
+    # silhouette() can return NA (not a matrix) for degenerate input.
+    return(na_result)
+  }
+  widths <- as.numeric(sil[, "sil_width"])
+  clusters <- as.integer(sil[, "cluster"])
+  clus_avg <- tapply(widths, clusters, mean, na.rm = TRUE)
+  tibble::tibble(
+    silhouette_score = widths,
+    nearest_cluster = as.integer(sil[, "neighbor"]),
+    cluster_width = as.numeric(clus_avg[as.character(clusters)])
+  )
+}
+
 #' analytics function for K-means view
 #' @export
 exp_kmeans <- function(df, ...,
