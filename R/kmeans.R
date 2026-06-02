@@ -194,6 +194,23 @@ exp_kmeans <- function(df, ...,
                    !!!rlang::syms(selected_cols))
   ret <- dplyr::ungroup(ret) # ungroup once so that the following mutate with purrr::map2 works.
 
+  # Build the normalized clustering matrix ONCE; the single dist() is the only
+  # O(n^2) cost and is shared with iterate_silhouette() (decision (a), #36106).
+  # Only build the shared dist for the ungrouped (UI) case; grouped models build
+  # their own per-group matrix below.
+  is_single_model <- length(ret$model) == 1
+  shared_sil_mat <- NULL
+  shared_sil_dist <- NULL
+  if (is_single_model) {
+    kmeans_df_shared <- df %>% dplyr::select(!!!rlang::syms(selected_cols))
+    shared_sil_mat <- as_numeric_matrix_(kmeans_df_shared, columns = colnames(kmeans_df_shared))
+    if (normalize_data) {
+      shared_sil_mat <- scale(shared_sil_mat)
+      shared_sil_mat[is.nan(shared_sil_mat)] <- 0
+    }
+    shared_sil_dist <- stats::dist(shared_sil_mat)
+  }
+
   # Compute elbow or silhouette results depending on optimal_method.
   elbow_result <- NULL
   silhouette_result <- NULL
@@ -216,13 +233,26 @@ exp_kmeans <- function(df, ...,
                                             algorithm = algorithm,
                                             trace = trace,
                                             normalize_data = normalize_data,
-                                            seed = NULL) # Seed is already set once at the top of exp_kmeans(). Skip it.
+                                            seed = NULL, # Seed is already set once at the top of exp_kmeans(). Skip it.
+                                            dist = shared_sil_dist) # Reuse the single dist when available.
   }
 
   ret <- ret %>% dplyr::mutate(model = purrr::imap(model, function(x, idx) {
     tryCatch({
       y <- kmeans_model_df$model[[idx]]
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
+      # Always attach per-row silhouette for the chosen clustering (#36106).
+      if (!is.null(shared_sil_mat)) {
+        x$silhouette <- compute_silhouette_per_row(y$cluster, shared_sil_mat, shared_sil_dist)
+      } else {
+        # Grouped case: build the matrix from this group's own data.
+        gmat <- as_numeric_matrix_(x$df[, selected_cols, drop = FALSE], columns = selected_cols)
+        if (normalize_data) {
+          gmat <- scale(gmat)
+          gmat[is.nan(gmat)] <- 0
+        }
+        x$silhouette <- compute_silhouette_per_row(y$cluster, gmat)
+      }
       x$sampled_nrow <- sampled_nrow
       x$excluded_nrow <- excluded_nrow
       if (!is.null(elbow_result)) {

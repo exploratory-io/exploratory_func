@@ -178,3 +178,15 @@ test_that("iterate_silhouette accepts a precomputed dist and matches recompute",
   set.seed(1); b <- iterate_silhouette(df, max_centers = 4, normalize_data = TRUE, seed = 1, dist = d)
   expect_equal(a, b)
 })
+
+test_that("exp_kmeans attaches per-row silhouette to each model (all elbow modes)", {
+  df <- mtcars
+  for (mode in list("none", "elbow", "silhouette")) {
+    model_df <- exp_kmeans(df, cyl, mpg, hp, centers = 3, elbow_method_mode = mode, max_nrow = 30)
+    model <- model_df$model[[1]]
+    expect_true(!is.null(model$silhouette))
+    expect_equal(nrow(model$silhouette), nrow(model$df))
+    expect_setequal(colnames(model$silhouette),
+                    c("silhouette_score", "nearest_cluster", "cluster_width"))
+  }
+})
