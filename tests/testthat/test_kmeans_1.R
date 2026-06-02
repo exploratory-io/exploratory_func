@@ -190,3 +190,13 @@ test_that("exp_kmeans attaches per-row silhouette to each model (all elbow modes
                     c("silhouette_score", "nearest_cluster", "cluster_width"))
   }
 })
+
+test_that("tidy_rowwise summary includes per-cluster silhouette aggregates", {
+  df <- mtcars
+  model_df <- exp_kmeans(df, cyl, mpg, hp, centers = 3, max_nrow = 30)
+  res <- model_df %>% tidy_rowwise(model, type = "summary")
+  expect_true(all(c("avg_silhouette", "min_silhouette", "pct_negative") %in% colnames(res)))
+  non_excluded <- res[!is.na(res$cluster), ]
+  expect_true(all(non_excluded$pct_negative >= 0 & non_excluded$pct_negative <= 1))
+  expect_true(all(non_excluded$avg_silhouette >= non_excluded$min_silhouette))
+})

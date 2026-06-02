@@ -175,6 +175,22 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   }
   else if (type == "summary") { # This is only for kmeans case. TODO: We might want to separate PCA code and k-means code.
     res <- broom::tidy(x$kmeans)
+    if (!is.null(x$silhouette)) {
+      # Per-cluster silhouette aggregates keyed by the same cluster labels as broom::tidy(kmeans).
+      sil_summary <- x$silhouette %>%
+        dplyr::mutate(.cluster_key = as.character(x$kmeans$cluster)) %>%
+        dplyr::group_by(.cluster_key) %>%
+        dplyr::summarise(
+          avg_silhouette = mean(silhouette_score, na.rm = TRUE),
+          min_silhouette = suppressWarnings(min(silhouette_score, na.rm = TRUE)),
+          pct_negative = mean(silhouette_score < 0, na.rm = TRUE),
+          .groups = "drop"
+        )
+      res <- res %>%
+        dplyr::mutate(.cluster_key = as.character(cluster)) %>%
+        dplyr::left_join(sil_summary, by = ".cluster_key") %>%
+        dplyr::select(-.cluster_key)
+    }
     if (with_excluded_rows) {
       res <- res %>% tibble::add_row(size=x$excluded_nrow)
     }
