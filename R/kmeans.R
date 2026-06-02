@@ -40,7 +40,8 @@ iterate_silhouette <- function(df, max_centers = 10,
                                algorithm = "Hartigan-Wong",
                                trace = FALSE,
                                normalize_data = TRUE,
-                               seed = NULL) {
+                               seed = NULL,
+                               dist = NULL) {
   mat <- as_numeric_matrix_(df, columns = colnames(df))
   if (normalize_data) {
     mat <- scale(mat)
@@ -54,7 +55,7 @@ iterate_silhouette <- function(df, max_centers = 10,
     return(data.frame(center = integer(0), avg_silhouette = numeric(0),
                       min_silhouette = numeric(0), pct_negative = numeric(0)))
   }
-  d <- stats::dist(mat)
+  d <- if (is.null(dist)) stats::dist(mat) else dist
   purrr::map_dfr(seq(2, upper), function(k) {
     if (!is.null(seed)) {
       set.seed(seed)

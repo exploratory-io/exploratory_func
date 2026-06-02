@@ -168,3 +168,13 @@ test_that("compute_silhouette_per_row returns all-NA for degenerate input (no er
   expect_true(all(is.na(res$nearest_cluster)))
   expect_true(all(is.na(res$cluster_width)))
 })
+
+test_that("iterate_silhouette accepts a precomputed dist and matches recompute", {
+  set.seed(1)
+  df <- iris[, 1:4]
+  mat <- scale(as_numeric_matrix_(df, columns = colnames(df)))
+  d <- stats::dist(mat)
+  set.seed(1); a <- iterate_silhouette(df, max_centers = 4, normalize_data = TRUE, seed = 1)
+  set.seed(1); b <- iterate_silhouette(df, max_centers = 4, normalize_data = TRUE, seed = 1, dist = d)
+  expect_equal(a, b)
+})
