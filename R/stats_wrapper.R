@@ -277,9 +277,13 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
       ordered(mat[, k])
     }))
     colnames(ordered_df) <- sorted_colnames
-    # use is "pairwise.complete.obs" by default, matching the other methods.
-    # (hetcor's own default is listwise "complete.obs", which we do not want.)
-    het <- polycor::hetcor(ordered_df, ML = TRUE, std.err = TRUE, use = use)
+    # hetcor only supports "complete.obs" and "pairwise.complete.obs", while the other
+    # methods (via cor()/cor.test()) also accept "everything", "all.obs", and
+    # "na.or.complete". Map those to pairwise (the do_cor default) so polychoric does not
+    # error where the other methods would succeed. (hetcor's own default is listwise
+    # "complete.obs", which we do not want.)
+    het_use <- if (identical(use, "complete.obs")) "complete.obs" else "pairwise.complete.obs"
+    het <- polycor::hetcor(ordered_df, ML = TRUE, std.err = TRUE, use = het_use)
     cor_mat <- het$correlations
     tvalue_mat <- het$correlations / het$std.errors # z value; off-diagonal NA SE stays NA.
     pvalue_mat <- 2 * stats::pnorm(-abs(tvalue_mat))
