@@ -120,6 +120,58 @@ test_that("do_cor should skip group with only one row.", {
   expect_equal(nrow(res %>% filter(z==F)), 0)
 })
 
+test_that("do_cor with polychoric method", {
+  # Polychoric correlation is for ordinal variables. The latent variables behind x and y
+  # are correlated at 0.7, while z is independent of them.
+  set.seed(123)
+  n <- 200
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n); z3 <- rnorm(n)
+  df <- data.frame(x = cut5(z1), y = cut5(z2), z = cut5(z3))
+  model_df <- df %>% do_cor(`x`, `y`, `z`, method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(nrow(res), 9) # All 9 combinations.
+  xy <- res %>% filter(pair.name.x == "x", pair.name.y == "y")
+  expect_true(xy$correlation > 0.5) # Strong positive polychoric correlation.
+  expect_true(xy$p_value < 0.05) # Statistically significant.
+  expect_true(is.finite(xy$statistic)) # z value is populated.
+  diag_row <- res %>% filter(pair.name.x == "x", pair.name.y == "x")
+  expect_equal(diag_row$correlation, 1) # Diagonal correlation is 1.
+  expect_equal(diag_row$p_value, 0) # Diagonal P value is 0.
+})
+
+test_that("do_cor with polychoric method handles a constant column without error", {
+  set.seed(123)
+  n <- 100
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n)
+  df <- data.frame(x = cut5(z1), y = cut5(z2), w = rep(3L, n)) # w is constant.
+  # hetcor warns for the non-estimable pairs involving the constant column; that is expected.
+  model_df <- suppressWarnings(df %>% do_cor(`x`, `y`, `w`, method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model"))
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  xy <- res %>% filter(pair.name.x == "x", pair.name.y == "y")
+  expect_equal(nrow(xy), 1) # The estimable pair is still computed.
+  expect_true(xy$correlation > 0.5)
+  # The constant-column pair has NA correlation and is dropped by na.rm in mat_to_df.
+  expect_equal(nrow(res %>% filter(pair.name.x == "x", pair.name.y == "w")), 0)
+})
+
+test_that("do_cor with polychoric method handles complex column names", {
+  set.seed(123)
+  n <- 100
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n)
+  sname <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  df <- data.frame(a = cut5(z1), b = cut5(z2), check.names = FALSE)
+  names(df) <- c(sname, "plain")
+  model_df <- df %>% do_cor(tidyselect::everything(), method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_true(sname %in% as.character(res$pair.name.x)) # Complex name survives the round trip.
+  pair <- res %>% filter(as.character(pair.name.x) == sname, pair.name.y == "plain")
+  expect_equal(nrow(pair), 1)
+  expect_true(is.finite(pair$correlation))
+})
+
 test_that("test do_svd.kv with fill", {
   test_df <- data.frame(
     rand=runif(20, min = 0, max=10),
