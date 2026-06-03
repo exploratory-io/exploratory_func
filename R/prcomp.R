@@ -175,6 +175,23 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   }
   else if (type == "summary") { # This is only for kmeans case. TODO: We might want to separate PCA code and k-means code.
     res <- broom::tidy(x$kmeans)
+    if (!is.null(x$silhouette)) {
+      # Per-cluster silhouette aggregates keyed by the same cluster labels as broom::tidy(kmeans).
+      sil_summary <- x$silhouette %>%
+        dplyr::mutate(.cluster_key = as.character(x$kmeans$cluster)) %>%
+        dplyr::group_by(.cluster_key) %>%
+        dplyr::summarise(
+          # Guard the degenerate all-NA case so it yields NA (not NaN/Inf) consistently.
+          avg_silhouette = if (all(is.na(silhouette_score))) NA_real_ else mean(silhouette_score, na.rm = TRUE),
+          min_silhouette = if (all(is.na(silhouette_score))) NA_real_ else min(silhouette_score, na.rm = TRUE),
+          pct_negative = if (all(is.na(silhouette_score))) NA_real_ else mean(silhouette_score < 0, na.rm = TRUE),
+          .groups = "drop"
+        )
+      res <- res %>%
+        dplyr::mutate(.cluster_key = as.character(cluster)) %>%
+        dplyr::left_join(sil_summary, by = ".cluster_key") %>%
+        dplyr::select(-.cluster_key)
+    }
     if (with_excluded_rows) {
       res <- res %>% tibble::add_row(size=x$excluded_nrow)
     }
@@ -193,6 +210,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     column_names <- attr(x$rotation, "dimname")[[1]] 
     if (normalize_data) {
       res <- res %>% dplyr::mutate(dplyr::across(dplyr::all_of(column_names), exploratory::normalize))
+    }
+
+    if (type == "data" && !is.null(x$silhouette)) {
+      # Bind per-row silhouette (aligned positionally to x$df, same as the cluster column above).
+      res <- res %>% dplyr::bind_cols(x$silhouette)
     }
 
     if (!is.null(n_sample)) { # default is no sampling.

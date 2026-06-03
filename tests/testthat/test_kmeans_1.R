@@ -138,3 +138,86 @@ test_that("exp_kmeans elbow_method_mode backward compatibility: logical TRUE/FAL
 #  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE, max_centers=3)
 #  model_df %>% tidyr::unnest(model)
 #})
+
+test_that("compute_silhouette_per_row returns aligned per-row columns", {
+  set.seed(1)
+  mat <- as.matrix(iris[, 1:4])
+  mat <- scale(mat)
+  km <- stats::kmeans(mat, centers = 3)
+  res <- compute_silhouette_per_row(km$cluster, mat)
+  expect_equal(nrow(res), nrow(mat))
+  expect_setequal(colnames(res), c("silhouette_score", "nearest_cluster", "cluster_width"))
+  expect_true(all(res$silhouette_score >= -1 & res$silhouette_score <= 1))
+  expect_true(all(res$nearest_cluster %in% unique(km$cluster)))
+  # cluster_width is the per-cluster mean of silhouette_score, broadcast to rows.
+  expected_avg <- tapply(res$silhouette_score, km$cluster, mean)
+  for (cl in unique(km$cluster)) {
+    expect_equal(unique(res$cluster_width[km$cluster == cl]), unname(expected_avg[as.character(cl)]))
+  }
+  # Passing precomputed dist gives identical result to recomputing it.
+  d <- stats::dist(mat)
+  res_d <- compute_silhouette_per_row(km$cluster, mat, d)
+  expect_equal(res, res_d)
+})
+
+test_that("compute_silhouette_per_row returns all-NA for degenerate input (no error)", {
+  mat <- matrix(rep(1, 20), ncol = 2)            # all identical points
+  res <- compute_silhouette_per_row(rep(1L, 10), mat)  # single cluster
+  expect_equal(nrow(res), 10)
+  expect_true(all(is.na(res$silhouette_score)))
+  expect_true(all(is.na(res$nearest_cluster)))
+  expect_true(all(is.na(res$cluster_width)))
+})
+
+test_that("iterate_silhouette accepts a precomputed dist and matches recompute", {
+  set.seed(1)
+  df <- iris[, 1:4]
+  mat <- scale(as_numeric_matrix_(df, columns = colnames(df)))
+  d <- stats::dist(mat)
+  set.seed(1); a <- iterate_silhouette(df, max_centers = 4, normalize_data = TRUE, seed = 1)
+  set.seed(1); b <- iterate_silhouette(df, max_centers = 4, normalize_data = TRUE, seed = 1, dist = d)
+  expect_equal(a, b)
+})
+
+test_that("exp_kmeans attaches per-row silhouette to each model (all elbow modes)", {
+  df <- mtcars
+  for (mode in list("none", "elbow", "silhouette")) {
+    model_df <- exp_kmeans(df, cyl, mpg, hp, centers = 3, elbow_method_mode = mode, max_nrow = 30)
+    model <- model_df$model[[1]]
+    expect_true(!is.null(model$silhouette))
+    expect_equal(nrow(model$silhouette), nrow(model$df))
+    expect_setequal(colnames(model$silhouette),
+                    c("silhouette_score", "nearest_cluster", "cluster_width"))
+  }
+})
+
+test_that("tidy_rowwise summary includes per-cluster silhouette aggregates", {
+  df <- mtcars
+  model_df <- exp_kmeans(df, cyl, mpg, hp, centers = 3, max_nrow = 30)
+  res <- model_df %>% tidy_rowwise(model, type = "summary")
+  expect_true(all(c("avg_silhouette", "min_silhouette", "pct_negative") %in% colnames(res)))
+  non_excluded <- res[!is.na(res$cluster), ]
+  expect_true(all(non_excluded$pct_negative >= 0 & non_excluded$pct_negative <= 1))
+  expect_true(all(non_excluded$avg_silhouette >= non_excluded$min_silhouette))
+})
+
+test_that("tidy_rowwise data includes per-row silhouette columns", {
+  df <- mtcars
+  model_df <- exp_kmeans(df, cyl, mpg, hp, centers = 3, max_nrow = 30)
+  res <- model_df %>% tidy_rowwise(model, type = "data")
+  expect_true(all(c("silhouette_score", "nearest_cluster", "cluster_width") %in% colnames(res)))
+  expect_true(all(res$silhouette_score >= -1 & res$silhouette_score <= 1))
+  # gathered_data must NOT carry the per-row silhouette columns (charts select their own cols).
+  g <- model_df %>% tidy_rowwise(model, type = "gathered_data")
+  expect_false("silhouette_score" %in% colnames(g))
+})
+
+test_that("exp_kmeans with strange column name still yields silhouette columns", {
+  df <- mtcars
+  df <- df %>% dplyr::rename(`Cy l !#$%` = cyl)
+  model_df <- exp_kmeans(df, `Cy l !#$%`, mpg, hp, centers = 3, max_nrow = 30)
+  res <- model_df %>% tidy_rowwise(model, type = "data")
+  expect_true("silhouette_score" %in% colnames(res))
+  smry <- model_df %>% tidy_rowwise(model, type = "summary")
+  expect_true("avg_silhouette" %in% colnames(smry))
+})
