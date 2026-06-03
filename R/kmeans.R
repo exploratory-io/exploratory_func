@@ -33,7 +33,22 @@ iterate_kmeans <- function(df, max_centers = 10,
   ret %>% rowwise(center) %>% glance_rowwise(model)
 }
 
+# Pick the row index used for the O(n^2) silhouette dist/computation (#36126).
+# Returns the full index when sample_size is unset / non-positive / not smaller than n;
+# otherwise a sorted random subsample of size sample_size. The RNG seed is set once at the
+# top of exp_kmeans(), so the draw is reproducible across runs.
+silhouette_sample_index <- function(n, sample_size = NULL) {
+  size <- suppressWarnings(as.numeric(sample_size))
+  if (length(size) != 1 || is.na(size) || size < 1 || n <= size) {
+    return(seq_len(n))
+  }
+  sort(sample.int(n, floor(size)))
+}
+
 # internal function to iterate number of centers (k) from 2 to max_centers for silhouette method to find optimal k.
+# When `mat` is supplied it must already be the numeric (and, if normalize_data, scaled)
+# matrix that `dist` was computed from; in that case df/normalize_data are ignored for the
+# matrix build so the kmeans input and the silhouette dist stay consistent (#36126).
 iterate_silhouette <- function(df, max_centers = 10,
                                iter.max = 10,
                                nstart = 1,
@@ -41,11 +56,14 @@ iterate_silhouette <- function(df, max_centers = 10,
                                trace = FALSE,
                                normalize_data = TRUE,
                                seed = NULL,
-                               dist = NULL) {
-  mat <- as_numeric_matrix_(df, columns = colnames(df))
-  if (normalize_data) {
-    mat <- scale(mat)
-    mat[is.nan(mat)] <- 0
+                               dist = NULL,
+                               mat = NULL) {
+  if (is.null(mat)) {
+    mat <- as_numeric_matrix_(df, columns = colnames(df))
+    if (normalize_data) {
+      mat <- scale(mat)
+      mat[is.nan(mat)] <- 0
+    }
   }
   # Cap k by the number of distinct data points, not just the row count:
   # stats::kmeans() errors with "more cluster centers than distinct data points"
@@ -81,22 +99,32 @@ iterate_silhouette <- function(df, max_centers = 10,
 
 # Compute per-row silhouette widths for an already-built clustering.
 #
-# cluster_ids: integer cluster assignment vector (length n, aligned to mat rows).
-#              For K-Means this is x$kmeans$cluster (integer 1..k).
-# mat:         normalized numeric matrix used for clustering (n rows).
+# cluster_ids: integer cluster assignment vector (length n) for the FULL data.
+#              For K-Means this is x$kmeans$cluster (integer 1..k). The result is always
+#              length n and positionally aligned to it (prcomp.R binds it onto x$df).
+# mat:         normalized numeric matrix for the rows named by sample_idx (sample_size rows
+#              when subsampling, otherwise n rows).
 # d:           optional precomputed stats::dist(mat) to reuse. Computed when NULL.
+# sample_idx:  positions (into 1..n) that mat/d correspond to. NULL means the full data
+#              (mat has n rows). When a strict subset, the silhouette is computed only on
+#              those rows and the scores are scattered back into the length-n result with
+#              NA elsewhere -- this bounds the O(n^2) dist to sample_size rows (#36126).
 #
 # Returns a tibble with n rows and columns silhouette_score, nearest_cluster, cluster_width.
 # Returns all-NA columns (no error) when silhouette is undefined
 # (fewer than 2 clusters, or fewer than 2 distinct points).
-compute_silhouette_per_row <- function(cluster_ids, mat, d = NULL) {
+compute_silhouette_per_row <- function(cluster_ids, mat, d = NULL, sample_idx = NULL) {
   n <- length(cluster_ids)
   na_result <- tibble::tibble(
     silhouette_score = rep(NA_real_, n),
     nearest_cluster = rep(NA_integer_, n),
     cluster_width = rep(NA_real_, n)
   )
-  ids <- as.integer(cluster_ids)
+  if (is.null(sample_idx)) {
+    sample_idx <- seq_len(n)
+  }
+  # mat/d already correspond to sample_idx rows; the cluster ids must be subset to match.
+  ids <- as.integer(cluster_ids[sample_idx])
   if (length(unique(ids)) < 2 || nrow(unique(mat)) < 2) {
     return(na_result)
   }
@@ -111,11 +139,12 @@ compute_silhouette_per_row <- function(cluster_ids, mat, d = NULL) {
   widths <- as.numeric(sil[, "sil_width"])
   clusters <- as.integer(sil[, "cluster"])
   clus_avg <- tapply(widths, clusters, mean, na.rm = TRUE)
-  tibble::tibble(
-    silhouette_score = widths,
-    nearest_cluster = as.integer(sil[, "neighbor"]),
-    cluster_width = as.numeric(clus_avg[as.character(clusters)])
-  )
+  # Scatter the per-sampled-row values back to full length (NA for non-sampled rows).
+  # silhouette() preserves the observation order of `ids`, so widths[i] -> sample_idx[i].
+  na_result$silhouette_score[sample_idx] <- widths
+  na_result$nearest_cluster[sample_idx] <- as.integer(sil[, "neighbor"])
+  na_result$cluster_width[sample_idx] <- as.numeric(clus_avg[as.character(clusters)])
+  na_result
 }
 
 #' analytics function for K-means view
@@ -130,7 +159,11 @@ exp_kmeans <- function(df, ...,
                        max_nrow = NULL,
                        seed = 1,
                        elbow_method_mode=FALSE,
-                       max_centers = 10
+                       max_centers = 10,
+                       # Bound the O(n^2) silhouette dist/computation to this many rows (#36126).
+                       # K-means itself still runs on the full (or max_nrow) data; only the
+                       # silhouette diagnostics are estimated from this subsample. NULL = no cap.
+                       silhouette_sample_size = 5000
                        ) {
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -198,9 +231,13 @@ exp_kmeans <- function(df, ...,
   # O(n^2) cost and is shared with iterate_silhouette() (decision (a), #36106).
   # Only build the shared dist for the ungrouped (UI) case; grouped models build
   # their own per-group matrix below.
+  # The dist()/silhouette work is bounded to silhouette_sample_size rows (#36126):
+  # scale over the full data (cheap, O(n*p)) so the sampled rows' coordinates stay
+  # consistent with build_kmeans.cols' full-data scaling, THEN subset before dist().
   is_single_model <- length(ret$model) == 1
   shared_sil_mat <- NULL
   shared_sil_dist <- NULL
+  sil_sample_idx <- NULL
   if (is_single_model) {
     kmeans_df_shared <- df %>% dplyr::select(!!!rlang::syms(selected_cols))
     shared_sil_mat <- as_numeric_matrix_(kmeans_df_shared, columns = colnames(kmeans_df_shared))
@@ -208,6 +245,8 @@ exp_kmeans <- function(df, ...,
       shared_sil_mat <- scale(shared_sil_mat)
       shared_sil_mat[is.nan(shared_sil_mat)] <- 0
     }
+    sil_sample_idx <- silhouette_sample_index(nrow(shared_sil_mat), silhouette_sample_size)
+    shared_sil_mat <- shared_sil_mat[sil_sample_idx, , drop = FALSE]
     shared_sil_dist <- stats::dist(shared_sil_mat)
   }
 
@@ -234,7 +273,8 @@ exp_kmeans <- function(df, ...,
                                             trace = trace,
                                             normalize_data = normalize_data,
                                             seed = NULL, # Seed is already set once at the top of exp_kmeans(). Skip it.
-                                            dist = shared_sil_dist) # Reuse the single dist when available.
+                                            dist = shared_sil_dist, # Reuse the single (subsampled) dist when available.
+                                            mat = shared_sil_mat) # Use the SAME subsampled scaled matrix so kmeans input and dist match (#36126).
   }
 
   ret <- ret %>% dplyr::mutate(model = purrr::imap(model, function(x, idx) {
@@ -242,16 +282,21 @@ exp_kmeans <- function(df, ...,
       y <- kmeans_model_df$model[[idx]]
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
       # Always attach per-row silhouette for the chosen clustering (#36106).
+      # The dist/silhouette is bounded to silhouette_sample_size rows; non-sampled rows
+      # get NA scores (compute_silhouette_per_row scatters back to full length, #36126).
       if (!is.null(shared_sil_mat)) {
-        x$silhouette <- compute_silhouette_per_row(y$cluster, shared_sil_mat, shared_sil_dist)
+        x$silhouette <- compute_silhouette_per_row(y$cluster, shared_sil_mat, shared_sil_dist,
+                                                   sample_idx = sil_sample_idx)
       } else {
-        # Grouped case: build the matrix from this group's own data.
+        # Grouped case: build the matrix from this group's own data, then subsample.
         gmat <- as_numeric_matrix_(x$df[, selected_cols, drop = FALSE], columns = selected_cols)
         if (normalize_data) {
           gmat <- scale(gmat)
           gmat[is.nan(gmat)] <- 0
         }
-        x$silhouette <- compute_silhouette_per_row(y$cluster, gmat)
+        g_sample_idx <- silhouette_sample_index(nrow(gmat), silhouette_sample_size)
+        x$silhouette <- compute_silhouette_per_row(y$cluster, gmat[g_sample_idx, , drop = FALSE],
+                                                   sample_idx = g_sample_idx)
       }
       x$sampled_nrow <- sampled_nrow
       x$excluded_nrow <- excluded_nrow
