@@ -45,7 +45,7 @@ do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
 #' @param dimension A column you want to use as a dimension to calculate the correlations.
 #' @param value A column for the values you want to use to calculate the correlations.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
-#' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
+#' @param method Method of calculation. This can be one of "pearson", "kendall", "spearman", or "polychoric".
 #' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @return correlations between pairs of groups
@@ -175,7 +175,7 @@ do_cor.kv_ <- function(df,
 #' @param df data frame in tidy format
 #' @param ... Arguments to select columns to calculate correlation.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
-#' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
+#' @param method Method of calculation. This can be one of "pearson", "kendall", "spearman", or "polychoric".
 #' @return correlations between pairs of columns
 #' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
@@ -261,42 +261,70 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
   sorted_colnames <- stringr::str_sort(colnames(mat))
   mat <- mat[,sorted_colnames]
 
-  cor_mat <- cor(mat, use = use, method = method)
+  # Create a matrix of P-values for Analytics View case.
+  dim <- length(sorted_colnames)
+
+  if (identical(method, "polychoric")) {
+    # Polychoric correlation is for ordinal variables (e.g. survey scales 1-5).
+    # stats::cor()/cor.test() do not support it, so we use polycor::hetcor(), which
+    # returns the full correlation matrix and the matrix of standard errors in one call.
+    # We coerce every column to an ordered factor so that polychoric (not Pearson or
+    # polyserial) is used for every pair, and derive a two-sided z-test P value from
+    # rho / SE. Non-estimable pairs (constant or near-perfect columns) come back as NA,
+    # which the UI treats as not-significant.
+    loadNamespace("polycor")
+    ordered_df <- as.data.frame(lapply(seq_len(dim), function(k) {
+      ordered(mat[, k])
+    }))
+    colnames(ordered_df) <- sorted_colnames
+    # hetcor only supports "complete.obs" and "pairwise.complete.obs", while the other
+    # methods (via cor()/cor.test()) also accept "everything", "all.obs", and
+    # "na.or.complete". Map those to pairwise (the do_cor default) so polychoric does not
+    # error where the other methods would succeed. (hetcor's own default is listwise
+    # "complete.obs", which we do not want.)
+    het_use <- if (identical(use, "complete.obs")) "complete.obs" else "pairwise.complete.obs"
+    het <- polycor::hetcor(ordered_df, ML = TRUE, std.err = TRUE, use = het_use)
+    cor_mat <- het$correlations
+    tvalue_mat <- het$correlations / het$std.errors # z value; off-diagonal NA SE stays NA.
+    pvalue_mat <- 2 * stats::pnorm(-abs(tvalue_mat))
+    diag(tvalue_mat) <- Inf # For i=j case, statistic should be Inf and P value 0.
+    diag(pvalue_mat) <- 0
+  } else {
+    cor_mat <- cor(mat, use = use, method = method)
+    pvalue_mat <- matrix(NA, dim, dim)
+    tvalue_mat <- matrix(NA, dim, dim)
+    for (i in 2:dim) {
+      for (j in 1:(i-1)) {
+        tryCatch({
+          cor_test_res <- cor.test(mat[,i], mat[,j], method = method)
+          pvalue_mat[i, j] <- cor_test_res$p.value
+          tvalue_mat[i, j] <- cor_test_res$statistic
+        }, error = function(e) {
+          if (e$message == "not enough finite observations") {
+            # This is the error cor.test returns when there is not enough non-NA data.
+            # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
+            pvalue_mat[i, j] <- NA
+            tvalue_mat[i, j] <- NA
+          }
+          else {
+            stop(e)
+          }
+        })
+        pvalue_mat[j, i] <- pvalue_mat[i, j]
+        tvalue_mat[j, i] <- tvalue_mat[i, j]
+      }
+    }
+    for (i in 1:dim) { # For i=j case, P value should be always 0 and t statistic should be Inf.
+      pvalue_mat[i, i] <- 0
+      tvalue_mat[i, i] <- Inf
+    }
+  }
+
   ret <- mat_to_df(cor_mat,
                    cnames=output_cols[1:3],
                    diag=diag,
                    na.rm=na.rm,
                    zero.rm=FALSE)
-
-  # Create a matrix of P-values for Analytics View case.
-  dim <- length(sorted_colnames)
-  pvalue_mat <- matrix(NA, dim, dim)
-  tvalue_mat <- matrix(NA, dim, dim)
-  for (i in 2:dim) {
-    for (j in 1:(i-1)) {
-      tryCatch({
-        cor_test_res <- cor.test(mat[,i], mat[,j], method = method)
-        pvalue_mat[i, j] <- cor_test_res$p.value
-        tvalue_mat[i, j] <- cor_test_res$statistic
-      }, error = function(e) {
-        if (e$message == "not enough finite observations") {
-          # This is the error cor.test returns when there is not enough non-NA data.
-          # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
-          pvalue_mat[i, j] <- NA
-          tvalue_mat[i, j] <- NA
-        }
-        else {
-          stop(e)
-        }
-      })
-      pvalue_mat[j, i] <- pvalue_mat[i, j]
-      tvalue_mat[j, i] <- tvalue_mat[i, j]
-    }
-  }
-  for (i in 1:dim) { # For i=j case, P value should be always 0 and t statistic should be Inf.
-    pvalue_mat[i, i] <- 0
-    tvalue_mat[i, i] <- Inf
-  }
   colnames(pvalue_mat) <- sorted_colnames
   rownames(pvalue_mat) <- sorted_colnames
   colnames(tvalue_mat) <- sorted_colnames

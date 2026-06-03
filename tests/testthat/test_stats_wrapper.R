@@ -120,6 +120,117 @@ test_that("do_cor should skip group with only one row.", {
   expect_equal(nrow(res %>% filter(z==F)), 0)
 })
 
+test_that("do_cor with polychoric method", {
+  # Polychoric correlation is for ordinal variables. The latent variables behind x and y
+  # are correlated at 0.7, while z is independent of them.
+  set.seed(123)
+  n <- 200
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n); z3 <- rnorm(n)
+  df <- data.frame(x = cut5(z1), y = cut5(z2), z = cut5(z3))
+  model_df <- df %>% do_cor(`x`, `y`, `z`, method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(nrow(res), 9) # All 9 combinations.
+  xy <- res %>% filter(pair.name.x == "x", pair.name.y == "y")
+  expect_true(xy$correlation > 0.5 && xy$correlation < 0.9) # Recovers the true latent 0.7, not inflated.
+  expect_true(xy$p_value < 0.05) # Statistically significant.
+  expect_true(is.finite(xy$statistic)) # z value is populated.
+  xz <- res %>% filter(pair.name.x == "x", pair.name.y == "z")
+  expect_true(abs(xz$correlation) < 0.3) # z is independent of x: near-zero polychoric correlation.
+  expect_true(xz$p_value > 0.05) # The independent pair is not statistically significant.
+  diag_row <- res %>% filter(pair.name.x == "x", pair.name.y == "x")
+  expect_equal(diag_row$correlation, 1) # Diagonal correlation is 1.
+  expect_equal(diag_row$p_value, 0) # Diagonal P value is 0.
+})
+
+test_that("do_cor with polychoric method handles a constant column without error", {
+  set.seed(123)
+  n <- 100
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n)
+  df <- data.frame(x = cut5(z1), y = cut5(z2), w = rep(3L, n)) # w is constant.
+  # hetcor warns for the non-estimable pairs involving the constant column; that is expected.
+  model_df <- suppressWarnings(df %>% do_cor(`x`, `y`, `w`, method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model"))
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  xy <- res %>% filter(pair.name.x == "x", pair.name.y == "y")
+  expect_equal(nrow(xy), 1) # The estimable pair is still computed.
+  expect_true(xy$correlation > 0.5)
+  # The constant-column pair has NA correlation and is dropped by na.rm in mat_to_df.
+  expect_equal(nrow(res %>% filter(pair.name.x == "x", pair.name.y == "w")), 0)
+})
+
+test_that("do_cor with polychoric method handles complex column names", {
+  set.seed(123)
+  n <- 100
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n)
+  sname <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  df <- data.frame(a = cut5(z1), b = cut5(z2), check.names = FALSE)
+  names(df) <- c(sname, "plain")
+  model_df <- df %>% do_cor(tidyselect::everything(), method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_true(sname %in% as.character(res$pair.name.x)) # Complex name survives the round trip.
+  pair <- res %>% filter(as.character(pair.name.x) == sname, pair.name.y == "plain")
+  expect_equal(nrow(pair), 1)
+  expect_true(is.finite(pair$correlation))
+})
+
+test_that("do_cor with polychoric method accepts use values hetcor does not support", {
+  # hetcor only accepts "complete.obs" and "pairwise.complete.obs", but the public
+  # do_cor API (and the other methods via cor()/cor.test()) also accept "everything",
+  # "all.obs", and "na.or.complete". Those must be mapped, not passed through as an error.
+  set.seed(123)
+  n <- 100
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n)
+  df <- data.frame(x = cut5(z1), y = cut5(z2))
+  for (u in c("everything", "all.obs", "na.or.complete", "complete.obs")) {
+    model_df <- df %>% do_cor(`x`, `y`, method = "polychoric", use = u, distinct = FALSE, diag = TRUE, return_type = "model")
+    res <- model_df %>% tidy_rowwise(model, type = 'cor')
+    xy <- res %>% filter(pair.name.x == "x", pair.name.y == "y")
+    expect_equal(nrow(xy), 1, info = u) # The pair is computed regardless of the use value.
+    expect_true(xy$correlation > 0.5, info = u)
+  }
+})
+
+test_that("do_cor with polychoric method for grouped (repeat-by) data", {
+  # Repeat By on Analytics View maps to group_by(). Each group must get its own
+  # polychoric correlation. Group A has a positive relationship, group B a negative one.
+  set.seed(123)
+  n <- 100
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  mk <- function(rho) {
+    z1 <- rnorm(n); z2 <- rho * z1 + sqrt(1 - rho^2) * rnorm(n)
+    data.frame(x = cut5(z1), y = cut5(z2))
+  }
+  df <- dplyr::bind_rows(cbind(mk(0.7), grp = "A"), cbind(mk(-0.7), grp = "B"))
+  model_df <- df %>% group_by(grp) %>% do_cor(`x`, `y`, method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_setequal(unique(as.character(res$grp)), c("A", "B")) # Both groups produced results.
+  a_xy <- res %>% filter(grp == "A", pair.name.x == "x", pair.name.y == "y")
+  b_xy <- res %>% filter(grp == "B", pair.name.x == "x", pair.name.y == "y")
+  expect_true(a_xy$correlation > 0.4) # Positive correlation in group A.
+  expect_true(b_xy$correlation < -0.4) # Negative correlation in group B, computed independently.
+})
+
+test_that("do_cor with polychoric method handles NA values via pairwise complete obs", {
+  # Survey data routinely has missing responses (NA). The default use="pairwise.complete.obs"
+  # must drop NAs pairwise rather than error, so every pair is still estimated.
+  set.seed(123)
+  n <- 200
+  cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  z1 <- rnorm(n); z2 <- 0.7 * z1 + sqrt(1 - 0.49) * rnorm(n); z3 <- rnorm(n)
+  x <- cut5(z1); y <- cut5(z2); z <- cut5(z3)
+  x[1:20] <- NA; y[15:30] <- NA; z[40:60] <- NA # Missing responses at different rows per column.
+  df <- data.frame(x = x, y = y, z = z)
+  model_df <- df %>% do_cor(`x`, `y`, `z`, method = "polychoric", distinct = FALSE, diag = TRUE, return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(nrow(res), 9) # Every pair is still estimated from the pairwise-complete rows.
+  xy <- res %>% filter(pair.name.x == "x", pair.name.y == "y")
+  expect_true(is.finite(xy$correlation)) # NAs did not break the estimate.
+  expect_true(xy$correlation > 0.4) # The x-y relationship is still recovered despite the NAs.
+})
+
 test_that("test do_svd.kv with fill", {
   test_df <- data.frame(
     rand=runif(20, min = 0, max=10),
