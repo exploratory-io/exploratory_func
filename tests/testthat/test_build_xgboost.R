@@ -728,6 +728,33 @@ if (Sys.info()["sysname"] != "Windows") {
   })
 }
 
+test_that("exp_xgboost handles column names with ASCII special characters", {
+  set.seed(1)
+  n <- 100
+  test_data <- data.frame(
+    col1 = rep(c(TRUE, FALSE), n / 2),
+    col2 = rep(c("DL", "MQ", "AA", "WN"), length.out = n),
+    col3 = rnorm(n),
+    stringsAsFactors = FALSE
+  )
+  colnames(test_data) <- c(
+    "Is Delayed !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x",
+    "Airline !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x",
+    "Flight Time !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x"
+  )
+  model_df <- test_data %>%
+    exp_xgboost(
+      `Is Delayed !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x`,
+      `Airline !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x`,
+      `Flight Time !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x`,
+      nrounds = 5
+    )
+  model <- model_df$model[[1]]
+  expect_false("error" %in% class(model))
+  expect_true(is.numeric(model$prediction_training))
+  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+})
+
 test_that("exp_xgboost works with grouped data (repeat-by)", {
   set.seed(1)
   test_data <- dplyr::tibble(
