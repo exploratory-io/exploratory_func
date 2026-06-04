@@ -633,3 +633,100 @@ test_that("exp_xgboost uses XGBoost default alpha=0 / lambda=1 when not specifie
   expect_equal(as.numeric(model$params$alpha), 0)
   expect_equal(as.numeric(model$params$lambda), 1)
 })
+
+test_that("exp_xgboost with alpha and lambda produces valid prediction outputs", {
+  set.seed(1)
+  n <- 100
+  # Binary: predicted probabilities must be in [0, 1]
+  bin_data <- data.frame(
+    target = rep(c(TRUE, FALSE), n / 2),
+    x1 = rnorm(n),
+    x2 = rnorm(n)
+  )
+  model_df <- bin_data %>% exp_xgboost(target, x1, x2, alpha = 1, lambda = 2, nrounds = 5)
+  probs <- model_df$model[[1]]$prediction_training
+  expect_true(is.numeric(probs))
+  expect_true(all(dplyr::between(probs, 0, 1), na.rm = TRUE))
+
+  # Regression: predicted values must be finite numerics
+  reg_data <- data.frame(y = rnorm(n), x1 = rnorm(n), x2 = rnorm(n))
+  model_df_reg <- reg_data %>% exp_xgboost(y, x1, x2, alpha = 0.5, lambda = 3, nrounds = 5)
+  preds <- model_df_reg$model[[1]]$prediction_training
+  expect_true(is.numeric(preds))
+  expect_true(all(is.finite(preds)))
+
+  # Multiclass: probability matrix with values in [0, 1]
+  multi_data <- data.frame(
+    label = rep(c("A", "B", "C"), length.out = n),
+    x1 = rnorm(n),
+    x2 = rnorm(n)
+  )
+  model_df_multi <- multi_data %>% exp_xgboost(label, x1, x2, alpha = 0.5, lambda = 2, nrounds = 5)
+  prob_mat <- model_df_multi$model[[1]]$prediction_training
+  expect_true(is.matrix(prob_mat))
+  expect_true(all(dplyr::between(as.numeric(prob_mat), 0, 1), na.rm = TRUE))
+})
+
+test_that("exp_xgboost handles highly imbalanced binary target", {
+  set.seed(1)
+  n <- 100
+  test_data <- data.frame(
+    target = c(rep(TRUE, 5), rep(FALSE, 95)),
+    x1 = rnorm(n),
+    x2 = rnorm(n)
+  )
+  model_df <- test_data %>% exp_xgboost(target, x1, x2, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_false("error" %in% class(model))
+  expect_true(is.numeric(model$prediction_training))
+  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+})
+
+test_that("exp_xgboost handles NA values in predictors", {
+  set.seed(1)
+  n <- 100
+  x1 <- rnorm(n)
+  x1[sample(n, 10)] <- NA
+  test_data <- data.frame(
+    target = rep(c(TRUE, FALSE), n / 2),
+    x1 = x1,
+    x2 = rnorm(n)
+  )
+  model_df <- test_data %>% exp_xgboost(target, x1, x2, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_false("error" %in% class(model))
+  expect_true(is.numeric(model$prediction_training))
+  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+})
+
+test_that("exp_xgboost handles column names with spaces", {
+  set.seed(1)
+  n <- 100
+  test_data <- data.frame(
+    target = rep(c(TRUE, FALSE), n / 2),
+    x1 = rnorm(n),
+    x2 = rnorm(n)
+  )
+  colnames(test_data) <- c("Is Target", "Feature 1", "Feature 2")
+  model_df <- test_data %>%
+    exp_xgboost(`Is Target`, `Feature 1`, `Feature 2`, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_false("error" %in% class(model))
+  expect_true(is.numeric(model$prediction_training))
+  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+})
+
+test_that("exp_xgboost works with grouped data (repeat-by)", {
+  set.seed(1)
+  test_data <- dplyr::tibble(
+    group = rep(c("A", "B"), each = 50),
+    target = c(rep(c(TRUE, FALSE), 25), rep(c(FALSE, TRUE), 25)),
+    x1 = rnorm(100),
+    x2 = rnorm(100)
+  )
+  model_df <- test_data %>%
+    dplyr::group_by(group) %>%
+    exp_xgboost(target, x1, x2, nrounds = 5)
+  expect_equal(nrow(model_df), 2)
+  expect_true(all(sapply(model_df$model, function(m) !("error" %in% class(m)))))
+})
