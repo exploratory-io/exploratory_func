@@ -699,22 +699,34 @@ test_that("exp_xgboost handles NA values in predictors", {
   expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
 })
 
-test_that("exp_xgboost handles column names with spaces", {
-  set.seed(1)
-  n <- 100
-  test_data <- data.frame(
-    target = rep(c(TRUE, FALSE), n / 2),
-    x1 = rnorm(n),
-    x2 = rnorm(n)
-  )
-  colnames(test_data) <- c("Is Target", "Feature 1", "Feature 2")
-  model_df <- test_data %>%
-    exp_xgboost(`Is Target`, `Feature 1`, `Feature 2`, nrounds = 5)
-  model <- model_df$model[[1]]
-  expect_false("error" %in% class(model))
-  expect_true(is.numeric(model$prediction_training))
-  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
-})
+if (Sys.info()["sysname"] != "Windows") {
+  test_that("exp_xgboost handles column names with Japanese and many special characters", {
+    set.seed(1)
+    n <- 100
+    test_data <- data.frame(
+      col1 = rep(c(TRUE, FALSE), n / 2),
+      col2 = rep(c("DL", "MQ", "AA", "WN"), length.out = n),
+      col3 = rnorm(n),
+      stringsAsFactors = FALSE
+    )
+    colnames(test_data) <- c(
+      "遅れ た !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表",
+      "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表",
+      "飛行 時間 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+    )
+    model_df <- test_data %>%
+      exp_xgboost(
+        `遅れ た !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`,
+        `航空 会社 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`,
+        `飛行 時間 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`,
+        nrounds = 5
+      )
+    model <- model_df$model[[1]]
+    expect_false("error" %in% class(model))
+    expect_true(is.numeric(model$prediction_training))
+    expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+  })
+}
 
 test_that("exp_xgboost works with grouped data (repeat-by)", {
   set.seed(1)
