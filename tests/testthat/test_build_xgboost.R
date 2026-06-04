@@ -598,3 +598,38 @@ test_that("new data prediction without response column", {
     prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.2)
   expect_equal(as.integer(prediction_ret$predicted_label)+1, as.integer(prediction_ret2$predicted_label))
 })
+
+# #36153 - XGBoost L1 (alpha) / L2 (lambda) regularization support.
+# These params are forwarded through ... from exp_xgboost -> xgboost_*() -> fml_xgboost() ->
+# xgboost::xgb.train(), exactly like `objective` (which is read back at model$params$objective).
+xgb_l1l2_test_data <- structure(
+  list(
+    CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+    CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+    DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)),
+  row.names = c(NA, -20L),
+  class = c("tbl_df", "tbl", "data.frame"))
+
+test_that("exp_xgboost forwards alpha (L1) and lambda (L2) to the booster", {
+  set.seed(1)
+  # Regression target (numeric) - non-default alpha/lambda must reach xgb.train params.
+  model_df <- xgb_l1l2_test_data %>% exp_xgboost(DISTANCE, CARRIER, alpha = 0.5, lambda = 2, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_equal(as.numeric(model$params$alpha), 0.5)
+  expect_equal(as.numeric(model$params$lambda), 2)
+
+  # Binary target (logical) - same forwarding through the binary branch.
+  bin_data <- xgb_l1l2_test_data %>% dplyr::mutate(is_cancelled = CANCELLED == 1)
+  model_df_bin <- bin_data %>% exp_xgboost(is_cancelled, CARRIER, alpha = 0.3, lambda = 4, nrounds = 5)
+  model_bin <- model_df_bin$model[[1]]
+  expect_equal(as.numeric(model_bin$params$alpha), 0.3)
+  expect_equal(as.numeric(model_bin$params$lambda), 4)
+})
+
+test_that("exp_xgboost uses XGBoost default alpha=0 / lambda=1 when not specified", {
+  set.seed(1)
+  model_df <- xgb_l1l2_test_data %>% exp_xgboost(DISTANCE, CARRIER, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_equal(as.numeric(model$params$alpha), 0)
+  expect_equal(as.numeric(model$params$lambda), 1)
+})
