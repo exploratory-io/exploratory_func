@@ -599,8 +599,9 @@ test_that("new data prediction without response column", {
   expect_equal(as.integer(prediction_ret$predicted_label)+1, as.integer(prediction_ret2$predicted_label))
 })
 
-# #36153 - XGBoost L1 (alpha) / L2 (lambda) regularization support.
-# These params are forwarded through ... from exp_xgboost -> xgboost_*() -> fml_xgboost() ->
+# exp_xgboost coverage: L1/L2 regularization (alpha/lambda), prediction output validity,
+# imbalanced targets, NA handling, and complex column names.
+# alpha/lambda are forwarded through ... from exp_xgboost -> xgboost_*() -> fml_xgboost() ->
 # xgboost::xgb.train(), exactly like `objective` (which is read back at model$params$objective).
 xgb_l1l2_test_data <- structure(
   list(
