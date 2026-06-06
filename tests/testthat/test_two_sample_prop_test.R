@@ -542,7 +542,7 @@ test_that("tidy data_summary Conf Low/High per group match individual prop.test 
   expect_equal(ds$`Conf High`[2], ciB[2])
 })
 
-test_that("tidy data_summary Std Error is the per-group Wilson SE", {
+test_that("tidy data_summary Std Error is the per-group Wald SE", {
   df <- data.frame(
     outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
     group = c(rep("A", 50), rep("B", 40))
