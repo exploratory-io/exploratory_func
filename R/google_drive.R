@@ -191,31 +191,49 @@ resolveGoogleDriveFileIdByName <- function(fileName, folderId, type = "csv",
 }
 
 # Pure: given the result of drive_get() for a single file id (a 1-row dribble, or NULL when the
-# id could not be fetched), decide whether the id no longer points to a live file. A file deleted
-# on Google Drive moves to Trash, where it is STILL downloadable by id (no 404), so the import
-# would silently fetch the old trashed content unless we treat trashed as stale. (issue #36171)
+# id could not be fetched), return list(trashedOrMissing, name, parentFolderId). A file deleted on
+# Google Drive moves to Trash, where it is STILL downloadable by id (no 404), so the import would
+# silently fetch the old trashed content unless we treat trashed as stale. drive_get(fields = "*")
+# also returns the file's own `name` and `parents`, which let the caller re-resolve by name even
+# when no folder/name context was passed in - including files in My Drive root. (issue #36171)
 # Kept free of I/O so it can be unit tested with constructed dribble-like values.
-isGoogleDriveMetadataTrashedOrMissing <- function(meta) {
+extractGoogleDriveFileStatus <- function(meta) {
+  missingStatus <- list(trashedOrMissing = TRUE, name = NA_character_, parentFolderId = NA_character_)
   if (is.null(meta)) {
-    return(TRUE)
+    return(missingStatus)
   }
   rowCount <- tryCatch(nrow(meta), error = function(e) 0)
   if (is.null(rowCount) || rowCount == 0) {
-    return(TRUE)
+    return(missingStatus)
   }
-  # drive_get() requests fields = "*", so drive_resource carries the `trashed` flag. If it is
-  # somehow absent, treat the file as live (FALSE) rather than erroring.
   resource <- tryCatch(meta$drive_resource[[1]], error = function(e) NULL)
-  isTRUE(resource[["trashed"]])
+  # drive_get() requests fields = "*", so `trashed` is present; if somehow absent, treat as live.
+  trashed <- isTRUE(resource[["trashed"]])
+  name <- tryCatch({
+    value <- resource[["name"]]
+    if (is.null(value) || length(value) == 0) NA_character_ else as.character(value[[1]])
+  }, error = function(e) NA_character_)
+  parentFolderId <- tryCatch({
+    parents <- resource[["parents"]]
+    if (is.null(parents) || length(parents) == 0) NA_character_ else as.character(parents[[1]])
+  }, error = function(e) NA_character_)
+  list(trashedOrMissing = trashed, name = name, parentFolderId = parentFolderId)
 }
 
-# I/O wrapper: fetch metadata for the stored file id and report whether it is trashed or gone.
-# Returns FALSE for transient/other errors so a network blip never forces the (heavier) name
-# fallback or turns a working download into an error - only an explicit "File not found" (the id
-# is permanently deleted) counts as stale alongside an actual trashed flag. (issue #36171)
-isGoogleDriveFileTrashedOrMissing <- function(fileId, teamDriveId = NULL) {
+# Back-compat boolean wrapper around extractGoogleDriveFileStatus.
+isGoogleDriveMetadataTrashedOrMissing <- function(meta) {
+  isTRUE(extractGoogleDriveFileStatus(meta)$trashedOrMissing)
+}
+
+# I/O wrapper: fetch metadata for the stored file id and return its status (trashed/missing + the
+# file's own name + parent folder). Returns a not-stale status for transient/other errors so a
+# network blip never forces the (heavier) name fallback or turns a working download into an error -
+# only an explicit "File not found" (the id is permanently deleted) counts as stale alongside an
+# actual trashed flag. (issue #36171)
+getGoogleDriveFileStatus <- function(fileId, teamDriveId = NULL) {
+  notStale <- list(trashedOrMissing = FALSE, name = NA_character_, parentFolderId = NA_character_)
   if (is.null(fileId) || length(fileId) != 1 || is.na(fileId) || !nzchar(fileId)) {
-    return(FALSE)
+    return(notStale)
   }
   currentConfig <- getOption("httr_config")
   httr::set_config(httr::config(http_version = 0))
@@ -232,10 +250,19 @@ isGoogleDriveFileTrashedOrMissing <- function(fileId, teamDriveId = NULL) {
       NULL
     }
     meta <- googledrive::drive_get(id = googledrive::as_id(fileId), shared_drive = sharedDrive)
-    isGoogleDriveMetadataTrashedOrMissing(meta)
+    extractGoogleDriveFileStatus(meta)
   }, error = function(e) {
-    any(stringr::str_detect(conditionMessage(e), "File not found|Not Found|404"))
+    if (any(stringr::str_detect(conditionMessage(e), "File not found|Not Found|404"))) {
+      list(trashedOrMissing = TRUE, name = NA_character_, parentFolderId = NA_character_)
+    } else {
+      notStale
+    }
   })
+}
+
+# Back-compat boolean wrapper around getGoogleDriveFileStatus.
+isGoogleDriveFileTrashedOrMissing <- function(fileId, teamDriveId = NULL) {
+  isTRUE(getGoogleDriveFileStatus(fileId, teamDriveId = teamDriveId)$trashedOrMissing)
 }
 
 #'API that imports a CSV file from Google Drive.
@@ -249,10 +276,12 @@ getCSVFileFromGoogleDrive <- function(fileId, delim, quote = '"',
                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                              progress = interactive(),
                              fileName = NULL, folderId = NULL,
-                             teamDriveId = NULL, sharedWithMe = FALSE) {
+                             teamDriveId = NULL, sharedWithMe = FALSE,
+                             detectStaleFile = TRUE) {
   filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "csv",
                                               fileName = fileName, folderId = folderId,
-                                              teamDriveId = teamDriveId, sharedWithMe = sharedWithMe)
+                                              teamDriveId = teamDriveId, sharedWithMe = sharedWithMe,
+                                              detectStaleFile = detectStaleFile)
   exploratory::read_delim_file(filePath, delim = delim, quote = quote,
                                escape_backslash = escape_backslash, escape_double = escape_double,
                                col_names = col_names, col_types = col_types,
@@ -284,9 +313,12 @@ getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, d
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(fileIds), fileNames)
+  # detectStaleFile = FALSE: the per-file stale/trashed re-resolution is a single-file-import
+  # concern; multi-file merge keeps the current behavior (no per-file drive_get). (issue #36171)
   df <- purrr::map_dfr(files, exploratory::getCSVFileFromGoogleDrive, delim = delim, quote = quote,
                        escape_backslash = escape_backslash, escape_double = escape_double,
                        col_names = col_names, col_types = col_types,
+                       detectStaleFile = FALSE,
                        locale = locale,
                        na = na, quoted_na = quoted_na,
                        comment = comment, trim_ws = trim_ws,
@@ -338,10 +370,11 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
 
 #'API that imports a Excel file from Google Drive.
 #'@export
-getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ..., fileName = NULL, folderId = NULL, teamDriveId = NULL, sharedWithMe = FALSE) {
+getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ..., fileName = NULL, folderId = NULL, teamDriveId = NULL, sharedWithMe = FALSE, detectStaleFile = TRUE) {
   filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "xlsx",
                                               fileName = fileName, folderId = folderId,
-                                              teamDriveId = teamDriveId, sharedWithMe = sharedWithMe)
+                                              teamDriveId = teamDriveId, sharedWithMe = sharedWithMe,
+                                              detectStaleFile = detectStaleFile)
   exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types,
                                na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl,
                                detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols,
@@ -359,10 +392,12 @@ getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE,
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(fileIds), fileNames)
+  # detectStaleFile = FALSE: per-file stale/trashed re-resolution is a single-file-import concern;
+  # multi-file merge keeps the current behavior (no per-file drive_get). (issue #36171)
   df <- purrr::map_dfr(files, exploratory::getExcelFileFromGoogleDrive, sheet = sheet,
                        col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl,
                        detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = FALSE,
-                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, detectStaleFile = FALSE, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
@@ -420,29 +455,44 @@ guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold =
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
 downloadDataFileFromGoogleDrive <- function(fileId, type = "csv", fileName = NULL,
                                             folderId = NULL, teamDriveId = NULL,
-                                            sharedWithMe = FALSE, fallbackAttempted = FALSE){
-  # Proactive stale-id detection (only with fallback context, and only before we have already
-  # re-resolved). A file deleted on Google Drive moves to Trash, where it remains DOWNLOADABLE by
-  # id with no 404 - so a plain download would silently return the old trashed content. Detect a
-  # trashed (or permanently deleted) id up front and re-resolve by name within the folder; the
-  # 404 handler further below remains as a secondary safety net. (issue #36171)
-  if (!isTRUE(fallbackAttempted) &&
-      !is.null(fileName) && !is.null(folderId) &&
-      length(fileName) == 1 && length(folderId) == 1 &&
-      !is.na(fileName) && !is.na(folderId) && nzchar(fileName) && nzchar(folderId) &&
-      isGoogleDriveFileTrashedOrMissing(fileId, teamDriveId = teamDriveId)) {
-    newFileId <- resolveGoogleDriveFileIdByName(fileName = fileName, folderId = folderId,
-                                                type = type, teamDriveId = teamDriveId,
-                                                sharedWithMe = sharedWithMe)
-    if (!is.null(newFileId)) {
-      return(downloadDataFileFromGoogleDrive(fileId = newFileId, type = type,
-                                             fileName = fileName, folderId = folderId,
-                                             teamDriveId = teamDriveId, sharedWithMe = sharedWithMe,
-                                             fallbackAttempted = TRUE))
+                                            sharedWithMe = FALSE, fallbackAttempted = FALSE,
+                                            detectStaleFile = FALSE){
+  # Proactive stale-id detection for single-file imports (detectStaleFile = TRUE), before we have
+  # already re-resolved. A file deleted on Google Drive moves to Trash, where it remains
+  # DOWNLOADABLE by id with no 404 - so a plain download would silently return the old trashed
+  # content. Check the stored id: if it is trashed (or permanently deleted) re-resolve by name.
+  # The file name and parent folder are taken from the caller's fileName/folderId when supplied,
+  # otherwise DERIVED from the trashed file's own metadata (drive_get returns name + parents) so
+  # this works even when tam stored no folder context - including files in My Drive root. The 404
+  # handler further below remains as a secondary safety net. (issue #36171)
+  if (isTRUE(detectStaleFile) && !isTRUE(fallbackAttempted) &&
+      !is.null(fileId) && length(fileId) == 1 && !is.na(fileId) && nzchar(fileId)) {
+    status <- getGoogleDriveFileStatus(fileId, teamDriveId = teamDriveId)
+    if (isTRUE(status$trashedOrMissing)) {
+      hasValue <- function(x) !is.null(x) && length(x) == 1 && !is.na(x) && nzchar(x)
+      resolvedName <- if (hasValue(fileName)) fileName else status$name
+      resolvedFolder <- if (hasValue(folderId)) folderId else status$parentFolderId
+      # A file at My Drive root may report no usable parent; fall back to the root listing path
+      # ("~/" is special-cased by listItemsInGoogleDrive) for non-team-drive sources.
+      if (!hasValue(resolvedFolder) && !hasValue(teamDriveId)) {
+        resolvedFolder <- "~/"
+      }
+      newFileId <- NULL
+      if (hasValue(resolvedName) && hasValue(resolvedFolder)) {
+        newFileId <- resolveGoogleDriveFileIdByName(fileName = resolvedName, folderId = resolvedFolder,
+                                                    type = type, teamDriveId = teamDriveId,
+                                                    sharedWithMe = sharedWithMe)
+      }
+      if (!is.null(newFileId) && newFileId != fileId) {
+        return(downloadDataFileFromGoogleDrive(fileId = newFileId, type = type,
+                                               fileName = resolvedName, folderId = resolvedFolder,
+                                               teamDriveId = teamDriveId, sharedWithMe = sharedWithMe,
+                                               fallbackAttempted = TRUE, detectStaleFile = FALSE))
+      }
+      # Trashed / gone and no live same-named replacement: the source no longer exists. Surface the
+      # clear error rather than silently downloading the trashed (stale) content.
+      stop(paste0('EXP-DATASRC-9 :: [] :: The specified Google Drive file does not exist.'))
     }
-    # Trashed / gone and no live same-named replacement: the source no longer exists. Surface the
-    # clear error rather than silently downloading the trashed (stale) content.
-    stop(paste0('EXP-DATASRC-9 :: [] :: The specified Google Drive file does not exist.'))
   }
   # Remember the current config
   currentConfig <- getOption("httr_config")

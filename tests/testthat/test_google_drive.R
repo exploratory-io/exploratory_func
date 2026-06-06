@@ -107,6 +107,41 @@ test_that("isGoogleDriveFileTrashedOrMissing returns FALSE for empty/NA file id 
   expect_false(exploratory:::isGoogleDriveFileTrashedOrMissing(""))
 })
 
+test_that("extractGoogleDriveFileStatus pulls trashed flag, name and parent from drive_get metadata", {
+  meta <- tibble::tibble(name = "sales.csv", id = "idA",
+    drive_resource = list(list(name = "sales.csv", trashed = TRUE, parents = list("folderA"))))
+  st <- exploratory:::extractGoogleDriveFileStatus(meta)
+  expect_true(st$trashedOrMissing)
+  expect_equal(st$name, "sales.csv")
+  expect_equal(st$parentFolderId, "folderA")
+})
+
+test_that("extractGoogleDriveFileStatus reports a live file with its parent folder", {
+  meta <- tibble::tibble(name = "sales.csv", id = "idA",
+    drive_resource = list(list(name = "sales.csv", trashed = FALSE, parents = list("rootFolderId"))))
+  st <- exploratory:::extractGoogleDriveFileStatus(meta)
+  expect_false(st$trashedOrMissing)
+  expect_equal(st$parentFolderId, "rootFolderId")
+})
+
+test_that("extractGoogleDriveFileStatus treats NULL / empty metadata as missing", {
+  st <- exploratory:::extractGoogleDriveFileStatus(NULL)
+  expect_true(st$trashedOrMissing)
+  expect_true(is.na(st$name))
+  expect_true(is.na(st$parentFolderId))
+})
+
+test_that("extractGoogleDriveFileStatus reports NA parent when the file has no parents (root edge)", {
+  # A trashed file may report a name but no parents; the caller then falls back to the My Drive
+  # root listing.
+  meta <- tibble::tibble(name = "sales.csv", id = "idA",
+    drive_resource = list(list(name = "sales.csv", trashed = TRUE)))
+  st <- exploratory:::extractGoogleDriveFileStatus(meta)
+  expect_true(st$trashedOrMissing)
+  expect_equal(st$name, "sales.csv")
+  expect_true(is.na(st$parentFolderId))
+})
+
 test_that("selectMostRecentGoogleDriveFileId orders real timestamps ahead of NA modifiedTime", {
   items <- data.frame(
     id = c("hasNA", "hasTime"),
