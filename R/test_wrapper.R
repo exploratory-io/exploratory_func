@@ -3377,6 +3377,17 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
       generate_norm_density_data(x$difference, p.value = x$p_value, mu = 0, sigma = x$se,
                                  sig_level = x$sig.level, alternative = x$alternative)
     }
+  } else if (type == "data_summary") {
+    seA <- sqrt(x$pA * (1 - x$pA) / x$nA)
+    seB <- sqrt(x$pB * (1 - x$pB) / x$nB)
+    tibble::tibble(
+      `Group`      = c(x$gA, x$gB),
+      `Rows`       = c(x$nA, x$nB),
+      `Proportion` = c(x$pA, x$pB),
+      `Conf Low`   = c(x$ciA[1], x$ciB[1]),
+      `Conf High`  = c(x$ciA[2], x$ciB[2]),
+      `Std Error`  = c(seA, seB)
+    )
   } else { # type == "data"
     tibble::tibble(
       `Group`          = c(x$gA, x$gB),
@@ -3535,6 +3546,14 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
                                  sig_level = x$sig.level, alternative = x$alternative) %>%
         dplyr::filter(x >= 0 & x <= 1)
     }
+  } else if (type == "data_summary") {
+    tibble::tibble(
+      `Rows`       = x$n,
+      `Proportion` = x$observed_prop,
+      `Conf Low`   = x$htest$conf.int[1],
+      `Conf High`  = x$htest$conf.int[2],
+      `Std Error`  = sqrt(x$observed_prop * (1 - x$observed_prop) / x$n)
+    )
   } else { # type == "data"
     # Return the original data so that the data-level charts (Error Bar Plot,
     # Data Distribution) can map to the target column. The chart templates

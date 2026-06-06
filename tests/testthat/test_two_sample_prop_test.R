@@ -511,3 +511,46 @@ test_that("tidy prob_dist_diff returns an empty tibble when the pooled SE is 0/N
   pd <- tidy(model, type = "prob_dist_diff")
   expect_equal(nrow(pd), 0)
 })
+
+# --- tidy(type = "data_summary") ---
+
+test_that("tidy data_summary returns one row per group with Rows, Proportion, Conf Low/High, Std Error", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  model <- exp_two_sample_prop_test(df, outcome, group, method = "approximate")$model[[1]]
+  ds <- tidy(model, type = "data_summary")
+  expect_equal(nrow(ds), 2)
+  expect_true(all(c("Group", "Rows", "Proportion", "Conf Low", "Conf High", "Std Error") %in% names(ds)))
+  expect_equal(ds$Group, c("A", "B"))
+  expect_equal(ds$Rows, c(50L, 40L))
+  expect_equal(ds$Proportion, c(23/50, 12/40))
+})
+
+test_that("tidy data_summary Conf Low/High per group match individual prop.test CIs", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  model <- exp_two_sample_prop_test(df, outcome, group, method = "approximate")$model[[1]]
+  ds <- tidy(model, type = "data_summary")
+  ciA <- prop.test(23, 50, correct = FALSE)$conf.int
+  ciB <- prop.test(12, 40, correct = FALSE)$conf.int
+  expect_equal(ds$`Conf Low`[1],  ciA[1])
+  expect_equal(ds$`Conf High`[1], ciA[2])
+  expect_equal(ds$`Conf Low`[2],  ciB[1])
+  expect_equal(ds$`Conf High`[2], ciB[2])
+})
+
+test_that("tidy data_summary Std Error is the per-group Wilson SE", {
+  df <- data.frame(
+    outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
+    group = c(rep("A", 50), rep("B", 40))
+  )
+  model <- exp_two_sample_prop_test(df, outcome, group, method = "approximate")$model[[1]]
+  ds <- tidy(model, type = "data_summary")
+  pA <- 23/50; pB <- 12/40
+  expect_equal(ds$`Std Error`[1], sqrt(pA * (1 - pA) / 50))
+  expect_equal(ds$`Std Error`[2], sqrt(pB * (1 - pB) / 40))
+})
