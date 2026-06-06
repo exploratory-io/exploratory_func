@@ -152,3 +152,8 @@ test_that("selectMostRecentGoogleDriveFileId orders real timestamps ahead of NA 
   result <- exploratory:::selectMostRecentGoogleDriveFileId(items, "sales.csv")
   expect_equal(result, "hasTime")
 })
+
+test_that("getExcelFilesFromGoogleDrive keeps stale-detection flag after dots", {
+  argNames <- names(formals(exploratory::getExcelFilesFromGoogleDrive))
+  expect_lt(which(argNames == "..."), which(argNames == "detectStaleFile"))
+})

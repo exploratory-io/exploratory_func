@@ -386,7 +386,7 @@ getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col
 
 #'API that imports multiple Excel files from Google Drive
 #'@export
-getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, detectStaleFile = TRUE, ...) {
+getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ..., detectStaleFile = TRUE) {
   # for preview mode, just use the first file.
   if (forPreview & length(fileNames) > 0 & length(fileIds) > 0) {
     fileNames <- fileNames[1]
@@ -595,5 +595,4 @@ clearGoogleDriveCacheFile <- function(fileId, type = "csv"){
   }, error = function(e){
   })
 }
-
 
