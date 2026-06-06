@@ -228,18 +228,17 @@ test_that("sig.level flips the significance Result on the same data", {
   expect_equal(tidy(sig_model, type = "model")$Result, "Statistically significant.")
 })
 
-test_that("tidy data type returns two-row CI data", {
+test_that("tidy data type returns the raw data with the target and explanatory columns", {
   df <- data.frame(
     outcome = c(rep(TRUE, 23), rep(FALSE, 27), rep(TRUE, 12), rep(FALSE, 28)),
     group = c(rep("A", 50), rep("B", 40))
   )
   result <- exp_two_sample_prop_test(df, outcome, group, method = "approximate")
   model <- result$model[[1]]
-  ci_data <- tidy(model, type = "data")
-  expect_equal(nrow(ci_data), 2)
-  expect_true("Proportion (%)" %in% names(ci_data))
-  expect_true("Conf Low (%)" %in% names(ci_data))
-  expect_true("Conf High (%)" %in% names(ci_data))
+  raw_data <- tidy(model, type = "data")
+  expect_equal(nrow(raw_data), 90)
+  expect_true("outcome" %in% names(raw_data))
+  expect_true("group" %in% names(raw_data))
 })
 
 test_that("stress test with complex column names", {

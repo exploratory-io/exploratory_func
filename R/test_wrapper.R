@@ -3310,6 +3310,7 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
         cohens_h = cohens_h, power = power, sig.level = sig.level, conf_level = conf_level,
         var_col = var_col, exp_col = exp_col)
       class(model) <- c("two_sample_prop_test_exploratory", class(model))
+      model$data <- df
       model
     }, error = function(e) {
       if (length(grouped_cols) > 0) { class(e) <- c("two_sample_prop_test_exploratory", class(e)); e }
@@ -3389,12 +3390,7 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
       `Std Error`  = c(seA, seB)
     )
   } else { # type == "data"
-    tibble::tibble(
-      `Group`          = c(x$gA, x$gB),
-      `Proportion (%)`  = c(x$pA * 100, x$pB * 100),
-      `Conf Low (%)`   = c(x$ciA[1] * 100, x$ciB[1] * 100),
-      `Conf High (%)`  = c(x$ciA[2] * 100, x$ciB[2] * 100)
-    )
+    x$data
   }
 }
 
