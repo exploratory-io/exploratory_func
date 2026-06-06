@@ -76,6 +76,37 @@ test_that("selectMostRecentGoogleDriveFileId returns first match when modifiedTi
   expect_equal(result, "idA")
 })
 
+test_that("isGoogleDriveMetadataTrashedOrMissing treats NULL / empty metadata as stale", {
+  expect_true(exploratory:::isGoogleDriveMetadataTrashedOrMissing(NULL))
+  empty <- tibble::tibble(name = character(0), id = character(0),
+                         drive_resource = list())
+  expect_true(exploratory:::isGoogleDriveMetadataTrashedOrMissing(empty))
+})
+
+test_that("isGoogleDriveMetadataTrashedOrMissing reports trashed flag from drive_resource", {
+  trashedMeta <- tibble::tibble(name = "sales.csv", id = "idA",
+                               drive_resource = list(list(trashed = TRUE)))
+  expect_true(exploratory:::isGoogleDriveMetadataTrashedOrMissing(trashedMeta))
+
+  liveMeta <- tibble::tibble(name = "sales.csv", id = "idA",
+                            drive_resource = list(list(trashed = FALSE)))
+  expect_false(exploratory:::isGoogleDriveMetadataTrashedOrMissing(liveMeta))
+})
+
+test_that("isGoogleDriveMetadataTrashedOrMissing treats an absent trashed flag as live", {
+  # drive_get(fields = "*") always returns `trashed`, but if it is somehow missing we must not
+  # mistake a live file for a deleted one.
+  noFlagMeta <- tibble::tibble(name = "sales.csv", id = "idA",
+                              drive_resource = list(list(mimeType = "text/csv")))
+  expect_false(exploratory:::isGoogleDriveMetadataTrashedOrMissing(noFlagMeta))
+})
+
+test_that("isGoogleDriveFileTrashedOrMissing returns FALSE for empty/NA file id (nothing to check)", {
+  expect_false(exploratory:::isGoogleDriveFileTrashedOrMissing(NULL))
+  expect_false(exploratory:::isGoogleDriveFileTrashedOrMissing(NA_character_))
+  expect_false(exploratory:::isGoogleDriveFileTrashedOrMissing(""))
+})
+
 test_that("selectMostRecentGoogleDriveFileId orders real timestamps ahead of NA modifiedTime", {
   items <- data.frame(
     id = c("hasNA", "hasTime"),

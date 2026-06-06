@@ -190,6 +190,54 @@ resolveGoogleDriveFileIdByName <- function(fileName, folderId, type = "csv",
   selectMostRecentGoogleDriveFileId(items, fileName)
 }
 
+# Pure: given the result of drive_get() for a single file id (a 1-row dribble, or NULL when the
+# id could not be fetched), decide whether the id no longer points to a live file. A file deleted
+# on Google Drive moves to Trash, where it is STILL downloadable by id (no 404), so the import
+# would silently fetch the old trashed content unless we treat trashed as stale. (issue #36171)
+# Kept free of I/O so it can be unit tested with constructed dribble-like values.
+isGoogleDriveMetadataTrashedOrMissing <- function(meta) {
+  if (is.null(meta)) {
+    return(TRUE)
+  }
+  rowCount <- tryCatch(nrow(meta), error = function(e) 0)
+  if (is.null(rowCount) || rowCount == 0) {
+    return(TRUE)
+  }
+  # drive_get() requests fields = "*", so drive_resource carries the `trashed` flag. If it is
+  # somehow absent, treat the file as live (FALSE) rather than erroring.
+  resource <- tryCatch(meta$drive_resource[[1]], error = function(e) NULL)
+  isTRUE(resource[["trashed"]])
+}
+
+# I/O wrapper: fetch metadata for the stored file id and report whether it is trashed or gone.
+# Returns FALSE for transient/other errors so a network blip never forces the (heavier) name
+# fallback or turns a working download into an error - only an explicit "File not found" (the id
+# is permanently deleted) counts as stale alongside an actual trashed flag. (issue #36171)
+isGoogleDriveFileTrashedOrMissing <- function(fileId, teamDriveId = NULL) {
+  if (is.null(fileId) || length(fileId) != 1 || is.na(fileId) || !nzchar(fileId)) {
+    return(FALSE)
+  }
+  currentConfig <- getOption("httr_config")
+  httr::set_config(httr::config(http_version = 0))
+  on.exit({
+    if (is.null(currentConfig)) httr::reset_config() else httr::set_config(currentConfig)
+  })
+  tryCatch({
+    token <- exploratory::getGoogleTokenForDrive()
+    googledrive::drive_set_token(token)
+    sharedDrive <- if (!is.null(teamDriveId) && length(teamDriveId) == 1 &&
+                       !is.na(teamDriveId) && nzchar(teamDriveId)) {
+      googledrive::as_id(teamDriveId)
+    } else {
+      NULL
+    }
+    meta <- googledrive::drive_get(id = googledrive::as_id(fileId), shared_drive = sharedDrive)
+    isGoogleDriveMetadataTrashedOrMissing(meta)
+  }, error = function(e) {
+    any(stringr::str_detect(conditionMessage(e), "File not found|Not Found|404"))
+  })
+}
+
 #'API that imports a CSV file from Google Drive.
 #'@export
 getCSVFileFromGoogleDrive <- function(fileId, delim, quote = '"',
@@ -373,6 +421,29 @@ guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold =
 downloadDataFileFromGoogleDrive <- function(fileId, type = "csv", fileName = NULL,
                                             folderId = NULL, teamDriveId = NULL,
                                             sharedWithMe = FALSE, fallbackAttempted = FALSE){
+  # Proactive stale-id detection (only with fallback context, and only before we have already
+  # re-resolved). A file deleted on Google Drive moves to Trash, where it remains DOWNLOADABLE by
+  # id with no 404 - so a plain download would silently return the old trashed content. Detect a
+  # trashed (or permanently deleted) id up front and re-resolve by name within the folder; the
+  # 404 handler further below remains as a secondary safety net. (issue #36171)
+  if (!isTRUE(fallbackAttempted) &&
+      !is.null(fileName) && !is.null(folderId) &&
+      length(fileName) == 1 && length(folderId) == 1 &&
+      !is.na(fileName) && !is.na(folderId) && nzchar(fileName) && nzchar(folderId) &&
+      isGoogleDriveFileTrashedOrMissing(fileId, teamDriveId = teamDriveId)) {
+    newFileId <- resolveGoogleDriveFileIdByName(fileName = fileName, folderId = folderId,
+                                                type = type, teamDriveId = teamDriveId,
+                                                sharedWithMe = sharedWithMe)
+    if (!is.null(newFileId)) {
+      return(downloadDataFileFromGoogleDrive(fileId = newFileId, type = type,
+                                             fileName = fileName, folderId = folderId,
+                                             teamDriveId = teamDriveId, sharedWithMe = sharedWithMe,
+                                             fallbackAttempted = TRUE))
+    }
+    # Trashed / gone and no live same-named replacement: the source no longer exists. Surface the
+    # clear error rather than silently downloading the trashed (stale) content.
+    stop(paste0('EXP-DATASRC-9 :: [] :: The specified Google Drive file does not exist.'))
+  }
   # Remember the current config
   currentConfig <- getOption("httr_config")
   # To workaround Error in the HTTP2 framing layer
