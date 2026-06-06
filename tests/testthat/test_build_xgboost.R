@@ -598,3 +598,175 @@ test_that("new data prediction without response column", {
     prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.2)
   expect_equal(as.integer(prediction_ret$predicted_label)+1, as.integer(prediction_ret2$predicted_label))
 })
+
+# exp_xgboost coverage: L1/L2 regularization (alpha/lambda), prediction output validity,
+# imbalanced targets, NA handling, and complex column names.
+# alpha/lambda are forwarded through ... from exp_xgboost -> xgboost_*() -> fml_xgboost() ->
+# xgboost::xgb.train(), exactly like `objective` (which is read back at model$params$objective).
+xgb_l1l2_test_data <- structure(
+  list(
+    CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+    CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+    DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)),
+  row.names = c(NA, -20L),
+  class = c("tbl_df", "tbl", "data.frame"))
+
+test_that("exp_xgboost forwards alpha (L1) and lambda (L2) to the booster", {
+  set.seed(1)
+  # Regression target (numeric) - non-default alpha/lambda must reach xgb.train params.
+  model_df <- xgb_l1l2_test_data %>% exp_xgboost(DISTANCE, CARRIER, alpha = 0.5, lambda = 2, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_equal(as.numeric(model$params$alpha), 0.5)
+  expect_equal(as.numeric(model$params$lambda), 2)
+
+  # Binary target (logical) - same forwarding through the binary branch.
+  bin_data <- xgb_l1l2_test_data %>% dplyr::mutate(is_cancelled = CANCELLED == 1)
+  model_df_bin <- bin_data %>% exp_xgboost(is_cancelled, CARRIER, alpha = 0.3, lambda = 4, nrounds = 5)
+  model_bin <- model_df_bin$model[[1]]
+  expect_equal(as.numeric(model_bin$params$alpha), 0.3)
+  expect_equal(as.numeric(model_bin$params$lambda), 4)
+})
+
+test_that("exp_xgboost uses XGBoost default alpha=0 / lambda=1 when not specified", {
+  set.seed(1)
+  model_df <- xgb_l1l2_test_data %>% exp_xgboost(DISTANCE, CARRIER, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_equal(as.numeric(model$params$alpha), 0)
+  expect_equal(as.numeric(model$params$lambda), 1)
+})
+
+test_that("exp_xgboost with alpha and lambda produces valid prediction outputs", {
+  set.seed(1)
+  n <- 100
+  # Binary: predicted probabilities must be in [0, 1]
+  bin_data <- data.frame(
+    target = rep(c(TRUE, FALSE), n / 2),
+    x1 = rnorm(n),
+    x2 = rnorm(n)
+  )
+  model_df <- bin_data %>% exp_xgboost(target, x1, x2, alpha = 1, lambda = 2, nrounds = 5)
+  probs <- model_df$model[[1]]$prediction_training
+  expect_true(is.numeric(probs))
+  expect_true(all(dplyr::between(probs, 0, 1), na.rm = TRUE))
+
+  # Regression: predicted values must be finite numerics
+  reg_data <- data.frame(y = rnorm(n), x1 = rnorm(n), x2 = rnorm(n))
+  model_df_reg <- reg_data %>% exp_xgboost(y, x1, x2, alpha = 0.5, lambda = 3, nrounds = 5)
+  preds <- model_df_reg$model[[1]]$prediction_training
+  expect_true(is.numeric(preds))
+  expect_true(all(is.finite(preds)))
+
+  # Multiclass: probability matrix with values in [0, 1]
+  multi_data <- data.frame(
+    label = rep(c("A", "B", "C"), length.out = n),
+    x1 = rnorm(n),
+    x2 = rnorm(n)
+  )
+  model_df_multi <- multi_data %>% exp_xgboost(label, x1, x2, alpha = 0.5, lambda = 2, nrounds = 5)
+  prob_mat <- model_df_multi$model[[1]]$prediction_training
+  expect_true(is.matrix(prob_mat))
+  expect_true(all(dplyr::between(as.numeric(prob_mat), 0, 1), na.rm = TRUE))
+})
+
+test_that("exp_xgboost handles highly imbalanced binary target", {
+  set.seed(1)
+  n <- 100
+  test_data <- data.frame(
+    target = c(rep(TRUE, 5), rep(FALSE, 95)),
+    x1 = rnorm(n),
+    x2 = rnorm(n)
+  )
+  model_df <- test_data %>% exp_xgboost(target, x1, x2, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_false("error" %in% class(model))
+  expect_true(is.numeric(model$prediction_training))
+  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+})
+
+test_that("exp_xgboost handles NA values in predictors", {
+  set.seed(1)
+  n <- 100
+  x1 <- rnorm(n)
+  x1[sample(n, 10)] <- NA
+  test_data <- data.frame(
+    target = rep(c(TRUE, FALSE), n / 2),
+    x1 = x1,
+    x2 = rnorm(n)
+  )
+  model_df <- test_data %>% exp_xgboost(target, x1, x2, nrounds = 5)
+  model <- model_df$model[[1]]
+  expect_false("error" %in% class(model))
+  expect_true(is.numeric(model$prediction_training))
+  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+})
+
+if (Sys.info()["sysname"] != "Windows") {
+  test_that("exp_xgboost handles column names with Japanese and many special characters", {
+    set.seed(1)
+    n <- 100
+    test_data <- data.frame(
+      col1 = rep(c(TRUE, FALSE), n / 2),
+      col2 = rep(c("DL", "MQ", "AA", "WN"), length.out = n),
+      col3 = rnorm(n),
+      stringsAsFactors = FALSE
+    )
+    colnames(test_data) <- c(
+      "遅れ た !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表",
+      "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表",
+      "飛行 時間 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+    )
+    model_df <- test_data %>%
+      exp_xgboost(
+        `遅れ た !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`,
+        `航空 会社 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`,
+        `飛行 時間 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`,
+        nrounds = 5
+      )
+    model <- model_df$model[[1]]
+    expect_false("error" %in% class(model))
+    expect_true(is.numeric(model$prediction_training))
+    expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+  })
+}
+
+test_that("exp_xgboost handles column names with ASCII special characters", {
+  set.seed(1)
+  n <- 100
+  test_data <- data.frame(
+    col1 = rep(c(TRUE, FALSE), n / 2),
+    col2 = rep(c("DL", "MQ", "AA", "WN"), length.out = n),
+    col3 = rnorm(n),
+    stringsAsFactors = FALSE
+  )
+  colnames(test_data) <- c(
+    "Is Delayed !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x",
+    "Airline !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x",
+    "Flight Time !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x"
+  )
+  model_df <- test_data %>%
+    exp_xgboost(
+      `Is Delayed !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x`,
+      `Airline !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x`,
+      `Flight Time !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ x`,
+      nrounds = 5
+    )
+  model <- model_df$model[[1]]
+  expect_false("error" %in% class(model))
+  expect_true(is.numeric(model$prediction_training))
+  expect_true(all(dplyr::between(model$prediction_training, 0, 1), na.rm = TRUE))
+})
+
+test_that("exp_xgboost works with grouped data (repeat-by)", {
+  set.seed(1)
+  test_data <- dplyr::tibble(
+    group = rep(c("A", "B"), each = 50),
+    target = c(rep(c(TRUE, FALSE), 25), rep(c(FALSE, TRUE), 25)),
+    x1 = rnorm(100),
+    x2 = rnorm(100)
+  )
+  model_df <- test_data %>%
+    dplyr::group_by(group) %>%
+    exp_xgboost(target, x1, x2, nrounds = 5)
+  expect_equal(nrow(model_df), 2)
+  expect_true(all(sapply(model_df$model, function(m) !("error" %in% class(m)))))
+})

@@ -1092,6 +1092,10 @@ cleanup_df_for_test <- function(df_test, df_train, c_cols) {
 }
 
 #' Build XGBoost model for Analytics View.
+#' @param alpha L1 regularization term on weights (XGBoost "alpha", alias "reg_alpha").
+#'   Larger values make the model more conservative. Default 0 (no L1 regularization).
+#' @param lambda L2 regularization term on weights (XGBoost "lambda", alias "reg_lambda").
+#'   Larger values make the model more conservative. Default 1 (XGBoost tree-booster default).
 #' @export
 exp_xgboost <- function(df,
                         target,
@@ -1113,6 +1117,8 @@ exp_xgboost <- function(df,
                         eta = 0.3, # We used to set learning_rate parameter here for Analytics Step. Corrected it while 6.2 development.
                                    # Either xgboost package changed parameter name at some point,
                                    # or we might have been wrong about the parameter name in the first place.
+                        alpha = 0,  # L1 regularization term on weights (XGBoost "alpha"/"reg_alpha"). 0 = no L1.
+                        lambda = 1, # L2 regularization term on weights (XGBoost "lambda"/"reg_lambda"). XGBoost tree-booster default = 1.
                         output_type_regression = "linear",
                         eval_metric_regression = "rmse",
                         output_type_binary = "logistic",
@@ -1327,7 +1333,9 @@ exp_xgboost <- function(df,
                         subsample = subsample,
                         colsample_bytree = colsample_bytree,
                         eta = eta,
-                        output_type = output_type_binary, 
+                        alpha = alpha,
+                        lambda = lambda,
+                        output_type = output_type_binary,
                         eval_metric = eval_metric_binary)
       }
       else if(is_target_numeric) {
@@ -1343,7 +1351,9 @@ exp_xgboost <- function(df,
                         subsample = subsample,
                         colsample_bytree = colsample_bytree,
                         eta = eta,
-                        output_type = output_type_regression, 
+                        alpha = alpha,
+                        lambda = lambda,
+                        output_type = output_type_regression,
                         eval_metric = eval_metric_regression)
       }
       else {
@@ -1359,7 +1369,9 @@ exp_xgboost <- function(df,
                         subsample = subsample,
                         colsample_bytree = colsample_bytree,
                         eta = eta,
-                        output_type = output_type_multiclass, 
+                        alpha = alpha,
+                        lambda = lambda,
+                        output_type = output_type_multiclass,
                         eval_metric = eval_metric_multiclass)
       }
       class(model) <- c("xgboost_exp", class(model))

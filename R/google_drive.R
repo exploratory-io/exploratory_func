@@ -129,7 +129,11 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL, useGoo
 # is no match. This is the decision core of the stale-fileId fallback (issue #36171) and is
 # kept free of any Google Drive I/O so it can be unit tested with plain data frames.
 selectMostRecentGoogleDriveFileId <- function(items, fileName) {
-  if (is.null(items) || is.null(fileName) || length(fileName) == 0 || fileName == "") {
+  # Reject anything that is not a single, non-NA, non-empty string. Checking length and is.na
+  # BEFORE nzchar matters: a bare `fileName == ""` on an NA or length>1 value makes the `if`
+  # condition NA / length>1 and errors with "missing value where TRUE/FALSE needed" on R >= 4.2.
+  if (is.null(items) || is.null(fileName) || length(fileName) != 1 ||
+      is.na(fileName) || !nzchar(fileName)) {
     return(NULL)
   }
   if (!("name" %in% colnames(items)) || !("id" %in% colnames(items)) || nrow(items) == 0) {
@@ -158,8 +162,11 @@ selectMostRecentGoogleDriveFileId <- function(items, fileName) {
 # Returns the resolved file id, or NULL when the folder cannot be listed or nothing matches.
 resolveGoogleDriveFileIdByName <- function(fileName, folderId, type = "csv",
                                            teamDriveId = NULL, sharedWithMe = FALSE) {
-  if (is.null(fileName) || is.null(folderId) || length(fileName) == 0 ||
-      length(folderId) == 0 || fileName == "" || folderId == "") {
+  # Require both to be single, non-NA, non-empty strings (see selectMostRecentGoogleDriveFileId
+  # for why the length / is.na checks precede the emptiness check).
+  if (is.null(fileName) || is.null(folderId) ||
+      length(fileName) != 1 || length(folderId) != 1 ||
+      is.na(fileName) || is.na(folderId) || !nzchar(fileName) || !nzchar(folderId)) {
     return(NULL)
   }
   listType <- if (any(type %in% c("xls", "xlsx"))) c("xls", "xlsx") else c("csv", "tsv", "txt")
@@ -283,7 +290,7 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
 
 #'API that imports a Excel file from Google Drive.
 #'@export
-getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, fileName = NULL, folderId = NULL, teamDriveId = NULL, sharedWithMe = FALSE, ...) {
+getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ..., fileName = NULL, folderId = NULL, teamDriveId = NULL, sharedWithMe = FALSE) {
   filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "xlsx",
                                               fileName = fileName, folderId = folderId,
                                               teamDriveId = teamDriveId, sharedWithMe = sharedWithMe)
@@ -419,7 +426,8 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv", fileName = NUL
       # Google Drive under the same name gets a NEW id, so the stored id goes stale. Re-resolve
       # the file by its name within the folder and retry the download once. (Issue #36171)
       if (!isTRUE(fallbackAttempted) && !is.null(fileName) && !is.null(folderId) &&
-          length(fileName) > 0 && length(folderId) > 0 && fileName != "" && folderId != "") {
+          length(fileName) == 1 && length(folderId) == 1 &&
+          !is.na(fileName) && !is.na(folderId) && nzchar(fileName) && nzchar(folderId)) {
         newFileId <- resolveGoogleDriveFileIdByName(fileName = fileName, folderId = folderId,
                                                     type = type, teamDriveId = teamDriveId,
                                                     sharedWithMe = sharedWithMe)

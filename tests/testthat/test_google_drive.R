@@ -49,6 +49,9 @@ test_that("selectMostRecentGoogleDriveFileId returns NULL for empty/NULL inputs"
                       modifiedTime = "2024-01-01T00:00:00Z", stringsAsFactors = FALSE)
   expect_null(exploratory:::selectMostRecentGoogleDriveFileId(items, NULL))
   expect_null(exploratory:::selectMostRecentGoogleDriveFileId(items, ""))
+  # NA / non-scalar fileName must return NULL, not raise "missing value where TRUE/FALSE needed".
+  expect_null(exploratory:::selectMostRecentGoogleDriveFileId(items, NA_character_))
+  expect_null(exploratory:::selectMostRecentGoogleDriveFileId(items, c("sales.csv", "other.csv")))
 })
 
 test_that("selectMostRecentGoogleDriveFileId handles a complex multibyte file name", {

@@ -218,6 +218,24 @@ test_that("tidy model exposes correct observed proportion, difference and CI val
   expect_equal(tidied$`Conf High`, expected$conf.int[2])
 })
 
+test_that("tidy model exposes Diff Conf Low/High as proportion CI shifted by benchmark", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  model <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
+  tidied <- tidy(model, type = "model")
+  expect_true("Diff Conf Low" %in% names(tidied))
+  expect_true("Diff Conf High" %in% names(tidied))
+  expect_equal(tidied$`Diff Conf Low`,  tidied$`Conf Low`  - 0.4)
+  expect_equal(tidied$`Diff Conf High`, tidied$`Conf High` - 0.4)
+})
+
+test_that("tidy model Diff Conf Low/High also correct for exact method", {
+  df <- data.frame(outcome = c(rep(TRUE, 12), rep(FALSE, 88)))
+  model <- exp_one_sample_prop_test(df, outcome, p = 0.1, method = "exact")$model[[1]]
+  tidied <- tidy(model, type = "model")
+  expect_equal(tidied$`Diff Conf Low`,  tidied$`Conf Low`  - 0.1)
+  expect_equal(tidied$`Diff Conf High`, tidied$`Conf High` - 0.1)
+})
+
 test_that("Z Value is the standardized statistic and is exposed before P Value", {
   df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
   model <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
@@ -416,4 +434,32 @@ test_that("tidy prob_dist_prop returns an empty tibble when the SE is 0/NA", {
     class = c("one_sample_prop_test_exploratory", "list"))
   pd <- tidy(model, type = "prob_dist_prop")
   expect_equal(nrow(pd), 0)
+})
+
+# --- tidy(type = "data_summary") ---
+
+test_that("tidy data_summary returns Rows, Proportion, Conf Low/High, Std Error", {
+  df <- data.frame(outcome = c(rep(TRUE, 50), rep(FALSE, 50)))
+  model <- exp_one_sample_prop_test(df, outcome, p = 0.4, method = "approximate")$model[[1]]
+  ds <- tidy(model, type = "data_summary")
+  expect_equal(nrow(ds), 1)
+  expect_true(all(c("Rows", "Proportion", "Conf Low", "Conf High", "Std Error") %in% names(ds)))
+  expect_equal(ds$Rows, 100)
+  expect_equal(ds$Proportion, 0.5)
+  expect_equal(ds$`Conf Low`,  model$htest$conf.int[1])
+  expect_equal(ds$`Conf High`, model$htest$conf.int[2])
+  # Std Error is based on the observed proportion, not the benchmark (H0) proportion.
+  expect_equal(ds$`Std Error`, sqrt(0.5 * 0.5 / 100))
+})
+
+test_that("tidy data_summary Conf Low/High match the method used (exact vs approximate)", {
+  df <- data.frame(outcome = c(rep(TRUE, 12), rep(FALSE, 88)))
+  model_exact <- exp_one_sample_prop_test(df, outcome, p = 0.1, method = "exact")$model[[1]]
+  model_approx <- exp_one_sample_prop_test(df, outcome, p = 0.1, method = "approximate")$model[[1]]
+  ds_exact  <- tidy(model_exact,  type = "data_summary")
+  ds_approx <- tidy(model_approx, type = "data_summary")
+  expect_equal(ds_exact$`Conf Low`,  binom.test(12, 100, p = 0.1)$conf.int[1])
+  expect_equal(ds_exact$`Conf High`, binom.test(12, 100, p = 0.1)$conf.int[2])
+  expect_equal(ds_approx$`Conf Low`,  prop.test(12, 100, p = 0.1, correct = FALSE)$conf.int[1])
+  expect_equal(ds_approx$`Conf High`, prop.test(12, 100, p = 0.1, correct = FALSE)$conf.int[2])
 })
