@@ -3619,6 +3619,8 @@ tidy.one_sample_t_test_exploratory <- function(x, type = "model", conf_level = 0
       `P Value`           = x$htest$p.value,
       `Conf Low`          = x$htest$conf.int[1],
       `Conf High`         = x$htest$conf.int[2],
+      `Diff Conf Low`     = x$htest$conf.int[1] - x$mu,
+      `Diff Conf High`    = x$htest$conf.int[2] - x$mu,
       `Cohen's d`         = x$cohens_d,
       `Power`             = x$power,
       `Test Direction`    = direction,

@@ -211,8 +211,8 @@ test_that("tidy model type returns the expected column set", {
   expected_cols <- c(
     "Number of Rows", "Mean", "Std Deviation", "Std Error",
     "Hypothesized Mean", "Difference", "t Value", "DF", "P Value",
-    "Conf Low", "Conf High", "Cohen's d", "Power",
-    "Test Direction", "Result"
+    "Conf Low", "Conf High", "Diff Conf Low", "Diff Conf High",
+    "Cohen's d", "Power", "Test Direction", "Result"
   )
   for (col in expected_cols) {
     expect_true(col %in% names(tidied), info = paste("Missing column:", col))
@@ -237,6 +237,8 @@ test_that("tidy model values are numerically correct", {
   expect_equal(tidied$`P Value`, expected$p.value)
   expect_equal(tidied$`Conf Low`, expected$conf.int[1])
   expect_equal(tidied$`Conf High`, expected$conf.int[2])
+  expect_equal(tidied$`Diff Conf Low`,  expected$conf.int[1] - 4.5)
+  expect_equal(tidied$`Diff Conf High`, expected$conf.int[2] - 4.5)
 })
 
 test_that("tidy model Test Direction maps correctly from alternative", {
