@@ -305,7 +305,7 @@ getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, d
                               na = c("", "NA"), quoted_na = TRUE,
                               comment = "", trim_ws = FALSE,
                               skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                              progress = interactive()) {
+                              progress = interactive(), detectStaleFile = TRUE) {
   # for preview mode, just use the first file.
   if (forPreview & length(fileNames) > 0 & length(fileIds) > 0) {
     fileNames <- fileNames[1]
@@ -313,12 +313,13 @@ getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, d
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(fileIds), fileNames)
-  # detectStaleFile = FALSE: the per-file stale/trashed re-resolution is a single-file-import
-  # concern; multi-file merge keeps the current behavior (no per-file drive_get). (issue #36171)
+  # detectStaleFile: TRUE for a direct multi-file re-import (the stored ids may be stale -- each
+  # file is checked and re-resolved by name); search-mode callers pass FALSE because their ids
+  # were just listed live. (issue #36171)
   df <- purrr::map_dfr(files, exploratory::getCSVFileFromGoogleDrive, delim = delim, quote = quote,
                        escape_backslash = escape_backslash, escape_double = escape_double,
                        col_names = col_names, col_types = col_types,
-                       detectStaleFile = FALSE,
+                       detectStaleFile = detectStaleFile,
                        locale = locale,
                        na = na, quoted_na = quoted_na,
                        comment = comment, trim_ws = trim_ws,
@@ -361,9 +362,10 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
   if (nrow(items) == 0) {
     stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
   }
+  # items$id were just listed live (drive_ls excludes trashed), so skip the per-file stale check.
   exploratory::getCSVFilesFromGoogleDrive(items$id, items$name, forPreview = forPreview, delim = delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names,
                                           col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max,
-                                          guess_max = guess_max, progress = progress)
+                                          guess_max = guess_max, progress = progress, detectStaleFile = FALSE)
 
 }
 
@@ -384,7 +386,7 @@ getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col
 
 #'API that imports multiple Excel files from Google Drive
 #'@export
-getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
+getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, detectStaleFile = TRUE, ...) {
   # for preview mode, just use the first file.
   if (forPreview & length(fileNames) > 0 & length(fileIds) > 0) {
     fileNames <- fileNames[1]
@@ -392,12 +394,12 @@ getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, forPreview = FALSE,
   }
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(fileIds), fileNames)
-  # detectStaleFile = FALSE: per-file stale/trashed re-resolution is a single-file-import concern;
-  # multi-file merge keeps the current behavior (no per-file drive_get). (issue #36171)
+  # detectStaleFile: TRUE for a direct multi-file re-import (stored ids may be stale); search-mode
+  # callers pass FALSE because their ids were just listed live. (issue #36171)
   df <- purrr::map_dfr(files, exploratory::getExcelFileFromGoogleDrive, sheet = sheet,
                        col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl,
                        detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = FALSE,
-                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, detectStaleFile = FALSE, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, detectStaleFile = detectStaleFile, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
@@ -431,22 +433,27 @@ searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword
   if (nrow(items) == 0) {
     stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
   }
+  # items$id were just listed live (drive_ls excludes trashed), so skip the per-file stale check.
   exploratory::getExcelFilesFromGoogleDrive(items$id, items$name, forPreview = forPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip,
                                             trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows,
-                                            skipEmptyCols = skipEmptyCols, check.names = check.names, convertDataTypeToChar = convertDataTypeToChar, tzone = tzone, ...)
+                                            skipEmptyCols = skipEmptyCols, check.names = check.names, convertDataTypeToChar = convertDataTypeToChar, tzone = tzone, detectStaleFile = FALSE, ...)
 }
 
 #'Wrapper for readxl::excel_sheets to support Google Drive Excel file
 #'@export
 getExcelSheetsFromGoogleDriveExcelFile <- function(fileId){
-  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "xlsx")
+  # detectStaleFile = TRUE so the import dialog's sheet list reflects a re-uploaded file rather
+  # than the old trashed one. (issue #36171)
+  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "xlsx", detectStaleFile = TRUE)
   readxl::excel_sheets(filePath)
 }
 
 #'Wrapper for readr::guess_encoding to support Google Drive csv file
 #'@export
 guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold = 0.20){
-  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "csv")
+  # detectStaleFile = TRUE so the encoding guess reflects a re-uploaded file rather than the old
+  # trashed one. (issue #36171)
+  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "csv", detectStaleFile = TRUE)
   readr::guess_encoding(filePath, n_max, threshold)
 }
 
