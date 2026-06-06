@@ -3310,6 +3310,7 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
         cohens_h = cohens_h, power = power, sig.level = sig.level, conf_level = conf_level,
         var_col = var_col, exp_col = exp_col)
       class(model) <- c("two_sample_prop_test_exploratory", class(model))
+      model$data <- df
       model
     }, error = function(e) {
       if (length(grouped_cols) > 0) { class(e) <- c("two_sample_prop_test_exploratory", class(e)); e }
@@ -3347,6 +3348,7 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
       `Odds Ratio`               = x$odds_ratio,
       `Odds Ratio Conf Low`      = x$or_low,
       `Odds Ratio Conf High`     = x$or_high,
+      `Std Error`                = x$se,
       `Z Value`                  = x$z,
       `P Value`                  = x$p_value,
       `Cohen's h`                = x$cohens_h,
@@ -3376,13 +3378,19 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
       generate_norm_density_data(x$difference, p.value = x$p_value, mu = 0, sigma = x$se,
                                  sig_level = x$sig.level, alternative = x$alternative)
     }
-  } else { # type == "data"
+  } else if (type == "data_summary") {
+    seA <- sqrt(x$pA * (1 - x$pA) / x$nA)
+    seB <- sqrt(x$pB * (1 - x$pB) / x$nB)
     tibble::tibble(
-      `Group`          = c(x$gA, x$gB),
-      `Proportion (%)`  = c(x$pA * 100, x$pB * 100),
-      `Conf Low (%)`   = c(x$ciA[1] * 100, x$ciB[1] * 100),
-      `Conf High (%)`  = c(x$ciA[2] * 100, x$ciB[2] * 100)
+      `Group`      = c(x$gA, x$gB),
+      `Rows`       = c(x$nA, x$nB),
+      `Proportion` = c(x$pA, x$pB),
+      `Conf Low`   = c(x$ciA[1], x$ciB[1]),
+      `Conf High`  = c(x$ciA[2], x$ciB[2]),
+      `Std Error`  = c(seA, seB)
     )
+  } else { # type == "data"
+    x$data
   }
 }
 
@@ -3500,6 +3508,9 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
       `Difference`           = diff,
       `Conf Low`             = x$htest$conf.int[1],
       `Conf High`            = x$htest$conf.int[2],
+      `Diff Conf Low`        = x$htest$conf.int[1] - x$p,
+      `Diff Conf High`       = x$htest$conf.int[2] - x$p,
+      `Std Error`            = x$se,
       `Z Value`              = x$z,
       `P Value`              = x$htest$p.value,
       `Cohen's h`            = x$cohens_h,
@@ -3531,6 +3542,14 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
                                  sig_level = x$sig.level, alternative = x$alternative) %>%
         dplyr::filter(x >= 0 & x <= 1)
     }
+  } else if (type == "data_summary") {
+    tibble::tibble(
+      `Rows`       = x$n,
+      `Proportion` = x$observed_prop,
+      `Conf Low`   = x$htest$conf.int[1],
+      `Conf High`  = x$htest$conf.int[2],
+      `Std Error`  = sqrt(x$observed_prop * (1 - x$observed_prop) / x$n)
+    )
   } else { # type == "data"
     # Return the original data so that the data-level charts (Error Bar Plot,
     # Data Distribution) can map to the target column. The chart templates
