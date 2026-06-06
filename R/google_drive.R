@@ -124,6 +124,65 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL, useGoo
   result
 }
 
+# Pure selector: given a data frame with columns id, name and (optionally) modifiedTime,
+# return the id of the most-recently-modified row whose name == fileName, or NULL when there
+# is no match. This is the decision core of the stale-fileId fallback (issue #36171) and is
+# kept free of any Google Drive I/O so it can be unit tested with plain data frames.
+selectMostRecentGoogleDriveFileId <- function(items, fileName) {
+  if (is.null(items) || is.null(fileName) || length(fileName) == 0 || fileName == "") {
+    return(NULL)
+  }
+  if (!("name" %in% colnames(items)) || !("id" %in% colnames(items)) || nrow(items) == 0) {
+    return(NULL)
+  }
+  # Exact (case-sensitive) match. Exact match is multibyte-safe and avoids the false positives
+  # a substring/regex match on the file name could produce.
+  matched <- items[items$name == fileName & !is.na(items$name), , drop = FALSE]
+  if (nrow(matched) == 0) {
+    return(NULL)
+  }
+  # When several files share the name, the most-recently-modified one wins - it matches the
+  # delete-then-reupload workflow that produced the duplicate. Rows with an unparseable or
+  # missing modifiedTime sort last so a real timestamp always beats NA.
+  if ("modifiedTime" %in% colnames(matched)) {
+    mtime <- suppressWarnings(lubridate::ymd_hms(as.character(matched$modifiedTime), quiet = TRUE))
+    ord <- order(mtime, decreasing = TRUE, na.last = TRUE)
+    matched <- matched[ord, , drop = FALSE]
+  }
+  as.character(matched$id[[1]])
+}
+
+# I/O wrapper around selectMostRecentGoogleDriveFileId: list the folder, normalize the
+# googledrive dribble (id and name are top-level columns; modifiedTime lives inside the
+# drive_resource list-column) and pick the most-recently-modified file matching fileName.
+# Returns the resolved file id, or NULL when the folder cannot be listed or nothing matches.
+resolveGoogleDriveFileIdByName <- function(fileName, folderId, type = "csv",
+                                           teamDriveId = NULL, sharedWithMe = FALSE) {
+  if (is.null(fileName) || is.null(folderId) || length(fileName) == 0 ||
+      length(folderId) == 0 || fileName == "" || folderId == "") {
+    return(NULL)
+  }
+  listType <- if (any(type %in% c("xls", "xlsx"))) c("xls", "xlsx") else c("csv", "tsv", "txt")
+  items <- tryCatch({
+    exploratory::listItemsInGoogleDrive(path = folderId, type = listType,
+                                        teamDriveId = teamDriveId, sharedWithMe = sharedWithMe)
+  }, error = function(e) {
+    NULL
+  })
+  if (is.null(items) || nrow(items) == 0) {
+    return(NULL)
+  }
+  # The dribble exposes id and name as top-level columns but keeps modifiedTime nested in the
+  # drive_resource list-column, so lift it out before handing the frame to the pure selector.
+  if (!("modifiedTime" %in% colnames(items)) && ("drive_resource" %in% colnames(items))) {
+    items$modifiedTime <- purrr::map_chr(items$drive_resource, function(resource) {
+      mt <- resource[["modifiedTime"]]
+      if (is.null(mt)) NA_character_ else as.character(mt)
+    })
+  }
+  selectMostRecentGoogleDriveFileId(items, fileName)
+}
+
 #'API that imports a CSV file from Google Drive.
 #'@export
 getCSVFileFromGoogleDrive <- function(fileId, delim, quote = '"',
@@ -133,8 +192,12 @@ getCSVFileFromGoogleDrive <- function(fileId, delim, quote = '"',
                              na = c("", "NA"), quoted_na = TRUE,
                              comment = "", trim_ws = FALSE,
                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                             progress = interactive()) {
-  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "csv")
+                             progress = interactive(),
+                             fileName = NULL, folderId = NULL,
+                             teamDriveId = NULL, sharedWithMe = FALSE) {
+  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "csv",
+                                              fileName = fileName, folderId = folderId,
+                                              teamDriveId = teamDriveId, sharedWithMe = sharedWithMe)
   exploratory::read_delim_file(filePath, delim = delim, quote = quote,
                                escape_backslash = escape_backslash, escape_double = escape_double,
                                col_names = col_names, col_types = col_types,
@@ -220,8 +283,10 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
 
 #'API that imports a Excel file from Google Drive.
 #'@export
-getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...) {
-  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "xlsx")
+getExcelFileFromGoogleDrive <- function(fileId, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, fileName = NULL, folderId = NULL, teamDriveId = NULL, sharedWithMe = FALSE, ...) {
+  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "xlsx",
+                                              fileName = fileName, folderId = folderId,
+                                              teamDriveId = teamDriveId, sharedWithMe = sharedWithMe)
   exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types,
                                na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl,
                                detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols,
@@ -298,7 +363,9 @@ guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold =
 #' API to download remote data file (excel, csv) from Google Drive and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
-downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
+downloadDataFileFromGoogleDrive <- function(fileId, type = "csv", fileName = NULL,
+                                            folderId = NULL, teamDriveId = NULL,
+                                            sharedWithMe = FALSE, fallbackAttempted = FALSE){
   # Remember the current config
   currentConfig <- getOption("httr_config")
   # To workaround Error in the HTTP2 framing layer
@@ -348,7 +415,21 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
   }, error = function(e) {
     if (any(stringr::str_detect(e$message, "File not found"))) {
       # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
-      # This means the folder with the folderId does not exist.
+      # This means the file with the fileId does not exist. A file deleted and re-uploaded to
+      # Google Drive under the same name gets a NEW id, so the stored id goes stale. Re-resolve
+      # the file by its name within the folder and retry the download once. (Issue #36171)
+      if (!isTRUE(fallbackAttempted) && !is.null(fileName) && !is.null(folderId) &&
+          length(fileName) > 0 && length(folderId) > 0 && fileName != "" && folderId != "") {
+        newFileId <- resolveGoogleDriveFileIdByName(fileName = fileName, folderId = folderId,
+                                                    type = type, teamDriveId = teamDriveId,
+                                                    sharedWithMe = sharedWithMe)
+        if (!is.null(newFileId) && newFileId != fileId) {
+          return(downloadDataFileFromGoogleDrive(fileId = newFileId, type = type,
+                                                 fileName = fileName, folderId = folderId,
+                                                 teamDriveId = teamDriveId, sharedWithMe = sharedWithMe,
+                                                 fallbackAttempted = TRUE))
+        }
+      }
       stop(paste0('EXP-DATASRC-9 :: [] :: The specified Google Drive file does not exist.'))
     }
     else {
