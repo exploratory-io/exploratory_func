@@ -3597,7 +3597,7 @@ exp_one_sample_t_test <- function(df, var, mu = 0, alternative = "two.sided",
 }
 
 #' @export
-tidy.one_sample_t_test_exploratory <- function(x, type = "model") {
+tidy.one_sample_t_test_exploratory <- function(x, type = "model", conf_level = 0.95) {
   if ("error" %in% class(x)) return(tibble::tibble(Note = x$message))
   if (type == "model") {
     diff <- x$observed_mean - x$mu
@@ -3623,6 +3623,24 @@ tidy.one_sample_t_test_exploratory <- function(x, type = "model") {
       `Power`             = x$power,
       `Test Direction`    = direction,
       `Result`            = result_label
+    )
+  } else if (type == "data_summary") {
+    conf_threshold <- 1 - (1 - conf_level) / 2
+    vec <- x$data[[x$var_col]]
+    vec <- vec[!is.na(vec)]
+    n <- length(vec)
+    mean_val <- mean(vec)
+    sd_val <- sd(vec)
+    se_val <- sd_val / sqrt(n)
+    tibble::tibble(
+      `Rows`              = n,
+      `Mean`              = mean_val,
+      `Conf Low`          = mean_val - se_val * qt(p = conf_threshold, df = n - 1),
+      `Conf High`         = mean_val + se_val * qt(p = conf_threshold, df = n - 1),
+      `Std Error of Mean` = se_val,
+      `Std Deviation`     = sd_val,
+      `Minimum`           = min(vec),
+      `Maximum`           = max(vec)
     )
   } else if (type == "prob_dist") {
     generate_ttest_density_data(t = unname(x$htest$statistic), p.value = x$htest$p.value,

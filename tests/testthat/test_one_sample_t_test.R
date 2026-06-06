@@ -412,6 +412,58 @@ test_that("tidy prob_dist_mean no-ops (0-row tibble) when stderr is degenerate",
   expect_equal(nrow(pd), 0)
 })
 
+# --- tidy(type = "data_summary") ---
+
+test_that("tidy data_summary type returns summary statistics with confidence intervals", {
+  set.seed(42)
+  vec <- rnorm(50, mean = 5, sd = 2)
+  df <- data.frame(x = vec)
+  model <- exp_one_sample_t_test(df, x, mu = 4.5)$model[[1]]
+  result <- tidy(model, type = "data_summary", conf_level = 0.95)
+
+  expected_cols <- c("Rows", "Mean", "Conf Low", "Conf High",
+                     "Std Error of Mean", "Std Deviation", "Minimum", "Maximum")
+  expect_true(all(expected_cols %in% names(result)))
+  expect_equal(nrow(result), 1)
+
+  n <- length(vec)
+  conf_threshold <- 1 - (1 - 0.95) / 2
+  expected_se <- sd(vec) / sqrt(n)
+  expect_equal(result$Rows, n)
+  expect_equal(result$Mean, mean(vec))
+  expect_equal(result$`Std Deviation`, sd(vec))
+  expect_equal(result$`Std Error of Mean`, expected_se)
+  expect_equal(result$`Conf Low`,  mean(vec) - expected_se * qt(p = conf_threshold, df = n - 1))
+  expect_equal(result$`Conf High`, mean(vec) + expected_se * qt(p = conf_threshold, df = n - 1))
+  expect_equal(result$Minimum, min(vec))
+  expect_equal(result$Maximum, max(vec))
+})
+
+test_that("tidy data_summary conf_level parameter changes confidence intervals", {
+  set.seed(42)
+  vec <- rnorm(50, mean = 5, sd = 2)
+  df <- data.frame(x = vec)
+  model <- exp_one_sample_t_test(df, x, mu = 4.5)$model[[1]]
+
+  result_95 <- tidy(model, type = "data_summary", conf_level = 0.95)
+  result_90 <- tidy(model, type = "data_summary", conf_level = 0.90)
+
+  expect_true(result_95$`Conf Low`  < result_90$`Conf Low`)
+  expect_true(result_95$`Conf High` > result_90$`Conf High`)
+})
+
+test_that("tidy_rowwise with type=data_summary works for one sample t-test", {
+  set.seed(42)
+  vec <- rnorm(50, mean = 5, sd = 2)
+  df <- data.frame(x = vec)
+  result <- exp_one_sample_t_test(df, x, mu = 4.5) %>%
+    tidy_rowwise(model, type = "data_summary", conf_level = 0.95)
+
+  expect_true("Rows" %in% names(result))
+  expect_true("Mean" %in% names(result))
+  expect_equal(result$Rows, 50)
+})
+
 # --- tidy(type = "data") ---
 
 test_that("tidy data type returns the raw data with the target column", {
