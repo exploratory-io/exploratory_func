@@ -1,8 +1,10 @@
 context("test ARIMA functions")
 test_that("exp_arima with aggregation", {
   Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2014-01-01 00:00:00", tz="UTC"), by="1 hour", length.out=1400),
+    count = round(abs(rnorm(1400, mean=1000, sd=200)))
+  )
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
   model_df <- raw_data %>%
@@ -45,8 +47,10 @@ test_that("exp_arima with aggregation", {
 
 test_that("exp_arima with minutes", {
   Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2014-01-01 00:00:00", tz="UTC"), by="1 hour", length.out=1400),
+    count = round(abs(rnorm(1400, mean=1000, sd=200)))
+  )
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
   ret <- raw_data %>% tail(100) %>%
@@ -292,8 +296,10 @@ test_that("exp_arima test mode with extra regressor", {
 })
 
 test_that("exp_arima wrong grouping case", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2014-01-01 00:00:00", tz="UTC"), by="1 hour", length.out=1400),
+    count = round(abs(rnorm(1400, mean=1000, sd=200)))
+  )
   expect_error({
     ret <- raw_data %>%
       dplyr::group_by(timestamp) %>%
@@ -308,8 +314,10 @@ test_that("exp_arima wrong grouping case", {
 })
 
 test_that("exp_arima grouped case", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2014-01-01 00:00:00", tz="UTC"), by="1 hour", length.out=1400),
+    count = round(abs(rnorm(1400, mean=1000, sd=200)))
+  )
   raw_data1 <- raw_data
   raw_data2 <- raw_data
   raw_data1 <- raw_data1 %>% mutate(group='A')
@@ -326,8 +334,10 @@ test_that("exp_arima grouped case", {
 })
 
 test_that("exp_arima without value_col", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2014-01-01 00:00:00", tz="UTC"), by="1 hour", length.out=1400),
+    count = round(abs(rnorm(1400, mean=1000, sd=200)))
+  )
   ret <- raw_data %>%
     exp_arima(timestamp, , 10)
   # verify that the last forecasted_value is not NA to test #9211
@@ -335,8 +345,10 @@ test_that("exp_arima without value_col", {
 })
 
 test_that("exp_arima with all-NA value col", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2014-01-01 00:00:00", tz="UTC"), by="1 hour", length.out=1400),
+    count = round(abs(rnorm(1400, mean=1000, sd=200)))
+  )
   data <- raw_data %>% mutate(count=NA) # Make the count column all-NA.
   ret <- data %>%
     exp_arima(timestamp, count, 10)
