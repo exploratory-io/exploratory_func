@@ -53,8 +53,10 @@ test_that("exp_arima with minutes", {
   )
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
+  # na_fill_type is required when hourly data is aggregated to minute granularity;
+  # otherwise fable sees implicit time gaps and returns a null model.
   ret <- raw_data %>% tail(100) %>%
-    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE)
+    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE, na_fill_type = "previous")
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
