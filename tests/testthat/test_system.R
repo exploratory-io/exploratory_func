@@ -15,7 +15,7 @@ test_that("test clean_data_frame",{
   result2 <- clean_data_frame(df2)
   expect_equal(colnames(result2), c("country  year"))
 
-  # Stripping newlines from names can create duplicates; repair_names should dedupe.
+  # Stripping newlines from names can create duplicates; clean_data_frame should dedupe.
   df4 <- data.frame(
     `ABCDE` = 1:3,
     x = 4:6,
@@ -25,6 +25,16 @@ test_that("test clean_data_frame",{
   result4 <- clean_data_frame(df4)
   expect_equal(ncol(result4), 2)
   expect_equal(colnames(result4), c("ABCDE", "ABCDE_1"))
+
+  df5 <- data.frame(
+    `和歌山下津` = 1:3,
+    x = 4:6,
+    check.names = FALSE
+  )
+  colnames(df5)[2] <- paste0("和歌山", "\r\n", "下津")
+  result5 <- clean_data_frame(df5)
+  expect_equal(ncol(result5), 2)
+  expect_equal(colnames(result5), c("和歌山下津", "和歌山下津_1"))
 
   # Make sure clean_data_frame drops row names.
   # Use mtcars for the test because it has row names.

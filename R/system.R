@@ -2917,14 +2917,6 @@ getObjectFromRdata <- function(rdata_path, object_name){
 }
 
 
-#' This function can clean the given data frame. It actually does
-#' 1) split a column with a data.frame vector into seprate columns
-#' 2) repair column names such as columns with NA for column names,
-#' or duplicate column names.
-#'
-#' @param x data frame
-#' @return cleaned data frame
-#' @export
 uniqueify_names <- function(nms) {
   out <- nms
   for (i in seq_along(nms)) {
@@ -2941,14 +2933,22 @@ uniqueify_names <- function(nms) {
   out
 }
 
+#' This function can clean the given data frame. It actually does
+#' 1) split a column with a data.frame vector into seprate columns
+#' 2) repair column names such as columns with NA for column names,
+#' or duplicate column names.
+#'
+#' @param x data frame
+#' @return cleaned data frame
+#' @export
 clean_data_frame <- function(x) {
   df <- tibble::repair_names(jsonlite::flatten(x))
   original_names <- names(df)
   # Remove tab, new line, carriage return, and backslash from column names
   clean_names <- original_names  %>% gsub("[\r\n\t\\]", "", .)
-  # Stripping those characters can create duplicate names (e.g. "ABC" and
-  # "AB\r\nC" both become "ABC"). make.unique() does not handle
-  # all Unicode names, so dedupe explicitly.
+  # Stripping those characters can create duplicate names (e.g. "和歌山下津" and
+  # "和歌山\r\n下津" both become "和歌山下津"). uniqueify_names() appends _1, _2,
+  # ... suffixes; make.unique() uses different separators and runs earlier in import.
   names(df) <- uniqueify_names(clean_names)
   # Remove row names.
   row.names(df) <- NULL
