@@ -1,8 +1,10 @@
 context("test prophet functions")
 test_that("do_prophet with aggregation", {
   Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 10, time_unit = "day")
@@ -359,8 +361,10 @@ test_that("do_prophet test mode with extra regressor", {
 
 
 test_that("do_prophet grouped case", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   expect_error({
     ret <- raw_data %>%
       dplyr::group_by(timestamp) %>%
@@ -375,8 +379,10 @@ test_that("do_prophet grouped case", {
 })
 
 test_that("do_prophet without value_col", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   ret <- raw_data %>%
     do_prophet(timestamp, NULL, 10)
   expect_true(is.data.frame(ret))

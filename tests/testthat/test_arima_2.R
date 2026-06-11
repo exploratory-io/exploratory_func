@@ -1,10 +1,12 @@
 context("test exp_arima")
 test_that("exp_arima with aggregation", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
 
   # Create time gap intentionally.
-  raw_data <- raw_data %>% filter(as.Date(timestamp) != as.Date("1980-09-26"))
+  raw_data <- raw_data %>% filter(as.Date(timestamp) != as.Date("2010-01-15"))
 
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
   raw_data$pre_col1 <- runif(nrow(raw_data))
