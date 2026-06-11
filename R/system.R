@@ -2917,6 +2917,22 @@ getObjectFromRdata <- function(rdata_path, object_name){
 }
 
 
+uniqueify_names <- function(nms) {
+  out <- nms
+  for (i in seq_along(nms)) {
+    if (any(out[seq_len(i - 1L)] == nms[i])) {
+      suffix <- 1L
+      candidate <- paste0(nms[i], "_", suffix)
+      while (any(out == candidate, na.rm = TRUE)) {
+        suffix <- suffix + 1L
+        candidate <- paste0(nms[i], "_", suffix)
+      }
+      out[i] <- candidate
+    }
+  }
+  out
+}
+
 #' This function can clean the given data frame. It actually does
 #' 1) split a column with a data.frame vector into seprate columns
 #' 2) repair column names such as columns with NA for column names,
@@ -2930,7 +2946,10 @@ clean_data_frame <- function(x) {
   original_names <- names(df)
   # Remove tab, new line, carriage return, and backslash from column names
   clean_names <- original_names  %>% gsub("[\r\n\t\\]", "", .)
-  names(df) <- clean_names
+  # Stripping those characters can create duplicate names (e.g. "和歌山下津" and
+  # "和歌山\r\n下津" both become "和歌山下津"). uniqueify_names() appends _1, _2,
+  # ... suffixes; make.unique() uses different separators and runs earlier in import.
+  names(df) <- uniqueify_names(clean_names)
   # Remove row names.
   row.names(df) <- NULL
   df

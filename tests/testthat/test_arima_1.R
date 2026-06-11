@@ -1,8 +1,10 @@
 context("test ARIMA functions")
 test_that("exp_arima with aggregation", {
   Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
   model_df <- raw_data %>%
@@ -45,12 +47,16 @@ test_that("exp_arima with aggregation", {
 
 test_that("exp_arima with minutes", {
   Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
+  # na_fill_type is required when hourly data is aggregated to minute granularity;
+  # otherwise fable sees implicit time gaps and returns a null model.
   ret <- raw_data %>% tail(100) %>%
-    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE)
+    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE, na_fill_type = "previous")
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
@@ -292,8 +298,10 @@ test_that("exp_arima test mode with extra regressor", {
 })
 
 test_that("exp_arima wrong grouping case", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   expect_error({
     ret <- raw_data %>%
       dplyr::group_by(timestamp) %>%
@@ -308,8 +316,10 @@ test_that("exp_arima wrong grouping case", {
 })
 
 test_that("exp_arima grouped case", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   raw_data1 <- raw_data
   raw_data2 <- raw_data
   raw_data1 <- raw_data1 %>% mutate(group='A')
@@ -326,8 +336,10 @@ test_that("exp_arima grouped case", {
 })
 
 test_that("exp_arima without value_col", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   ret <- raw_data %>%
     exp_arima(timestamp, , 10)
   # verify that the last forecasted_value is not NA to test #9211
@@ -335,8 +347,10 @@ test_that("exp_arima without value_col", {
 })
 
 test_that("exp_arima with all-NA value col", {
-  data("raw_data", package = "AnomalyDetection")
-  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- data.frame(
+    timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
+    count = as.integer(runif(1440, min = 100, max = 3000))
+  )
   data <- raw_data %>% mutate(count=NA) # Make the count column all-NA.
   ret <- data %>%
     exp_arima(timestamp, count, 10)
