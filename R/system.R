@@ -2925,12 +2925,31 @@ getObjectFromRdata <- function(rdata_path, object_name){
 #' @param x data frame
 #' @return cleaned data frame
 #' @export
+uniqueify_names <- function(nms) {
+  out <- nms
+  for (i in seq_along(nms)) {
+    if (any(out[seq_len(i - 1L)] == nms[i])) {
+      suffix <- 1L
+      candidate <- paste0(nms[i], "_", suffix)
+      while (any(out == candidate, na.rm = TRUE)) {
+        suffix <- suffix + 1L
+        candidate <- paste0(nms[i], "_", suffix)
+      }
+      out[i] <- candidate
+    }
+  }
+  out
+}
+
 clean_data_frame <- function(x) {
   df <- tibble::repair_names(jsonlite::flatten(x))
   original_names <- names(df)
   # Remove tab, new line, carriage return, and backslash from column names
   clean_names <- original_names  %>% gsub("[\r\n\t\\]", "", .)
-  names(df) <- clean_names
+  # Stripping those characters can create duplicate names (e.g. "ABC" and
+  # "AB\r\nC" both become "ABC"). make.unique() does not handle
+  # all Unicode names, so dedupe explicitly.
+  names(df) <- uniqueify_names(clean_names)
   # Remove row names.
   row.names(df) <- NULL
   df
