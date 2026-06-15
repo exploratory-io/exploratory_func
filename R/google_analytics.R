@@ -20,17 +20,16 @@ getGoogleProfile <- function(tokenFileId = ""){
     }
   })
 
-  if (nrow(v4df) > 0) {
-    # Keep the legacy field names (webPropertyId / webPropertyName / accountName) in the
-    # response so Exploratory Desktop, which reads those keys from the tableId LOV (and from
-    # the cached ga_metadata connection attribute), does not need any change.
-    # any_of() guards the empty / changed-schema cases so the rename never errors.
-    v4df <- v4df %>% dplyr::rename(
-      accountName = dplyr::any_of("account_name"),
-      webPropertyId = dplyr::any_of("propertyId"),
-      webPropertyName = dplyr::any_of("property_name")
-    )
-  }
+  # Keep the legacy field names (webPropertyId / webPropertyName / accountName) in the
+  # response so Exploratory Desktop, which reads those keys from the tableId LOV (and from
+  # the cached ga_metadata connection attribute), does not need any change.
+  # any_of() no-ops missing columns, so this is safe for the empty init frame and for any
+  # GA4 schema change (no nrow guard needed).
+  v4df <- v4df %>% dplyr::rename(
+    accountName = dplyr::any_of("account_name"),
+    webPropertyId = dplyr::any_of("propertyId"),
+    webPropertyName = dplyr::any_of("property_name")
+  )
 
   v4df
 }
@@ -78,7 +77,7 @@ getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""
     res <- exploratory:::getGoogleAnalyticsV4Property(accountId)
     df <- data.frame(res)
     # Make sure to filter the result by webPropertyId. (NOTE: name column contains property id as properties/123345 style.)
-    if (!is.null(webPropertyId) && length(webPropertyId) > 0 && webPropertyId != "") {
+    if (!is.null(webPropertyId) && length(webPropertyId) > 0 && !is.na(webPropertyId) && webPropertyId != "") {
       df <- df %>% dplyr::filter(stringr::str_detect(name, webPropertyId))
     }
     # for V4, timezone is stored in timeZone
