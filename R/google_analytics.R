@@ -6,14 +6,6 @@ getGoogleProfile <- function(tokenFileId = ""){
 
   token <- getGoogleTokenForAnalytics(tokenFileId);
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
-  # Get V3 account list.
-  df <- googleAnalyticsR::ga_account_list()
-  if (nrow(df) > 0) { # if there are V3 accounts, only select below columns.
-    df <- df %>% dplyr::select(accountId, accountName, viewId, viewName, webPropertyId, webPropertyName)
-  } else {
-    # It means there are no v3 accounts, so create an empty data frame without columns and bind this to a v4 account data frame.
-    df <- tibble::tibble()
-  }
   # get V4 Account
   v4df <- data.frame()
   tryCatch({
@@ -27,12 +19,19 @@ getGoogleProfile <- function(tokenFileId = ""){
       stop(err)
     }
   })
-  if (nrow(v4df) > 0) {
-    v4df <- v4df %>% dplyr::rename(accountName = account_name, webPropertyId = propertyId, webPropertyName = property_name)
-    df <- df %>% dplyr::bind_rows(v4df)
-  }
 
-  df
+  # Keep the legacy field names (webPropertyId / webPropertyName / accountName) in the
+  # response so Exploratory Desktop, which reads those keys from the tableId LOV (and from
+  # the cached ga_metadata connection attribute), does not need any change.
+  # any_of() no-ops missing columns, so this is safe for the empty init frame and for any
+  # GA4 schema change (no nrow guard needed).
+  v4df <- v4df %>% dplyr::rename(
+    accountName = dplyr::any_of("account_name"),
+    webPropertyId = dplyr::any_of("propertyId"),
+    webPropertyName = dplyr::any_of("property_name")
+  )
+
+  v4df
 }
 #' Helper API to get properites from response.
 parse_webproperty_list <- function(x) {
@@ -78,7 +77,9 @@ getGoogleAnalyticsTimeZoneInfo <- function(accountId, webPropertyId, viewId = ""
     res <- exploratory:::getGoogleAnalyticsV4Property(accountId)
     df <- data.frame(res)
     # Make sure to filter the result by webPropertyId. (NOTE: name column contains property id as properties/123345 style.)
-    df <- df %>% dplyr::filter(stringr::str_detect(name, webPropertyId))
+    if (!is.null(webPropertyId) && length(webPropertyId) > 0 && !is.na(webPropertyId) && webPropertyId != "") {
+      df <- df %>% dplyr::filter(stringr::str_detect(name, webPropertyId))
+    }
     # for V4, timezone is stored in timeZone
     df$timeZone
   } else {
