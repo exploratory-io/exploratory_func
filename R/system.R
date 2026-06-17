@@ -1575,7 +1575,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         }, warning = function(w) {
         }, error = function(e) {
         })
-        conn <<- NULL  # <<- so the outer conn is reset; the handler is a separate function scope (tam#36429)
+        conn <<- NULL  # <<- so the outer conn is reset; the handler is a separate function scope 
         # fall through to getting new connection.
       })
     }
