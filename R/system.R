@@ -1436,7 +1436,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       conn
     }
     # Guard dbIsValid() in tryCatch: a dead external pointer throws instead of returning FALSE, so treat
-    # any error as invalid and reconnect rather than returning a closed connection. (tam#36429)
+    # any error as invalid and reconnect rather than returning a closed connection. 
     if (is.null(conn) || !isTRUE(tryCatch(DBI::dbIsValid(conn), error = function(e) FALSE))) {
       conn <- connect()
       if (user_env$pool_connection) { # pool connection if connection pooling is on.
