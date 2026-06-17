@@ -1257,7 +1257,12 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       driverstr = driver;
     }
     key <- paste(type, subType, dsn, hoststr, username, additionalParams, driverstr, timezone, connectionString, sep = ":")
-    conn <- connection_pool[[key]]
+    # Only reuse a pooled connection when pooling is on; otherwise queryODBC() may have already closed
+    # this connection, leaving a dead external pointer in the pool. (tam#36429)
+    conn <- NULL
+    if (user_env$pool_connection) {
+      conn <- connection_pool[[key]]
+    }
     if (!is.null(conn)){
       tryCatch({
         # test connection
@@ -1284,7 +1289,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         }, warning = function(w) {
         }, error = function(e) {
         })
-        conn <- NULL
+        conn <<- NULL  # <<- so the outer conn is reset; the handler is a separate function scope 
         # fall through to getting new connection.
       })
     }
@@ -1430,7 +1435,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
       conn
     }
-    if (is.null(conn)) {
+    # Guard dbIsValid() in tryCatch: a dead external pointer throws instead of returning FALSE, so treat
+    # any error as invalid and reconnect rather than returning a closed connection. 
+    if (is.null(conn) || !isTRUE(tryCatch(DBI::dbIsValid(conn), error = function(e) FALSE))) {
       conn <- connect()
       if (user_env$pool_connection) { # pool connection if connection pooling is on.
         connection_pool[[key]] <- conn
@@ -1543,7 +1550,12 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
     key <- paste("mssqlserver", host, port, databaseName, username, timezone, additionalParams, sep = ":")
-    conn <- connection_pool[[key]]
+    # Only reuse a pooled connection when pooling is on; otherwise queryODBC() may have already closed
+    # this connection, leaving a dead external pointer in the pool. (tam#36429)
+    conn <- NULL
+    if (user_env$pool_connection) {
+      conn <- connection_pool[[key]]
+    }
     if (!is.null(conn)){
       tryCatch({
         # test connection
@@ -1563,12 +1575,13 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         }, warning = function(w) {
         }, error = function(e) {
         })
-        conn <- NULL
+        conn <<- NULL  # <<- so the outer conn is reset; the handler is a separate function scope 
         # fall through to getting new connection.
       })
     }
     # if the connection is null or the connection is invalid, create a new one.
-    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+    # Guard dbIsValid() in tryCatch: a dead external pointer throws instead of returning FALSE. (tam#36429)
+    if (is.null(conn) || !isTRUE(tryCatch(DBI::dbIsValid(conn), error = function(e) FALSE))) {
       # For Windows, set encoding to make sure non-ascii data is handled properly.
       # ref: https://github.com/r-dbi/odbc/issues/153
       if (timezone == "") {
@@ -1603,7 +1616,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                bigint = "numeric"
         )
       }
-      connection_pool[[key]] <- conn
+      if (user_env$pool_connection) {
+        connection_pool[[key]] <- conn
+      }
     }
   } else if (type == "snowflake") {
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
@@ -1633,7 +1648,12 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
 
     key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, additionalParams, role, secretKeyFile, secretKeyFilePassword, sep = ":")
-    conn <- connection_pool[[key]]
+    # Only reuse a pooled connection when pooling is on; otherwise queryODBC() may have already closed
+    # this connection, leaving a dead external pointer in the pool. (tam#36429)
+    conn <- NULL
+    if (user_env$pool_connection) {
+      conn <- connection_pool[[key]]
+    }
     if (!is.null(conn)) {
       tryCatch({
         # test connection
@@ -1653,12 +1673,13 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         }, warning = function(w) {
         }, error = function(e) {
         })
-        conn <- NULL
+        conn <<- NULL  # <<- so the outer conn is reset; the handler is a separate function scope
         # fall through to getting new connection.
       })
     }
     # if the connection is null or the connection is invalid, create a new one.
-    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+    # Guard dbIsValid() in tryCatch: a dead external pointer throws instead of returning FALSE. (tam#36429)
+    if (is.null(conn) || !isTRUE(tryCatch(DBI::dbIsValid(conn), error = function(e) FALSE))) {
 
       loc <- Sys.getlocale(category = "LC_CTYPE")
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
@@ -1703,7 +1724,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                bigint = "numeric"
         )
       }
-      connection_pool[[key]] <- conn
+      if (user_env$pool_connection) {
+        connection_pool[[key]] <- conn
+      }
     }
   }  else if (type == "oracle") {
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
@@ -1725,7 +1748,14 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
 
     key <- paste("oracle", host, port,databaseName, username, timezone, additionalParams, sep = ":")
-    conn <- connection_pool[[key]]
+    # Only reuse a pooled connection when connection pooling is on (e.g. while the data source dialog
+    # is open). During an import/refresh job pooling is off, so each query gets a fresh connection and
+    # we never reuse a connection that queryODBC() already closed -- which used to leave a dead external
+    # pointer in the pool and make the 2nd query fail with "external pointer is not valid". 
+    conn <- NULL
+    if (user_env$pool_connection) {
+      conn <- connection_pool[[key]]
+    }
     if (!is.null(conn)) {
       tryCatch({
         # test connection
@@ -1745,12 +1775,14 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         }, warning = function(w) {
         }, error = function(e) {
         })
-        conn <- NULL
+        conn <<- NULL  # <<- so the outer conn is reset; the handler is a separate function scope 
         # fall through to getting new connection.
       })
     }
     # if the connection is null or the connection is invalid, create a new one.
-    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+    # Guard dbIsValid() in tryCatch: on a dead external pointer it throws instead of returning FALSE,
+    # so treat any error as invalid and reconnect. (tam#36429)
+    if (is.null(conn) || !isTRUE(tryCatch(DBI::dbIsValid(conn), error = function(e) FALSE))) {
 
       loc <- Sys.getlocale(category = "LC_CTYPE")
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
@@ -1781,7 +1813,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                bigint = "numeric"
         )
       }
-      connection_pool[[key]] <- conn
+      if (user_env$pool_connection) {
+        connection_pool[[key]] <- conn
+      }
     }
   }
   conn
