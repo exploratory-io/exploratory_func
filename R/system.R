@@ -1751,7 +1751,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # Only reuse a pooled connection when connection pooling is on (e.g. while the data source dialog
     # is open). During an import/refresh job pooling is off, so each query gets a fresh connection and
     # we never reuse a connection that queryODBC() already closed -- which used to leave a dead external
-    # pointer in the pool and make the 2nd query fail with "external pointer is not valid". (tam#36429)
+    # pointer in the pool and make the 2nd query fail with "external pointer is not valid". 
     conn <- NULL
     if (user_env$pool_connection) {
       conn <- connection_pool[[key]]
