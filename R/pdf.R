@@ -24,12 +24,21 @@ resolve_docling_python <- function() {
     if (is.null(resolved) || resolved == "") {
       return(FALSE)
     }
+    # Use importlib.util.find_spec, NOT `import docling`: find_spec only LOCATES the
+    # module, it does not execute it, so it returns in ~100ms whether docling is present
+    # or missing. A real `import docling` loads torch (tens of seconds) -- doing that
+    # here (per candidate) and again for the extraction is a double heavy load that can
+    # exceed the 120s tool timeout and trigger a retry. find_spec detects missing docling
+    # fast so the flow fails quickly (and can prompt install) instead of timing out.
+    # shQuote the -c code: system2 pastes args into a shell command line WITHOUT quoting,
+    # so an unquoted (space-containing) code string is word-split by the shell (#36434).
+    check_code <- "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('docling') is not None else 1)"
+    # timeout so a hanging python invocation (e.g. the Windows `python` Microsoft Store
+    # stub, which can block waiting on a prompt) can't stall the whole tool for 120s --
+    # bound the per-candidate check so missing docling is reported quickly (#36434).
     status <- tryCatch(
-      # shQuote the -c code: system2 pastes args into a shell command line WITHOUT
-      # quoting, so an unquoted "import docling" is word-split by the shell and python
-      # runs `-c import` -> SyntaxError -> docling always reported missing (#36434).
-      suppressWarnings(system2(resolved, c("-c", shQuote("import docling")),
-                               stdout = FALSE, stderr = FALSE)),
+      suppressWarnings(system2(resolved, c("-c", shQuote(check_code)),
+                               stdout = FALSE, stderr = FALSE, timeout = 20)),
       error = function(e) 1L
     )
     isTRUE(status == 0)
