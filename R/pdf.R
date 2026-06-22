@@ -25,7 +25,10 @@ resolve_docling_python <- function() {
       return(FALSE)
     }
     status <- tryCatch(
-      suppressWarnings(system2(resolved, c("-c", "import docling"),
+      # shQuote the -c code: system2 pastes args into a shell command line WITHOUT
+      # quoting, so an unquoted "import docling" is word-split by the shell and python
+      # runs `-c import` -> SyntaxError -> docling always reported missing (#36434).
+      suppressWarnings(system2(resolved, c("-c", shQuote("import docling")),
                                stdout = FALSE, stderr = FALSE)),
       error = function(e) 1L
     )
@@ -99,8 +102,11 @@ read_pdf_table <- function(pdf_path, table_index = NULL, out_dir = NULL,
 
   # Drain stdout/stderr (do NOT discard at fd level -- that can break torch init) but
   # keep them only for an error message; the authoritative result is metadata.json.
+  # shQuote every arg: system2 pastes them into a shell command line without quoting,
+  # so a script/PDF/out-dir path containing a space (or the bare args themselves) would
+  # be word-split by the shell (#36434).
   output <- tryCatch(
-    suppressWarnings(system2(python, args, stdout = TRUE, stderr = TRUE,
+    suppressWarnings(system2(python, shQuote(args), stdout = TRUE, stderr = TRUE,
                              timeout = timeout)),
     error = function(e) {
       stop(paste0("PDF table extraction failed to run: ", conditionMessage(e)))
