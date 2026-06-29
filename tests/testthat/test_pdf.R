@@ -48,6 +48,19 @@ stub_docling_resolver <- function() {
   }
 }
 
+test_that("resolve_docling_python quotes the Python -c probe as one argument", {
+  source_candidates <- c(file.path("R", "pdf.R"),
+                         file.path("..", "..", "R", "pdf.R"))
+  source_path <- source_candidates[file.exists(source_candidates)][1]
+  if (is.na(source_path)) {
+    skip("R/pdf.R source file is not available")
+  }
+
+  src <- readLines(source_path, warn = FALSE)
+  expect_true(any(grepl("system2\\(resolved, c\\(\"-c\", shQuote\\(check_code\\)\\)",
+                        src)))
+})
+
 test_that("read_pdf_table validates a negative / non-integer table_index before running", {
   pdf <- tempfile(fileext = ".pdf")
   writeLines("dummy", pdf)
