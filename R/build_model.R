@@ -1,8 +1,15 @@
 #' @rdname build_model_
 #' @export
 build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
-  .dots <- lazyeval::dots_capture(...)
-  
+  # R 4.6 changed promise-forcing semantics, causing lazyeval::dots_capture(...) to
+  # fail with "Promise has already been forced" when called with expressions like
+  # weight=log(w). Use rlang::enquos() instead, then wrap as lazyeval-compatible
+  # "lazy" objects (same structure that lazyeval::lazy_eval.lazy expects).
+  qs <- rlang::enquos(...)
+  .dots <- lapply(qs, function(q) {
+    structure(list(expr = rlang::quo_get_expr(q), env = rlang::quo_get_env(q)), class = "lazy")
+  })
+
   # Extract valid_data from .dots before passing to build_model_
   # valid_data is a data frame and can't be converted to a lazy object by lazyeval
   # This causes "is.call(expr) || is.name(expr) || is.atomic(expr) is not TRUE" errors
