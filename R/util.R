@@ -2844,18 +2844,30 @@ sum_if_pct <- function(x, ..., na.rm = TRUE) {
 }
 
 #' export
-count_if <- function(x, ..., na.rm = TRUE) {
-  aggregate_if(x, "count", ..., na.rm = na.rm)
+count_if <- function(cond, ..., na.rm = TRUE) {
+  if (...length() == 0) {
+    sum(cond, na.rm = na.rm)
+  } else {
+    aggregate_if(cond, "count", ..., na.rm = na.rm)
+  }
 }
 
 #' export
-count_if_ratio <- function(x, ..., na.rm = TRUE) {
-  aggregate_if(x, "count_ratio", ..., na.rm = na.rm)
+count_if_ratio <- function(cond, ..., na.rm = TRUE) {
+  if (...length() == 0) {
+    mean(cond, na.rm = na.rm)
+  } else {
+    aggregate_if(cond, "count_ratio", ..., na.rm = na.rm)
+  }
 }
 
 #' export
-count_if_pct <- function(x, ..., na.rm = TRUE) {
-  aggregate_if(x, "count_pct", ..., na.rm = na.rm)
+count_if_pct <- function(cond, ..., na.rm = TRUE) {
+  if (...length() == 0) {
+    mean(cond, na.rm = na.rm) * 100
+  } else {
+    aggregate_if(cond, "count_pct", ..., na.rm = na.rm)
+  }
 }
 
 #' export
