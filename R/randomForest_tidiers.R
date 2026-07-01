@@ -1412,6 +1412,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       }
 
       # Extract test prediction result embedded in the model.
+      # Threshold for labels is applied via get_test_predicted_labels(), not via prediction(),
+      # because augment args passed through expand_args are evaluated in a context that does not
+      # include rf_evaluation_training_and_test's formal arguments.
       test_pred_ret <- df %>% prediction(data = "test", ...)
 
       tryCatch({ #TODO: Not too sure why this tryCatch is needed. It could hide errors that should be properly reported.
@@ -1467,12 +1470,14 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             } else {
               predicted <- NULL # Just declaring variable.
               if (model_object$classification_type == "binary") { # Make it model agnostic.
+                predicted <- get_test_predicted_labels(model_object, binary_classification_threshold)
+                if (is.null(predicted)) {
+                  predicted <- test_pred_ret$predicted_label
+                }
                 if ("xgboost_exp" %in% class(model_object)) {
-                  predicted <- extract_predicted_binary_labels(model_object, type = "test", threshold = binary_classification_threshold) # If threshold is specified in ..., take it.
                   predicted_probability <- extract_predicted(model_object, type = "test")
                 }
                 else {
-                  predicted <- test_pred_ret$predicted_label
                   predicted_probability <- test_pred_ret$predicted_probability
                 }
                 is_rpart <- "rpart" %in% class(model_object)
@@ -1505,16 +1510,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             dplyr::bind_rows(lapply(levels(actual), per_level))
           },
           conf_mat = {
-            model_object <- df$model[[1]]
-            if ("xgboost_exp" %in% class(model_object)) {
-              if (get_prediction_type(model_object) == "binary") {
-                predicted <- extract_predicted_binary_labels(model_object, type = "test", threshold = binary_classification_threshold)
-              }
-              else {
-                predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
-              }
-            }
-            else {
+            predicted <- get_test_predicted_labels(model_object, binary_classification_threshold)
+            if (is.null(predicted)) {
               predicted <- test_pred_ret$predicted_label
             }
             ret <- calc_conf_mat(actual, predicted)
@@ -3707,6 +3704,49 @@ get_class_levels_rpart <- function(x) {
     ylevels <- attr(x,"ylevels")
   }
   ylevels
+}
+
+# Returns threshold-aware predicted labels for test data embedded in the model.
+# Returns NULL for model types / classification types handled via test_pred_ret fallback.
+get_test_predicted_labels <- function(model_object, binary_classification_threshold = 0.5) {
+  if ("xgboost_exp" %in% class(model_object)) {
+    if (get_prediction_type(model_object) == "binary") {
+      return(extract_predicted_binary_labels(
+        model_object, type = "test", threshold = binary_classification_threshold
+      ))
+    }
+    return(extract_predicted_multiclass_labels(model_object, type = "test"))
+  }
+  if (("lightgbm_exp" %in% class(model_object) || "catboost_exp" %in% class(model_object)) &&
+      model_object$classification_type == "binary") {
+    predicted_nona <- extract_predicted_binary_labels(
+      model_object, type = "test", threshold = binary_classification_threshold
+    )
+    predicted_nona <- restore_na(predicted_nona, attr(model_object$prediction_test, "unknown_category_rows_index"))
+    return(restore_na(predicted_nona, attr(model_object$prediction_test, "na.action")))
+  }
+  if ("ranger" %in% class(model_object) &&
+      !is.null(model_object$classification_type) &&
+      model_object$classification_type == "binary") {
+    predicted_nona <- predict_value_from_prob(
+      NULL,
+      model_object$prediction_test$predictions,
+      NULL,
+      threshold = binary_classification_threshold
+    )
+    predicted_nona <- restore_na(predicted_nona, attr(model_object$prediction_test, "unknown_category_rows_index"))
+    return(restore_na(predicted_nona, attr(model_object$prediction_test, "na.action")))
+  }
+  if ("rpart" %in% class(model_object) && model_object$classification_type == "binary") {
+    predicted_nona <- get_predicted_class_rpart(
+      model_object,
+      data_type = "test",
+      binary_classification_threshold = binary_classification_threshold
+    )
+    predicted_nona <- restore_na(predicted_nona, model_object$unknown_category_rows_index_test)
+    return(restore_na(predicted_nona, model_object$na_row_numbers_test))
+  }
+  NULL
 }
 
 get_predicted_class_rpart <- function(x, data_type = "training", binary_classification_threshold = 0.5) {
