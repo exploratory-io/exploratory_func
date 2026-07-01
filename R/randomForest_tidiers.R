@@ -3781,7 +3781,7 @@ get_predicted_probability_rpart <- function(x, data_type = "training") {
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
+tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
     ret <- data.frame()
     return(ret)
@@ -3810,7 +3810,12 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         glance(x, pretty.name = pretty.name, ...)
       } else {
         actual <- get_actual_class_rpart(x)
-        predicted <- x$predicted_class
+        predicted <- if (x$classification_type == "binary") {
+          get_predicted_class_rpart(x, data_type = "training",
+                                    binary_classification_threshold = binary_classification_threshold)
+        } else {
+          x$predicted_class
+        }
         # unlike ranger, x$y of rpart in this case is integer. convert it to factor to make use of common functions.
         if (x$classification_type == "binary") {
           if (class(x$y) == "logical") {
@@ -3838,7 +3843,12 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       # get evaluation scores from training data
 
       actual <- get_actual_class_rpart(x)
-      predicted <- x$predicted_class
+      predicted <- if (x$classification_type == "binary") {
+        get_predicted_class_rpart(x, data_type = "training",
+                                  binary_classification_threshold = binary_classification_threshold)
+      } else {
+        x$predicted_class
+      }
       ylevels <- get_class_levels_rpart(x)
 
       per_level <- function(level) {
@@ -3855,7 +3865,12 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
     conf_mat = {
       # return confusion matrix
       actual <- get_actual_class_rpart(x)
-      predicted <- x$predicted_class
+      predicted <- if (x$classification_type == "binary") {
+        get_predicted_class_rpart(x, data_type = "training",
+                                  binary_classification_threshold = binary_classification_threshold)
+      } else {
+        x$predicted_class
+      }
 
       # for rpart, factor levels for logical case is kept in FALSE, TRUE order not to mess up rpart.plot.
       # so need to revert it now, right before visualization.

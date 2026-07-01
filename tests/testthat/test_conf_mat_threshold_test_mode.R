@@ -25,19 +25,39 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path)
 }
 
-expect_test_conf_mat_changes_with_threshold <- function(model_df, eval_fn,
-                                                        threshold_high = 0.5,
-                                                        threshold_low = 0.1) {
+expect_conf_mat_changes_with_threshold <- function(model_df, eval_fn,
+                                                    data_type = c("test", "training"),
+                                                    threshold_high = 0.5,
+                                                    threshold_low = 0.1) {
+  data_type <- match.arg(data_type)
   cm_high <- eval_fn(model_df, threshold_high)
   cm_low <- eval_fn(model_df, threshold_low)
 
-  test_high <- cm_high %>% dplyr::filter(is_test_data == TRUE)
-  test_low <- cm_low %>% dplyr::filter(is_test_data == TRUE)
+  if (data_type == "test") {
+    subset_high <- cm_high %>% dplyr::filter(is_test_data == TRUE)
+    subset_low <- cm_low %>% dplyr::filter(is_test_data == TRUE)
+    info_msg <- "Test confusion matrix should change when threshold changes"
+  } else {
+    subset_high <- cm_high %>% dplyr::filter(is_test_data == FALSE)
+    subset_low <- cm_low %>% dplyr::filter(is_test_data == FALSE)
+    info_msg <- "Training confusion matrix should change when threshold changes"
+  }
 
-  expect_gt(nrow(test_high), 0)
-  expect_gt(nrow(test_low), 0)
-  expect_false(identical(test_high, test_low),
-               info = "Test confusion matrix should change when threshold changes")
+  expect_gt(nrow(subset_high), 0)
+  expect_gt(nrow(subset_low), 0)
+  expect_false(identical(subset_high, subset_low), info = info_msg)
+}
+
+# Backward-compatible alias for existing test-data checks.
+expect_test_conf_mat_changes_with_threshold <- function(model_df, eval_fn,
+                                                        threshold_high = 0.5,
+                                                        threshold_low = 0.1) {
+  expect_conf_mat_changes_with_threshold(
+    model_df, eval_fn,
+    data_type = "test",
+    threshold_high = threshold_high,
+    threshold_low = threshold_low
+  )
 }
 
 rf_conf_mat_eval <- function(model_df, threshold) {
@@ -180,4 +200,70 @@ test_that("rf test conf_mat matches threshold-aware labels at same threshold", {
   manual <- manual %>% dplyr::arrange(actual_value, predicted_value)
 
   expect_equal(test_cm, manual)
+})
+
+test_that("conf_mat training data respects threshold - Decision Tree (rpart)", {
+  set.seed(1)
+  df <- data.frame(
+    y = sample(c(TRUE, FALSE), 500, replace = TRUE, prob = c(0.55, 0.45)),
+    x1 = rnorm(500),
+    x2 = rnorm(500),
+    x3 = rnorm(500)
+  )
+  model_df <- df %>% exp_rpart(y, x1, x2, x3, test_rate = 0.3, binary_classification_threshold = 0.5)
+  expect_conf_mat_changes_with_threshold(model_df, rf_conf_mat_eval, data_type = "training")
+})
+
+test_that("conf_mat training data respects threshold - LightGBM", {
+  skip_if_not_installed("lightgbm")
+  set.seed(1)
+  data <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`))
+  model_df <- data %>% exp_lightgbm(
+    is_delayed, `DIS TANCE`, `DEP TIME`,
+    predictor_funs = list(`DIS TANCE` = "none", `DEP TIME` = "none"),
+    test_rate = 0.3,
+    max_pd_vars = 0,
+    pd_with_bin_means = FALSE,
+    importance_measure = "lightgbm"
+  )
+  expect_conf_mat_changes_with_threshold(model_df, rf_conf_mat_eval, data_type = "training")
+})
+
+test_that("rpart training conf_mat matches threshold-aware labels at same threshold", {
+  set.seed(1)
+  df <- data.frame(
+    y = sample(c(TRUE, FALSE), 500, replace = TRUE, prob = c(0.55, 0.45)),
+    x1 = rnorm(500),
+    x2 = rnorm(500),
+    x3 = rnorm(500)
+  )
+  model_df <- df %>% exp_rpart(y, x1, x2, x3, test_rate = 0.3, binary_classification_threshold = 0.5)
+  threshold <- 0.3
+  model_object <- model_df$model[[1]]
+
+  actual <- get_actual_class_rpart(model_object)
+  predicted <- get_predicted_class_rpart(
+    model_object,
+    data_type = "training",
+    binary_classification_threshold = threshold
+  )
+  if (is.factor(actual) && length(levels(actual)) == 2 && all(levels(actual) == c("FALSE", "TRUE"))) {
+    actual <- forcats::fct_rev(actual)
+  }
+  if (is.factor(predicted) && length(levels(predicted)) == 2 && all(levels(predicted) == c("FALSE", "TRUE"))) {
+    predicted <- forcats::fct_rev(predicted)
+  }
+  manual <- calc_conf_mat(actual, predicted)
+
+  cm <- rf_evaluation_training_and_test(
+    model_df,
+    type = "conf_mat",
+    binary_classification_threshold = threshold
+  )
+  train_cm <- cm %>% dplyr::filter(is_test_data == FALSE) %>%
+    dplyr::select(actual_value, predicted_value, count) %>%
+    dplyr::arrange(actual_value, predicted_value)
+  manual <- manual %>% dplyr::arrange(actual_value, predicted_value)
+
+  expect_equal(train_cm, manual)
 })
