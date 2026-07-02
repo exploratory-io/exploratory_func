@@ -1011,7 +1011,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(Sys.info()["sysname"] == "Linux" && sslCA != ""){
       sslCA <- "/etc/ssl/certs/rds-combined-ca-bundle.pem";
     }
-    key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sep = ":")
+    key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sslMode, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -1036,26 +1036,27 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
+    # Map PostgreSQL-style sslMode values to RMariaDB ssl.mode constants.
+    rmariadb_ssl_mode <- switch(sslMode,
+      "disable"    = "SSL_MODE_DISABLED",
+      "allow"      = "SSL_MODE_PREFERRED",
+      "prefer"     = "SSL_MODE_PREFERRED",
+      "require"    = "SSL_MODE_REQUIRED",
+      "verify-ca"  = "SSL_MODE_VERIFY_CA",
+      "verify-full"= "SSL_MODE_VERIFY_IDENTITY",
+      NULL  # empty string or unknown -> let RMariaDB use its default
+    )
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
-      if (timezone != "") {# if Timezone is set use it for timezone and timezone_out
-        if (sslCA != "") { # if sslCA is set, pass it as ssl.ca
-          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
-                                     password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
-        } else { # if sslCA is not set, do not set it since passing empty string causes Error : Failed to connect: SSL connection error: No such file or directory
-          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
-                                     password = password, host = host, port = port, bigint = "numeric")
-        }
-      } else {# if sslCA is set, pass it as ssl.ca
-        if (sslCA != "") {
-          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                                     password = password, host = host, port = port, bigint = "numeric", ssl.ca = sslCA)
-        } else {# if sslCA is not set, do not set it since passing empty string causes Error : Failed to connect: SSL connection error: No such file or directory
-          conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                                     password = password, host = host, port = port, bigint = "numeric")
-        }
-      }
+      tz_args <- if (timezone != "") list(timezone = timezone, timezone_out = timezone) else list()
+      ca_args  <- if (sslCA != "") list(ssl.ca = sslCA) else list()
+      mode_args <- if (!is.null(rmariadb_ssl_mode)) list(ssl.mode = rmariadb_ssl_mode) else list()
+      conn <- do.call(RMariaDB::dbConnect, c(
+        list(RMariaDB::MariaDB(), dbname = databaseName, username = username,
+             password = password, host = host, port = port, bigint = "numeric"),
+        tz_args, ca_args, mode_args
+      ))
       connection_pool[[key]] <- conn
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
@@ -1857,7 +1858,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
   }
   else if (type %in% c("mysql", "aurora")) {
     # they use common key "mysql"
-    key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sep = ":")
+    key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sslMode, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({ # try to close connection and ignore error
@@ -2010,7 +2011,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 #' @export
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = "", sslCA = "", sslMode = "", role = "", ...){
   if (type %in% c("mysql", "aurora")) { # In case of MySQL, just use queryMySQL, since it has workaround to read multibyte column names without getting garbled.
-    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query, timezone = timezone, sslCA = sslCA)
+    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query, timezone = timezone, sslCA = sslCA, sslMode = sslMode)
     df <- readr::type_convert(df)
     # It is hackish, but to read multibyte character data correctly, type_convert helps for some reason.
     # There is small chance of column getting converted to unwanted type, but for our usage, that is unlikely, and being able to read multibyte outweighs the potential drawback.
@@ -2048,11 +2049,11 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
 
 
 #' @export
-queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslCA = "", ...){
+queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", sslCA = "", sslMode = "", ...){
   if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  conn <- getDBConnection(type = "mysql", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslCA = sslCA)
+  conn <- getDBConnection(type = "mysql", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone, sslCA = sslCA, sslMode = sslMode)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -2060,7 +2061,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     df <- RMariaDB::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection("mysql", host, port, databaseName, username, timezone = timezone)
+    clearDBConnection("mysql", host, port, databaseName, username, timezone = timezone, sslCA = sslCA, sslMode = sslMode)
     stop(err)
   })
   RMariaDB::dbClearResult(resultSet)
