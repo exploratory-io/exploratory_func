@@ -1,7 +1,27 @@
 #' @rdname build_model_
 #' @export
 build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
-  .dots <- lazyeval::dots_capture(...)
+  # R 4.6+ compatibility: lazyeval::dots_capture fails for non-primitive function values
+  # (e.g. na.action = na.omit) because R 4.6 forces these promises eagerly.
+  # Fall back to reconstructing lazy objects from match.call when that happens.
+  # Capture call context BEFORE tryCatch: sys.call()/sys.function() inside an error handler
+  # return the tryCatch machinery frame, NOT build_model frame. Must capture upfront.
+  .bm_call <- sys.call()
+  .bm_func <- sys.function()
+  .bm_parent_env <- parent.frame()
+  .dots <- tryCatch(
+    lazyeval::dots_capture(...),
+    error = function(e) {
+      if (grepl("Promise has already been forced", conditionMessage(e))) {
+        mc <- match.call(.bm_func, .bm_call, expand.dots = FALSE)
+        raw_dots <- mc[["..."]]
+        if (is.null(raw_dots)) return(list())
+        lapply(as.list(raw_dots), function(expr) structure(list(expr = expr, env = .bm_parent_env), class = "lazy"))
+      } else {
+        stop(e)
+      }
+    }
+  )
   
   # Extract valid_data from .dots before passing to build_model_
   # valid_data is a data frame and can't be converted to a lazy object by lazyeval
