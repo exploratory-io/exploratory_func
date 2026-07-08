@@ -3752,3 +3752,137 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
     )
   }
 }
+
+#' Transform one or more "multiple answer" (comma-separated choice) columns
+#' into a single long-format table keyed by Question/Selection/Answer.
+#'
+#' For each target column, values are split on `sep`, then expanded into a
+#' 1/0 one-hot block. Every target column's one-hot block is joined back onto
+#' an internal row id (never onto the raw data), so columns are expanded
+#' independently and the row count grows additively across questions
+#' (sum of selections per question) instead of multiplying (cartesian
+#' blow-up from chaining separate_rows() column by column).
+#'
+#' @param df A data frame.
+#' @param ... One or more target columns holding delimited multiple answers.
+#' @param sep Separator between choices within a cell. Default ",".
+#' @param question_col Name of the output column holding the original
+#'   target column name. Default "Question".
+#' @param selection_col Name of the output column holding the individual
+#'   choice. Default "Selection".
+#' @param answer_col Name of the output column holding 1/0. Default "Answer".
+#' @param keep "both" (default) keeps every question x selection combination
+#'   the respondent could have picked (Answer = 0 for not-picked); "one"
+#'   keeps only the picked (Answer = 1) rows.
+#' @param trim_ws Trim leading/trailing whitespace around each split choice.
+#'   Default TRUE.
+#' @export
+exp_multiple_answers_to_longer <- function(df, ...,
+                                            sep = ",",
+                                            question_col = "Question",
+                                            selection_col = "Selection",
+                                            answer_col = "Answer",
+                                            keep = "both",
+                                            trim_ws = TRUE) {
+  target_cols <- tidyselect::eval_select(rlang::expr(c(...)), df)
+  target_names <- names(target_cols)
+
+  if (length(target_names) == 0) {
+    stop("At least one column must be selected to transform into rows.")
+  }
+
+  output_col_names <- c(question_col, selection_col, answer_col)
+  if (length(unique(output_col_names)) != length(output_col_names)) {
+    stop("Question, Selection, and Answer column names must be distinct.")
+  }
+  passthrough_names <- setdiff(names(df), target_names)
+  colliding <- intersect(output_col_names, passthrough_names)
+  if (length(colliding) > 0) {
+    stop(paste0(
+      "Column name(s) already exist in the data and would collide with the ",
+      "requested output column names: ", paste(colliding, collapse = ", ")
+    ))
+  }
+
+  # Internal row id, guaranteed not to collide with any existing column name.
+  row_id_col <- ".exp_multiple_answers_row_id"
+  while (row_id_col %in% names(df)) {
+    row_id_col <- paste0(row_id_col, "_")
+  }
+
+  base <- df
+  base[[row_id_col]] <- seq_len(nrow(df))
+
+  expanded_names <- character(0)
+  # NULL, not an all-row-id seed: a respondent who answers NONE of the
+  # target questions must never appear in `wide` at all (they contribute no
+  # rows). Answer = 0 is only filled in for a question when at least one
+  # OTHER respondent's choice created that question's one-hot column.
+  wide <- NULL
+
+  for (col_name in target_names) {
+    col_values <- base[[col_name]]
+    if (trim_ws && is.character(col_values)) {
+      col_values <- trimws(col_values)
+    }
+
+    piece <- data.frame(
+      row_id = base[[row_id_col]],
+      value = col_values,
+      stringsAsFactors = FALSE
+    )
+    names(piece)[1] <- row_id_col
+
+    piece <- piece %>% tidyr::separate_rows(value, sep = sep)
+    if (trim_ws) {
+      piece$value <- trimws(piece$value)
+    }
+    # Drop blank/NA choices so they never surface as a phantom "<col>_NA"
+    # one-hot column; a respondent who left this question blank simply
+    # contributes no rows for it.
+    piece <- piece[!is.na(piece$value) & piece$value != "", , drop = FALSE]
+    if (nrow(piece) == 0) {
+      next
+    }
+
+    piece_wide <- piece %>% pivot_wider(names_from = value, names_prefix = paste0(col_name, "_"))
+    new_cols <- setdiff(names(piece_wide), row_id_col)
+    expanded_names <- c(expanded_names, new_cols)
+    wide <- if (is.null(wide)) piece_wide else dplyr::full_join(wide, piece_wide, by = row_id_col)
+  }
+
+  if (length(expanded_names) == 0) {
+    stop("No values found to expand across the selected column(s).")
+  }
+
+  # inner_join, not left_join: a respondent absent from every target
+  # column's one-hot block (blank across ALL target questions) contributes
+  # nothing to `wide` and must be dropped entirely, not carried through with
+  # every expanded column NA (which would later be misread as "answered 0").
+  result <- dplyr::inner_join(base, wide, by = row_id_col)
+  result <- result[, !(names(result) %in% target_names), drop = FALSE]
+
+  # Split "<question>_<selection>" on the LAST underscore only, so a question
+  # name containing underscores still splits correctly (mirrors the same
+  # names_sep convention used by the Wide to Long / pivot_longer command).
+  #
+  # values_fill is intentionally NOT passed to pivot_longer here: the
+  # bundled tidyr/rlang combination rejects it ("Arguments in ... must be
+  # used") for this names_to/names_sep shape, so missing combinations
+  # (respondent had no entry for a given question) are filled manually below.
+  long <- result %>%
+    tidyr::pivot_longer(
+      cols = tidyselect::all_of(expanded_names),
+      names_to = c(question_col, selection_col),
+      names_sep = "_(?=[^_]+$)",
+      values_to = answer_col
+    )
+  long[[answer_col]][is.na(long[[answer_col]])] <- 0
+
+  if (identical(keep, "one")) {
+    long <- long[long[[answer_col]] == 1, , drop = FALSE]
+  }
+
+  long[[row_id_col]] <- NULL
+  long
+}
