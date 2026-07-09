@@ -3787,7 +3787,8 @@ get_predicted_probability_rpart <- function(x, data_type = "training") {
 # name may itself contain operator characters (< = >). Names are restored to the
 # original via x$terms_mapping. One row per node; columns are exactly:
 #   node_id, parent_id, depth, is_leaf, edge_label, predicted, n, pct,
-#   class_json, cond_column, cond_operator, cond_value, mean_value
+#   class_json, cond_column, cond_operator, cond_value, mean_value,
+#   sd_value, rmse_value, dist_json   (last three regression-only, else NA)
 build_rpart_tree_nodes <- function(x) {
   fr <- x$frame
   ids <- as.integer(rownames(fr))
@@ -3895,23 +3896,77 @@ build_rpart_tree_nodes <- function(x) {
 
   counts <- if (!is_reg) x$frame$yval2[, 1 + (1:k), drop = FALSE] else NULL
 
+  # Regression only: within-node SD / RMSE (from frame$dev, the anova within-node
+  # sum of squared deviations) and a within-node target histogram on bins shared
+  # by every node (so distribution shapes are comparable). Node membership is
+  # reconstructed from x$where (each training row's leaf frame-row) in a SINGLE
+  # pass: each row's value is accumulated into its leaf and all its ancestors.
+  dist_by_id <- NULL
+  shared_breaks <- NULL
+  if (is_reg) {
+    yv <- x$y
+    if (!is.null(yv) && length(yv) > 0 && !is.null(x$where)) {
+      yfin <- yv[is.finite(yv)]
+      if (length(yfin) >= 2 && diff(range(yfin)) > 0) {
+        shared_breaks <- seq(min(yfin), max(yfin), length.out = 21) # ~20 equal-width bins
+      } else if (length(yfin) >= 1) {
+        shared_breaks <- c(yfin[1] - 0.5, yfin[1] + 0.5)             # degenerate: single bin
+      }
+      if (!is.null(shared_breaks)) {
+        nbin <- length(shared_breaks) - 1L
+        leaf_id_of_row <- ids[x$where]      # per training row: its leaf node id
+        dist_by_id <- list()
+        for (r in seq_along(yv)) {
+          v <- yv[r]
+          if (!is.finite(v)) next
+          bi <- .bincode(v, shared_breaks, include.lowest = TRUE) # 1..nbin, right-closed like hist()
+          if (is.na(bi)) next
+          nd <- leaf_id_of_row[r]
+          repeat {
+            key <- as.character(nd)
+            cc <- dist_by_id[[key]]
+            if (is.null(cc)) cc <- integer(nbin)
+            cc[bi] <- cc[bi] + 1L
+            dist_by_id[[key]] <- cc
+            if (nd <= 1L) break
+            nd <- nd %/% 2L
+          }
+        }
+      }
+    }
+  }
+  dist_json_for <- function(id) {
+    if (!is_reg || is.null(shared_breaks)) return(NA_character_)
+    cc <- dist_by_id[[as.character(id)]]
+    if (is.null(cc)) cc <- integer(length(shared_breaks) - 1L)
+    as.character(jsonlite::toJSON(list(breaks = shared_breaks, counts = cc),
+                                  digits = 10, auto_unbox = FALSE))
+  }
+
   rows <- lapply(seq_len(n_node), function(i) {
     id <- ids[i]
     is_leaf <- as.character(fr$var[i]) == "<leaf>"
     ec <- make_edge_and_cond(id)
+    node_n <- fr$n[i]
     if (is_reg) {
       predicted <- num_str(fr$yval[i])
       class_json <- NA_character_
       mean_value <- as.numeric(fr$yval[i])
+      dev_i <- as.numeric(fr$dev[i])
+      rmse_value <- if (node_n > 0) sqrt(dev_i / node_n) else NA_real_
+      sd_value <- if (node_n > 1) sqrt(dev_i / (node_n - 1)) else NA_real_
+      dist_json <- dist_json_for(id)
     } else {
       predicted <- yl[fr$yval[i]]
-      node_n <- fr$n[i]
       cnt <- as.numeric(counts[i, ])
       arr <- lapply(ord, function(j) {
         list(label = yl[j], n = cnt[j], pct = if (node_n > 0) cnt[j] / node_n else 0)
       })
       class_json <- as.character(jsonlite::toJSON(arr, auto_unbox = TRUE, digits = NA))
       mean_value <- NA_real_
+      sd_value <- NA_real_
+      rmse_value <- NA_real_
+      dist_json <- NA_character_
     }
     data.frame(
       node_id = id,
@@ -3927,6 +3982,9 @@ build_rpart_tree_nodes <- function(x) {
       cond_operator = ec$op,
       cond_value = ec$val,
       mean_value = mean_value,
+      sd_value = sd_value,
+      rmse_value = rmse_value,
+      dist_json = dist_json,
       stringsAsFactors = FALSE
     )
   })

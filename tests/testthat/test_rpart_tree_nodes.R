@@ -12,7 +12,8 @@ if (!exists("flight")) {
 stress_name <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
 
 expected_cols <- c("node_id","parent_id","depth","is_leaf","edge_label","predicted",
-                   "n","pct","class_json","cond_column","cond_operator","cond_value","mean_value")
+                   "n","pct","class_json","cond_column","cond_operator","cond_value","mean_value",
+                   "sd_value","rmse_value","dist_json")
 
 parse_classes <- function(json) {
   # returns list of data.frames per row (NA -> NULL)
@@ -68,16 +69,46 @@ test_that("tree_nodes multiclass classification - one class entry per ylevel", {
   expect_setequal(root_cls$label, c("CA","NY","TX"))
   expect_equal(sum(root_cls$n), nodes[nodes$node_id==1, ]$n)
   expect_true(all(is.na(nodes$mean_value)))              # not regression
+  # classification leaves the regression-only columns NA (requirement 7)
+  expect_true(all(is.na(nodes$sd_value)))
+  expect_true(all(is.na(nodes$rmse_value)))
+  expect_true(all(is.na(nodes$dist_json)))
 })
 
-test_that("tree_nodes regression - predicted mean, class_json NA, mean_value populated", {
+test_that("tree_nodes regression - predicted mean, class_json NA, sd/rmse/dist (requirement 7)", {
   model_df <- flight %>% exp_rpart(`ARR DELAY`, `DEP DELAY`)
   nodes <- model_df %>% tidy_rowwise(model, type="tree_nodes")
   expect_equal(colnames(nodes), expected_cols)
   expect_true(all(is.na(nodes$class_json)))
   expect_true(all(!is.na(nodes$mean_value)))
-  # predicted string equals formatted mean_value
   expect_true(all(!is.na(nodes$predicted)))
+
+  # SD / RMSE come from frame$dev (anova within-node SSE). Rebuild the model's
+  # frame to check the closed forms exactly.
+  rp <- model_df$model[[1]]
+  fr <- rp$frame
+  fr_ids <- as.integer(rownames(fr))
+  ord <- match(nodes$node_id, fr_ids)
+  expect_equal(nodes$rmse_value, sqrt(fr$dev[ord] / fr$n[ord]), tolerance = 1e-8)
+  sd_expected <- ifelse(fr$n[ord] > 1, sqrt(fr$dev[ord] / (fr$n[ord] - 1)), NA_real_)
+  expect_equal(nodes$sd_value, sd_expected, tolerance = 1e-8)
+
+  # dist_json: shared bins on every node; per-node counts sum to n; an internal
+  # node's counts equal the element-wise sum of its two children's.
+  parse_dist <- function(j) jsonlite::fromJSON(j)
+  root <- parse_dist(nodes$dist_json[nodes$node_id == 1])
+  expect_equal(length(root$breaks), 21)                  # ~20 equal-width bins
+  expect_equal(sum(root$counts), nodes$n[nodes$node_id == 1])
+  # breaks identical across all nodes
+  all_breaks <- lapply(nodes$dist_json, function(j) parse_dist(j)$breaks)
+  for (b in all_breaks) expect_equal(b, root$breaks)
+  # children-sum invariant on the root's two children (if the tree split)
+  kids <- nodes[!is.na(nodes$parent_id) & nodes$parent_id == 1, ]
+  if (nrow(kids) == 2) {
+    c1 <- parse_dist(kids$dist_json[1])$counts
+    c2 <- parse_dist(kids$dist_json[2])$counts
+    expect_equal(c1 + c2, root$counts)
+  }
 })
 
 test_that("tree_nodes multibyte/symbol column with categorical + numeric split", {
@@ -122,4 +153,22 @@ test_that("tree_nodes single-node tree (no split) - one leaf row, no error", {
   expect_true(nodes$is_leaf[1])
   expect_true(is.na(nodes$parent_id[1]))
   expect_true(is.na(nodes$edge_label[1]) || nodes$edge_label[1] == "")
+})
+
+test_that("tree_nodes regression with a (near-)constant target - no crash, SD/RMSE ~ 0 (requirement 7)", {
+  set.seed(11)
+  n <- 80
+  df <- tibble::tibble(
+    x = rnorm(n),
+    target = 5 + rnorm(n) * 1e-9                       # essentially constant
+  )
+  model_df <- df %>% exp_rpart(target, x, cp = 0.9)     # root-only regression tree
+  nodes <- model_df %>% tidy_rowwise(model, type="tree_nodes")
+  expect_equal(colnames(nodes), expected_cols)
+  expect_equal(nrow(nodes), 1)
+  expect_true(!is.na(nodes$mean_value[1]))
+  expect_lt(nodes$rmse_value[1], 1e-6)                  # zero variance -> ~0
+  # dist_json still valid: single-bin (or degenerate) histogram summing to n
+  d <- jsonlite::fromJSON(nodes$dist_json[1])
+  expect_equal(sum(d$counts), nodes$n[1])
 })
