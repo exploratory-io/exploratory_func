@@ -3779,8 +3779,162 @@ get_predicted_probability_rpart <- function(x, data_type = "training") {
   predicted
 }
 
+# Builds one row per node of an rpart tree for the interactive tree chart.
+# Source of truth is the model internals (frame, splits, csplit, ylevels); the
+# split condition for each node is reconstructed STRUCTURALLY from x$splits and
+# x$csplit (never by parsing labels(x) text), because for rpart the fit-time
+# column names are the original names with only commas replaced by dots, so a
+# name may itself contain operator characters (< = >). Names are restored to the
+# original via x$terms_mapping. One row per node; columns are exactly:
+#   node_id, parent_id, depth, is_leaf, edge_label, predicted, n, pct,
+#   class_json, cond_column, cond_operator, cond_value, mean_value
+build_rpart_tree_nodes <- function(x) {
+  fr <- x$frame
+  ids <- as.integer(rownames(fr))
+  n_node <- nrow(fr)
+  root_n <- fr$n[1]
+
+  tm <- x$terms_mapping # named vector: fit-time (dotted) name -> original name
+  map_name <- function(v) {
+    v <- as.character(v)
+    if (!is.null(tm) && v %in% names(tm)) unname(tm[v]) else v
+  }
+
+  ctype <- x$classification_type
+  is_reg <- !is.null(ctype) && ctype == "regression"
+  yl <- attr(x, "ylevels")
+  k <- length(yl)
+
+  # Display order of classes. For a logical / Yes-No binary target, list the
+  # positive class (TRUE / Yes) FIRST so a FALSE-predicted node still shows its
+  # TRUE proportion at the top (SPSS parity; fixes the "FALSE listed first" report).
+  ord <- seq_len(k)
+  if (!is_reg && k == 2) {
+    up <- toupper(yl)
+    positive_idx <- if (setequal(up, c("FALSE", "TRUE"))) {
+      which(up == "TRUE")
+    } else if (setequal(up, c("NO", "YES"))) {
+      which(up == "YES")
+    } else {
+      NA_integer_
+    }
+    if (!is.na(positive_idx)) {
+      ord <- c(positive_idx, setdiff(seq_len(k), positive_idx))
+    }
+  }
+
+  # Map each internal frame row to its PRIMARY split row in x$splits. rpart lays
+  # out splits per node as: primary, then ncompete competitors, then nsurrogate
+  # surrogates. So the primary split index advances by 1 + ncompete + nsurrogate.
+  sp <- x$splits
+  cs <- x$csplit
+  xl <- attr(x, "xlevels")
+  prim <- rep(NA_integer_, n_node)
+  si <- 1L
+  for (i in seq_len(n_node)) {
+    if (as.character(fr$var[i]) != "<leaf>") {
+      prim[i] <- si
+      si <- si + 1L + fr$ncompete[i] + fr$nsurrogate[i]
+    }
+  }
+
+  num_str <- function(v) {
+    # Compact, exact numeric string for cutpoints (no scientific notation).
+    trimws(formatC(v, format = "fg", digits = 15))
+  }
+
+  # For internal frame row i, return the incoming-edge condition for each child.
+  # Continuous: ncat == 1  -> left is ">=", right is "<";  ncat == -1 -> reversed.
+  # Categorical: csplit row, 1 = goes left, 3 = goes right (2 = not present).
+  split_of <- function(i) {
+    v_fit <- as.character(fr$var[i])
+    v_orig <- map_name(v_fit)
+    s <- sp[prim[i], ]
+    nc <- s[["ncat"]]
+    idx <- s[["index"]]
+    if (nc == 1L || nc == -1L) {
+      if (nc == -1L) {
+        left  <- list(col = v_orig, op = "<",  val = idx)
+        right <- list(col = v_orig, op = ">=", val = idx)
+      } else {
+        left  <- list(col = v_orig, op = ">=", val = idx)
+        right <- list(col = v_orig, op = "<",  val = idx)
+      }
+    } else {
+      lv <- xl[[v_fit]]
+      row <- cs[idx, ]
+      left  <- list(col = v_orig, op = "in", val = lv[which(row == 1L)])
+      right <- list(col = v_orig, op = "in", val = lv[which(row == 3L)])
+    }
+    list(left = left, right = right)
+  }
+
+  # Condition into each node keyed by that node's id (left child = 2k, right = 2k+1).
+  cond_by_child <- list()
+  for (i in which(!is.na(prim))) {
+    pid <- ids[i]
+    sc <- split_of(i)
+    cond_by_child[[as.character(pid * 2L)]] <- sc$left
+    cond_by_child[[as.character(pid * 2L + 1L)]] <- sc$right
+  }
+
+  make_edge_and_cond <- function(id) {
+    if (id == 1L) return(list(edge = "", col = NA_character_, op = NA_character_, val = NA_character_))
+    c0 <- cond_by_child[[as.character(id)]]
+    if (is.null(c0)) return(list(edge = "", col = NA_character_, op = NA_character_, val = NA_character_))
+    if (identical(c0$op, "in")) {
+      edge <- paste0(c0$col, " = ", paste(c0$val, collapse = ", "))
+      # JSON array string so category values containing commas survive intact.
+      val <- as.character(jsonlite::toJSON(as.character(c0$val)))
+    } else {
+      edge <- paste0(c0$col, " ", c0$op, " ", num_str(c0$val))
+      val <- num_str(c0$val)
+    }
+    list(edge = edge, col = c0$col, op = c0$op, val = val)
+  }
+
+  counts <- if (!is_reg) x$frame$yval2[, 1 + (1:k), drop = FALSE] else NULL
+
+  rows <- lapply(seq_len(n_node), function(i) {
+    id <- ids[i]
+    is_leaf <- as.character(fr$var[i]) == "<leaf>"
+    ec <- make_edge_and_cond(id)
+    if (is_reg) {
+      predicted <- num_str(fr$yval[i])
+      class_json <- NA_character_
+      mean_value <- as.numeric(fr$yval[i])
+    } else {
+      predicted <- yl[fr$yval[i]]
+      node_n <- fr$n[i]
+      cnt <- as.numeric(counts[i, ])
+      arr <- lapply(ord, function(j) {
+        list(label = yl[j], n = cnt[j], pct = if (node_n > 0) cnt[j] / node_n else 0)
+      })
+      class_json <- as.character(jsonlite::toJSON(arr, auto_unbox = TRUE, digits = NA))
+      mean_value <- NA_real_
+    }
+    data.frame(
+      node_id = id,
+      parent_id = if (id == 1L) NA_integer_ else as.integer(id %/% 2L),
+      depth = as.integer(floor(log2(id))),
+      is_leaf = is_leaf,
+      edge_label = ec$edge,
+      predicted = as.character(predicted),
+      n = as.integer(fr$n[i]),
+      pct = fr$n[i] / root_n,
+      class_json = class_json,
+      cond_column = ec$col,
+      cond_operator = ec$op,
+      cond_value = ec$val,
+      mean_value = mean_value,
+      stringsAsFactors = FALSE
+    )
+  })
+  dplyr::bind_rows(rows)
+}
+
 #' @export
-#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
+#' @param type "importance", "evaluation", "conf_mat" or "tree_nodes". Feature importance, evaluated scores, confusion matrix of training data, or per-node data for the interactive decision tree chart.
 tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
     ret <- data.frame()
@@ -3897,6 +4051,10 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_class
     partial_dependence = {
       ret <- handle_partial_dependence(x)
       ret
+    },
+    tree_nodes = {
+      # Per-node data for the interactive decision tree chart.
+      build_rpart_tree_nodes(x)
     },
     {
       stop(paste0("type ", type, " is not defined"))
