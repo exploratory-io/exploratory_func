@@ -119,6 +119,48 @@ test_that("custom separator other than comma works", {
   expect_equal(sort(result$Answer), c("Edion", "Yamada"))
 })
 
+test_that("sep is treated as a LITERAL delimiter, not a regex (regex metacharacters)", {
+  # sep is passed to tidyr::separate_rows() internally, which treats its sep
+  # argument as a regex. exp_multiple_answers_to_longer's own `sep` parameter
+  # is documented as a literal separator, so regex metacharacters in a
+  # user-supplied delimiter must NOT be interpreted as regex syntax.
+  expect_equal(
+    sort((data.frame(id = 1, store = "Yamada|Edion", stringsAsFactors = FALSE) %>%
+      exp_multiple_answers_to_longer(store, sep = "|"))$Answer),
+    c("Edion", "Yamada")
+  )
+  expect_equal(
+    sort((data.frame(id = 1, store = "Yamada+Edion", stringsAsFactors = FALSE) %>%
+      exp_multiple_answers_to_longer(store, sep = "+"))$Answer),
+    c("Edion", "Yamada")
+  )
+  expect_equal(
+    sort((data.frame(id = 1, store = "Yamada.Edion", stringsAsFactors = FALSE) %>%
+      exp_multiple_answers_to_longer(store, sep = "."))$Answer),
+    c("Edion", "Yamada")
+  )
+  expect_equal(
+    sort((data.frame(id = 1, store = "Yamada$Edion", stringsAsFactors = FALSE) %>%
+      exp_multiple_answers_to_longer(store, sep = "$"))$Answer),
+    c("Edion", "Yamada")
+  )
+  expect_equal(
+    sort((data.frame(id = 1, store = "Yamada(1)Edion", stringsAsFactors = FALSE) %>%
+      exp_multiple_answers_to_longer(store, sep = "(1)"))$Answer),
+    c("Edion", "Yamada")
+  )
+  expect_equal(
+    sort((data.frame(id = 1, store = "Yamada[x]Edion", stringsAsFactors = FALSE) %>%
+      exp_multiple_answers_to_longer(store, sep = "[x]"))$Answer),
+    c("Edion", "Yamada")
+  )
+  expect_equal(
+    sort((data.frame(id = 1, store = "Yamada\\Edion", stringsAsFactors = FALSE) %>%
+      exp_multiple_answers_to_longer(store, sep = "\\"))$Answer),
+    c("Edion", "Yamada")
+  )
+})
+
 test_that("multibyte and symbol-bearing column names and choice values round-trip", {
   complex_col <- "店舗 \"レビュー\" #1"
   df <- data.frame(id = c(1), stringsAsFactors = FALSE)

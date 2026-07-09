@@ -3765,7 +3765,8 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
 #'
 #' @param df A data frame.
 #' @param ... One or more target columns holding delimited multiple answers.
-#' @param sep Separator between choices within a cell. Default ",".
+#' @param sep Literal separator between choices within a cell (e.g. "|" splits
+#'   on a literal pipe character, not a regex alternation). Default ",".
 #' @param question_col Name of the output column holding the original
 #'   target column name. Default "Question".
 #' @param answer_col Name of the output column holding the split value.
@@ -3780,9 +3781,24 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
 #'   row came from. Default TRUE.
 #' @param row_id_col Name of the row-id column when `add_row_id` is TRUE.
 #'   Default "Original Row ID".
+#' Escape every regex metacharacter in `x` so it can be used as a literal
+#' match/split pattern (e.g. with `tidyr::separate_rows()`, whose own `sep`
+#' argument is otherwise treated as a regex).
+#' @param x character scalar.
+#' @return character scalar.
+escape_regex_literal <- function(x) {
+  gsub("([\\\\^$.|?*+()\\[\\]{}])", "\\\\\\1", x, perl = TRUE)
+}
+
 #' @param keep_other_columns Keep the passthrough (non-target) columns from
 #'   the original data. Default TRUE.
 #' @export
+#'
+#' @details `sep` is used as a LITERAL delimiter, not a regular expression --
+#'   internally it is regex-escaped before being handed to
+#'   `tidyr::separate_rows()` (which otherwise treats its own `sep` argument
+#'   as a regex, e.g. `sep = "|"` would split on every character and
+#'   `sep = "+"` would throw an invalid-regex error).
 exp_multiple_answers_to_longer <- function(df, ...,
                                             sep = ",",
                                             question_col = "Question",
@@ -3799,6 +3815,8 @@ exp_multiple_answers_to_longer <- function(df, ...,
   if (length(target_names) == 0) {
     stop("At least one column must be selected to transform into rows.")
   }
+
+  sep_regex <- escape_regex_literal(sep)
 
   output_col_names <- c(question_col, answer_col)
   if (add_row_id) {
@@ -3840,7 +3858,7 @@ exp_multiple_answers_to_longer <- function(df, ...,
     )
     names(piece)[1] <- row_id_col_internal
 
-    piece <- piece %>% tidyr::separate_rows(value, sep = sep)
+    piece <- piece %>% tidyr::separate_rows(value, sep = sep_regex)
     if (trim_ws) {
       piece$value <- trimws(piece$value)
     }
