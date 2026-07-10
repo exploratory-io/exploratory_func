@@ -1,7 +1,11 @@
 #' @rdname build_model_
 #' @export
 build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
-  .dots <- lazyeval::dots_capture(...)
+  # R 4.6: lazyeval::dots_capture() fails with "Promise has already been forced"
+  # Capture ... via rlang::enquos() and build lazyeval-compatible lazy objects directly.
+  .dots <- lapply(rlang::enquos(...), function(q) {
+    structure(list(expr = rlang::quo_get_expr(q), env = rlang::quo_get_env(q)), class = "lazy")
+  })
   
   # Extract valid_data from .dots before passing to build_model_
   # valid_data is a data frame and can't be converted to a lazy object by lazyeval
@@ -173,8 +177,21 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
       # slice training data
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         tmp_df <- safe_slice(df, index, remove = TRUE)
-        # execute model_func with parsed arguments
+        # R 4.6 + rlang::enquos: when formula is passed via a variable (e.g. formula = fml
+        # or formula = formula), enquos captures the SYMBOL (not the value). make_call then
+        # embeds the symbol in the reconstructed call. When lazy_eval evaluates that call in
+        # the lambda env, the symbol resolves to build_model_'s `formula` local var (which is
+        # the lazy OBJECT), not the actual formula -- causing "invalid formula" or "object of
+        # type 'symbol' is not subsettable".
+        # Fix: pre-evaluate ONLY the formula lazy using its captured env (so `fml` or `formula`
+        # resolves in the caller's scope), then re-wrap it as a lambda-local lazy so make_call
+        # can find `.resolved_formula` in the lambda env. NSE args like `weights = weight` must
+        # stay as lazy symbols so model_func's own NSE evaluates them in the data frame context.
         eval_arg <- dots
+        if (!is.null(eval_arg$formula)) {
+          .resolved_formula <- lazyeval::lazy_eval(eval_arg$formula)
+          eval_arg$formula <- lazyeval::lazy(.resolved_formula)
+        }
         eval_arg[["data"]] <- lazyeval::lazy(tmp_df)
         .call <- lazyeval::make_call(quote(model_func), eval_arg)
         lazyeval::lazy_eval(.call, data = environment())
@@ -196,9 +213,14 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
   }, error = function(e){
     # In dplyr 1.1+, errors inside mutate() are wrapped with context messages like
     # "In argument: `model = purrr::map2(...)`." The root cause is in e$parent chain.
+    # R 4.6: root$parent may be a symbol (not a list/condition), so guard the traversal.
     root <- e
-    while (!is.null(root$parent)) root <- root$parent
-    stop(root$message)
+    while (is.list(root) && !is.null(root$parent) &&
+           (is.list(root$parent) || inherits(root$parent, "condition"))) {
+      root <- root$parent
+    }
+    msg <- if (is.list(root) && is.character(root$message)) root$message else conditionMessage(e)
+    stop(msg)
   })
   ret
 }
