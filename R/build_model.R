@@ -6,7 +6,7 @@ build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = 
   .dots <- lapply(rlang::enquos(...), function(q) {
     structure(list(expr = rlang::quo_get_expr(q), env = rlang::quo_get_env(q)), class = "lazy")
   })
-  
+
   # Extract valid_data from .dots before passing to build_model_
   # valid_data is a data frame and can't be converted to a lazy object by lazyeval
   # This causes "is.call(expr) || is.name(expr) || is.atomic(expr) is not TRUE" errors
