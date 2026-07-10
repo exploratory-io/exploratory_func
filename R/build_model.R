@@ -3,6 +3,8 @@
 build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
   # R 4.6: lazyeval::dots_capture() fails with "Promise has already been forced"
   # Capture ... via rlang::enquos() and build lazyeval-compatible lazy objects directly.
+  # NOTE: we must NOT use lazyeval::as.lazy() here — it converts character strings to
+  # symbol names (e.g. "auc" -> symbol `auc`), breaking string-valued arguments.
   .dots <- lapply(rlang::enquos(...), function(q) {
     structure(list(expr = rlang::quo_get_expr(q), env = rlang::quo_get_env(q)), class = "lazy")
   })
