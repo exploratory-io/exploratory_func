@@ -1536,14 +1536,29 @@ test_that("count_if", {
   expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
 })
 
+test_that("count_if - 1-arg form (condition only)", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if(mpg > 15))
+  expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
+})
+
 test_that("count_if_ratio", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_ratio(hp, mpg > 15, na.rm = F))
+  expect_equal(df %>% dplyr::pull(custom), c(1, 1, 8/14)) # 11/11, 7/7, 8/14
+})
+
+test_that("count_if_ratio - 1-arg form (condition only)", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_ratio(mpg > 15))
   expect_equal(df %>% dplyr::pull(custom), c(1, 1, 8/14)) # 11/11, 7/7, 8/14
 })
 
 test_that("count_if_pct", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_pct(hp, mpg > 15, na.rm = F))
   expect_equal(df %>% dplyr::pull(custom), c(100, 100, 800/14)) # 100 *11/11, 100*7/7, 100*8/14
+})
+
+test_that("count_if_pct - 1-arg form (condition only)", {
+  df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_pct(mpg > 15))
+  expect_equal(df %>% dplyr::pull(custom), c(100, 100, 800/14)) # 100*11/11, 100*7/7, 100*8/14
 })
 
 test_that("count_unique_if", {
