@@ -115,6 +115,13 @@ chaid_fit <- function(data,
     numeric_binning_map = prepared$numeric_binning_map,
     class_levels = class.levels,
     target = target,
+    target_type = if (is.logical(data[[target]])) {
+      'logical'
+    } else if (is.factor(data[[target]])) {
+      'factor'
+    } else {
+      'character'
+    },
     predictors = prepared$predictors,
     parameters = validation$parameters,
     training_metadata = list(
@@ -124,8 +131,11 @@ chaid_fit <- function(data,
     prepared_levels = prepared$prepared_levels,
     predictor_info = prepared$predictor_info
   )
+  low.expected.split <- FALSE
+  grew.tree <- FALSE
   if (length(prepared$predictors) > 0 && nrow(prepared$data) > 0 &&
       length(class.levels) > 1) {
+    grew.tree <- TRUE
     tree <- grow_chaid_tree(
       data = prepared$data,
       target = target,
@@ -140,9 +150,47 @@ chaid_fit <- function(data,
     model$category_merge_map <- tree$category_merge_map
     model$rules <- tree$nodes[tree$nodes$is_terminal,
                               c('node_id', 'rule', 'predicted_class', 'n')]
+    low.expected.split <- isTRUE(tree$low_expected)
   }
   class(model) <- c('exploratory_chaid', 'list')
+
+  emit_chaid_warnings(
+    numeric_binned = names(Filter(function(m) isTRUE(!m$excluded) && m$method != 'none',
+                                  prepared$numeric_binning_map)),
+    root_only = grew.tree && nrow(model$nodes) == 1L,
+    low_expected = low.expected.split
+  )
   model
+}
+
+#' Emit the diagnostic warnings called for by the CHAID spec.
+#'
+#' Emitted once per fit (not per node) so a large tree does not produce a
+#' warning storm.
+#'
+#' @param numeric_binned Names of numeric predictors that were binned.
+#' @param root_only TRUE when a splittable problem produced only the root node.
+#' @param low_expected TRUE when an accepted split relied on a table with many
+#'   small expected cell counts.
+#' @return Invisibly NULL.
+emit_chaid_warnings <- function(numeric_binned, root_only, low_expected) {
+  if (length(numeric_binned) > 0) {
+    warning(paste0(
+      'Numeric predictor(s) ', paste(numeric_binned, collapse = ', '),
+      ' were binned into categories; results depend on the binning method.'
+    ), call. = FALSE)
+  }
+  if (isTRUE(root_only)) {
+    warning('No significant split was found; the tree contains only the root node.',
+            call. = FALSE)
+  }
+  if (isTRUE(low_expected)) {
+    warning(paste0(
+      'Some chi-square tests had low expected cell frequencies; ',
+      'p-values may be unreliable.'
+    ), call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 #' Prepare target and predictors for CHAID fitting.
@@ -183,10 +231,17 @@ prepare_chaid_data <- function(data, target, predictors, parameters) {
       )
       transformed <- binning$values
       numeric.binning.map[[variable]] <- binning$metadata
-      ordered.variable <- FALSE
+      # Binned numerics are ordinal: bins have a natural order, so CHAID may only
+      # merge ADJACENT bins. This keeps numeric split rules contiguous (a single
+      # range chain) rather than lumping, say, the lowest and highest bins.
+      ordered.variable <- TRUE
+      ordered.levels <- binning$metadata$labels
+      if (parameters$missing == 'as_category') {
+        ordered.levels <- c(ordered.levels, 'Missing')
+      }
       predictor.info[[variable]] <- list(
-        ordered = FALSE,
-        levels = unique(transformed[!is.na(transformed)])
+        ordered = TRUE,
+        levels = ordered.levels
       )
     } else {
       transformed <- as.character(value)
@@ -220,6 +275,10 @@ prepare_chaid_data <- function(data, target, predictors, parameters) {
 
   target.levels <- if (is.factor(target.raw)) {
     levels(target.raw)
+  } else if (is.logical(target.raw)) {
+    # Stable, deterministic order with the positive class (TRUE) first, so
+    # class_levels[1] is the positive class for binary/logical targets.
+    c('TRUE', 'FALSE')
   } else {
     unique(as.character(target.raw[!is.na(target.raw)]))
   }
@@ -238,6 +297,44 @@ prepare_chaid_data <- function(data, target, predictors, parameters) {
     numeric_binning_map = numeric.binning.map,
     prepared_levels = prepared.levels[predictors.kept]
   )
+}
+
+#' Format numeric break values compactly for bin labels.
+#'
+#' @param v A numeric value.
+#' @return A compact string without scientific notation.
+format_chaid_break <- function(v) {
+  trimws(formatC(signif(v, 6), format = 'fg', digits = 15))
+}
+
+#' Build human-readable range labels for numeric bins.
+#'
+#' Given break points `c(-Inf, b1, ..., bk, Inf)` used with right-closed cuts,
+#' produce interpretable labels such as `<= b1`, `(b1, b2]`, `> bk`, so rules
+#' and tree edges read as ranges rather than opaque `Bin1`..`BinN` codes.
+#'
+#' @param breaks Numeric break points, ascending, first `-Inf` and last `Inf`.
+#' @return A character vector of `length(breaks) - 1` labels, in break order.
+format_chaid_bin_labels <- function(breaks) {
+  n <- length(breaks) - 1L
+  if (n <= 0) {
+    return(character())
+  }
+  vapply(seq_len(n), function(i) {
+    lo <- breaks[i]
+    hi <- breaks[i + 1L]
+    lo.inf <- is.infinite(lo) && lo < 0
+    hi.inf <- is.infinite(hi) && hi > 0
+    if (lo.inf && hi.inf) {
+      'All values'
+    } else if (lo.inf) {
+      paste0('<= ', format_chaid_break(hi))
+    } else if (hi.inf) {
+      paste0('> ', format_chaid_break(lo))
+    } else {
+      paste0('(', format_chaid_break(lo), ', ', format_chaid_break(hi), ']')
+    }
+  }, character(1))
 }
 
 #' Create deterministic bins for a numeric predictor.
@@ -266,14 +363,18 @@ create_numeric_bins <- function(value, method, n_bins) {
     breaks[length(breaks)] <- Inf
   }
 
-  labels <- paste0('Bin', seq_len(length(breaks) - 1))
-  binned <- as.character(cut(
+  labels <- format_chaid_bin_labels(breaks)
+  # Cut to bin indices, then map to labels. Indexing (rather than passing
+  # labels= to cut) keeps this robust even if two labels round to the same
+  # display string, which would otherwise be a duplicated-factor-level error.
+  bin.index <- cut(
     value,
     breaks = breaks,
-    labels = labels,
+    labels = FALSE,
     include.lowest = TRUE,
     right = TRUE
-  ))
+  )
+  binned <- labels[bin.index]
   list(
     values = binned,
     metadata = list(
@@ -285,27 +386,19 @@ create_numeric_bins <- function(value, method, n_bins) {
   )
 }
 
-#' Return a fallback value when a list element is NULL.
+#' Compute a chi-square association test from a contingency matrix.
 #'
-#' @param x Value to inspect.
-#' @param y Fallback value.
-#' @return `x` unless it is NULL, otherwise `y`.
-`%||%` <- function(x, y) {
-  if (is.null(x)) y else x
-}
-
-#' Compute a chi-square association test for two categorical vectors.
+#' This is the hot-path entry point: category merging computes the
+#' target-by-category table once per predictor per node, then evaluates every
+#' pairwise and overall test as sub-matrices of it, avoiding a raw-data pass per
+#' test. Pearson matches `stats::chisq.test(correct = FALSE)`.
 #'
-#' @param x Predictor categories.
-#' @param y Target categories.
+#' @param observed Integer matrix, rows = target classes, cols = categories.
 #' @param method Pearson or likelihood-ratio chi-square.
-#' @return A list containing the test statistic, p-value, degrees of freedom,
-#'   observed counts, and expected counts.
-compute_chisq_test <- function(x, y, method = 'pearson') {
-  valid <- !is.na(x) & !is.na(y)
-  x <- as.character(x[valid])
-  y <- as.character(y[valid])
-  observed <- table(y, x, useNA = 'no')
+#' @return A list with statistic, p-value, degrees of freedom, the (trimmed)
+#'   observed and expected matrices, and `low_expected` (share of expected cells
+#'   below 5).
+compute_chisq_from_counts <- function(observed, method = 'pearson') {
   observed <- observed[rowSums(observed) > 0, colSums(observed) > 0, drop = FALSE]
   if (nrow(observed) < 2 || ncol(observed) < 2) {
     return(list(
@@ -313,32 +406,45 @@ compute_chisq_test <- function(x, y, method = 'pearson') {
       p_value = NA_real_,
       df = 0,
       observed = observed,
-      expected = matrix(numeric(), nrow = 0, ncol = 0)
+      expected = matrix(numeric(), nrow = 0, ncol = 0),
+      low_expected = NA_real_
     ))
   }
-
+  expected <- outer(rowSums(observed), colSums(observed)) / sum(observed)
+  low.expected <- mean(expected < 5)
   if (method == 'likelihood_ratio') {
-    expected <- outer(rowSums(observed), colSums(observed)) / sum(observed)
     positive <- observed > 0 & expected > 0
     statistic <- 2 * sum(observed[positive] *
       log(observed[positive] / expected[positive]))
-    df <- (nrow(observed) - 1) * (ncol(observed) - 1)
-    p.value <- stats::pchisq(statistic, df = df, lower.tail = FALSE)
   } else {
-    test <- suppressWarnings(stats::chisq.test(observed, correct = FALSE))
-    statistic <- unname(test$statistic)
-    p.value <- test$p.value
-    df <- unname(test$parameter)
-    expected <- test$expected
+    statistic <- sum((observed - expected)^2 / expected)
   }
-
+  df <- (nrow(observed) - 1) * (ncol(observed) - 1)
+  p.value <- stats::pchisq(statistic, df = df, lower.tail = FALSE)
   list(
     statistic = as.numeric(statistic),
     p_value = as.numeric(p.value),
     df = as.numeric(df),
     observed = observed,
-    expected = expected
+    expected = expected,
+    low_expected = as.numeric(low.expected)
   )
+}
+
+#' Compute a chi-square association test for two categorical vectors.
+#'
+#' Thin wrapper over [compute_chisq_from_counts()] kept for the raw-vector
+#' callers and for equivalence testing against the counts path.
+#'
+#' @param x Predictor categories.
+#' @param y Target categories.
+#' @param method Pearson or likelihood-ratio chi-square.
+#' @return A list containing the test statistic, p-value, degrees of freedom,
+#'   observed counts, expected counts, and low-expected share.
+compute_chisq_test <- function(x, y, method = 'pearson') {
+  valid <- !is.na(x) & !is.na(y)
+  observed <- table(as.character(y[valid]), as.character(x[valid]), useNA = 'no')
+  compute_chisq_from_counts(observed, method = method)
 }
 
 #' Apply Bonferroni correction to a vector of p-values.
@@ -387,8 +493,27 @@ merge_categories <- function(values,
   } else {
     unique(values)
   }
-  groups <- lapply(categories, function(category) category)
+
+  # Build the target-by-category contingency table ONCE. Every pairwise merge
+  # test and the overall test are then column extractions / sums of this matrix,
+  # so no per-test pass over the raw vectors is needed (the performance fix).
+  target.levels <- unique(target)
+  contingency <- unclass(table(
+    factor(target, levels = target.levels),
+    factor(values, levels = categories)
+  ))
+
+  # Each group is a set of column indices into `categories`.
+  groups <- as.list(seq_along(categories))
   merge.history <- list()
+
+  col_of_group <- function(group.indices) {
+    if (length(group.indices) == 1L) {
+      contingency[, group.indices]
+    } else {
+      rowSums(contingency[, group.indices, drop = FALSE])
+    }
+  }
 
   repeat {
     if (length(groups) < 2) {
@@ -401,13 +526,8 @@ merge_categories <- function(values,
         if (ordered && j != i + 1L) {
           next
         }
-        pair.categories <- c(groups[[i]], groups[[j]])
-        pair.rows <- values %in% pair.categories
-        test <- compute_chisq_test(
-          values[pair.rows],
-          target[pair.rows],
-          method = chi_square
-        )
+        pair.observed <- cbind(col_of_group(groups[[i]]), col_of_group(groups[[j]]))
+        test <- compute_chisq_from_counts(pair.observed, method = chi_square)
         candidate.index <- candidate.index + 1L
         candidates[[candidate.index]] <- list(
           i = i,
@@ -430,7 +550,7 @@ merge_categories <- function(values,
       break
     }
     selected <- candidates[[best]]
-    original.categories <- c(groups[[selected$i]], groups[[selected$j]])
+    original.categories <- categories[c(groups[[selected$i]], groups[[selected$j]])]
     merge.history[[length(merge.history) + 1L]] <- list(
       node_id = node_id,
       variable = variable,
@@ -439,23 +559,22 @@ merge_categories <- function(values,
       merge_p_value = raw.p.values[best],
       adjusted_p_value = adjusted.p.values[best]
     )
-    groups[[selected$i]] <- original.categories
+    groups[[selected$i]] <- c(groups[[selected$i]], groups[[selected$j]])
     groups[[selected$j]] <- NULL
   }
 
-  group.labels <- vapply(groups, paste, character(1), collapse = ' + ')
-  group.values <- rep(NA_character_, length(values))
-  for (i in seq_along(groups)) {
-    group.values[values %in% groups[[i]]] <- group.labels[i]
-  }
-  overall.test <- compute_chisq_test(group.values, target, method = chi_square)
+  group.category.lists <- lapply(groups, function(group.indices) categories[group.indices])
+  group.labels <- vapply(group.category.lists, paste, character(1), collapse = ' + ')
+  overall.observed <- vapply(groups, col_of_group, numeric(length(target.levels)))
+  overall.test <- compute_chisq_from_counts(overall.observed, method = chi_square)
   list(
-    groups = groups,
+    groups = group.category.lists,
     group_labels = group.labels,
     merge_history = merge.history,
     p_value = overall.test$p_value,
     adjusted_p_value = overall.test$p_value,
-    test = overall.test
+    test = overall.test,
+    low_expected = isTRUE(overall.test$low_expected >= 0.2)
   )
 }
 
@@ -505,13 +624,16 @@ evaluate_predictor <- function(data, target, variable, parameters,
 #' @return Tree tables and traversal metadata.
 grow_chaid_tree <- function(data, target, predictors, parameters,
                             predictor_info, class_levels) {
-  state <- list(
-    node_records = list(),
-    edges = list(),
-    node_metadata = list(),
-    merge_history = list(),
-    next_id = 1L
-  )
+  # An environment (reference semantics) rather than a list: grow_node recurses
+  # and mutates this shared state, and nested list-`<<-` updates are prone to
+  # lost updates. With an environment, `state$field <- value` mutates in place.
+  state <- new.env(parent = emptyenv())
+  state$node_records <- list()
+  state$edges <- list()
+  state$node_metadata <- list()
+  state$merge_history <- list()
+  state$next_id <- 1L
+  state$low_expected <- FALSE
 
   grow_node <- function(node.data, node.id, parent.id, depth, rule) {
     target.factor <- factor(as.character(node.data[[target]]), levels = class_levels)
@@ -535,8 +657,8 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
       adjusted_p_value = NA_real_,
       rule = rule
     )
-    state$node_records[[as.character(node.id)]] <<- record
-    state$node_metadata[[as.character(node.id)]] <<- list(
+    state$node_records[[as.character(node.id)]] <- record
+    state$node_metadata[[as.character(node.id)]] <- list(
       split_variable = NULL,
       split_groups = NULL,
       group_labels = NULL
@@ -583,7 +705,7 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
     current.record <- state$node_records[[as.character(node.id)]]
     current.record$p_value <- best$p_value
     current.record$adjusted_p_value <- best$adjusted_p_value
-    state$node_records[[as.character(node.id)]] <<- current.record
+    state$node_records[[as.character(node.id)]] <- current.record
 
     if (is.na(best$p_value) || best$adjusted_p_value > parameters$alpha_split) {
       return(invisible(NULL))
@@ -597,10 +719,13 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
       return(invisible(NULL))
     }
 
+    if (isTRUE(best$low_expected)) {
+      state$low_expected <- TRUE
+    }
     current.record$is_terminal <- FALSE
     current.record$split_variable <- best$variable
-    state$node_records[[as.character(node.id)]] <<- current.record
-    state$node_metadata[[as.character(node.id)]] <<- list(
+    state$node_records[[as.character(node.id)]] <- current.record
+    state$node_metadata[[as.character(node.id)]] <- list(
       split_variable = best$variable,
       split_groups = best$groups,
       group_labels = best$group_labels
@@ -610,12 +735,12 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
     }
 
     for (i in seq_along(best$groups)) {
-      state$next_id <<- state$next_id + 1L
+      state$next_id <- state$next_id + 1L
       child.id <- state$next_id
       group <- best$groups[[i]]
       child.data <- node.data[best$values %in% group, , drop = FALSE]
       label <- best$group_labels[i]
-      state$edges[[length(state$edges) + 1L]] <<- list(
+      state$edges[[length(state$edges) + 1L]] <- list(
         parent_id = as.integer(node.id),
         child_id = as.integer(child.id),
         split_variable = best$variable,
@@ -666,7 +791,8 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
     nodes = nodes,
     edges = edges,
     node_metadata = state$node_metadata,
-    category_merge_map = merge_history_to_data(state$merge_history)
+    category_merge_map = merge_history_to_data(state$merge_history),
+    low_expected = state$low_expected
   )
 }
 
@@ -738,13 +864,14 @@ apply_numeric_bins <- function(value, metadata) {
   if (!is.numeric(value)) {
     value <- suppressWarnings(as.numeric(as.character(value)))
   }
-  as.character(cut(
+  bin.index <- cut(
     value,
     breaks = metadata$breaks,
-    labels = metadata$labels,
+    labels = FALSE,
     include.lowest = TRUE,
     right = TRUE
-  ))
+  )
+  metadata$labels[bin.index]
 }
 
 #' Traverse one row through a fitted CHAID tree.
@@ -1037,8 +1164,9 @@ validate_chaid_inputs <- function(data,
       !target %in% names(data)) {
     stop('target must name an existing column')
   }
-  if (!is.factor(data[[target]]) && !is.character(data[[target]])) {
-    stop('target must be character or factor')
+  if (!is.factor(data[[target]]) && !is.character(data[[target]]) &&
+      !is.logical(data[[target]])) {
+    stop('target must be character, factor, or logical')
   }
   if (all(is.na(data[[target]]))) {
     stop('target must contain at least one non-missing value')

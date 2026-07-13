@@ -3,7 +3,7 @@ test_that('chaid_fit rejects invalid targets and predictors', {
 
   expect_error(chaid_fit(data, target = 'missing'), 'target')
   expect_error(chaid_fit(data, target = 'target', predictors = 'missing'), 'predictor')
-  expect_error(chaid_fit(data.frame(target = 1:2, x = 1:2), target = 'target'), 'character or factor')
+  expect_error(chaid_fit(data.frame(target = 1:2, x = 1:2), target = 'target'), 'character, factor, or logical')
   expect_error(chaid_fit(data, target = 'target', min_split = 1, min_bucket = 2), 'min_split')
   expect_error(chaid_fit(data.frame(target = c(NA_character_, NA_character_), x = c('a', 'b')),
                          target = 'target'), 'non-missing')
@@ -190,4 +190,92 @@ test_that('CHAID public functions are exported', {
   expect_true('chaid_fit' %in% getNamespaceExports('exploratory'))
   expect_true('chaid_predict' %in% getNamespaceExports('exploratory'))
   expect_true('chaid_tree_data' %in% getNamespaceExports('exploratory'))
+})
+
+test_that('numeric bins use human-readable range labels, not BinN codes', {
+  data <- data.frame(target = rep(c('yes', 'no'), each = 30), x = rep(1:6, each = 10))
+  model <- suppressWarnings(
+    chaid_fit(data, target = 'target', numeric_binning = 'equal_width',
+              numeric_bins = 3, min_split = 5, min_bucket = 2)
+  )
+
+  labels <- model$numeric_binning_map$x$labels
+  expect_false(any(grepl('^Bin[0-9]+$', labels)))
+  # First / last bins are open-ended; middle bins are (lo, hi].
+  expect_true(any(grepl('^<= ', labels)))
+  expect_true(any(grepl('^> ', labels)))
+  # No BinN leaks into rules, edges, or the node summary.
+  expect_false(any(grepl('Bin[0-9]', model$nodes$rule)))
+  expect_false(any(grepl('Bin[0-9]', model$edges$label)))
+})
+
+test_that('numeric bin labels are reused at prediction time', {
+  data <- data.frame(target = rep(c('yes', 'no'), 10), x = 1:20)
+  model <- suppressWarnings(
+    chaid_fit(data, target = 'target', numeric_binning = 'quantile',
+              numeric_bins = 4, min_split = 2, min_bucket = 1)
+  )
+  labels <- model$numeric_binning_map$x$labels
+  binned <- chaid_predict(model, data.frame(x = c(-100, 100)), type = 'node')
+  # Out-of-range values map into the open-ended first/last bins without error.
+  expect_length(binned, 2)
+  expect_true(all(!is.na(binned)))
+})
+
+test_that('binned numeric predictors merge only adjacent (contiguous) bins', {
+  # Ordered numeric bins may only merge neighbours, so no merge groups the
+  # lowest and highest bins together.
+  data <- data.frame(
+    target = c(rep('yes', 60), rep('no', 60)),
+    x = c(rep(1, 30), rep(2, 30), rep(3, 30), rep(4, 30))
+  )
+  model <- suppressWarnings(
+    chaid_fit(data, target = 'target', numeric_binning = 'equal_width',
+              numeric_bins = 4, min_split = 10, min_bucket = 5)
+  )
+  info <- model$predictor_info$x
+  expect_true(isTRUE(info$ordered))
+})
+
+test_that('chaid_fit accepts a logical target with TRUE-first levels', {
+  data <- data.frame(target = rep(c(TRUE, FALSE), each = 30),
+                     x = rep(c('a', 'b', 'c'), each = 20))
+  model <- suppressWarnings(chaid_fit(data, target = 'target', min_split = 5, min_bucket = 2))
+
+  expect_s3_class(model, 'exploratory_chaid')
+  expect_equal(model$class_levels, c('TRUE', 'FALSE'))
+  expect_equal(model$target_type, 'logical')
+  classes <- chaid_predict(model, data.frame(x = c('a', 'b')), type = 'class')
+  expect_true(all(classes %in% c('TRUE', 'FALSE')))
+})
+
+test_that('chaid_fit emits spec warnings once per fit', {
+  # Numeric binning warning.
+  binned <- data.frame(target = rep(c('yes', 'no'), 10), x = 1:20)
+  expect_warning(chaid_fit(binned, target = 'target', numeric_bins = 3,
+                           min_split = 2, min_bucket = 1),
+                 'were binned')
+
+  # No-significant-split warning (root-only tree despite two classes).
+  no_split <- data.frame(target = rep(c('yes', 'no'), 50),
+                         x = rep(c('a', 'b'), each = 50))
+  expect_warning(chaid_fit(no_split, target = 'target', alpha_split = 0.001,
+                           min_split = 10, min_bucket = 5),
+                 'only the root node')
+})
+
+test_that('counts-based chi-square matches the raw-vector path', {
+  set.seed(1)
+  values <- sample(c('a', 'b', 'c'), 200, replace = TRUE)
+  target <- sample(c('yes', 'no'), 200, replace = TRUE)
+  observed <- unclass(table(target, values))
+
+  raw <- exploratory:::compute_chisq_test(values, target, method = 'pearson')
+  counts <- exploratory:::compute_chisq_from_counts(observed, method = 'pearson')
+  expect_equal(raw$statistic, counts$statistic)
+  expect_equal(raw$p_value, counts$p_value)
+
+  raw_lr <- exploratory:::compute_chisq_test(values, target, method = 'likelihood_ratio')
+  counts_lr <- exploratory:::compute_chisq_from_counts(observed, method = 'likelihood_ratio')
+  expect_equal(raw_lr$statistic, counts_lr$statistic)
 })
