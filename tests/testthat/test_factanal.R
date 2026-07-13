@@ -232,15 +232,21 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   expect_equal(moderate$status, "moderate")
 
   # Communality bar capping: a Heywood case (communality > 1) must be capped so the 100%-stacked
-  # communality/uniqueness bar stays valid (communality <= 1, uniqueness >= 0). (#37018)
+  # communality/uniqueness bar stays valid (communality <= 1, uniqueness >= 0), and the affected
+  # bar's label carries a warning marker + the actual value. (#37018)
   fake_fa <- list(communality = c(A = 0.70, B = 1.05, C = 0.30))
   class(fake_fa) <- "fa_exploratory"
   clong <- tidy.fa_exploratory(fake_fa, type = "communalities_long")
   expect_equal(colnames(clong), c("variable", "Component", "Ratio"))
   bwide <- tidyr::pivot_wider(clong, names_from = Component, values_from = Ratio)
-  expect_equal(bwide$Communality[bwide$variable == "B"], 1)      # capped from 1.05
-  expect_equal(bwide$Uniqueness[bwide$variable == "B"], 0)       # clamped from -0.05
-  expect_equal(bwide$Communality[bwide$variable == "A"], 0.70)   # normal case unchanged
+  # Heywood variable (B): capped values, label flagged with the warning marker + actual value.
+  b_row <- bwide[grepl("⚠", bwide$variable), ]
+  expect_equal(nrow(b_row), 1)
+  expect_true(grepl("1.05", b_row$variable))
+  expect_equal(b_row$Communality, 1)      # capped from 1.05
+  expect_equal(b_row$Uniqueness, 0)       # clamped from -0.05
+  # Normal variables are unchanged (label and values).
+  expect_equal(bwide$Communality[bwide$variable == "A"], 0.70)
   expect_true(all(bwide$Communality + bwide$Uniqueness <= 1 + 1e-9))
 
   # Parallel analysis returns a recommended count and per-factor threshold table, deterministically.

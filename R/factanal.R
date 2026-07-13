@@ -449,11 +449,20 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # Long form for the 100%-stacked communality/uniqueness bar chart. Normally the two components
     # sum to 1. In a Heywood case (communality > 1) uniqueness goes negative, which would break the
     # 100%-stacked bar. Cap the DISPLAYED ratios -- communality at 1, uniqueness at 0 -- so the bar
-    # stays a clean 100% stack. The exact communality and the improper-solution warning are surfaced
-    # in the Communality table (judge_communality "Possibly improper solution"). (#37018)
+    # stays a clean 100% stack. (#37018)
     comm <- as.numeric(x$communality)
+    # For a Heywood-case variable, flag its bar on the chart with a warning marker + the actual
+    # (uncapped) communality value, appended to the category label. This is language-neutral (a
+    # symbol + a number, no translated text) so it is safe for both EN and JA, and it renders
+    # reliably on the axis / hover without any chart-code change. The full explanation is in the
+    # Communality table judgment ("Possibly improper solution") and the report warning.
+    var_labels <- names(x$communality)
+    improper <- !is.na(comm) & comm > 1
+    if (any(improper)) {
+      var_labels[improper] <- paste0(var_labels[improper], "  ⚠ ", format(round(comm[improper], 2), nsmall = 2))
+    }
     res <- tibble::tibble(
-      variable = names(x$communality),
+      variable = var_labels,
       Communality = pmin(comm, 1),
       Uniqueness = pmax(1 - comm, 0)
     ) %>%
