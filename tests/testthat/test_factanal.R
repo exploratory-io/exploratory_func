@@ -195,7 +195,9 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   expect_equal(judge_bartlett(0.20)$status, "caution")
   expect_equal(judge_bartlett(NA_real_)$status, "na")
 
-  # Communality thresholds.
+  # Communality thresholds. A communality > 1 (Heywood case) is flagged before "too high".
+  expect_equal(judge_communality(1.05)$status, "improper")
+  expect_equal(judge_communality(1.0)$status, "too_high")
   expect_equal(judge_communality(0.97)$status, "too_high")
   expect_equal(judge_communality(0.70)$status, "good")
   expect_equal(judge_communality(0.50)$status, "moderate")

@@ -61,6 +61,10 @@ judge_bartlett <- function(p_value, cfg = factanal_report_config()) {
 
 judge_communality <- function(communality, cfg = factanal_report_config()) {
   if (is.na(communality)) return(list(label = "Not Available", status = "na"))
+  # A communality > 1 (i.e. negative uniqueness) is a Heywood case: NOT "explained more than
+  # 100%", but a sign that the estimation is unstable / the solution is improper. Flag it before
+  # the "too high" check so it gets its own, more serious judgment. (issue #37018)
+  if (communality > 1) return(list(label = "Possibly improper solution", status = "improper"))
   if (communality >= cfg$communality_too_high) list(label = "Too high (caution)", status = "too_high")
   else if (communality >= cfg$communality_good) list(label = "Well explained", status = "good")
   else if (communality >= cfg$communality_low) list(label = "Moderately explained", status = "moderate")
