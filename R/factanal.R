@@ -446,9 +446,17 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     ) %>% dplyr::arrange(dplyr::desc(Communality))
   }
   else if (type == "communalities_long") {
-    # Long form for the 100%-stacked communality/uniqueness bar chart. The two components sum to 1.
-    comm <- x$communality
-    res <- tibble::tibble(variable = names(comm), Communality = as.numeric(comm), Uniqueness = 1 - as.numeric(comm)) %>%
+    # Long form for the 100%-stacked communality/uniqueness bar chart. Normally the two components
+    # sum to 1. In a Heywood case (communality > 1) uniqueness goes negative, which would break the
+    # 100%-stacked bar. Cap the DISPLAYED ratios -- communality at 1, uniqueness at 0 -- so the bar
+    # stays a clean 100% stack. The exact communality and the improper-solution warning are surfaced
+    # in the Communality table (judge_communality "Possibly improper solution"). (#37018)
+    comm <- as.numeric(x$communality)
+    res <- tibble::tibble(
+      variable = names(x$communality),
+      Communality = pmin(comm, 1),
+      Uniqueness = pmax(1 - comm, 0)
+    ) %>%
       tidyr::pivot_longer(cols = c("Communality", "Uniqueness"), names_to = "Component", values_to = "Ratio") %>%
       dplyr::mutate(Component = forcats::fct_relevel(as.factor(Component), "Communality", "Uniqueness"))
   }
