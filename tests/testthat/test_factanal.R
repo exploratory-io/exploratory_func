@@ -8,7 +8,7 @@ test_that("exp_factanal with default orthogonal varimax rotation", {
   check_output <- function(model_df) {
     res <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
     expect_equal(colnames(res),
-                 c("Factors", "Variance Explained (Ratio)", "Variance Explained", "Chi-Square", "P Value", "DF", "Rows"))
+                 c("Factors", "Variance Explained (Ratio)", "Variance Explained", "Chi-Square", "P Value", "DF", "Rows", "Method", "Rotation", "RMSR", "RMSEA", "TLI", "BIC"))
     res <- model_df %>% tidy_rowwise(model, type="variances")
     expect_equal(colnames(res),
                  c("SS loadings", "Proportion Var", "Cumulative Var", "Proportion Explained", "Cumulative Proportion", "Factor", "% Variance", "Cummulated % Variance"))
@@ -32,6 +32,25 @@ test_that("exp_factanal with default orthogonal varimax rotation", {
     res <- model_df %>% tidy_rowwise(model, type="data")
     expect_equal(colnames(res),
                  c("mpg","cyl","disp","hp","drat","wt","qsec","vs","am","gear","carb","new_col","Factor 1","Factor 2","Factor 3"))
+    # New report tidy types (issue #37018).
+    res <- model_df %>% tidy_rowwise(model, type="suitability")
+    expect_equal(colnames(res), c("Metric", "Value", "Judgement", "Description", "status"))
+    expect_equal(res$Metric, c("KMO", "Bartlett's Test of Sphericity", "Rows Used", "Variables Used"))
+    res <- model_df %>% tidy_rowwise(model, type="factor_count")
+    expect_equal(colnames(res), c("Method", "Recommended Number of Factors", "Description"))
+    expect_equal(res$Method, c("Kaiser Criterion", "Parallel Analysis", "Scree Plot"))
+    expect_equal(res$`Recommended Number of Factors`[3], "Check the chart")
+    res <- model_df %>% tidy_rowwise(model, type="parallel_screeplot")
+    expect_equal(colnames(res), c("Factor", "Eigenvalue", "Random Data Eigenvalue"))
+    res <- model_df %>% tidy_rowwise(model, type="loadings_wide")
+    expect_equal(colnames(res), c("variable", "Factor 1", "Factor 2", "Factor 3", "Judgement", "judgement_status", "primary_factor", "secondary_factors", "direction"))
+    # Every status token must be one of the known set (guards against a typo drifting from the client tooltip keys).
+    expect_true(all(res$judgement_status %in% c("strong", "moderate", "near_crossload", "crossload", "ambiguous_crossload", "low_loading")))
+    res <- model_df %>% tidy_rowwise(model, type="communalities")
+    expect_equal(colnames(res), c("variable", "Communality", "Uniqueness", "Judgement", "judgement_status"))
+    res <- model_df %>% tidy_rowwise(model, type="communalities_long")
+    expect_equal(colnames(res), c("variable", "Component", "Ratio"))
+    expect_equal(levels(res$Component), c("Communality", "Uniqueness"))
   }
 
   model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="minres") 
@@ -62,7 +81,7 @@ test_that("exp_factanal with oblique Promax rotation", {
   check_output <- function(model_df) {
     res <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
     expect_equal(colnames(res),
-                 c("Factors", "Variance Explained (Ratio)", "Variance Explained", "Chi-Square", "P Value", "DF", "Rows"))
+                 c("Factors", "Variance Explained (Ratio)", "Variance Explained", "Chi-Square", "P Value", "DF", "Rows", "Method", "Rotation", "RMSR", "RMSEA", "TLI", "BIC"))
     res <- model_df %>% tidy_rowwise(model, type="variances")
     expect_equal(colnames(res),
                  c("SS loadings", "Proportion Var", "Cumulative Var", "Proportion Explained", "Cumulative Proportion", "Factor", "% Variance", "Cummulated % Variance"))
@@ -150,4 +169,69 @@ test_that("exp_factanal with strange column name and all-NA column", {
   res <- model_df %>% tidy_rowwise(model, type="data")
   expect_equal(colnames(res),
                c("mpg","Cy l","disp","hp","drat","wt","qsec","vs","am","gear","carb","new_col","Factor 1","Factor 2"))
+  # New tidy types must also survive a strange column name + all-NA column (issue #37018).
+  res <- model_df %>% tidy_rowwise(model, type="suitability")
+  expect_equal(colnames(res), c("Metric", "Value", "Judgement", "Description", "status"))
+  res <- model_df %>% tidy_rowwise(model, type="loadings_wide")
+  expect_true(all(c("variable", "Judgement", "judgement_status") %in% colnames(res)))
+  res <- model_df %>% tidy_rowwise(model, type="communalities")
+  expect_equal(colnames(res), c("variable", "Communality", "Uniqueness", "Judgement", "judgement_status"))
+})
+
+test_that("factor analysis report judgment helpers (issue #37018)", {
+  cfg <- factanal_report_config()
+
+  # KMO thresholds + NA handling. Labels are English-canonical; status is the language-neutral token.
+  expect_equal(judge_kmo(0.85)$status, "great")
+  expect_equal(judge_kmo(0.75)$status, "good")
+  expect_equal(judge_kmo(0.65)$status, "min")
+  expect_equal(judge_kmo(0.55)$status, "poor")
+  expect_equal(judge_kmo(0.40)$status, "below")
+  expect_equal(judge_kmo(NA_real_)$status, "na")
+  expect_equal(judge_kmo(0.85)$label, "Very Suitable")
+
+  # Bartlett p-value.
+  expect_equal(judge_bartlett(0.001)$status, "suitable")
+  expect_equal(judge_bartlett(0.20)$status, "caution")
+  expect_equal(judge_bartlett(NA_real_)$status, "na")
+
+  # Communality thresholds.
+  expect_equal(judge_communality(0.97)$status, "too_high")
+  expect_equal(judge_communality(0.70)$status, "good")
+  expect_equal(judge_communality(0.50)$status, "moderate")
+  expect_equal(judge_communality(0.30)$status, "weak")
+  expect_equal(judge_communality(NA_real_)$status, "na")
+
+  # Loading judgment: strong, negative direction, hard-to-interpret, cross-loading.
+  strong <- judge_loading(c(`Factor 1` = 0.75, `Factor 2` = 0.10))
+  expect_equal(strong$status, "strong")
+  expect_equal(strong$primary_factor, "Factor 1")
+  expect_equal(strong$direction, "positive")
+  expect_equal(strong$label, "Strongly related to Factor 1")
+
+  strong_neg <- judge_loading(c(`Factor 1` = 0.10, `Factor 2` = -0.75))
+  expect_equal(strong_neg$status, "strong")
+  expect_equal(strong_neg$direction, "negative")
+  expect_equal(strong_neg$label, "Strongly related to Factor 2 (negative)")
+
+  low <- judge_loading(c(`Factor 1` = 0.20, `Factor 2` = 0.15))
+  expect_equal(low$status, "low_loading")
+  expect_equal(low$label, "Hard to interpret")
+
+  ambiguous <- judge_loading(c(`Factor 1` = 0.55, `Factor 2` = 0.50))
+  expect_equal(ambiguous$status, "ambiguous_crossload")
+
+  crossload <- judge_loading(c(`Factor 1` = 0.70, `Factor 2` = 0.45))
+  expect_equal(crossload$status, "crossload")
+  expect_equal(crossload$primary_factor, "Factor 1")
+  expect_equal(crossload$secondary_factors, "Factor 2")
+
+  moderate <- judge_loading(c(`Factor 1` = 0.45, `Factor 2` = 0.05))
+  expect_equal(moderate$status, "moderate")
+
+  # Parallel analysis returns a recommended count and per-factor threshold table, deterministically.
+  set.seed(1)
+  pa <- compute_parallel_analysis(mtcars[, c("mpg","cyl","disp","hp","drat","wt","qsec")], n_iter = 20)
+  expect_true(is.numeric(pa$recommended_n))
+  expect_equal(colnames(pa$table), c("factor_number", "actual_eigenvalue", "random_eigenvalue_threshold"))
 })
