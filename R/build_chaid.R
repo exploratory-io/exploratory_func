@@ -1,0 +1,460 @@
+# Analytics View integration layer for the CHAID engine in chaid.R.
+#
+# exp_chaid() wraps chaid_fit() in the standard model-data-frame shape (one row
+# per group: `model`, `.test_index`, `source.data`) used by every Analytics View
+# decision-tree/model template, and the augment/tidy/glance S3 methods below let
+# the framework's generic preprocessors (prediction(), rf_evaluation_*,
+# tidy_rowwise()) dispatch on an `exploratory_chaid` model. This mirrors the
+# exp_rpart() pattern in randomForest_tidiers.R, minus regression, SMOTE,
+# variable importance, and partial dependence (out of scope for CHAID V1).
+
+#' Fit a CHAID classification tree as an Analytics View model data frame.
+#'
+#' @param df A data frame, optionally grouped.
+#' @param target Target column (unquoted); character/factor/logical.
+#' @param ... Predictor columns (unquoted), tidyselect-style.
+#' @param target_fun Optional function name to transform the target.
+#' @param predictor_funs Optional named list of predictor transformations.
+#' @param alpha_split,alpha_merge,max_depth,min_split,min_bucket,min_node_proportion CHAID growth controls.
+#' @param numeric_binning,numeric_bins Numeric predictor binning controls.
+#' @param missing Missing-value handling (`as_category` or `exclude`).
+#' @param chi_square Chi-square statistic (`pearson` or `likelihood_ratio`).
+#' @param bonferroni Whether to apply Bonferroni correction.
+#' @param max_categories Maximum predictor categories before a predictor is skipped.
+#' @param max_nrow Row cap; data is sampled down to this before fitting.
+#' @param target_n,predictor_n Category caps; excess categories are lumped into "Other".
+#' @param binary_classification_threshold Probability threshold for the positive class.
+#' @param seed Random seed for sampling / splitting reproducibility.
+#' @param test_rate Fraction of rows held out as test data.
+#' @param test_split_type `random` or `ordered`.
+#' @return A rowwise model data frame with `model`, `.test_index`, `source.data`.
+#' @export
+exp_chaid <- function(df,
+                      target,
+                      ...,
+                      target_fun = NULL,
+                      predictor_funs = NULL,
+                      alpha_split = 0.05,
+                      alpha_merge = 0.05,
+                      max_depth = 3,
+                      min_split = 50,
+                      min_bucket = 20,
+                      min_node_proportion = NULL,
+                      numeric_binning = "quantile",
+                      numeric_bins = 10,
+                      missing = "as_category",
+                      chi_square = "pearson",
+                      bonferroni = TRUE,
+                      max_categories = 50,
+                      max_nrow = 50000,
+                      target_n = 20,
+                      predictor_n = 12,
+                      binary_classification_threshold = 0.5,
+                      seed = 1,
+                      test_rate = 0.0,
+                      test_split_type = "random") {
+  if (test_rate < 0 || 1 < test_rate) {
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1) {
+    stop("test_rate must be less than 1")
+  }
+
+  # NSE column selection, mirroring exp_rpart.
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  if (is.numeric(df[[target_col]])) {
+    stop("CHAID supports categorical target variables only.")
+  }
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  } else {
+    selected_cols <- orig_selected_cols
+  }
+
+  grouped_cols <- grouped_by(df)
+  # Sort predictors so the fitted tree is stable against input column order.
+  selected_cols <- stringr::str_sort(selected_cols)
+
+  is_target_logical <- is.logical(df[[target_col]])
+
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols,
+                          target_n, predictor_n, map_name = FALSE)
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
+
+  each_func <- function(df) {
+    tryCatch({
+      if (!is.null(seed)) {
+        set.seed(seed)
+      }
+      clean_df_ret <- cleanup_df_per_group(
+        df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n,
+        revert_logical_levels = FALSE, filter_numeric_na = TRUE,
+        # Keep a logical target logical so chaid_fit() sets TRUE-first levels.
+        convert_logical = FALSE
+      )
+      if (is.null(clean_df_ret)) {
+        return(NULL) # skip this group
+      }
+      df <- clean_df_ret$df
+      c_cols <- clean_df_ret$c_cols
+      if (length(c_cols) == 0) {
+        stop("Invalid Predictors: Only one unique value.")
+      }
+      group_name_map <- clean_df_ret$name_map
+
+      # Split training and test data.
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+
+      unique_val <- unique(df[[clean_target_col]])
+      if (length(unique_val[!is.na(unique_val)]) <= 1) {
+        stop("Categorical Target Variable must have 2 or more unique values.")
+      }
+
+      model <- chaid_fit(
+        df, target = clean_target_col, predictors = c_cols,
+        alpha_split = alpha_split, alpha_merge = alpha_merge,
+        max_depth = max_depth, min_split = min_split, min_bucket = min_bucket,
+        min_node_proportion = min_node_proportion,
+        numeric_binning = numeric_binning, numeric_bins = numeric_bins,
+        missing = missing, chi_square = chi_square, bonferroni = bonferroni,
+        max_categories = max_categories
+      )
+      model$classification_type <- if (model$target_type == "logical") "binary" else "multi"
+
+      # Store training actual / predicted so tidy() evaluation and conf_mat can
+      # reuse the shared model-agnostic evaluation helpers.
+      actual <- factor(as.character(df[[clean_target_col]]), levels = model$class_levels)
+      train_all <- chaid_predict(model, df, type = "all")
+      model$y <- actual
+      model$predicted_class <- chaid_predicted_class(
+        model, train_all, binary_classification_threshold
+      )
+      model$predicted_prob <- chaid_positive_probability(model, train_all)
+
+      # Metadata expected by the framework.
+      model$terms_mapping <- names(group_name_map)
+      names(model$terms_mapping) <- group_name_map
+      # formula_terms lets generic evaluation code find the target column name
+      # (all.vars(model$formula_terms)[1]) in the test-evaluation path.
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- stats::as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
+      model$formula_terms <- stats::terms(fml)
+      attr(model$formula_terms, ".Environment") <- NULL
+      model$orig_target_col <- target_col
+      model$is_target_logical <- is_target_logical
+      if (!is.null(target_funs)) {
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        attr(predictor_funs, "LC_TIME") <- Sys.getlocale("LC_TIME")
+        attr(predictor_funs, "sysname") <- Sys.info()[["sysname"]]
+        attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
+        model$predictor_funs <- predictor_funs
+      }
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
+
+      list(model = model, test_index = test_index, source_data = source_data)
+    }, error = function(e) {
+      if (length(grouped_cols) > 0) {
+        # Report per-group errors in the Summary table rather than aborting.
+        class(e) <- c("chaid", class(e))
+        list(model = e, test_index = NULL, source_data = NULL)
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+  ret <- ret %>% dplyr::ungroup()
+
+  ret <- ret %>%
+    dplyr::mutate(model = purrr::imap(data, function(df, idx) {
+      tryCatch(df[[model_and_data_col]][[1]]$model,
+               error = function(e) stop(paste0(e$message, " (while extracting model from group ", idx, ")"), call. = FALSE))
+    })) %>%
+    dplyr::mutate(.test_index = purrr::imap(data, function(df, idx) {
+      tryCatch(df[[model_and_data_col]][[1]]$test_index,
+               error = function(e) stop(paste0(e$message, " (while extracting test_index from group ", idx, ")"), call. = FALSE))
+    })) %>%
+    dplyr::mutate(source.data = purrr::imap(data, function(df, idx) {
+      tryCatch({
+        d <- df[[model_and_data_col]][[1]]$source_data
+        if (length(grouped_cols) > 0 && !is.null(d)) d %>% dplyr::select(-grouped_cols) else d
+      }, error = function(e) stop(paste0(e$message, " (while extracting source.data from group ", idx, ")"), call. = FALSE))
+    })) %>%
+    dplyr::select(-data)
+
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
+  # .model passes viz-layer column-type validation; .model.chaid identifies the step.
+  class(ret$model) <- c("list", ".model", ".model.chaid")
+  ret
+}
+
+#' Predicted class for a CHAID model, applying the binary threshold.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @param all_prediction Output of `chaid_predict(type = "all")`.
+#' @param threshold Positive-class probability threshold (binary only).
+#' @return A factor of predicted classes with levels `model$class_levels`.
+chaid_predicted_class <- function(model, all_prediction, threshold = 0.5) {
+  if (identical(model$classification_type, "binary")) {
+    prob_true <- all_prediction[[".pred_prob_TRUE"]]
+    labels <- ifelse(prob_true >= threshold, "TRUE", "FALSE")
+  } else {
+    labels <- as.character(all_prediction[[".pred_class"]])
+  }
+  factor(labels, levels = model$class_levels)
+}
+
+#' Positive-class (binary) or max-class (multiclass) probability.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @param all_prediction Output of `chaid_predict(type = "all")`.
+#' @return A numeric probability vector.
+chaid_positive_probability <- function(model, all_prediction) {
+  prob_cols <- grep("^\\.pred_prob_", names(all_prediction), value = TRUE)
+  if (identical(model$classification_type, "binary")) {
+    all_prediction[[".pred_prob_TRUE"]]
+  } else {
+    apply(as.matrix(all_prediction[, prob_cols, drop = FALSE]), 1, max)
+  }
+}
+
+#' Augment data with CHAID predictions (broom S3 method).
+#'
+#' Supports both the `data =` and `newdata =` calling conventions used by
+#' prediction(); predictions are computed directly from the supplied rows, so no
+#' precomputed train/test predictions are required. Adds `predicted_label`,
+#' `predicted_probability`, and (multiclass) `predicted_probability_<class>`.
+#'
+#' @param x A fitted `exploratory_chaid` model.
+#' @param data Rows to predict on (training / test path).
+#' @param newdata Rows to predict on (new-data path).
+#' @param data_type Ignored; predictions come from the supplied rows.
+#' @param binary_classification_threshold Positive-class threshold (binary).
+#' @param ... Unused.
+#' @return The supplied data frame with prediction columns appended.
+#' @export
+augment.exploratory_chaid <- function(x, data = NULL, newdata = NULL,
+                                      data_type = "training",
+                                      binary_classification_threshold = 0.5, ...) {
+  if ("error" %in% class(x)) {
+    return(data.frame())
+  }
+  frame <- if (!is.null(newdata)) newdata else data
+  if (is.null(frame)) {
+    stop("data or newdata have to be indicated.")
+  }
+  if (nrow(frame) == 0) {
+    return(frame)
+  }
+
+  # Replay predictor transformations for the new-data path.
+  if (!is.null(newdata) && !is.null(x$predictor_funs)) {
+    frame <- frame %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+  }
+
+  all_prediction <- chaid_predict(x, frame, type = "all")
+  predicted_label <- as.character(chaid_predicted_class(
+    x, all_prediction, binary_classification_threshold
+  ))
+  predicted_probability <- chaid_positive_probability(x, all_prediction)
+
+  predicted_label_col <- avoid_conflict(colnames(frame), "predicted_label")
+  predicted_probability_col <- avoid_conflict(colnames(frame), "predicted_probability")
+  frame[[predicted_label_col]] <- predicted_label
+  frame[[predicted_probability_col]] <- predicted_probability
+
+  if (identical(x$classification_type, "multi")) {
+    for (cls in x$class_levels) {
+      col <- avoid_conflict(colnames(frame), paste0("predicted_probability_", cls))
+      frame[[col]] <- all_prediction[[paste0(".pred_prob_", cls)]]
+    }
+  }
+  frame
+}
+
+#' glance for a CHAID model (broom S3 method).
+#'
+#' @param x A fitted `exploratory_chaid` model.
+#' @param pretty.name Whether to use display-friendly column names.
+#' @param ... Unused.
+#' @return A one-row model summary data frame.
+#' @export
+glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
+  if ("error" %in% class(x)) {
+    return(data.frame(Note = x$message))
+  }
+  tidy.exploratory_chaid(x, type = "evaluation", pretty.name = pretty.name, ...)
+}
+
+#' tidy for a CHAID model (broom S3 method).
+#'
+#' @param x A fitted `exploratory_chaid` model.
+#' @param type One of `evaluation`, `evaluation_by_class`, `conf_mat`,
+#'   `tree_nodes`, `node_summary`, `rules`, `category_merges`, `split_summary`,
+#'   or `importance`.
+#' @param pretty.name Whether to use display-friendly column names.
+#' @param binary_classification_threshold Positive-class threshold (binary).
+#' @param ... Unused.
+#' @return A data frame whose shape depends on `type`.
+#' @export
+tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
+                                   binary_classification_threshold = 0.5, ...) {
+  if ("error" %in% class(x) && type != "evaluation") {
+    return(data.frame())
+  }
+  actual <- x$y
+  predicted <- x$predicted_class
+  switch(
+    type,
+    evaluation = {
+      if ("error" %in% class(x)) {
+        return(data.frame(Note = x$message))
+      }
+      if (identical(x$classification_type, "binary")) {
+        evaluate_binary_classification(actual, predicted, x$predicted_prob,
+                                       pretty.name = pretty.name, is_rpart = FALSE)
+      } else {
+        evaluate_multi_(data.frame(predicted = predicted, actual = actual),
+                        "predicted", "actual", pretty.name = pretty.name)
+      }
+    },
+    evaluation_by_class = {
+      per_level <- function(level) {
+        evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
+      }
+      dplyr::bind_rows(lapply(x$class_levels, per_level))
+    },
+    conf_mat = {
+      calc_conf_mat(actual, predicted)
+    },
+    tree_nodes = {
+      build_chaid_tree_nodes(x)
+    },
+    node_summary = {
+      chaid_node_summary(x)
+    },
+    rules = {
+      chaid_rule_table(x)
+    },
+    category_merges = {
+      chaid_category_merge_table(x)
+    },
+    split_summary = {
+      chaid_split_summary(x)
+    },
+    importance = {
+      stop("Variable importance is not supported for CHAID yet.")
+    },
+    {
+      stop(paste0("type ", type, " is not defined"))
+    }
+  )
+}
+
+#' Build per-node data for the interactive decision tree chart.
+#'
+#' Emits the same schema as build_rpart_tree_nodes() so the existing N-ary tree
+#' renderer draws CHAID's multiway splits with no front-end changes.
+#'
+#' @param x A fitted `exploratory_chaid` model.
+#' @return A data frame with one row per node.
+build_chaid_tree_nodes <- function(x) {
+  nodes <- x$nodes
+  edges <- x$edges
+  root_n <- nodes$n[nodes$node_id == 1L]
+  class_levels <- x$class_levels
+
+  map_name <- function(v) {
+    tm <- x$terms_mapping
+    v <- as.character(v)
+    if (!is.null(tm) && v %in% names(tm)) unname(tm[v]) else v
+  }
+
+  # Positive class first for a 2-class target (SPSS-style ordering).
+  ord <- seq_along(class_levels)
+  if (length(class_levels) == 2) {
+    up <- toupper(class_levels)
+    positive_idx <- if (setequal(up, c("FALSE", "TRUE"))) which(up == "TRUE")
+                    else if (setequal(up, c("NO", "YES"))) which(up == "YES")
+                    else NA_integer_
+    if (!is.na(positive_idx)) {
+      ord <- c(positive_idx, setdiff(seq_along(class_levels), positive_idx))
+    }
+  }
+
+  rows <- lapply(seq_len(nrow(nodes)), function(i) {
+    id <- nodes$node_id[i]
+    node_n <- nodes$n[i]
+    distribution <- nodes$class_distribution[[i]]
+    counts <- as.numeric(distribution) * node_n
+    arr <- lapply(ord, function(j) {
+      list(label = class_levels[j], n = counts[j],
+           pct = if (node_n > 0) counts[j] / node_n else 0)
+    })
+    class_json <- as.character(jsonlite::toJSON(arr, auto_unbox = TRUE, digits = NA))
+
+    edge_row <- which(edges$child_id == id)
+    if (length(edge_row) == 1) {
+      cond_column <- map_name(edges$split_variable[edge_row])
+      original_categories <- strsplit(edges$original_categories[edge_row], " \\| ")[[1]]
+      edge_label <- paste0(cond_column, " = ", paste(original_categories, collapse = ", "))
+      cond_value <- as.character(jsonlite::toJSON(as.character(original_categories)))
+    } else {
+      cond_column <- NA_character_
+      edge_label <- ""
+      cond_value <- NA_character_
+    }
+
+    data.frame(
+      node_id = as.integer(id),
+      parent_id = if (is.na(nodes$parent_id[i])) NA_integer_ else as.integer(nodes$parent_id[i]),
+      depth = as.integer(nodes$depth[i]),
+      is_leaf = nodes$is_terminal[i],
+      edge_label = edge_label,
+      predicted = as.character(nodes$predicted_class[i]),
+      n = as.integer(node_n),
+      pct = if (root_n > 0) node_n / root_n else 0,
+      class_json = class_json,
+      cond_column = cond_column,
+      cond_operator = if (is.na(cond_column)) NA_character_ else "in",
+      cond_value = cond_value,
+      mean_value = NA_real_,
+      sd_value = NA_real_,
+      rmse_value = NA_real_,
+      dist_json = NA_character_,
+      stringsAsFactors = FALSE
+    )
+  })
+  dplyr::bind_rows(rows)
+}
