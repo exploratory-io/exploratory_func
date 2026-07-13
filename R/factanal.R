@@ -461,14 +461,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     if (any(improper)) {
       var_labels[improper] <- paste0(var_labels[improper], "  ⚠ ", format(round(comm[improper], 2), nsmall = 2))
     }
-    # Order the bars by communality (ascending -> highest communality at the TOP of the horizontal
-    # bar chart). Ratios are on a 0-100 percentage scale for the 100%-style bar. Component is
-    # Communality-first so it stacks/colors/legends before Uniqueness.
-    var_factor <- forcats::fct_reorder(var_labels, comm)
+    # Order the bars by communality DESCENDING (highest communality at the TOP of the horizontal
+    # bar chart). Ratios are kept as 0-1 proportions; the chart renders them as percentages via the
+    # viz's percentage number formatting. Component is Communality-first so it
+    # stacks/colors/legends before Uniqueness.
+    var_factor <- forcats::fct_reorder(var_labels, comm, .desc = TRUE)
     res <- tibble::tibble(
       variable = var_factor,
-      Communality = pmin(comm, 1) * 100,
-      Uniqueness = pmax(1 - comm, 0) * 100
+      Communality = pmin(comm, 1),
+      Uniqueness = pmax(1 - comm, 0)
     ) %>%
       tidyr::pivot_longer(cols = c("Communality", "Uniqueness"), names_to = "Component", values_to = "Ratio") %>%
       dplyr::mutate(Component = forcats::fct_relevel(as.factor(Component), "Communality", "Uniqueness"))

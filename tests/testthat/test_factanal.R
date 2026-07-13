@@ -239,18 +239,20 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   clong <- tidy.fa_exploratory(fake_fa, type = "communalities_long")
   expect_equal(colnames(clong), c("variable", "Component", "Ratio"))
   bwide <- tidyr::pivot_wider(clong, names_from = Component, values_from = Ratio)
-  # Ratios are on a 0-100 percentage scale. Heywood variable (B): capped values, label flagged
-  # with the warning marker + actual (raw, un-scaled) communality value.
+  # Ratios are 0-1 proportions (the chart renders them as %). Heywood variable (B): capped values,
+  # label flagged with the warning marker + actual communality value.
   b_row <- bwide[grepl("⚠", as.character(bwide$variable)), ]
   expect_equal(nrow(b_row), 1)
   expect_true(grepl("1.05", as.character(b_row$variable)))
-  expect_equal(b_row$Communality, 100)    # capped from 1.05 -> 1 * 100
-  expect_equal(b_row$Uniqueness, 0)        # clamped from -0.05 -> 0
-  # Normal variables unchanged in value (70% communality) and label.
-  expect_equal(bwide$Communality[as.character(bwide$variable) == "A"], 70)
-  expect_true(all(bwide$Communality + bwide$Uniqueness <= 100 + 1e-9))
+  expect_equal(b_row$Communality, 1)      # capped from 1.05
+  expect_equal(b_row$Uniqueness, 0)        # clamped from -0.05
+  # Normal variables unchanged in value and label.
+  expect_equal(bwide$Communality[as.character(bwide$variable) == "A"], 0.70)
+  expect_true(all(bwide$Communality + bwide$Uniqueness <= 1 + 1e-9))
   # Component is Communality-first (stack/color/legend order).
   expect_equal(levels(clong$Component), c("Communality", "Uniqueness"))
+  # Variables ordered by communality DESCENDING: the highest (Heywood B) is the first level.
+  expect_true(grepl("⚠", levels(clong$variable)[1]))
 
   # Parallel analysis returns a recommended count and per-factor threshold table, deterministically.
   set.seed(1)
