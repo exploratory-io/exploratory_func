@@ -1,3 +1,69 @@
+# All judge_*/classify_* helpers emit English-canonical labels and a language-neutral
+# `status` token. The desktop/server client translates the labels (VizUtil message tables)
+# and composes tooltips from token + params. No natural language for translation lives
+# in R output. (issue #37019; contract established by #37018)
+prcomp_report_config <- function() {
+  list(
+    loading_salient = 0.40,
+    dominant_contribution = 0.40,
+    dominant_ratio = 1.5,
+    representation_high = 0.70,
+    representation_mostly = 0.50,
+    representation_partial = 0.30,
+    cumulative_high = 0.80,
+    cumulative_mid = 0.60,
+    two_d_high = 0.70,
+    two_d_mid = 0.50,
+    scale_ratio_warning = 10,
+    na_exclusion_warning = 0.20,
+    next_gain_threshold = 0.20,
+    related_min = 2,
+    related_max = 5
+  )
+}
+
+classify_pca_component_pattern <- function(loadings, contributions, cfg = prcomp_report_config()) {
+  ordered_contribution <- sort(contributions, decreasing = TRUE)
+  maximum_contribution <- ordered_contribution[1]
+  second_contribution <- if (length(ordered_contribution) >= 2) ordered_contribution[2] else 0
+  is_dominant <- maximum_contribution >= cfg$dominant_contribution &&
+    (second_contribution == 0 || maximum_contribution / second_contribution >= cfg$dominant_ratio)
+  positive_variables <- names(loadings)[loadings >= cfg$loading_salient]
+  negative_variables <- names(loadings)[loadings <= -cfg$loading_salient]
+  salient_count <- length(positive_variables) + length(negative_variables)
+  same_sign_share <- if (salient_count == 0) 0 else max(length(positive_variables), length(negative_variables)) / salient_count
+  top_three_sum <- sum(head(ordered_contribution, 3))
+  dominant_variable <- names(which.max(contributions))
+  base <- list(dominant_variable = dominant_variable,
+               positive_variables = paste(positive_variables, collapse = ","),
+               negative_variables = paste(negative_variables, collapse = ","))
+  if (is_dominant) {
+    c(list(status = "single_variable", label = "Single Variable"), base)
+  } else if (length(positive_variables) >= 1 && length(negative_variables) >= 1) {
+    c(list(status = "contrast", label = "Contrast"), base)
+  } else if (salient_count >= 3 && same_sign_share >= 0.80) {
+    c(list(status = "common_direction", label = "Common Direction"), base)
+  } else if (top_three_sum < 0.50) {
+    c(list(status = "diffuse", label = "Diffuse"), base)
+  } else {
+    c(list(status = "mixed", label = "Mixed"), base)
+  }
+}
+
+select_pca_related_variables <- function(loadings, contributions, cfg = prcomp_report_config()) {
+  candidate_index <- which(abs(loadings) >= cfg$loading_salient)
+  if (length(candidate_index) < cfg$related_min) {
+    candidate_index <- head(order(abs(loadings), decreasing = TRUE), cfg$related_min)
+  }
+  candidate_index <- candidate_index[order(abs(loadings[candidate_index]),
+                                           contributions[candidate_index], decreasing = TRUE)]
+  candidate_index <- head(candidate_index, cfg$related_max)
+  selected <- loadings[candidate_index]
+  labels <- paste0(ifelse(selected >= 0, "+", "-"), names(selected))
+  list(variables = names(selected), loadings = unname(selected),
+       display_text = paste(labels, collapse = ", "))
+}
+
 #' do PCA
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
 #' @export
