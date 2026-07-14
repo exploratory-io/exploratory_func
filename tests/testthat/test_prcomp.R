@@ -121,3 +121,35 @@ test_that("new report tidy types return empty typed tibbles for kmeans fits", {
                                "parallel_status","kaiser_status","selected_status"))
   expect_equal(nrow(vj), 0)
 })
+
+test_that("component_profiles / loadings_signed / contributions", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, retained_components = 3)
+  res <- model_df %>% tidy_rowwise(model, type = "component_profiles")
+  expect_equal(colnames(res), c("Component","Eigenvalue","% Variance","Cummulated % Variance",
+                                "Related Variables","Pattern",
+                                "pattern_status","dominant_variable","positive_variables","negative_variables"))
+  expect_equal(nrow(res), 3)
+  expect_true(all(res$pattern_status %in% c("single_variable","common_direction","contrast","diffuse","mixed")))
+  res <- model_df %>% tidy_rowwise(model, type = "loadings_signed")
+  expect_equal(colnames(res), c("Variable","Component","Loading"))
+  expect_true(any(res$Loading < 0))
+  res <- model_df %>% tidy_rowwise(model, type = "contributions")
+  expect_equal(colnames(res), c("Variable","Component","Contribution"))
+  sums <- res %>% dplyr::group_by(Component) %>% dplyr::summarize(s = sum(Contribution)) %>% dplyr::pull(s)
+  expect_true(all(abs(sums - 100) < 1e-6))
+})
+
+test_that("component_profiles / loadings_signed / contributions empty for kmeans fits", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  cp <- km %>% tidy_rowwise(model, type = "component_profiles")
+  expect_equal(colnames(cp), c("Component","Eigenvalue","% Variance","Cummulated % Variance",
+                               "Related Variables","Pattern",
+                               "pattern_status","dominant_variable","positive_variables","negative_variables"))
+  expect_equal(nrow(cp), 0)
+  ls <- km %>% tidy_rowwise(model, type = "loadings_signed")
+  expect_equal(colnames(ls), c("Variable","Component","Loading"))
+  expect_equal(nrow(ls), 0)
+  ct <- km %>% tidy_rowwise(model, type = "contributions")
+  expect_equal(colnames(ct), c("Variable","Component","Contribution"))
+  expect_equal(nrow(ct), 0)
+})

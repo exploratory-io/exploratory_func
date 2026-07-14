@@ -470,6 +470,86 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       )
     }
   }
+  else if (type == "component_profiles") {
+    # PCA report: ONE ROW PER RETAINED COMPONENT with pattern classification + related variables
+    # (issue #37019). English-canonical Pattern label + language-neutral status token; the client
+    # translates. Empty typed tibble for k-means / old saved models (no report data).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        Component = character(0), Eigenvalue = numeric(0),
+        `% Variance` = numeric(0), `Cummulated % Variance` = numeric(0),
+        `Related Variables` = character(0), Pattern = character(0),
+        pattern_status = character(0), dominant_variable = character(0),
+        positive_variables = character(0), negative_variables = character(0)
+      )
+    }
+    else {
+      cfg <- prcomp_report_config()
+      # Reconstruct the used numeric variables. variable_sd is named over exactly those columns
+      # (== rownames(x$rotation)), the SAME reconstruction the fit uses for cor(cleaned_df, fit$x).
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      # 主成分負荷量 = correlation between variable and score (signed), variables x components.
+      signed_loadings <- cor(cleaned_df, x$x)
+      # Eigenvalue / % Variance / Cummulated % Variance from x$sdev^2 -- SAME basis as "variances".
+      eigenvalue <- x$sdev^2
+      total_variance <- sum(eigenvalue)
+      pct_variance <- eigenvalue / total_variance * 100
+      cum_pct_variance <- cumsum(pct_variance)
+      retained <- if (!is.null(x$retained_components)) x$retained_components else 0L
+      rows <- lapply(seq_len(retained), function(i) {
+        loadings_i <- signed_loadings[, i]
+        # Contribution = each variable's share of this PC. rotation columns are unit vectors so
+        # sum(rotation[,i]^2) == 1; normalize explicitly so the share always sums to 1.
+        contributions_i <- x$rotation[, i]^2
+        contributions_i <- contributions_i / sum(contributions_i)
+        profile <- classify_pca_component_pattern(loadings = loadings_i, contributions = contributions_i, cfg = cfg)
+        related <- select_pca_related_variables(loadings = loadings_i, contributions = contributions_i, cfg = cfg)
+        tibble::tibble(
+          Component = paste0("PC", i),
+          Eigenvalue = eigenvalue[i],
+          `% Variance` = pct_variance[i],
+          `Cummulated % Variance` = cum_pct_variance[i],
+          `Related Variables` = related$display_text,
+          Pattern = profile$label,
+          pattern_status = profile$status,
+          dominant_variable = profile$dominant_variable,
+          positive_variables = profile$positive_variables,
+          negative_variables = profile$negative_variables
+        )
+      })
+      res <- dplyr::bind_rows(rows)
+    }
+  }
+  else if (type == "loadings_signed") {
+    # PCA report: signed principal-component loadings (主成分負荷量 = cor(cleaned_df, fit$x)) in
+    # long format for ALL components (issue #37019). Unlike the "loadings" branch (squared cosine),
+    # values are signed correlations -- sign-stabilized rotation still yields negatives on
+    # non-dominant variables. Empty typed tibble for k-means / old saved models.
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Variable = character(0), Component = character(0), Loading = numeric(0))
+    }
+    else {
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      signed_loadings <- cor(cleaned_df, x$x)
+      res <- tibble::as_tibble(signed_loadings, rownames = "Variable") %>%
+        tidyr::gather(Component, Loading, dplyr::starts_with("PC"), convert = TRUE) %>%
+        dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
+    }
+  }
+  else if (type == "contributions") {
+    # PCA report: each variable's percent contribution to each component (issue #37019).
+    # rotation^2 per column normalized to sum 100 (%). Long format. Empty typed tibble for k-means.
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Variable = character(0), Component = character(0), Contribution = numeric(0))
+    }
+    else {
+      contribution <- x$rotation^2
+      contribution <- sweep(contribution, 2, colSums(contribution), "/") * 100 # each column sums to 100
+      res <- tibble::as_tibble(contribution, rownames = "Variable") %>%
+        tidyr::gather(Component, Contribution, dplyr::starts_with("PC"), convert = TRUE) %>%
+        dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
+    }
+  }
   else { # should be data or gathered_data
     res <- x$df
     if (!is.null(x$kmeans)) {
