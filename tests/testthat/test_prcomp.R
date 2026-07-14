@@ -176,3 +176,121 @@ test_that("variable_map / representation empty for kmeans fits", {
   expect_true(all(c("Variable","Retained","Judgement","judgement_status") %in% colnames(rp)))
   expect_equal(nrow(rp), 0)
 })
+
+# ---------------------------------------------------------------------------
+# A6 robustness sweep: grouped / strange-names / 2-var / kmeans / old-model.
+# The report tidy types (issue #37019) must degrade gracefully across these.
+# ---------------------------------------------------------------------------
+
+# Canonical strange/multibyte stress name (project convention). No backticks.
+PRCOMP_STRESS_NAME <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+
+# The eight report tidy types + their required columns (empty case = 0 rows, same cols).
+PRCOMP_REPORT_TYPE_COLS <- list(
+  analysis_conditions = c("Metric", "Value", "Description", "status"),
+  parallel_screeplot  = c("Component", "Eigenvalue", "Random Data Eigenvalue"),
+  variances_judged    = c("Component", "Eigenvalue", "% Variance", "Cummulated % Variance",
+                          "Parallel Analysis", "Kaiser Criterion", "Selected",
+                          "parallel_status", "kaiser_status", "selected_status"),
+  component_profiles  = c("Component", "Eigenvalue", "% Variance", "Cummulated % Variance",
+                          "Related Variables", "Pattern",
+                          "pattern_status", "dominant_variable", "positive_variables", "negative_variables"),
+  loadings_signed     = c("Variable", "Component", "Loading"),
+  contributions       = c("Variable", "Component", "Contribution"),
+  variable_map        = c("measure_name", "PC1", "PC2", "Measures", "Representation 2D"),
+  representation       = c("Variable", "Retained", "Judgement", "judgement_status")
+)
+
+test_that("report tidy types run per-group and preserve the group column (Repeat By)", {
+  model_df <- mtcars %>% dplyr::group_by(am) %>% do_prcomp(mpg, disp, hp, wt)
+  # One model row per group.
+  expect_equal(nrow(model_df), length(unique(mtcars$am)))
+  for (ty in c("component_profiles", "variances_judged", "loadings_signed", "variable_map", "representation")) {
+    res <- model_df %>% tidy_rowwise(model, type = ty)
+    # group column preserved and both groups present
+    expect_true("am" %in% colnames(res), info = ty)
+    expect_gt(nrow(res), 0)
+    expect_equal(sort(unique(res$am)), sort(unique(mtcars$am)), info = ty)
+    # the type's required output columns are all present alongside the group column
+    expect_true(all(PRCOMP_REPORT_TYPE_COLS[[ty]] %in% colnames(res)), info = ty)
+  }
+})
+
+test_that("report tidy types pass strange / multibyte variable names through intact", {
+  d <- mtcars[, c("mpg", "cyl", "disp")]
+  colnames(d) <- c("Cy l", PRCOMP_STRESS_NAME, "disp")
+  # select all three columns (names contain spaces/symbols, so use tidyselect everything()).
+  model_df <- d %>% do_prcomp(dplyr::everything())
+
+  ls <- model_df %>% tidy_rowwise(model, type = "loadings_signed")
+  expect_true(PRCOMP_STRESS_NAME %in% ls$Variable)
+  expect_true("Cy l" %in% ls$Variable)
+
+  vm <- model_df %>% tidy_rowwise(model, type = "variable_map")
+  expect_true(PRCOMP_STRESS_NAME %in% vm$measure_name)
+  expect_true("Cy l" %in% vm$measure_name)
+
+  ct <- model_df %>% tidy_rowwise(model, type = "contributions")
+  expect_true(PRCOMP_STRESS_NAME %in% ct$Variable)
+
+  rp <- model_df %>% tidy_rowwise(model, type = "representation")
+  expect_true(PRCOMP_STRESS_NAME %in% rp$Variable)
+
+  # component_profiles surfaces variable names inside the Related Variables text; the
+  # stress name (or "Cy l") must appear intact somewhere in that column.
+  cp <- model_df %>% tidy_rowwise(model, type = "component_profiles")
+  expect_gt(nrow(cp), 0)
+  related_blob <- paste(cp$`Related Variables`, collapse = " | ")
+  expect_true(grepl(PRCOMP_STRESS_NAME, related_blob, fixed = TRUE) ||
+                grepl("Cy l", related_blob, fixed = TRUE))
+})
+
+test_that("report tidy types handle 2-variable input", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl)
+
+  vj <- model_df %>% tidy_rowwise(model, type = "variances_judged")
+  expect_equal(nrow(vj), 2) # 2 components
+
+  cp <- model_df %>% tidy_rowwise(model, type = "component_profiles")
+  expect_gte(nrow(cp), 1) # at least one retained component
+
+  vm <- model_df %>% tidy_rowwise(model, type = "variable_map")
+  # two variables -> two origin rows + two endpoint rows
+  expect_equal(nrow(vm), 4)
+  expect_true(all(c("PC1", "PC2", "measure_name", "Representation 2D") %in% colnames(vm)))
+
+  rp <- model_df %>% tidy_rowwise(model, type = "representation")
+  pc_cols <- grep("^PC[0-9]+$", colnames(rp), value = TRUE)
+  expect_equal(length(pc_cols), 2)   # exactly PC1, PC2 (not padded)
+  expect_equal(nrow(rp), 2)          # two variables
+  # cumulative representation monotone non-decreasing across the two PC columns
+  m <- as.matrix(rp[, pc_cols])
+  expect_true(all(apply(m, 1, function(r) all(diff(r) >= -1e-9))))
+})
+
+test_that("all 8 report tidy types return 0-row typed tibbles for a kmeans fit", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, hp, centers = 2)
+  for (ty in names(PRCOMP_REPORT_TYPE_COLS)) {
+    res <- km %>% tidy_rowwise(model, type = ty)
+    expect_equal(nrow(res), 0, info = ty)
+    expect_true(all(PRCOMP_REPORT_TYPE_COLS[[ty]] %in% colnames(res)), info = ty)
+  }
+})
+
+test_that("all 8 report tidy types return 0-row typed tibbles for an old saved model (report fields stripped)", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp)
+  fit <- model_df$model[[1]]
+  # Simulate a model saved before the #37019 report data existed.
+  fit$parallel <- NULL
+  fit$input_diagnostics <- NULL
+  fit$retained_components <- NULL
+  fit$retained_is_auto <- NULL
+  fit$kaiser_components <- NULL
+  fit$recommended_components <- NULL
+  fit$normalize_data <- NULL
+  for (ty in names(PRCOMP_REPORT_TYPE_COLS)) {
+    res <- exploratory:::tidy.prcomp_exploratory(fit, type = ty)
+    expect_equal(nrow(res), 0, info = ty)
+    expect_true(all(PRCOMP_REPORT_TYPE_COLS[[ty]] %in% colnames(res)), info = ty)
+  }
+})
