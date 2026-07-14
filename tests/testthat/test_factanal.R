@@ -153,7 +153,7 @@ test_that("exp_factanal with strange column name and all-NA column", {
   model_df <- exp_factanal(df, `Cy l`, mpg, hp, na_col)
   res <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(res),
-               c("Factors", "Variance Explained (Ratio)", "Variance Explained", "Chi-Square", "P Value", "DF", "Rows"))
+               c("Factors", "Variance Explained (Ratio)", "Variance Explained", "Chi-Square", "P Value", "DF", "Rows", "Method", "Rotation", "RMSR", "RMSEA", "TLI", "BIC"))
   res <- model_df %>% tidy_rowwise(model, type="variances")
   expect_equal(colnames(res),
                c("SS loadings", "Proportion Var", "Cumulative Var", "Proportion Explained", "Cumulative Proportion", "Factor", "% Variance", "Cummulated % Variance"))
@@ -231,28 +231,26 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   moderate <- judge_loading(c(`Factor 1` = 0.45, `Factor 2` = 0.05))
   expect_equal(moderate$status, "moderate")
 
-  # Communality bar capping: a Heywood case (communality > 1) must be capped so the 100%-stacked
-  # communality/uniqueness bar stays valid (communality <= 1, uniqueness >= 0), and the affected
-  # bar's label carries a warning marker + the actual value. (#37018)
+  # Communality bar (#37018): a Heywood case (communality > 1) leaves communality UNCAPPED so the
+  # numeric label shows the actual value (e.g. 105); the chart's 0-100 value-axis range clips the
+  # bar at 100. Uniqueness is clamped to 0 (never negative). Variable names stay clean (no marker).
   fake_fa <- list(communality = c(A = 0.70, B = 1.05, C = 0.30))
   class(fake_fa) <- "fa_exploratory"
   clong <- tidy.fa_exploratory(fake_fa, type = "communalities_long")
   expect_equal(colnames(clong), c("variable", "Component", "Ratio"))
   bwide <- tidyr::pivot_wider(clong, names_from = Component, values_from = Ratio)
-  # Ratios are on a 0-100 percentage scale. Heywood variable (B): capped values, label flagged
-  # with the warning marker + actual communality value.
-  b_row <- bwide[grepl("⚠", as.character(bwide$variable)), ]
-  expect_equal(nrow(b_row), 1)
-  expect_true(grepl("1.05", as.character(b_row$variable)))
-  expect_equal(b_row$Communality, 100)    # capped from 1.05 -> 1 * 100
-  expect_equal(b_row$Uniqueness, 0)        # clamped from -0.05
-  # Normal variables unchanged in value and label.
+  # Ratios are on a 0-100 percentage scale. Heywood variable (B): uncapped communality (105) so the
+  # label shows the actual value; uniqueness clamped to 0.
+  expect_equal(bwide$Communality[as.character(bwide$variable) == "B"], 105)
+  expect_equal(bwide$Uniqueness[as.character(bwide$variable) == "B"], 0)
+  # Normal variable unchanged.
   expect_equal(bwide$Communality[as.character(bwide$variable) == "A"], 70)
-  expect_true(all(bwide$Communality + bwide$Uniqueness <= 100 + 1e-9))
+  # No warning marker appended to any variable name.
+  expect_false(any(grepl("⚠", as.character(bwide$variable))))
   # Component is Communality-first (stack/color/legend order).
   expect_equal(levels(clong$Component), c("Communality", "Uniqueness"))
   # Variables ordered by communality DESCENDING: the highest (Heywood B) is the first level.
-  expect_true(grepl("⚠", levels(clong$variable)[1]))
+  expect_equal(levels(clong$variable)[1], "B")
 
   # Parallel analysis returns a recommended count and per-factor threshold table, deterministically.
   set.seed(1)
