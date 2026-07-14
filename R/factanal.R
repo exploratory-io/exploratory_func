@@ -438,10 +438,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   }
   else if (type == "communalities") {
     comm <- x$communality
-    # Wrap the variable names in backticks so the table presents them as data-column identifiers
-    # (e.g. `サイズ`), consistent with how Exploratory shows column references. The client strips the
-    # backticks when it reuses these names in the rule-based summary. (#37018)
-    res <- tibble::tibble(variable = paste0("`", names(comm), "`"), Communality = as.numeric(comm), Uniqueness = as.numeric(x$uniquenesses))
+    res <- tibble::tibble(variable = names(comm), Communality = as.numeric(comm), Uniqueness = as.numeric(x$uniquenesses))
     judgements <- purrr::map(res$Communality, judge_communality)
     res <- res %>% dplyr::mutate(
       Judgement = purrr::map_chr(judgements, "label"),
