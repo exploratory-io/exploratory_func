@@ -88,3 +88,36 @@ test_that("do_prcomp attaches report data, sign stabilization, retained resoluti
   m3 <- df %>% do_prcomp(mpg, cyl, disp, retained_components = 2)
   expect_equal(m3$model[[1]]$retained_components, 2L)
 })
+
+test_that("new report tidy types return expected columns and tokens", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(colnames(res), c("Metric", "Value", "Description", "status"))
+  expect_true(all(c("Rows Used","Variables Used","Normalization","SD Ratio (Max/Min)") %in% res$Metric))
+  res <- model_df %>% tidy_rowwise(model, type = "parallel_screeplot")
+  expect_equal(colnames(res), c("Component", "Eigenvalue", "Random Data Eigenvalue"))
+  res <- model_df %>% tidy_rowwise(model, type = "variances_judged")
+  expect_equal(colnames(res), c("Component","Eigenvalue","% Variance","Cummulated % Variance",
+                                "Parallel Analysis","Kaiser Criterion","Selected",
+                                "parallel_status","kaiser_status","selected_status"))
+  expect_true(all(res$parallel_status %in% c("adopted","not_adopted","na")))
+  expect_true(all(res$selected_status %in% c("adopted","not_adopted")))
+  m2 <- mtcars %>% do_prcomp(mpg, cyl, disp, normalize_data = FALSE)
+  r2 <- m2 %>% tidy_rowwise(model, type = "variances_judged")
+  expect_true(all(r2$kaiser_status == "na"))
+})
+
+test_that("new report tidy types return empty typed tibbles for kmeans fits", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  ac <- km %>% tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(colnames(ac), c("Metric", "Value", "Description", "status"))
+  expect_equal(nrow(ac), 0)
+  ps <- km %>% tidy_rowwise(model, type = "parallel_screeplot")
+  expect_equal(colnames(ps), c("Component", "Eigenvalue", "Random Data Eigenvalue"))
+  expect_equal(nrow(ps), 0)
+  vj <- km %>% tidy_rowwise(model, type = "variances_judged")
+  expect_equal(colnames(vj), c("Component","Eigenvalue","% Variance","Cummulated % Variance",
+                               "Parallel Analysis","Kaiser Criterion","Selected",
+                               "parallel_status","kaiser_status","selected_status"))
+  expect_equal(nrow(vj), 0)
+})

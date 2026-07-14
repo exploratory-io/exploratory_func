@@ -324,6 +324,152 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
+  else if (type == "analysis_conditions") {
+    # PCA report: one row per analysis condition, composed from fit-time input diagnostics
+    # (issue #37019). English-canonical Description sentences + language-neutral status tokens;
+    # the client translates. Empty typed tibble for k-means / old saved models (no report data).
+    cfg <- prcomp_report_config()
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Metric = character(0), Value = character(0),
+                            Description = character(0), status = character(0))
+    }
+    else {
+      d <- x$input_diagnostics
+      normalized <- isTRUE(x$normalize_data)
+      variables_used <- length(d$variable_sd)
+      excluded_names <- d$excluded_variables
+      excluded_display <- if (length(excluded_names) == 0) "-" else paste(excluded_names, collapse = ", ")
+      excluded_pct <- d$excluded_row_rate * 100
+      scale_ratio <- d$scale_ratio
+      scale_display <- if (is.na(scale_ratio)) "-" else format(round(scale_ratio, 1), nsmall = 1)
+      scale_status <- if (!normalized && is.finite(scale_ratio) && scale_ratio >= cfg$scale_ratio_warning) "scale_warning" else "ok"
+      res <- tibble::tibble(
+        Metric = c("Rows Used", "Rows Excluded", "Variables Used", "Excluded Variables",
+                   "Normalization", "SD Ratio (Max/Min)", "Rows vs Variables"),
+        Value = c(
+          as.character(d$analyzed_row_count),
+          paste0(d$excluded_row_count, " (", format(round(excluded_pct, 1), nsmall = 1), "%)"),
+          as.character(variables_used),
+          excluded_display,
+          if (normalized) "Yes" else "No",
+          scale_display,
+          paste0(d$analyzed_row_count, " rows / ", variables_used, " variables")
+        ),
+        Description = c(
+          "Number of rows used after removing missing values.",
+          "Number and rate of rows removed because of missing values.",
+          "Number of variables used in the analysis.",
+          "Variables dropped before analysis because they had only NA or a single value.",
+          "Whether variables were scaled to unit variance before analysis.",
+          "Ratio of the largest to the smallest variable standard deviation.",
+          "Number of rows compared with the number of variables."
+        ),
+        status = c(
+          "ok",
+          if (d$excluded_row_rate >= cfg$na_exclusion_warning) "high_na_exclusion" else "ok",
+          "ok",
+          if (length(excluded_names) == 0) "na" else "ok",
+          "ok",
+          scale_status,
+          if (d$analyzed_row_count <= variables_used) "few_rows" else "ok"
+        )
+      )
+    }
+  }
+  else if (type == "parallel_screeplot") {
+    # Horn's parallel analysis scree data: actual correlation-matrix eigenvalue vs the random-data
+    # threshold, per component (issue #37019). Component is the integer factor number. Empty typed
+    # tibble when parallel analysis is absent (k-means / old saved models).
+    if (is.null(x$parallel)) {
+      res <- tibble::tibble(Component = integer(0), Eigenvalue = numeric(0),
+                            `Random Data Eigenvalue` = numeric(0))
+    }
+    else {
+      tbl <- x$parallel$table
+      res <- tibble::tibble(
+        Component = as.integer(tbl$factor_number),
+        Eigenvalue = tbl$actual_eigenvalue,
+        `Random Data Eigenvalue` = tbl$random_eigenvalue_threshold
+      )
+    }
+  }
+  else if (type == "variances_judged") {
+    # PCA report: per-component variance table with three retention judgments (issue #37019).
+    # Empty typed tibble for k-means / old saved models (no report data).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        Component = character(0), Eigenvalue = numeric(0),
+        `% Variance` = numeric(0), `Cummulated % Variance` = numeric(0),
+        `Parallel Analysis` = character(0), `Kaiser Criterion` = character(0),
+        Selected = character(0), parallel_status = character(0),
+        kaiser_status = character(0), selected_status = character(0)
+      )
+    }
+    else {
+      # Eigenvalue / % Variance / Cummulated % Variance use x$sdev^2 -- the SAME basis as the
+      # existing "variances" branch -- so these numbers match the Variance (%) tab exactly.
+      # When normalize_data=TRUE, x$sdev^2 equals the correlation-matrix eigenvalues that parallel
+      # analysis and Kaiser use, so all bases coincide. They diverge only when normalize_data=FALSE
+      # (covariance-scaled sdev), and there Kaiser is "na" anyway; the Parallel Adopt columns read
+      # actual vs random eigenvalues directly from x$parallel$table (correlation eigenvalues from
+      # compute_parallel_analysis), NOT from this Eigenvalue column, so the Adopt judgment always
+      # agrees with the parallel scree regardless of basis.
+      eigenvalue <- x$sdev^2
+      n_comp <- length(eigenvalue)
+      total_variance <- sum(eigenvalue)
+      pct_variance <- eigenvalue / total_variance * 100
+      cum_pct_variance <- cumsum(pct_variance)
+      component <- paste0("PC", seq_len(n_comp))
+      normalized <- isTRUE(x$normalize_data)
+
+      # Parallel Analysis: adopt when actual eigenvalue > random threshold, keyed by component
+      # index (factor_number). NULL parallel -> Not Available / na.
+      if (is.null(x$parallel)) {
+        parallel_label <- rep("Not Available", n_comp)
+        parallel_status <- rep("na", n_comp)
+      }
+      else {
+        ptbl <- x$parallel$table
+        in_range <- ptbl$factor_number <= n_comp
+        actual <- rep(NA_real_, n_comp)
+        threshold <- rep(NA_real_, n_comp)
+        actual[ptbl$factor_number[in_range]] <- ptbl$actual_eigenvalue[in_range]
+        threshold[ptbl$factor_number[in_range]] <- ptbl$random_eigenvalue_threshold[in_range]
+        adopted <- !is.na(actual) & !is.na(threshold) & actual > threshold
+        parallel_label <- ifelse(adopted, "Adopt", "Not Adopted")
+        parallel_status <- ifelse(adopted, "adopted", "not_adopted")
+      }
+
+      # Kaiser Criterion: only meaningful when normalized (eigenvalue >= 1). Otherwise "-"/na.
+      if (normalized) {
+        kaiser_adopted <- eigenvalue >= 1
+        kaiser_label <- ifelse(kaiser_adopted, "Adopt", "Not Adopted")
+        kaiser_status <- ifelse(kaiser_adopted, "adopted", "not_adopted")
+      }
+      else {
+        kaiser_label <- rep("-", n_comp)
+        kaiser_status <- rep("na", n_comp)
+      }
+
+      retained <- if (!is.null(x$retained_components)) x$retained_components else 0L
+      selected_adopted <- seq_len(n_comp) <= retained
+      selected_label <- ifelse(selected_adopted, "Adopt", "Not Adopted")
+      selected_status <- ifelse(selected_adopted, "adopted", "not_adopted")
+
+      res <- tibble::tibble(
+        Component = component,
+        Eigenvalue = eigenvalue,
+        `% Variance` = pct_variance,
+        `Cummulated % Variance` = cum_pct_variance,
+        `Parallel Analysis` = parallel_label,
+        `Kaiser Criterion` = kaiser_label,
+        Selected = selected_label,
+        parallel_status = parallel_status,
+        kaiser_status = kaiser_status,
+        selected_status = selected_status
+      )
+    }
+  }
   else { # should be data or gathered_data
     res <- x$df
     if (!is.null(x$kmeans)) {
