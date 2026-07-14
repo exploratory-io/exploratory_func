@@ -550,6 +550,95 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
         dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
     }
   }
+  else if (type == "variable_map") {
+    # PCA report: variable-vector rows for a 2D correlation-circle chart (issue #37019).
+    # The tam side renders this like the biplot's VARIABLE vectors only (no observation points),
+    # so we MIRROR the biplot branch's variable-loading columns: `measure_name` (label), `PC1`
+    # (x axis) and `Measures` (biplot's name for the PC2 axis of measures), plus a zero-origin
+    # pairing (two rows per variable: origin (0,0) then the endpoint) so the chart can draw a line
+    # from the origin to each variable point. We ADD an explicit `PC2` column (same value as
+    # `Measures`) so downstream code / tests can read PC2 directly, and `Representation 2D`
+    # (= (cor_PC1^2 + cor_PC2^2) * 100), the variable's 2D representation quality in percent.
+    # Coordinates are RAW correlations cor(variable, score) -- NOT pre-scaled; the tam chart
+    # applies its own display scaling (unlike the biplot branch, which pre-scales loadings so
+    # measures and observation points share one scatter plot). Empty typed tibble for k-means /
+    # old saved models (no report data).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        measure_name = character(0), PC1 = numeric(0), PC2 = numeric(0),
+        Measures = numeric(0), `Representation 2D` = numeric(0)
+      )
+    }
+    else {
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      # cor(variable, score) -- signed correlations, variables x components. Same basis the fit
+      # uses for sign stabilization and the component_profiles / loadings_signed branches.
+      signed_loadings <- cor(cleaned_df, x$x)
+      n_comp <- ncol(signed_loadings)
+      cor_pc1 <- signed_loadings[, 1]
+      # Guard: needs >= 2 components. With only 1 component PC2 has no meaning -- use 0 (a point on
+      # the PC1 axis) rather than NA so the origin->endpoint line still renders on the chart.
+      cor_pc2 <- if (n_comp >= 2) signed_loadings[, 2] else rep(0, length(cor_pc1))
+      representation_2d <- (cor_pc1^2 + cor_pc2^2) * 100
+      endpoint <- tibble::tibble(
+        measure_name = rownames(signed_loadings),
+        PC1 = cor_pc1,
+        PC2 = cor_pc2,
+        Measures = cor_pc2, # mirror biplot: the PC2 axis for measures is named "Measures".
+        `Representation 2D` = representation_2d
+      )
+      # Origin rows (0,0) pair with each endpoint so the chart draws a vector from the origin.
+      # Representation 2D is a per-variable quality, meaningless at the origin -> NA there.
+      origin <- endpoint %>%
+        dplyr::mutate(PC1 = 0, PC2 = 0, Measures = 0, `Representation 2D` = NA_real_)
+      res <- dplyr::bind_rows(origin, endpoint)
+    }
+  }
+  else if (type == "representation") {
+    # PCA report: per-variable CUMULATIVE representation table, WIDE (issue #37019). Each PC column
+    # holds the cumulative representation quality (%) up to that component -- how much of the
+    # variable's variance is captured by PC1..PCk. `Retained` reads the cumulative value at the
+    # retained-component count; `Judgement`/`judgement_status` bucket that fraction. English-canonical
+    # Judgement label + language-neutral status token; the client translates. Empty typed tibble for
+    # k-means / old saved models. NOTE: the dynamic PC1..PCn columns exist only when there is data;
+    # the empty case returns just the fixed columns (Variable, Retained, Judgement, judgement_status).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        Variable = character(0), Retained = numeric(0),
+        Judgement = character(0), judgement_status = character(0)
+      )
+    }
+    else {
+      cfg <- prcomp_report_config()
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      sq <- cor(cleaned_df, x$x)^2 # squared correlations, variables x components.
+      # Cumulative across components per variable. apply(..., 1, cumsum) returns components x
+      # variables, so transpose back to variables x components. cumsum of non-negative squared
+      # correlations is monotone non-decreasing; clamp+scale (a monotone map) preserves that order.
+      cumrep <- t(apply(sq, 1, cumsum))
+      # `cumrep[] <-` keeps the matrix dims/dimnames; a bare `pmin(...) * 100` drops them to a vector.
+      cumrep[] <- pmin(1, pmax(0, cumrep)) * 100
+      n_comp <- ncol(cumrep)
+      colnames(cumrep) <- paste0("PC", seq_len(n_comp))
+      retained_idx <- if (!is.null(x$retained_components)) as.integer(x$retained_components) else n_comp
+      retained_idx <- max(1L, min(retained_idx, n_comp))
+      retained_val <- cumrep[, retained_idx]
+      frac <- retained_val / 100
+      judgement <- ifelse(frac >= cfg$representation_high, "High",
+                   ifelse(frac >= cfg$representation_mostly, "Mostly Retained",
+                   ifelse(frac >= cfg$representation_partial, "Partially Retained", "Low")))
+      judgement_status <- ifelse(frac >= cfg$representation_high, "high",
+                          ifelse(frac >= cfg$representation_mostly, "mostly",
+                          ifelse(frac >= cfg$representation_partial, "partial", "low")))
+      res <- tibble::tibble(Variable = rownames(sq)) %>%
+        dplyr::bind_cols(tibble::as_tibble(cumrep)) %>%
+        dplyr::mutate(
+          Retained = retained_val,
+          Judgement = judgement,
+          judgement_status = judgement_status
+        )
+    }
+  }
   else { # should be data or gathered_data
     res <- x$df
     if (!is.null(x$kmeans)) {

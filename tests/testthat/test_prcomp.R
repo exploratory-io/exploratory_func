@@ -153,3 +153,26 @@ test_that("component_profiles / loadings_signed / contributions empty for kmeans
   expect_equal(colnames(ct), c("Variable","Component","Contribution"))
   expect_equal(nrow(ct), 0)
 })
+
+test_that("variable_map / representation", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, retained_components = 2)
+  res <- model_df %>% tidy_rowwise(model, type = "variable_map")
+  expect_true(all(c("PC1","PC2","measure_name","Representation 2D") %in% colnames(res)))
+  res <- model_df %>% tidy_rowwise(model, type = "representation")
+  expect_true(all(c("Variable","PC1","PC2","Retained","Judgement","judgement_status") %in% colnames(res)))
+  expect_true(all(res$judgement_status %in% c("high","mostly","partial","low")))
+  # cumulative representation monotone non-decreasing across PC columns
+  pc_cols <- grep("^PC[0-9]+$", colnames(res), value = TRUE)
+  m <- as.matrix(res[, pc_cols])
+  expect_true(all(apply(m, 1, function(r) all(diff(r) >= -1e-9))))
+})
+
+test_that("variable_map / representation empty for kmeans fits", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  vm <- km %>% tidy_rowwise(model, type = "variable_map")
+  expect_true(all(c("PC1","PC2","measure_name","Representation 2D") %in% colnames(vm)))
+  expect_equal(nrow(vm), 0)
+  rp <- km %>% tidy_rowwise(model, type = "representation")
+  expect_true(all(c("Variable","Retained","Judgement","judgement_status") %in% colnames(rp)))
+  expect_equal(nrow(rp), 0)
+})
