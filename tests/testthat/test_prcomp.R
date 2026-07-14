@@ -65,3 +65,26 @@ test_that("select_pca_related_variables respects threshold, min 2, max 5, orderi
   r <- f(loadings = c(a=0.9, b=0.2, c=0.1), contributions = c(a=.7,b=.2,c=.1))
   expect_equal(r$display_text, "+a, +b")
 })
+
+test_that("do_prcomp attaches report data, sign stabilization, retained resolution", {
+  df <- mtcars
+  model_df <- df %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
+  fit <- model_df$model[[1]]
+  expect_true(!is.null(fit$parallel))
+  expect_true(is.numeric(fit$recommended_components))
+  expect_true(fit$retained_components >= 1)
+  expect_true(!is.null(fit$input_diagnostics))
+  d <- fit$input_diagnostics
+  expect_true(all(c("original_row_count","analyzed_row_count","excluded_row_count",
+                    "excluded_row_rate","excluded_variables","variable_sd","scale_ratio") %in% names(d)))
+  # sign stabilization: strongest |correlation| per PC is non-negative
+  cleaned <- df[, c("mpg","cyl","disp","hp","drat","wt")]
+  cors <- cor(cleaned, fit$x)
+  strongest <- apply(cors, 2, function(col) col[which.max(abs(col))])
+  expect_true(all(strongest >= 0))
+  # explicit retained + clamp
+  m2 <- df %>% do_prcomp(mpg, cyl, disp, retained_components = 99)
+  expect_equal(m2$model[[1]]$retained_components, 3L)
+  m3 <- df %>% do_prcomp(mpg, cyl, disp, retained_components = 2)
+  expect_equal(m3$model[[1]]$retained_components, 2L)
+})

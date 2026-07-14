@@ -66,8 +66,10 @@ select_pca_related_variables <- function(loadings, contributions, cfg = prcomp_r
 
 #' do PCA
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
+#' retained_components - Number of principal components the report treats as retained. NULL = auto (use parallel analysis recommendation). Clamped to [1, number of components].
+#' with_report_data - Whether to compute and attach the redesigned PCA report data (parallel analysis, Kaiser, retained/diagnostics) AND apply sign stabilization. Pure-PCA only; exp_kmeans passes FALSE so k-means fits are neither given report data nor sign-flipped. (issue #37019)
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE) {
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE, retained_components = NULL, with_report_data = TRUE) {
   all_cols <- colnames(df)
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -98,6 +100,11 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
   }
 
   each_func <- function(df) {
+    # Capture the variable columns actually present in this group's data (after the
+    # list/difftime drop above) BEFORE preprocess_factanal_data_before_sample overwrites
+    # selected_cols, so the report can compute which variables were excluded. (issue #37019)
+    report_selected_cols <- intersect(selected_cols, colnames(df))
+
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
     sampled_nrow <- NULL
@@ -151,6 +158,57 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
+
+    # Fit-time PCA report data (issue #37019). PURE-PCA ONLY: exp_kmeans shares this
+    # machinery but passes with_report_data=FALSE, so k-means fits get neither the report
+    # data nor the sign flip below. Each piece is tryCatch-guarded (mirrors factanal.R) so a
+    # degenerate input degrades gracefully instead of aborting the fit.
+    if (with_report_data) {
+      # Sign stabilization (#37019 spec 4-3): flip each PC so the variable with the largest
+      # |correlation| loads positively. PCA signs are arbitrary; this makes interpretation
+      # text stable across runs. Compute in a guard so a degenerate correlation leaves signs
+      # untouched (all-1 multiplier is a no-op sweep).
+      sign_multiplier <- tryCatch({
+        variable_pc_correlations <- cor(cleaned_df, fit$x)
+        vapply(seq_len(ncol(variable_pc_correlations)), function(i) {
+          col <- variable_pc_correlations[, i]
+          strongest <- col[which.max(abs(col))]
+          if (length(strongest) == 0 || is.na(strongest) || strongest >= 0) 1 else -1
+        }, numeric(1))
+      }, error = function(e) rep(1, ncol(fit$rotation)))
+      fit$rotation <- sweep(fit$rotation, 2, sign_multiplier, "*")
+      fit$x <- sweep(fit$x, 2, sign_multiplier, "*")
+
+      fit$parallel <- tryCatch(compute_parallel_analysis(cleaned_df), error = function(e) NULL)
+      fit$kaiser_components <- tryCatch(
+        if (normalize_data) as.integer(sum(eigen(fit$correlation)$values >= 1)) else NA_integer_,
+        error = function(e) NA_integer_)
+      fit$recommended_components <- if (!is.null(fit$parallel)) fit$parallel$recommended_n else NA_integer_
+      n_comp <- length(fit$sdev)
+      fit$retained_components <- if (!is.null(retained_components)) {
+        min(max(1L, as.integer(retained_components)), n_comp)
+      } else {
+        min(max(1L, ifelse(is.na(fit$recommended_components), 1L, fit$recommended_components)), n_comp)
+      }
+      fit$retained_is_auto <- is.null(retained_components)
+      fit$normalize_data <- normalize_data
+      fit$input_diagnostics <- tryCatch({
+        variable_sd <- vapply(cleaned_df, sd, numeric(1))
+        original_row_count <- nrow(df)
+        analyzed_row_count <- nrow(cleaned_df)
+        excluded_row_count <- original_row_count - analyzed_row_count
+        list(
+          original_row_count = original_row_count,
+          analyzed_row_count = analyzed_row_count,
+          excluded_row_count = excluded_row_count,
+          excluded_row_rate = excluded_row_count / max(1, original_row_count),
+          excluded_variables = setdiff(report_selected_cols, colnames(cleaned_df)),
+          variable_sd = variable_sd,
+          scale_ratio = if (min(variable_sd) > 0) max(variable_sd) / min(variable_sd) else NA_real_
+        )
+      }, error = function(e) NULL)
+    }
+
     class(fit) <- c("prcomp_exploratory", class(fit))
     fit
   }
