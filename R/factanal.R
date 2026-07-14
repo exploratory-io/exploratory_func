@@ -447,28 +447,18 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   }
   else if (type == "communalities_long") {
     # Long form for the 100%-stacked communality/uniqueness bar chart. Normally the two components
-    # sum to 1. In a Heywood case (communality > 1) uniqueness goes negative, which would break the
-    # 100%-stacked bar. Cap the DISPLAYED ratios -- communality at 1, uniqueness at 0 -- so the bar
-    # stays a clean 100% stack. (#37018)
+    # sum to 1. In a Heywood case (communality > 1) uniqueness would go negative, which would break
+    # the stack. Per spec: the bar is CLIPPED at 100% (via the chart's 0-100 value-axis range) but
+    # the numeric label shows the ACTUAL communality (e.g. 101%), so communality is left UNCAPPED
+    # here; uniqueness is clamped to 0 so it is never negative. (#37018)
     comm <- as.numeric(x$communality)
-    # For a Heywood-case variable, flag its bar on the chart with a warning marker + the actual
-    # (uncapped) communality value, appended to the category label. This is language-neutral (a
-    # symbol + a number, no translated text) so it is safe for both EN and JA, and it renders
-    # reliably on the axis / hover without any chart-code change. The full explanation is in the
-    # Communality table judgment ("Possibly improper solution") and the report warning.
-    var_labels <- names(x$communality)
-    improper <- !is.na(comm) & comm > 1
-    if (any(improper)) {
-      var_labels[improper] <- paste0(var_labels[improper], "  ⚠ ", format(round(comm[improper], 2), nsmall = 2))
-    }
     # Order the bars by communality DESCENDING (highest communality at the TOP of the horizontal
-    # bar chart). Ratios are on a 0-100 percentage scale so the bar fills a 0-100 axis; the "%"
-    # suffix is added by the chart. Component is Communality-first so it stacks/colors/legends
-    # before Uniqueness.
-    var_factor <- forcats::fct_reorder(var_labels, comm, .desc = TRUE)
+    # bar chart). Ratios are on a 0-100 percentage scale. Component is Communality-first so it
+    # stacks/colors/legends before Uniqueness.
+    var_factor <- forcats::fct_reorder(names(x$communality), comm, .desc = TRUE)
     res <- tibble::tibble(
       variable = var_factor,
-      Communality = pmin(comm, 1) * 100,
+      Communality = comm * 100,
       Uniqueness = pmax(1 - comm, 0) * 100
     ) %>%
       tidyr::pivot_longer(cols = c("Communality", "Uniqueness"), names_to = "Component", values_to = "Ratio") %>%
