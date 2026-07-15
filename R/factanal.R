@@ -28,6 +28,126 @@ preprocess_factanal_data_before_sample <- function(df, predictor_cols) {
   df
 }
 
+# Threshold configuration for the Factor Analysis report judgments (issue #37018).
+# Kept as an internal function (not a mutable global) so helpers can pick it up by default.
+factanal_report_config <- function() {
+  list(
+    loading_salient = 0.40, loading_strong = 0.60, loading_crossload_diff = 0.20,
+    loading_near = 0.30, loading_near_diff = 0.25,
+    communality_low = 0.40, communality_good = 0.60, communality_too_high = 0.95,
+    kmo_poor = 0.50, kmo_min = 0.60, kmo_good = 0.70, kmo_great = 0.80,
+    factor_corr_medium = 0.30, factor_corr_high = 0.50,
+    p_value_threshold = 0.05
+  )
+}
+
+# All judge_* helpers emit English-canonical labels and a language-neutral `status` token.
+# The desktop/server client translates the label (VizUtil message tables) and composes tooltips
+# from the token + params. No natural language for translation lives in R output. (issue #37018)
+judge_kmo <- function(kmo, cfg = factanal_report_config()) {
+  if (is.na(kmo)) return(list(label = "Not Available", status = "na", description = "KMO could not be computed."))
+  if (kmo >= cfg$kmo_great) list(label = "Very Suitable", status = "great", description = "The variables have a correlation structure well suited for factor analysis.")
+  else if (kmo >= cfg$kmo_good) list(label = "Suitable", status = "good", description = "The variables have a correlation structure suited for factor analysis.")
+  else if (kmo >= cfg$kmo_min) list(label = "Marginally Suitable", status = "min", description = "Factor analysis is possible, but interpret the results with care.")
+  else if (kmo >= cfg$kmo_poor) list(label = "Somewhat Weak", status = "poor", description = "The correlation structure is somewhat weak for factor analysis.")
+  else list(label = "Possibly Unsuitable", status = "below", description = "Consider reselecting the variables.")
+}
+
+judge_bartlett <- function(p_value, cfg = factanal_report_config()) {
+  if (is.na(p_value)) return(list(label = "Not Available", status = "na", description = "Bartlett's test could not be computed."))
+  if (p_value < cfg$p_value_threshold) list(label = "Suitable", status = "suitable", description = "There is enough correlation among the variables for factor analysis.")
+  else list(label = "Caution", status = "caution", description = "The correlation among the variables may be weak.")
+}
+
+judge_communality <- function(communality, cfg = factanal_report_config()) {
+  if (is.na(communality)) return(list(label = "Not Available", status = "na"))
+  # A communality > 1 (i.e. negative uniqueness) is a Heywood case: NOT "explained more than
+  # 100%", but a sign that the estimation is unstable / the solution is improper. Flag it before
+  # the "too high" check so it gets its own, more serious judgment. (issue #37018)
+  if (communality > 1) return(list(label = "Possibly improper solution", status = "improper"))
+  if (communality >= cfg$communality_too_high) list(label = "Too high (caution)", status = "too_high")
+  else if (communality >= cfg$communality_good) list(label = "Well explained", status = "good")
+  else if (communality >= cfg$communality_low) list(label = "Moderately explained", status = "moderate")
+  else list(label = "Weakly explained", status = "weak")
+}
+
+# loadings: named numeric vector, names are "Factor 1", "Factor 2", ...
+# Returns label (English), status token, and params for the client-composed tooltip.
+judge_loading <- function(loadings, cfg = factanal_report_config()) {
+  abs_loadings <- abs(loadings)
+  ord <- order(abs_loadings, decreasing = TRUE)
+  primary_idx <- ord[1]
+  secondary_idx <- ord[2]
+  primary_factor <- names(loadings)[primary_idx]
+  secondary_factor <- names(loadings)[secondary_idx]
+  primary_loading <- loadings[[primary_idx]]
+  secondary_abs <- abs(loadings[[secondary_idx]])
+  primary_abs <- abs(primary_loading)
+  diff <- primary_abs - secondary_abs
+  salient <- names(loadings)[abs_loadings >= cfg$loading_salient]
+  num_salient <- length(salient)
+  direction <- if (primary_loading >= 0) "positive" else "negative"
+  neg_suffix <- if (primary_loading < 0) " (negative)" else ""
+
+  if (primary_abs < cfg$loading_salient) {
+    return(list(label = "Hard to interpret", status = "low_loading",
+                primary_factor = primary_factor, secondary_factors = "", direction = direction))
+  }
+  if (num_salient >= 2 && diff < cfg$loading_crossload_diff) {
+    return(list(label = "Cross-loading / ambiguous", status = "ambiguous_crossload",
+                primary_factor = primary_factor,
+                secondary_factors = paste(salient, collapse = ","), direction = direction))
+  }
+  if (num_salient >= 2) {
+    others <- setdiff(salient, primary_factor)
+    return(list(label = paste0("Leans to ", primary_factor, " / cross-loading"), status = "crossload",
+                primary_factor = primary_factor,
+                secondary_factors = paste(others, collapse = ","), direction = direction))
+  }
+  if (secondary_abs >= cfg$loading_near && diff < cfg$loading_near_diff) {
+    return(list(label = paste0("Leans to ", primary_factor, " / somewhat ambiguous"), status = "near_crossload",
+                primary_factor = primary_factor,
+                secondary_factors = secondary_factor, direction = direction))
+  }
+  if (primary_abs >= cfg$loading_strong) {
+    return(list(label = paste0("Strongly related to ", primary_factor, neg_suffix), status = "strong",
+                primary_factor = primary_factor, secondary_factors = "", direction = direction))
+  }
+  list(label = paste0("Moderately related to ", primary_factor, neg_suffix), status = "moderate",
+       primary_factor = primary_factor, secondary_factors = "", direction = direction)
+}
+
+# Horn's parallel analysis: compares actual correlation-matrix eigenvalues against the
+# quantile of eigenvalues from random normal data of the same shape. (issue #37018 spec 3.4)
+compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95) {
+  x <- as.data.frame(x)
+  n <- nrow(x)
+  p <- ncol(x)
+  actual_eigen <- eigen(cor(x, use = "pairwise.complete.obs"), only.values = TRUE)$values
+  # Snapshot the RNG so this null-distribution draw does not perturb the outer deterministic
+  # stream that later groups' sampling relies on. Restore afterward.
+  old_seed <- if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) get(".Random.seed", envir = .GlobalEnv) else NULL
+  set.seed(1234)
+  random_eigen_mat <- replicate(n_iter, {
+    rd <- matrix(stats::rnorm(n * p), nrow = n, ncol = p)
+    eigen(cor(rd), only.values = TRUE)$values
+  })
+  if (!is.null(old_seed)) {
+    assign(".Random.seed", old_seed, envir = .GlobalEnv)
+  } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    rm(".Random.seed", envir = .GlobalEnv)
+  }
+  random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
+  list(
+    recommended_n = sum(actual_eigen > random_threshold),
+    table = tibble::tibble(
+      factor_number = seq_along(actual_eigen),
+      actual_eigenvalue = actual_eigen,
+      random_eigenvalue_threshold = random_threshold
+    )
+  )
+}
+
 #' Function for Factor Analysis Analytics View
 #' @export
 exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1) {
@@ -98,10 +218,19 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     }
     fit <- psych::fa(cleaned_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
 
-    fit$correlation <- cor(cleaned_df) # For creating scree plot later.
+    cor_mat <- cor(cleaned_df)
+    fit$correlation <- cor_mat # For creating scree plot later.
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
+    # Suitability / factor-count diagnostics for the redesigned report (issue #37018).
+    # psych is already a hard dependency, so KMO/cortest.bartlett add nothing new. Each is
+    # guarded so a singular/degenerate correlation matrix degrades to NA instead of aborting.
+    fit$n_rows_used <- nrow(cleaned_df)
+    fit$n_variables <- ncol(cleaned_df)
+    fit$kmo <- tryCatch(as.numeric(psych::KMO(cor_mat)$MSA), error = function(e) NA_real_)
+    fit$bartlett <- tryCatch(psych::cortest.bartlett(cor_mat, n = nrow(cleaned_df)), error = function(e) NULL)
+    fit$parallel <- tryCatch(compute_parallel_analysis(cleaned_df), error = function(e) NULL)
     class(fit) <- c("fa_exploratory", class(fit))
     fit
   }
@@ -114,6 +243,18 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
   res <- broom:::glance.factanal(x) %>% dplyr::select(-n, -converged, -method) # But converged is NULL.
   res <- res %>% dplyr::mutate(variance=total.variance*length(x$communality), ratio_variance=total.variance)
   res <- res %>% dplyr::select(`Factors`=n.factors, `Variance Explained (Ratio)`=ratio_variance, `Variance Explained`=variance, `Chi-Square`=statistic, `P Value`=p.value, `DF`=df, `Rows`=nobs)
+  # Append fit-quality columns for the report's supplementary section (issue #37018). NA-safe:
+  # older psych fits may not carry every field. Append-only keeps the client's name-indexed reads working.
+  safe_num <- function(v) if (is.null(v) || length(v) == 0) NA_real_ else suppressWarnings(as.numeric(v)[1])
+  rmsea_val <- if (!is.null(x$RMSEA)) safe_num(x$RMSEA[["RMSEA"]]) else NA_real_
+  res <- res %>% dplyr::mutate(
+    `Method` = x$fm,
+    `Rotation` = if (!is.null(x$rotation)) x$rotation else NA_character_,
+    `RMSR` = safe_num(x$rms),
+    `RMSEA` = rmsea_val,
+    `TLI` = safe_num(x$TLI),
+    `BIC` = safe_num(x$BIC)
+  )
   res
 }
 
@@ -273,6 +414,95 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # Return an empty data frame.
       res <- tibble::tibble()
     }
+  }
+  else if (type == "loadings_wide") {
+    # Wide judged loadings table (issue #37018). One row per variable: Factor 1..N loadings plus a
+    # Judgement label and hidden token/param columns the client uses to compose per-cell tooltips.
+    wide <- broom:::tidy.factanal(x)
+    colnames(wide) <- c("variable", "uniqueness", stringr::str_c(factor_loading_prefix, 1:n_factor))
+    wide <- wide %>% dplyr::select(-uniqueness)
+    new_names <- stringr::str_c("Factor ", 1:n_factor)
+    colnames(wide) <- c("variable", new_names)
+    judgements <- purrr::map(seq_len(nrow(wide)), function(i) {
+      loadings <- unlist(wide[i, new_names], use.names = FALSE)
+      names(loadings) <- new_names
+      judge_loading(loadings)
+    })
+    res <- wide %>% dplyr::mutate(
+      Judgement = purrr::map_chr(judgements, "label"),
+      judgement_status = purrr::map_chr(judgements, "status"),
+      primary_factor = purrr::map_chr(judgements, "primary_factor"),
+      secondary_factors = purrr::map_chr(judgements, "secondary_factors"),
+      direction = purrr::map_chr(judgements, "direction")
+    )
+  }
+  else if (type == "communalities") {
+    comm <- x$communality
+    res <- tibble::tibble(variable = names(comm), Communality = as.numeric(comm), Uniqueness = as.numeric(x$uniquenesses))
+    judgements <- purrr::map(res$Communality, judge_communality)
+    res <- res %>% dplyr::mutate(
+      Judgement = purrr::map_chr(judgements, "label"),
+      judgement_status = purrr::map_chr(judgements, "status")
+    ) %>% dplyr::arrange(dplyr::desc(Communality))
+  }
+  else if (type == "communalities_long") {
+    # Long form for the 100%-stacked communality/uniqueness bar chart. Normally the two components
+    # sum to 1. In a Heywood case (communality > 1) uniqueness would go negative, which would break
+    # the stack. Per spec: the bar is CLIPPED at 100% (via the chart's 0-100 value-axis range) but
+    # the numeric label shows the ACTUAL communality (e.g. 101%), so communality is left UNCAPPED
+    # here; uniqueness is clamped to 0 so it is never negative. (#37018)
+    comm <- as.numeric(x$communality)
+    # Order the bars by communality DESCENDING (highest communality at the TOP of the horizontal
+    # bar chart). Ratios are on a 0-100 percentage scale. Component is Communality-first so it
+    # stacks/colors/legends before Uniqueness.
+    var_factor <- forcats::fct_reorder(names(x$communality), comm, .desc = TRUE)
+    res <- tibble::tibble(
+      variable = var_factor,
+      Communality = comm * 100,
+      Uniqueness = pmax(1 - comm, 0) * 100
+    ) %>%
+      tidyr::pivot_longer(cols = c("Communality", "Uniqueness"), names_to = "Component", values_to = "Ratio") %>%
+      dplyr::mutate(Component = forcats::fct_relevel(as.factor(Component), "Communality", "Uniqueness"))
+  }
+  else if (type == "suitability") {
+    kmo <- x$kmo
+    bart <- x$bartlett
+    p <- if (is.null(bart)) NA_real_ else bart$p.value
+    kj <- judge_kmo(kmo)
+    bj <- judge_bartlett(p)
+    kmo_val <- if (is.na(kmo)) "N/A" else format(round(kmo, 2), nsmall = 2)
+    bart_val <- if (is.na(p)) "N/A" else if (p < 0.001) "p < 0.001" else paste0("p = ", format(round(p, 3), nsmall = 3))
+    res <- tibble::tibble(
+      Metric = c("KMO", "Bartlett's Test of Sphericity", "Rows Used", "Variables Used"),
+      Value = c(kmo_val, bart_val, as.character(x$n_rows_used), as.character(x$n_variables)),
+      Judgement = c(kj$label, bj$label, "", ""),
+      Description = c(kj$description, bj$description,
+                      "Number of rows used after removing missing values.",
+                      "Number of variables used in the analysis."),
+      status = c(kj$status, bj$status, "", "")
+    )
+  }
+  else if (type == "factor_count") {
+    eig <- eigen(x$correlation, only.values = TRUE)$values
+    kaiser_n <- sum(eig > 1)
+    par <- x$parallel
+    parallel_rec <- if (is.null(par)) "Not available" else as.character(par$recommended_n)
+    res <- tibble::tibble(
+      Method = c("Kaiser Criterion", "Parallel Analysis", "Scree Plot"),
+      `Recommended Number of Factors` = c(as.character(kaiser_n), parallel_rec, "Check the chart"),
+      Description = c(
+        "Number of factors with an eigenvalue greater than 1.",
+        "Number of factors whose eigenvalue exceeds the random-data eigenvalue.",
+        "Look for the point where the eigenvalue drop levels off (the elbow)."
+      )
+    )
+  }
+  else if (type == "parallel_screeplot") {
+    eig <- eigen(x$correlation, only.values = TRUE)$values
+    par <- x$parallel
+    threshold <- if (is.null(par)) rep(NA_real_, length(eig)) else par$table$random_eigenvalue_threshold
+    length(threshold) <- length(eig) # pad/truncate to align with eigenvalue count
+    res <- tibble::tibble(Factor = 1:length(eig), Eigenvalue = eig, `Random Data Eigenvalue` = threshold)
   }
   else { # should be data
     scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
