@@ -1,3 +1,16 @@
+#' Return a fallback value when the left-hand side is NULL.
+#'
+#' Shared null-coalescing operator used across the package (e.g. chaid.R,
+#' build_catboost.R). Kept here rather than relying on an rlang import so the
+#' definition has a single, stable home.
+#'
+#' @param x Value to inspect.
+#' @param y Fallback value returned when `x` is NULL.
+#' @return `x` unless it is NULL, otherwise `y`.
+`%||%` <- function(x, y) {
+  if (is.null(x)) y else x
+}
+
 #' Column name parser
 #' This function is from https://github.com/tidyverse/broom/blob/master/R/utilities.R
 #' @export
