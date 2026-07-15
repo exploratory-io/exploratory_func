@@ -111,6 +111,24 @@ test_that("tree_nodes regression - predicted mean, class_json NA, sd/rmse/dist (
   }
 })
 
+test_that("tree_nodes regression - integer/discrete target uses one bin per integer", {
+  set.seed(7)
+  n <- 400
+  df <- tibble::tibble(x1 = rnorm(n), x2 = rnorm(n))
+  # discrete integer target, small range (<= 30) so it should get per-integer bins
+  df$level <- as.integer(pmin(5L, pmax(1L, round(3 + df$x1))))
+  model_df <- df %>% exp_rpart(level, x1, x2)
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+
+  root <- jsonlite::fromJSON(nodes$dist_json[nodes$node_id == 1])
+  # one bin per integer: breaks are consecutive half-integers (width 1, at n +/- 0.5)
+  expect_true(all(abs(diff(root$breaks) - 1) < 1e-9))
+  expect_true(all(abs((root$breaks %% 1) - 0.5) < 1e-9))
+  rng <- range(df$level)
+  expect_equal(length(root$counts), as.integer(diff(rng)) + 1L)
+  expect_equal(sum(root$counts), nodes$n[nodes$node_id == 1])
+})
+
 test_that("tree_nodes multibyte/symbol column with categorical + numeric split", {
   set.seed(42)
   n <- 400
