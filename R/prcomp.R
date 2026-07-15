@@ -550,6 +550,22 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
         dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
     }
   }
+  else if (type == "coefficients") {
+    # PCA report: raw principal-component coefficients (主成分係数 = fit$rotation, the eigenvector
+    # weights that construct each PC) in long format for ALL components (issue #37019). Unlike
+    # "loadings_signed" (cor(cleaned_df, fit$x) correlations) or "contributions" (rotation^2 share),
+    # these are the sign-stabilized rotation values themselves -- signed weights, negatives expected
+    # on non-dominant variables. rotation is already sign-stabilized (A2) -- do NOT re-flip. Empty
+    # typed tibble for k-means / old saved models.
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Variable = character(0), Component = character(0), Coefficient = numeric(0))
+    }
+    else {
+      res <- tibble::as_tibble(x$rotation, rownames = "Variable") %>%
+        tidyr::gather(Component, Coefficient, dplyr::starts_with("PC"), convert = TRUE) %>%
+        dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
+    }
+  }
   else if (type == "variable_map") {
     # PCA report: variable-vector rows for a 2D correlation-circle chart (issue #37019).
     # The tam side renders this like the biplot's VARIABLE vectors only (no observation points),
