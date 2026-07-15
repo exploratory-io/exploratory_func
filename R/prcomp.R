@@ -1,7 +1,75 @@
+# All judge_*/classify_* helpers emit English-canonical labels and a language-neutral
+# `status` token. The desktop/server client translates the labels (VizUtil message tables)
+# and composes tooltips from token + params. No natural language for translation lives
+# in R output. (issue #37019; contract established by #37018)
+prcomp_report_config <- function() {
+  list(
+    loading_salient = 0.40,
+    dominant_contribution = 0.40,
+    dominant_ratio = 1.5,
+    representation_high = 0.70,
+    representation_mostly = 0.50,
+    representation_partial = 0.30,
+    cumulative_high = 0.80,
+    cumulative_mid = 0.60,
+    two_d_high = 0.70,
+    two_d_mid = 0.50,
+    scale_ratio_warning = 10,
+    na_exclusion_warning = 0.20,
+    next_gain_threshold = 0.20,
+    related_min = 2,
+    related_max = 5
+  )
+}
+
+classify_pca_component_pattern <- function(loadings, contributions, cfg = prcomp_report_config()) {
+  ordered_contribution <- sort(contributions, decreasing = TRUE)
+  maximum_contribution <- ordered_contribution[1]
+  second_contribution <- if (length(ordered_contribution) >= 2) ordered_contribution[2] else 0
+  is_dominant <- maximum_contribution >= cfg$dominant_contribution &&
+    (second_contribution == 0 || maximum_contribution / second_contribution >= cfg$dominant_ratio)
+  positive_variables <- names(loadings)[loadings >= cfg$loading_salient]
+  negative_variables <- names(loadings)[loadings <= -cfg$loading_salient]
+  salient_count <- length(positive_variables) + length(negative_variables)
+  same_sign_share <- if (salient_count == 0) 0 else max(length(positive_variables), length(negative_variables)) / salient_count
+  top_three_sum <- sum(head(ordered_contribution, 3))
+  dominant_variable <- names(which.max(contributions))
+  base <- list(dominant_variable = dominant_variable,
+               positive_variables = paste(positive_variables, collapse = ","),
+               negative_variables = paste(negative_variables, collapse = ","))
+  if (is_dominant) {
+    c(list(status = "single_variable", label = "Single Variable"), base)
+  } else if (length(positive_variables) >= 1 && length(negative_variables) >= 1) {
+    c(list(status = "contrast", label = "Contrast"), base)
+  } else if (salient_count >= 3 && same_sign_share >= 0.80) {
+    c(list(status = "common_direction", label = "Common Direction"), base)
+  } else if (top_three_sum < 0.50) {
+    c(list(status = "diffuse", label = "Diffuse"), base)
+  } else {
+    c(list(status = "mixed", label = "Mixed"), base)
+  }
+}
+
+select_pca_related_variables <- function(loadings, contributions, cfg = prcomp_report_config()) {
+  candidate_index <- which(abs(loadings) >= cfg$loading_salient)
+  if (length(candidate_index) < cfg$related_min) {
+    candidate_index <- head(order(abs(loadings), decreasing = TRUE), cfg$related_min)
+  }
+  candidate_index <- candidate_index[order(abs(loadings[candidate_index]),
+                                           contributions[candidate_index], decreasing = TRUE)]
+  candidate_index <- head(candidate_index, cfg$related_max)
+  selected <- loadings[candidate_index]
+  labels <- paste0(ifelse(selected >= 0, "+", "-"), names(selected))
+  list(variables = names(selected), loadings = unname(selected),
+       display_text = paste(labels, collapse = ", "))
+}
+
 #' do PCA
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
+#' retained_components - Number of principal components the report treats as retained. NULL = auto (use parallel analysis recommendation). Clamped to [1, number of components].
+#' with_report_data - Whether to compute and attach the redesigned PCA report data (parallel analysis, Kaiser, retained/diagnostics) AND apply sign stabilization. Pure-PCA only; exp_kmeans passes FALSE so k-means fits are neither given report data nor sign-flipped. (issue #37019)
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE) {
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE, retained_components = NULL, with_report_data = TRUE) {
   all_cols <- colnames(df)
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -32,6 +100,11 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
   }
 
   each_func <- function(df) {
+    # Capture the variable columns actually present in this group's data (after the
+    # list/difftime drop above) BEFORE preprocess_factanal_data_before_sample overwrites
+    # selected_cols, so the report can compute which variables were excluded. (issue #37019)
+    report_selected_cols <- intersect(selected_cols, colnames(df))
+
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
     sampled_nrow <- NULL
@@ -85,6 +158,57 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
+
+    # Fit-time PCA report data (issue #37019). PURE-PCA ONLY: exp_kmeans shares this
+    # machinery but passes with_report_data=FALSE, so k-means fits get neither the report
+    # data nor the sign flip below. Each piece is tryCatch-guarded (mirrors factanal.R) so a
+    # degenerate input degrades gracefully instead of aborting the fit.
+    if (with_report_data) {
+      # Sign stabilization (#37019 spec 4-3): flip each PC so the variable with the largest
+      # |correlation| loads positively. PCA signs are arbitrary; this makes interpretation
+      # text stable across runs. Compute in a guard so a degenerate correlation leaves signs
+      # untouched (all-1 multiplier is a no-op sweep).
+      sign_multiplier <- tryCatch({
+        variable_pc_correlations <- cor(cleaned_df, fit$x)
+        vapply(seq_len(ncol(variable_pc_correlations)), function(i) {
+          col <- variable_pc_correlations[, i]
+          strongest <- col[which.max(abs(col))]
+          if (length(strongest) == 0 || is.na(strongest) || strongest >= 0) 1 else -1
+        }, numeric(1))
+      }, error = function(e) rep(1, ncol(fit$rotation)))
+      fit$rotation <- sweep(fit$rotation, 2, sign_multiplier, "*")
+      fit$x <- sweep(fit$x, 2, sign_multiplier, "*")
+
+      fit$parallel <- tryCatch(compute_parallel_analysis(cleaned_df), error = function(e) NULL)
+      fit$kaiser_components <- tryCatch(
+        if (normalize_data) as.integer(sum(eigen(fit$correlation)$values >= 1)) else NA_integer_,
+        error = function(e) NA_integer_)
+      fit$recommended_components <- if (!is.null(fit$parallel)) fit$parallel$recommended_n else NA_integer_
+      n_comp <- length(fit$sdev)
+      fit$retained_components <- if (!is.null(retained_components)) {
+        min(max(1L, as.integer(retained_components)), n_comp)
+      } else {
+        min(max(1L, ifelse(is.na(fit$recommended_components), 1L, fit$recommended_components)), n_comp)
+      }
+      fit$retained_is_auto <- is.null(retained_components)
+      fit$normalize_data <- normalize_data
+      fit$input_diagnostics <- tryCatch({
+        variable_sd <- vapply(cleaned_df, sd, numeric(1))
+        original_row_count <- nrow(df)
+        analyzed_row_count <- nrow(cleaned_df)
+        excluded_row_count <- original_row_count - analyzed_row_count
+        list(
+          original_row_count = original_row_count,
+          analyzed_row_count = analyzed_row_count,
+          excluded_row_count = excluded_row_count,
+          excluded_row_rate = excluded_row_count / max(1, original_row_count),
+          excluded_variables = setdiff(report_selected_cols, colnames(cleaned_df)),
+          variable_sd = variable_sd,
+          scale_ratio = if (min(variable_sd) > 0) max(variable_sd) / min(variable_sd) else NA_real_
+        )
+      }, error = function(e) NULL)
+    }
+
     class(fit) <- c("prcomp_exploratory", class(fit))
     fit
   }
@@ -199,6 +323,321 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   else if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
+  }
+  else if (type == "analysis_conditions") {
+    # PCA report: one row per analysis condition, composed from fit-time input diagnostics
+    # (issue #37019). English-canonical Description sentences + language-neutral status tokens;
+    # the client translates. Empty typed tibble for k-means / old saved models (no report data).
+    cfg <- prcomp_report_config()
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Metric = character(0), Value = character(0),
+                            Description = character(0), status = character(0))
+    }
+    else {
+      d <- x$input_diagnostics
+      normalized <- isTRUE(x$normalize_data)
+      variables_used <- length(d$variable_sd)
+      excluded_names <- d$excluded_variables
+      excluded_display <- if (length(excluded_names) == 0) "-" else paste(excluded_names, collapse = ", ")
+      excluded_pct <- d$excluded_row_rate * 100
+      scale_ratio <- d$scale_ratio
+      scale_display <- if (is.na(scale_ratio)) "-" else format(round(scale_ratio, 1), nsmall = 1)
+      scale_status <- if (!normalized && is.finite(scale_ratio) && scale_ratio >= cfg$scale_ratio_warning) "scale_warning" else "ok"
+      res <- tibble::tibble(
+        Metric = c("Rows Used", "Rows Excluded", "Variables Used", "Excluded Variables",
+                   "Normalization", "SD Ratio (Max/Min)", "Rows vs Variables"),
+        Value = c(
+          as.character(d$analyzed_row_count),
+          paste0(d$excluded_row_count, " (", format(round(excluded_pct, 1), nsmall = 1), "%)"),
+          as.character(variables_used),
+          excluded_display,
+          if (normalized) "Yes" else "No",
+          scale_display,
+          paste0(d$analyzed_row_count, " rows / ", variables_used, " variables")
+        ),
+        Description = c(
+          "Number of rows used after removing missing values.",
+          "Number and rate of rows removed because of missing values.",
+          "Number of variables used in the analysis.",
+          "Variables dropped before analysis because they had only NA or a single value.",
+          "Whether variables were scaled to unit variance before analysis.",
+          "Ratio of the largest to the smallest variable standard deviation.",
+          "Number of rows compared with the number of variables."
+        ),
+        status = c(
+          "ok",
+          if (d$excluded_row_rate >= cfg$na_exclusion_warning) "high_na_exclusion" else "ok",
+          "ok",
+          if (length(excluded_names) == 0) "na" else "ok",
+          "ok",
+          scale_status,
+          if (d$analyzed_row_count <= variables_used) "few_rows" else "ok"
+        )
+      )
+    }
+  }
+  else if (type == "parallel_screeplot") {
+    # Horn's parallel analysis scree data: actual correlation-matrix eigenvalue vs the random-data
+    # threshold, per component (issue #37019). Component is the integer factor number. Empty typed
+    # tibble when parallel analysis is absent (k-means / old saved models).
+    if (is.null(x$parallel)) {
+      res <- tibble::tibble(Component = integer(0), Eigenvalue = numeric(0),
+                            `Random Data Eigenvalue` = numeric(0))
+    }
+    else {
+      tbl <- x$parallel$table
+      res <- tibble::tibble(
+        Component = as.integer(tbl$factor_number),
+        Eigenvalue = tbl$actual_eigenvalue,
+        `Random Data Eigenvalue` = tbl$random_eigenvalue_threshold
+      )
+    }
+  }
+  else if (type == "variances_judged") {
+    # PCA report: per-component variance table with three retention judgments (issue #37019).
+    # Empty typed tibble for k-means / old saved models (no report data).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        Component = character(0), Eigenvalue = numeric(0),
+        `% Variance` = numeric(0), `Cummulated % Variance` = numeric(0),
+        `Parallel Analysis` = character(0), `Kaiser Criterion` = character(0),
+        Selected = character(0), parallel_status = character(0),
+        kaiser_status = character(0), selected_status = character(0)
+      )
+    }
+    else {
+      # Eigenvalue / % Variance / Cummulated % Variance use x$sdev^2 -- the SAME basis as the
+      # existing "variances" branch -- so these numbers match the Variance (%) tab exactly.
+      # When normalize_data=TRUE, x$sdev^2 equals the correlation-matrix eigenvalues that parallel
+      # analysis and Kaiser use, so all bases coincide. They diverge only when normalize_data=FALSE
+      # (covariance-scaled sdev), and there Kaiser is "na" anyway; the Parallel Adopt columns read
+      # actual vs random eigenvalues directly from x$parallel$table (correlation eigenvalues from
+      # compute_parallel_analysis), NOT from this Eigenvalue column, so the Adopt judgment always
+      # agrees with the parallel scree regardless of basis.
+      eigenvalue <- x$sdev^2
+      n_comp <- length(eigenvalue)
+      total_variance <- sum(eigenvalue)
+      pct_variance <- eigenvalue / total_variance * 100
+      cum_pct_variance <- cumsum(pct_variance)
+      component <- paste0("PC", seq_len(n_comp))
+      normalized <- isTRUE(x$normalize_data)
+
+      # Parallel Analysis: adopt when actual eigenvalue > random threshold, keyed by component
+      # index (factor_number). NULL parallel -> Not Available / na.
+      if (is.null(x$parallel)) {
+        parallel_label <- rep("Not Available", n_comp)
+        parallel_status <- rep("na", n_comp)
+      }
+      else {
+        ptbl <- x$parallel$table
+        in_range <- ptbl$factor_number <= n_comp
+        actual <- rep(NA_real_, n_comp)
+        threshold <- rep(NA_real_, n_comp)
+        actual[ptbl$factor_number[in_range]] <- ptbl$actual_eigenvalue[in_range]
+        threshold[ptbl$factor_number[in_range]] <- ptbl$random_eigenvalue_threshold[in_range]
+        adopted <- !is.na(actual) & !is.na(threshold) & actual > threshold
+        parallel_label <- ifelse(adopted, "Adopt", "Not Adopted")
+        parallel_status <- ifelse(adopted, "adopted", "not_adopted")
+      }
+
+      # Kaiser Criterion: only meaningful when normalized (eigenvalue >= 1). Otherwise "-"/na.
+      if (normalized) {
+        kaiser_adopted <- eigenvalue >= 1
+        kaiser_label <- ifelse(kaiser_adopted, "Adopt", "Not Adopted")
+        kaiser_status <- ifelse(kaiser_adopted, "adopted", "not_adopted")
+      }
+      else {
+        kaiser_label <- rep("-", n_comp)
+        kaiser_status <- rep("na", n_comp)
+      }
+
+      retained <- if (!is.null(x$retained_components)) x$retained_components else 0L
+      selected_adopted <- seq_len(n_comp) <= retained
+      selected_label <- ifelse(selected_adopted, "Adopt", "Not Adopted")
+      selected_status <- ifelse(selected_adopted, "adopted", "not_adopted")
+
+      res <- tibble::tibble(
+        Component = component,
+        Eigenvalue = eigenvalue,
+        `% Variance` = pct_variance,
+        `Cummulated % Variance` = cum_pct_variance,
+        `Parallel Analysis` = parallel_label,
+        `Kaiser Criterion` = kaiser_label,
+        Selected = selected_label,
+        parallel_status = parallel_status,
+        kaiser_status = kaiser_status,
+        selected_status = selected_status
+      )
+    }
+  }
+  else if (type == "component_profiles") {
+    # PCA report: ONE ROW PER RETAINED COMPONENT with pattern classification + related variables
+    # (issue #37019). English-canonical Pattern label + language-neutral status token; the client
+    # translates. Empty typed tibble for k-means / old saved models (no report data).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        Component = character(0), Eigenvalue = numeric(0),
+        `% Variance` = numeric(0), `Cummulated % Variance` = numeric(0),
+        `Related Variables` = character(0), Pattern = character(0),
+        pattern_status = character(0), dominant_variable = character(0),
+        positive_variables = character(0), negative_variables = character(0)
+      )
+    }
+    else {
+      cfg <- prcomp_report_config()
+      # Reconstruct the used numeric variables. variable_sd is named over exactly those columns
+      # (== rownames(x$rotation)), the SAME reconstruction the fit uses for cor(cleaned_df, fit$x).
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      # 主成分負荷量 = correlation between variable and score (signed), variables x components.
+      signed_loadings <- cor(cleaned_df, x$x)
+      # Eigenvalue / % Variance / Cummulated % Variance from x$sdev^2 -- SAME basis as "variances".
+      eigenvalue <- x$sdev^2
+      total_variance <- sum(eigenvalue)
+      pct_variance <- eigenvalue / total_variance * 100
+      cum_pct_variance <- cumsum(pct_variance)
+      retained <- if (!is.null(x$retained_components)) x$retained_components else 0L
+      rows <- lapply(seq_len(retained), function(i) {
+        loadings_i <- signed_loadings[, i]
+        # Contribution = each variable's share of this PC. rotation columns are unit vectors so
+        # sum(rotation[,i]^2) == 1; normalize explicitly so the share always sums to 1.
+        contributions_i <- x$rotation[, i]^2
+        contributions_i <- contributions_i / sum(contributions_i)
+        profile <- classify_pca_component_pattern(loadings = loadings_i, contributions = contributions_i, cfg = cfg)
+        related <- select_pca_related_variables(loadings = loadings_i, contributions = contributions_i, cfg = cfg)
+        tibble::tibble(
+          Component = paste0("PC", i),
+          Eigenvalue = eigenvalue[i],
+          `% Variance` = pct_variance[i],
+          `Cummulated % Variance` = cum_pct_variance[i],
+          `Related Variables` = related$display_text,
+          Pattern = profile$label,
+          pattern_status = profile$status,
+          dominant_variable = profile$dominant_variable,
+          positive_variables = profile$positive_variables,
+          negative_variables = profile$negative_variables
+        )
+      })
+      res <- dplyr::bind_rows(rows)
+    }
+  }
+  else if (type == "loadings_signed") {
+    # PCA report: signed principal-component loadings (主成分負荷量 = cor(cleaned_df, fit$x)) in
+    # long format for ALL components (issue #37019). Unlike the "loadings" branch (squared cosine),
+    # values are signed correlations -- sign-stabilized rotation still yields negatives on
+    # non-dominant variables. Empty typed tibble for k-means / old saved models.
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Variable = character(0), Component = character(0), Loading = numeric(0))
+    }
+    else {
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      signed_loadings <- cor(cleaned_df, x$x)
+      res <- tibble::as_tibble(signed_loadings, rownames = "Variable") %>%
+        tidyr::gather(Component, Loading, dplyr::starts_with("PC"), convert = TRUE) %>%
+        dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
+    }
+  }
+  else if (type == "contributions") {
+    # PCA report: each variable's percent contribution to each component (issue #37019).
+    # rotation^2 per column normalized to sum 100 (%). Long format. Empty typed tibble for k-means.
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Variable = character(0), Component = character(0), Contribution = numeric(0))
+    }
+    else {
+      contribution <- x$rotation^2
+      contribution <- sweep(contribution, 2, colSums(contribution), "/") * 100 # each column sums to 100
+      res <- tibble::as_tibble(contribution, rownames = "Variable") %>%
+        tidyr::gather(Component, Contribution, dplyr::starts_with("PC"), convert = TRUE) %>%
+        dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
+    }
+  }
+  else if (type == "variable_map") {
+    # PCA report: variable-vector rows for a 2D correlation-circle chart (issue #37019).
+    # The tam side renders this like the biplot's VARIABLE vectors only (no observation points),
+    # so we MIRROR the biplot branch's variable-loading columns: `measure_name` (label), `PC1`
+    # (x axis) and `Measures` (biplot's name for the PC2 axis of measures), plus a zero-origin
+    # pairing (two rows per variable: origin (0,0) then the endpoint) so the chart can draw a line
+    # from the origin to each variable point. We ADD an explicit `PC2` column (same value as
+    # `Measures`) so downstream code / tests can read PC2 directly, and `Representation 2D`
+    # (= (cor_PC1^2 + cor_PC2^2) * 100), the variable's 2D representation quality in percent.
+    # Coordinates are RAW correlations cor(variable, score) -- NOT pre-scaled; the tam chart
+    # applies its own display scaling (unlike the biplot branch, which pre-scales loadings so
+    # measures and observation points share one scatter plot). Empty typed tibble for k-means /
+    # old saved models (no report data).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        measure_name = character(0), PC1 = numeric(0), PC2 = numeric(0),
+        Measures = numeric(0), `Representation 2D` = numeric(0)
+      )
+    }
+    else {
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      # cor(variable, score) -- signed correlations, variables x components. Same basis the fit
+      # uses for sign stabilization and the component_profiles / loadings_signed branches.
+      signed_loadings <- cor(cleaned_df, x$x)
+      n_comp <- ncol(signed_loadings)
+      cor_pc1 <- signed_loadings[, 1]
+      # Guard: needs >= 2 components. With only 1 component PC2 has no meaning -- use 0 (a point on
+      # the PC1 axis) rather than NA so the origin->endpoint line still renders on the chart.
+      cor_pc2 <- if (n_comp >= 2) signed_loadings[, 2] else rep(0, length(cor_pc1))
+      representation_2d <- (cor_pc1^2 + cor_pc2^2) * 100
+      endpoint <- tibble::tibble(
+        measure_name = rownames(signed_loadings),
+        PC1 = cor_pc1,
+        PC2 = cor_pc2,
+        Measures = cor_pc2, # mirror biplot: the PC2 axis for measures is named "Measures".
+        `Representation 2D` = representation_2d
+      )
+      # Origin rows (0,0) pair with each endpoint so the chart draws a vector from the origin.
+      # Representation 2D is a per-variable quality, meaningless at the origin -> NA there.
+      origin <- endpoint %>%
+        dplyr::mutate(PC1 = 0, PC2 = 0, Measures = 0, `Representation 2D` = NA_real_)
+      res <- dplyr::bind_rows(origin, endpoint)
+    }
+  }
+  else if (type == "representation") {
+    # PCA report: per-variable CUMULATIVE representation table, WIDE (issue #37019). Each PC column
+    # holds the cumulative representation quality (%) up to that component -- how much of the
+    # variable's variance is captured by PC1..PCk. `Retained` reads the cumulative value at the
+    # retained-component count; `Judgement`/`judgement_status` bucket that fraction. English-canonical
+    # Judgement label + language-neutral status token; the client translates. Empty typed tibble for
+    # k-means / old saved models. NOTE: the dynamic PC1..PCn columns exist only when there is data;
+    # the empty case returns just the fixed columns (Variable, Retained, Judgement, judgement_status).
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(
+        Variable = character(0), Retained = numeric(0),
+        Judgement = character(0), judgement_status = character(0)
+      )
+    }
+    else {
+      cfg <- prcomp_report_config()
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      sq <- cor(cleaned_df, x$x)^2 # squared correlations, variables x components.
+      # Cumulative across components per variable. apply(..., 1, cumsum) returns components x
+      # variables, so transpose back to variables x components. cumsum of non-negative squared
+      # correlations is monotone non-decreasing; clamp+scale (a monotone map) preserves that order.
+      cumrep <- t(apply(sq, 1, cumsum))
+      # `cumrep[] <-` keeps the matrix dims/dimnames; a bare `pmin(...) * 100` drops them to a vector.
+      cumrep[] <- pmin(1, pmax(0, cumrep)) * 100
+      n_comp <- ncol(cumrep)
+      colnames(cumrep) <- paste0("PC", seq_len(n_comp))
+      retained_idx <- if (!is.null(x$retained_components)) as.integer(x$retained_components) else n_comp
+      retained_idx <- max(1L, min(retained_idx, n_comp))
+      retained_val <- cumrep[, retained_idx]
+      frac <- retained_val / 100
+      judgement <- ifelse(frac >= cfg$representation_high, "High",
+                   ifelse(frac >= cfg$representation_mostly, "Mostly Retained",
+                   ifelse(frac >= cfg$representation_partial, "Partially Retained", "Low")))
+      judgement_status <- ifelse(frac >= cfg$representation_high, "high",
+                          ifelse(frac >= cfg$representation_mostly, "mostly",
+                          ifelse(frac >= cfg$representation_partial, "partial", "low")))
+      res <- tibble::tibble(Variable = rownames(sq)) %>%
+        dplyr::bind_cols(tibble::as_tibble(cumrep)) %>%
+        dplyr::mutate(
+          Retained = retained_val,
+          Judgement = judgement,
+          judgement_status = judgement_status
+        )
+    }
   }
   else { # should be data or gathered_data
     res <- x$df
