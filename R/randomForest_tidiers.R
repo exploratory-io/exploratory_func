@@ -3908,7 +3908,17 @@ build_rpart_tree_nodes <- function(x) {
     if (!is.null(yv) && length(yv) > 0 && !is.null(x$where)) {
       yfin <- yv[is.finite(yv)]
       if (length(yfin) >= 2 && diff(range(yfin)) > 0) {
-        shared_breaks <- seq(min(yfin), max(yfin), length.out = 21) # ~20 equal-width bins
+        y_min <- min(yfin)
+        y_max <- max(yfin)
+        # Integer/discrete target: use one bin per integer value (breaks at n +/- 0.5)
+        # so the histogram shows discrete bars instead of ~20 continuous equal-width
+        # bins that scatter the integers into sparse, empty-gapped bins. Guard the
+        # range so a wide-range integer column (e.g. income) still uses equal-width bins.
+        if (all(yfin == floor(yfin)) && (y_max - y_min) <= 30) {
+          shared_breaks <- seq(y_min - 0.5, y_max + 0.5, by = 1) # one bin per integer
+        } else {
+          shared_breaks <- seq(y_min, y_max, length.out = 21)    # ~20 equal-width bins
+        }
       } else if (length(yfin) >= 1) {
         shared_breaks <- c(yfin[1] - 0.5, yfin[1] + 0.5)             # degenerate: single bin
       }
