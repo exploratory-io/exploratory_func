@@ -294,3 +294,16 @@ test_that("all 8 report tidy types return 0-row typed tibbles for an old saved m
     expect_true(all(PRCOMP_REPORT_TYPE_COLS[[ty]] %in% colnames(res)), info = ty)
   }
 })
+
+test_that("coefficients tidy type returns rotation weights (long, signed)", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
+  res <- model_df %>% tidy_rowwise(model, type = "coefficients")
+  expect_equal(colnames(res), c("Variable", "Component", "Coefficient"))
+  expect_true(any(res$Coefficient < 0))            # signed eigenvector weights
+  expect_true(nrow(res) == 6 * length(unique(res$Component)))  # vars x components
+  # kmeans fit -> empty
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  r2 <- km %>% tidy_rowwise(model, type = "coefficients")
+  expect_equal(nrow(r2), 0)
+  expect_equal(colnames(r2), c("Variable", "Component", "Coefficient"))
+})
