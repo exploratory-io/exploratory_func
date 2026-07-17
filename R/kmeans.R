@@ -224,6 +224,7 @@ exp_kmeans <- function(df, ...,
   allow_single_column <- length(selected_cols) == 1
   ret <- do_prcomp(df, normalize_data = normalize_data, allow_single_column = allow_single_column, seed = NULL,
                    na.rm = FALSE, # Skip NA filtering since it is already done.
+                   with_report_data = FALSE, # PCA report data + sign flip are pure-PCA only; k-means fits must not be altered. (#37019)
                    !!!rlang::syms(selected_cols))
   ret <- dplyr::ungroup(ret) # ungroup once so that the following mutate with purrr::map2 works.
 
