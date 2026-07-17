@@ -65,10 +65,10 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
     # Effective (non-dropped) selected variables, in selection order.
     effective_vars <- selected_cols[selected_cols %in% colnames(cleaned_df)]
 
-    # Rows used by the report's chi-square (listwise complete cases across effective vars).
+    # Rows used by the CA fit and by listwise association reporting.
     report_source <- df[, effective_vars, drop = FALSE]
     complete_rows <- stats::complete.cases(report_source)
-    n_used <- sum(complete_rows)
+    n_used <- if (missing_method == "listwise") sum(complete_rows) else nrow(df)
     n_excluded <- original_nrow - n_used
 
     is_ca <- length(effective_vars) == 2
@@ -119,16 +119,29 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
     }
 
     # Sections 3 & 4: pairwise associations (works for both CA and MCA).
-    fit$association <- build_pairwise_association_results(
-      data = report_source, variables = effective_vars,
-      overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
-      alpha = alpha, missing_method = missing_method, simulation_count = simulation_count,
-      seed = seed, suppress_cell_p_when_sparse = suppress_cell_p_when_sparse,
-      featured_rule = featured_rule, practical_ratio_upper = practical_ratio_upper,
-      practical_ratio_lower = practical_ratio_lower,
-      practical_minimum_difference = practical_minimum_difference,
-      require_overall_significance = require_overall_significance
-    )
+    # With one selected variable there are no pairs, but the legacy
+    # allow_single_column option still returns the fitted MCA model.
+    if (length(effective_vars) >= 2) {
+      association_data <- if (missing_method == "listwise") report_source else df
+      fit$association <- build_pairwise_association_results(
+        data = association_data, variables = effective_vars,
+        overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
+        alpha = alpha, missing_method = missing_method, simulation_count = simulation_count,
+        seed = seed, suppress_cell_p_when_sparse = suppress_cell_p_when_sparse,
+        featured_rule = featured_rule, practical_ratio_upper = practical_ratio_upper,
+        practical_ratio_lower = practical_ratio_lower,
+        practical_minimum_difference = practical_minimum_difference,
+        require_overall_significance = require_overall_significance
+      )
+    } else {
+      fit$association <- list(
+        variable_pair_results = tibble::tibble(),
+        residual_heatmap_data = tibble::tibble(),
+        featured_combinations = tibble::tibble(),
+        settings = list(variables = effective_vars, analysis_n = n_used,
+                        missing_method = missing_method)
+      )
+    }
 
     fit$effective_vars <- effective_vars
     fit$n_used <- n_used
@@ -303,13 +316,14 @@ tidy.ca_exploratory <- function(x, type = "categories", ...) {
   cum12 <- if (nrow(eig) >= 2) eig[[3]][2] else if (nrow(eig) >= 1) eig[[3]][1] else NA_real_
   main_vars <- x$section5$dimension_summary %>%
     dplyr::filter(dimension <= 2) %>% dplyr::pull(main_variables)
-  main_vars <- paste(unique(unlist(strsplit(main_vars, ""))), collapse = "")
+  main_vars <- unique(trimws(unlist(strsplit(main_vars, ",\\s*"))))
+  main_vars <- paste(main_vars[nzchar(main_vars)], collapse = ", ")
 
   tibble::tibble(
     Item = c("method", "variables", "n_used", "n_excluded", "category_total", "n_dims", "cumulative_1_2", "main_variables"),
     Value = c(
       analysis_type,
-      paste(x$effective_vars, collapse = ""),
+      paste(x$effective_vars, collapse = ", "),
       as.character(x$n_used),
       as.character(x$n_excluded),
       as.character(x$category_total),

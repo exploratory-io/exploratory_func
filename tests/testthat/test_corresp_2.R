@@ -20,8 +20,11 @@ test_that("MCA branch: 3 variables produce mca_exploratory with all new tidy typ
   expect_true(inherits(model, "mca_exploratory"))
   expect_false(inherits(model, "ca_exploratory"))
 
-  expect_equal(colnames(m %>% tidy_rowwise(model, type = "analysis_summary")),
+  summary <- m %>% tidy_rowwise(model, type = "analysis_summary")
+  expect_equal(colnames(summary),
                c("Item", "Value", "status"))
+  expect_equal(summary$Value[summary$Item == "variables"], "brand, age, gender")
+  expect_equal(summary$Value[summary$Item == "main_variables"], "brand, age, gender")
   expect_equal(colnames(m %>% tidy_rowwise(model, type = "category_map")),
                c("Variable", "Category", "Dimension 1", "Dimension 2", "Count", "Share",
                  "Contribution 1", "Contribution 2", "Cos2 1", "Cos2 2"))
@@ -57,7 +60,8 @@ test_that("CA branch: 2 variables produce ca_exploratory (still inherits mca_exp
 test_that("chi-square statistic matches base chisq.test", {
   df <- make_ca_data()
   m <- df %>% exp_mca(brand, age, gender, ncp = 5)
-  pa <- m %>% tidy_rowwise(m$model[[1]], type = "pairwise_association")
+  model <- m$model[[1]]
+  pa <- m %>% tidy_rowwise(model, type = "pairwise_association")
   ct <- table(df$brand, df$age)
   direct <- suppressWarnings(chisq.test(ct, correct = FALSE))
   row <- pa[pa$pair_id == "brand × age", ]
@@ -93,7 +97,8 @@ test_that("multibyte and colon-containing category values survive intact", {
     age = sample(c("10s", "20s", "30s"), n, replace = TRUE)
   )
   m <- df %>% exp_mca(!!rlang::sym(stress), gender, age, ncp = 5)
-  cm <- m %>% tidy_rowwise(m$model[[1]], type = "category_map")
+  model <- m$model[[1]]
+  cm <- m %>% tidy_rowwise(model, type = "category_map")
   sub <- cm[cm$Variable == stress, ]
   expect_true("時間:午前" %in% sub$Category)  # colon preserved, not split
 })
@@ -116,4 +121,31 @@ test_that("Repeat By (grouped) analysis runs per group", {
   df$segment <- sample(c("X", "Y"), nrow(df), replace = TRUE)
   m <- df %>% dplyr::group_by(segment) %>% exp_mca(brand, age, gender, ncp = 5)
   expect_equal(nrow(m), 2)  # one model per segment
+})
+
+test_that("pairwise missingness uses rows available for each pair", {
+  df <- data.frame(
+    a = c("a", "a", "b", "b"),
+    b = c("x", "y", "x", "y"),
+    c = c("u", NA, "v", "v"),
+    stringsAsFactors = FALSE
+  )
+  m <- df %>% exp_mca(a, b, c, missing_method = "pairwise", simulation_count = 100)
+  pa <- m %>% tidy_rowwise(model, type = "pairwise_association")
+  expect_equal(pa$n[pa$pair_id == "a × b"], 4)
+  expect_equal(m$model[[1]]$n_used, 4)
+})
+
+test_that("single-column and NULL seed options remain supported", {
+  one_column <- data.frame(a = c("a", "b", "a", "c"), stringsAsFactors = FALSE)
+  m <- one_column %>% exp_mca(a, allow_single_column = TRUE)
+  expect_true(inherits(m$model[[1]], "mca_exploratory"))
+  expect_equal(nrow(m %>% tidy_rowwise(model, type = "pairwise_association")), 0)
+
+  sparse <- data.frame(
+    a = c("a", "a", "b", "b", "c", "c"),
+    b = c("x", "y", "x", "y", "x", "y"),
+    stringsAsFactors = FALSE
+  )
+  expect_error(sparse %>% exp_mca(a, b, seed = NULL, simulation_count = 100), NA)
 })

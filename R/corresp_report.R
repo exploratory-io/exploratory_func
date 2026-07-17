@@ -131,19 +131,26 @@ ca_analyze_one_variable_pair <- function(
     ))
   }
 
+  # Reuse the package-wide count-based Pearson implementation for the shared
+  # statistic, expected counts, p-value, and degrees of freedom.  The
+  # chisq.test call below remains for residuals and the alternative sparse
+  # p-value paths.
+  pearson_counts <- compute_chisq_from_counts(contingency_table, method = "pearson")
   pearson_test <- suppressWarnings(chisq.test(contingency_table, correct = FALSE))
-  expected_diagnostics <- ca_evaluate_expected_counts(pearson_test$expected)
+  expected_diagnostics <- ca_evaluate_expected_counts(pearson_counts$expected)
   asymptotic_approximation_ok <- expected_diagnostics$approximation_ok
 
   if (asymptotic_approximation_ok) {
-    overall_p_value <- pearson_test$p.value
+    overall_p_value <- pearson_counts$p_value
     test_method <- "pearson"
   } else if (nrow(contingency_table) == 2 && ncol(contingency_table) == 2) {
     fisher_result <- fisher.test(contingency_table)
     overall_p_value <- fisher_result$p.value
     test_method <- "fisher"
   } else {
-    set.seed(seed + pair_index)
+    if (!is.null(seed)) {
+      set.seed(seed + pair_index)
+    }
     monte_carlo_result <- chisq.test(
       contingency_table, correct = FALSE,
       simulate.p.value = TRUE, B = simulation_count
@@ -152,8 +159,8 @@ ca_analyze_one_variable_pair <- function(
     test_method <- paste0("monte_carlo:", simulation_count)
   }
 
-  chi_square_statistic <- as.numeric(pearson_test$statistic)
-  degrees_of_freedom <- (nrow(contingency_table) - 1) * (ncol(contingency_table) - 1)
+  chi_square_statistic <- pearson_counts$statistic
+  degrees_of_freedom <- pearson_counts$df
   cramers_v <- ca_calculate_cramers_v(contingency_table, chi_square_statistic)
   association_strength <- ca_classify_cramers_v(cramers_v, nrow(contingency_table), ncol(contingency_table))
 
