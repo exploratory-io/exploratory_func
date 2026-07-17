@@ -53,14 +53,19 @@ exp_chaid <- function(df,
                       seed = 1,
                       test_rate = 0.0,
                       test_split_type = "random") {
-  if (test_rate < 0 || 1 < test_rate) {
+  if (length(test_rate) != 1L || !is.numeric(test_rate) ||
+      is.na(test_rate) || !is.finite(test_rate) || test_rate < 0 || 1 < test_rate) {
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1) {
     stop("test_rate must be less than 1")
   }
+  test_split_type <- match.arg(test_split_type, c("random", "ordered"))
 
   # NSE column selection, mirroring exp_rpart.
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
+  if (length(target_col) != 1L) {
+    stop("target must select exactly one column")
+  }
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   if (is.numeric(df[[target_col]])) {

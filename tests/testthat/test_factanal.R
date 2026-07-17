@@ -230,6 +230,13 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
 
   moderate <- judge_loading(c(`Factor 1` = 0.45, `Factor 2` = 0.05))
   expect_equal(moderate$status, "moderate")
+  one_factor <- judge_loading(c(`Factor 1` = 0.75))
+  expect_equal(one_factor$status, "strong")
+  expect_equal(one_factor$secondary_factors, "")
+  expect_equal(judge_loading(c(`Factor 1` = NA_real_, `Factor 2` = NA_real_))$status, "na")
+  old_fa <- structure(list(), class = "fa_exploratory")
+  expect_equal(tidy.fa_exploratory(old_fa, type = "suitability")$Value,
+               c("N/A", "N/A", "N/A", "N/A"))
 
   # Communality bar (#37018): a Heywood case (communality > 1) leaves communality UNCAPPED so the
   # numeric label shows the actual value (e.g. 105); the chart's 0-100 value-axis range clips the
@@ -257,4 +264,12 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   pa <- compute_parallel_analysis(mtcars[, c("mpg","cyl","disp","hp","drat","wt","qsec")], n_iter = 20)
   expect_true(is.numeric(pa$recommended_n))
   expect_equal(colnames(pa$table), c("factor_number", "actual_eigenvalue", "random_eigenvalue_threshold"))
+  set.seed(99)
+  before <- .Random.seed
+  compute_parallel_analysis(mtcars[, 1:3], n_iter = 2)
+  expect_equal(.Random.seed, before)
+  set.seed(99)
+  before <- .Random.seed
+  expect_error(compute_parallel_analysis(mtcars[, 1:3], n_iter = 0), "positive integer")
+  expect_equal(.Random.seed, before)
 })

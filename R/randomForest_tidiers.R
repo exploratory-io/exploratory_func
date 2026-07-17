@@ -3802,7 +3802,9 @@ build_rpart_tree_nodes <- function(x) {
   }
 
   ctype <- x$classification_type
-  is_reg <- !is.null(ctype) && ctype == "regression"
+  # exp_rpart stores classification_type, but plain rpart() objects do not.
+  is_reg <- identical(ctype, "regression") || is.null(attr(x, "ylevels")) ||
+    is.null(fr$yval2)
   yl <- attr(x, "ylevels")
   k <- length(yl)
 
