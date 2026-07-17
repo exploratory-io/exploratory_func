@@ -104,6 +104,27 @@ test_that("exp_cronbach_alpha errors with fewer than 2 variables", {
                "at least 2 variables")
 })
 
+test_that("exp_cronbach_alpha rejects nominal (unordered, 3+ level) factor columns", {
+  df <- make_reliability_df() %>%
+    dplyr::mutate(`部署` = factor(rep(c("A", "B", "C"), length.out = dplyr::n())))
+  expect_error(exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "auto"),
+               "nominal")
+})
+
+test_that("exp_cronbach_alpha drops constant columns and errors when fewer than 2 remain", {
+  # One constant column is dropped; 3 valid items remain -> report still builds.
+  df <- make_reliability_df() %>% dplyr::mutate(`定数` = 3L)
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson")
+  res <- model_df %>% tidy_rowwise(model, type = "item_stats")
+  expect_false("定数" %in% res$Variable)
+  expect_equal(nrow(res), 4)
+
+  # Only one non-constant column left -> not enough columns.
+  df2 <- tibble::tibble(a = 1:20, b = rep(1L, 20))
+  expect_error(exp_cronbach_alpha(df2, dplyr::everything(), correlation_method = "pearson"),
+               "not enough columns")
+})
+
 test_that("exp_cronbach_alpha works with group_by (per group model)", {
   df <- make_reliability_df() %>%
     dplyr::mutate(grp = rep(c("A", "B"), length.out = dplyr::n())) %>%
