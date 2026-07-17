@@ -614,14 +614,14 @@ ca_select_summary_categories <- function(dimension_data, side_name, maximum_cate
     dplyr::slice_head(n = maximum_categories)
 }
 
-# 5-1 dimension summary (language-neutral; joins categories as "variablecategory" pipe-joined)
+# 5-1 dimension summary (language-neutral; positive/negative categories joined as readable text)
 ca_build_dimension_summary <- function(metrics, max_dimensions = 5, analysis_type = "MCA") {
   dimensions <- sort(unique(metrics$dimension))
   dimensions <- dimensions[dimensions <= max_dimensions]
 
   join_labels <- function(x) {
     if (nrow(x) == 0) return("")
-    paste0(x$variable, "", x$category, collapse = "")
+    paste(paste0(x$variable, ": ", x$category), collapse = ", ")
   }
 
   purrr::map_dfr(dimensions, function(current_dimension) {
@@ -635,9 +635,9 @@ ca_build_dimension_summary <- function(metrics, max_dimensions = 5, analysis_typ
       dplyr::arrange(dplyr::desc(variable_contribution))
 
     main_variables <- if (analysis_type == "CA") {
-      paste(variable_contributions$variable, collapse = "")
+      paste(variable_contributions$variable, collapse = ", ")
     } else {
-      paste(head(variable_contributions$variable, 2), collapse = "")
+      paste(head(variable_contributions$variable, 2), collapse = ", ")
     }
 
     pattern_status <- dplyr::case_when(
