@@ -45,7 +45,9 @@ factanal_report_config <- function() {
 # The desktop/server client translates the label (VizUtil message tables) and composes tooltips
 # from the token + params. No natural language for translation lives in R output. (issue #37018)
 judge_kmo <- function(kmo, cfg = factanal_report_config()) {
-  if (is.na(kmo)) return(list(label = "Not Available", status = "na", description = "KMO could not be computed."))
+  if (length(kmo) != 1L || is.na(kmo)) {
+    return(list(label = "Not Available", status = "na", description = "KMO could not be computed."))
+  }
   if (kmo >= cfg$kmo_great) list(label = "Very Suitable", status = "great", description = "The variables have a correlation structure well suited for factor analysis.")
   else if (kmo >= cfg$kmo_good) list(label = "Suitable", status = "good", description = "The variables have a correlation structure suited for factor analysis.")
   else if (kmo >= cfg$kmo_min) list(label = "Marginally Suitable", status = "min", description = "Factor analysis is possible, but interpret the results with care.")
@@ -54,13 +56,17 @@ judge_kmo <- function(kmo, cfg = factanal_report_config()) {
 }
 
 judge_bartlett <- function(p_value, cfg = factanal_report_config()) {
-  if (is.na(p_value)) return(list(label = "Not Available", status = "na", description = "Bartlett's test could not be computed."))
+  if (length(p_value) != 1L || is.na(p_value)) {
+    return(list(label = "Not Available", status = "na", description = "Bartlett's test could not be computed."))
+  }
   if (p_value < cfg$p_value_threshold) list(label = "Suitable", status = "suitable", description = "There is enough correlation among the variables for factor analysis.")
   else list(label = "Caution", status = "caution", description = "The correlation among the variables may be weak.")
 }
 
 judge_communality <- function(communality, cfg = factanal_report_config()) {
-  if (is.na(communality)) return(list(label = "Not Available", status = "na"))
+  if (length(communality) != 1L || is.na(communality)) {
+    return(list(label = "Not Available", status = "na"))
+  }
   # A communality > 1 (i.e. negative uniqueness) is a Heywood case: NOT "explained more than
   # 100%", but a sign that the estimation is unstable / the solution is improper. Flag it before
   # the "too high" check so it gets its own, more serious judgment. (issue #37018)
@@ -74,14 +80,27 @@ judge_communality <- function(communality, cfg = factanal_report_config()) {
 # loadings: named numeric vector, names are "Factor 1", "Factor 2", ...
 # Returns label (English), status token, and params for the client-composed tooltip.
 judge_loading <- function(loadings, cfg = factanal_report_config()) {
+  loading_names <- names(loadings)
+  loadings <- as.numeric(loadings)
+  if (is.null(loading_names)) {
+    loading_names <- rep("", length(loadings))
+  }
+  names(loadings) <- loading_names
+  valid <- is.finite(loadings)
+  if (!any(valid)) {
+    return(list(label = "Not Available", status = "na",
+                primary_factor = "", secondary_factors = "", direction = "na"))
+  }
+
+  loadings <- loadings[valid]
   abs_loadings <- abs(loadings)
   ord <- order(abs_loadings, decreasing = TRUE)
   primary_idx <- ord[1]
-  secondary_idx <- ord[2]
+  secondary_idx <- if (length(ord) >= 2L) ord[2] else NA_integer_
   primary_factor <- names(loadings)[primary_idx]
-  secondary_factor <- names(loadings)[secondary_idx]
+  secondary_factor <- if (is.na(secondary_idx)) "" else names(loadings)[secondary_idx]
   primary_loading <- loadings[[primary_idx]]
-  secondary_abs <- abs(loadings[[secondary_idx]])
+  secondary_abs <- if (is.na(secondary_idx)) 0 else abs(loadings[[secondary_idx]])
   primary_abs <- abs(primary_loading)
   diff <- primary_abs - secondary_abs
   salient <- names(loadings)[abs_loadings >= cfg$loading_salient]
@@ -120,23 +139,33 @@ judge_loading <- function(loadings, cfg = factanal_report_config()) {
 # Horn's parallel analysis: compares actual correlation-matrix eigenvalues against the
 # quantile of eigenvalues from random normal data of the same shape. (issue #37018 spec 3.4)
 compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95) {
+  if (length(n_iter) != 1L || is.na(n_iter) || n_iter < 1 || n_iter != as.integer(n_iter)) {
+    stop("n_iter must be a positive integer")
+  }
+  if (length(quantile_prob) != 1L || is.na(quantile_prob) ||
+      quantile_prob < 0 || quantile_prob > 1) {
+    stop("quantile_prob must be between 0 and 1")
+  }
   x <- as.data.frame(x)
   n <- nrow(x)
   p <- ncol(x)
   actual_eigen <- eigen(cor(x, use = "pairwise.complete.obs"), only.values = TRUE)$values
   # Snapshot the RNG so this null-distribution draw does not perturb the outer deterministic
   # stream that later groups' sampling relies on. Restore afterward.
-  old_seed <- if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) get(".Random.seed", envir = .GlobalEnv) else NULL
+  had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  old_seed <- if (had_seed) get(".Random.seed", envir = .GlobalEnv) else NULL
   set.seed(1234)
+  on.exit({
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = .GlobalEnv)
+    } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+      rm(".Random.seed", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
   random_eigen_mat <- replicate(n_iter, {
     rd <- matrix(stats::rnorm(n * p), nrow = n, ncol = p)
     eigen(cor(rd), only.values = TRUE)$values
   })
-  if (!is.null(old_seed)) {
-    assign(".Random.seed", old_seed, envir = .GlobalEnv)
-  } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
-    rm(".Random.seed", envir = .GlobalEnv)
-  }
   random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
   list(
     recommended_n = sum(actual_eigen > random_threshold),
@@ -465,16 +494,21 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       dplyr::mutate(Component = forcats::fct_relevel(as.factor(Component), "Communality", "Uniqueness"))
   }
   else if (type == "suitability") {
-    kmo <- x$kmo
+    scalar_num <- function(v) {
+      if (is.null(v) || length(v) != 1L) NA_real_ else suppressWarnings(as.numeric(v))
+    }
+    kmo <- scalar_num(x$kmo)
     bart <- x$bartlett
-    p <- if (is.null(bart)) NA_real_ else bart$p.value
+    p <- if (is.null(bart)) NA_real_ else scalar_num(bart$p.value)
     kj <- judge_kmo(kmo)
     bj <- judge_bartlett(p)
     kmo_val <- if (is.na(kmo)) "N/A" else format(round(kmo, 2), nsmall = 2)
     bart_val <- if (is.na(p)) "N/A" else if (p < 0.001) "p < 0.001" else paste0("p = ", format(round(p, 3), nsmall = 3))
+    rows_used <- if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
+    variables_used <- if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A"
     res <- tibble::tibble(
       Metric = c("KMO", "Bartlett's Test of Sphericity", "Rows Used", "Variables Used"),
-      Value = c(kmo_val, bart_val, as.character(x$n_rows_used), as.character(x$n_variables)),
+      Value = c(kmo_val, bart_val, rows_used, variables_used),
       Judgement = c(kj$label, bj$label, "", ""),
       Description = c(kj$description, bj$description,
                       "Number of rows used after removing missing values.",

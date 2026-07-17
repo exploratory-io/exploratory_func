@@ -152,3 +152,11 @@ test_that("exp_chaid rejects a numeric target", {
   df <- data.frame(y = 1:10, x = rep(c("a", "b"), 5))
   expect_error(exp_chaid(df, y, x), "categorical target")
 })
+
+test_that("exp_chaid validates test split arguments", {
+  df <- make_multi_df(n = 60)
+  expect_error(exp_chaid(df, segment, channel, age_group, test_split_type = "bad"),
+               "arg.*should be one of")
+  expect_error(exp_chaid(df, segment, channel, age_group, test_rate = NA_real_),
+               "test_rate must be between")
+})

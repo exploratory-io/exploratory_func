@@ -190,3 +190,14 @@ test_that("tree_nodes regression with a (near-)constant target - no crash, SD/RM
   d <- jsonlite::fromJSON(nodes$dist_json[1])
   expect_equal(sum(d$counts), nodes$n[1])
 })
+
+test_that("tree_nodes accepts a plain rpart regression object", {
+  set.seed(12)
+  fit <- rpart::rpart(target ~ x, data = data.frame(target = rnorm(80), x = rnorm(80)),
+                      method = "anova", control = rpart::rpart.control(cp = 0.9))
+  nodes <- exploratory:::build_rpart_tree_nodes(fit)
+  expect_equal(colnames(nodes), expected_cols)
+  expect_true(all(is.na(nodes$class_json)))
+  expect_true(all(!is.na(nodes$mean_value)))
+  expect_true(all(!is.na(nodes$dist_json)))
+})
