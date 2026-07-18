@@ -66,6 +66,35 @@ test_that("tree_nodes tidy output matches the renderer schema", {
   expect_true(all(c("label", "n", "pct") %in% names(parsed)))
 })
 
+test_that("tree_nodes carries CHAID split stats on split nodes, NA on leaves", {
+  # Build a target that genuinely depends on `plan` so CHAID makes a split.
+  set.seed(3)
+  n <- 400
+  plan <- sample(c("A", "B"), n, replace = TRUE)
+  is_churn <- ifelse(plan == "A", runif(n) < 0.8, runif(n) < 0.2)
+  df <- data.frame(is_churn = is_churn, plan = plan,
+                   region = sample(c("east", "west"), n, replace = TRUE),
+                   stringsAsFactors = FALSE)
+  model_df <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
+                                         min_split = 20, min_bucket = 5))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+
+  stat_cols <- c("p_value", "adjusted_p_value", "split_statistic", "split_df")
+  expect_true(all(stat_cols %in% colnames(nodes)))
+
+  split_nodes <- nodes[!nodes$is_leaf, ]
+  leaf_nodes <- nodes[nodes$is_leaf, ]
+  expect_gt(nrow(split_nodes), 0)
+  # Every splitting node reports a finite chi-square, df, and adjusted p-value.
+  expect_true(all(is.finite(split_nodes$split_statistic)))
+  expect_true(all(is.finite(split_nodes$split_df)))
+  expect_true(all(is.finite(split_nodes$adjusted_p_value)))
+  expect_true(all(split_nodes$adjusted_p_value >= 0 & split_nodes$adjusted_p_value <= 1))
+  # Leaves never carry a split test.
+  expect_true(all(is.na(leaf_nodes$split_statistic)))
+  expect_true(all(is.na(leaf_nodes$split_df)))
+})
+
 test_that("binary tree_nodes lists the positive (TRUE) class first", {
   df <- make_binary_df()
   model_df <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
