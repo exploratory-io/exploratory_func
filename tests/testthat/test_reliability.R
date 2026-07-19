@@ -96,6 +96,13 @@ test_that("exp_cronbach_alpha handles mixed correlation", {
   expect_equal(model_df$model[[1]]$selected_method, "mixed")
   res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
   expect_equal(res$Coefficient, "Mixed-Correlation Alpha")
+  expect_false(is.na(res$`CI Lower`))
+  expect_false(is.na(res$`CI Upper`))
+
+  summary <- model_df %>% tidy_rowwise(model, type = "summary")
+  ci_row <- summary %>% dplyr::filter(Metric == "95% CI")
+  expect_equal(nrow(ci_row), 1)
+  expect_true(nzchar(ci_row$Value[[1]]))
 })
 
 test_that("exp_cronbach_alpha errors with fewer than 2 variables", {

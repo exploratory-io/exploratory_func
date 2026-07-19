@@ -388,7 +388,9 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       reliability_safe_number(matrix_alpha_object$total[["G6(smc)"]])
     } else NA_real_
 
-    # Pearson only: raw alpha + Feldt/Duhachek CI from the raw data.
+    # Pearson uses raw alpha from the data. For polychoric/mixed methods,
+    # psych::alpha on the correlation matrix provides the standardized alpha
+    # and its Feldt/Duhachek interval using n.obs.
     raw_alpha <- NA_real_
     raw_alpha_object <- NULL
     confidence_interval <- tibble::tibble(method = character(), lower = numeric(),
@@ -399,16 +401,20 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
         error = function(e) NULL)
       if (!is.null(raw_alpha_object)) {
         raw_alpha <- reliability_safe_number(raw_alpha_object$total$raw_alpha)
-        # psych::alpha()$feldt is a list of 1-row data frames (lower.ci/alpha/upper.ci),
-        # each holding a raw_alpha column.
-        feldt <- raw_alpha_object$feldt
-        ci_lower <- reliability_safe_number(feldt$lower.ci$raw_alpha)
-        ci_est <- reliability_safe_number(feldt$alpha$raw_alpha)
-        ci_upper <- reliability_safe_number(feldt$upper.ci$raw_alpha)
-        if (!is.na(ci_lower) || !is.na(ci_upper)) {
-          confidence_interval <- tibble::tibble(
-            method = "Feldt", lower = ci_lower, estimate = ci_est, upper = ci_upper)
-        }
+      }
+    }
+
+    # psych::alpha()$feldt is a list of 1-row data frames
+    # (lower.ci/alpha/upper.ci), each holding a raw_alpha column.
+    ci_alpha_object <- if (selected_method == "pearson") raw_alpha_object else matrix_alpha_object
+    if (!is.null(ci_alpha_object)) {
+      feldt <- ci_alpha_object$feldt
+      ci_lower <- reliability_safe_number(feldt$lower.ci$raw_alpha)
+      ci_est <- reliability_safe_number(feldt$alpha$raw_alpha)
+      ci_upper <- reliability_safe_number(feldt$upper.ci$raw_alpha)
+      if (!is.na(ci_lower) || !is.na(ci_upper)) {
+        confidence_interval <- tibble::tibble(
+          method = "Feldt", lower = ci_lower, estimate = ci_est, upper = ci_upper)
       }
     }
 
@@ -455,7 +461,7 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       dplyr::slice_head(n = 1) %>% dplyr::pull(removed_item)
     flagged_item <- if (length(flagged) == 0) NA_character_ else flagged
 
-    ci_text <- if (selected_method == "pearson" && nrow(confidence_interval) > 0) {
+    ci_text <- if (nrow(confidence_interval) > 0) {
       paste0(round(confidence_interval$lower[[1]], 3), " - ",
              round(confidence_interval$upper[[1]], 3))
     } else NA_character_
@@ -476,7 +482,7 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       Interpretation = c(
         reliability_classify_alpha(display_alpha),
         "Standardized consistency",
-        if (selected_method == "pearson") "Feldt/Duhachek interval" else NA_character_,
+        if (nrow(confidence_interval) > 0) "Feldt/Duhachek interval" else NA_character_,
         paste0(ncol(cleaned_df), " items used"),
         "Rows with no missing values",
         "Rows with 1+ missing value",
