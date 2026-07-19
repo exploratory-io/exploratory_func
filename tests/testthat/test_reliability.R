@@ -52,7 +52,7 @@ test_that("exp_cronbach_alpha Pearson report sections", {
                c("Variable", "Item-Rest Correlation", "Item-Total Correlation",
                  "Standardized Item-Total", "Corrected Correlation", "Rows", "Missing",
                  "Mean", "Standard Deviation", "Interpretation"))
-  # raw.r (Item-Total Correlation) is populated for Pearson.
+  # Observed item-total correlation is populated for Pearson.
   expect_true(all(!is.na(res$`Item-Total Correlation`)))
 
   res <- model_df %>% tidy_rowwise(model, type = "correlation")
@@ -78,9 +78,9 @@ test_that("exp_cronbach_alpha auto-selects polychoric for ordered factors (Ordin
   res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
   expect_equal(res$Coefficient, "Ordinal Alpha")
 
-  # raw.r (observed item-total) is hidden for non-Pearson methods.
+  # Observed item-total correlation is available for every correlation method.
   res <- model_df %>% tidy_rowwise(model, type = "item_stats")
-  expect_true(all(is.na(res$`Item-Total Correlation`)))
+  expect_true(all(!is.na(res$`Item-Total Correlation`)))
   # Standardized item-total is still computed from the correlation matrix.
   expect_true(all(!is.na(res$`Standardized Item-Total`)))
 })
@@ -98,6 +98,8 @@ test_that("exp_cronbach_alpha handles mixed correlation", {
   expect_equal(res$Coefficient, "Mixed-Correlation Alpha")
   expect_false(is.na(res$`CI Lower`))
   expect_false(is.na(res$`CI Upper`))
+  res <- model_df %>% tidy_rowwise(model, type = "item_stats")
+  expect_true(all(!is.na(res$`Item-Total Correlation`)))
 
   summary <- model_df %>% tidy_rowwise(model, type = "summary")
   ci_row <- summary %>% dplyr::filter(Metric == "95% CI")

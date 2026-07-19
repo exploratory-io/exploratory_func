@@ -276,6 +276,20 @@ reliability_observed_item_statistics <- function(prepared_data) {
   })
 }
 
+reliability_observed_item_total_correlation <- function(prepared_data) {
+  total_score <- rowSums(prepared_data, na.rm = FALSE)
+  items <- names(prepared_data)
+  stats::setNames(vapply(items, function(item) {
+    x <- prepared_data[[item]]
+    complete <- stats::complete.cases(x, total_score)
+    if (sum(complete) < 2 || stats::sd(x[complete]) == 0 ||
+        stats::sd(total_score[complete]) == 0) {
+      return(NA_real_)
+    }
+    stats::cor(x[complete], total_score[complete], method = "pearson")
+  }, numeric(1)), items)
+}
+
 reliability_scale_candidates <- function(current_alpha, alpha_if_deleted, item_count) {
   base <- tibble::tibble(
     candidate = "Use all items",
@@ -432,13 +446,9 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       mstats <- matrix_alpha_object$item.stats
       r_cor_vec[rownames(mstats)] <- mstats$r.cor
     }
-    # raw.r (observed item-total) only meaningful for Pearson, from the raw-data alpha.
-    raw_r_vec <- stats::setNames(rep(NA_real_, length(colnames(r))), colnames(r))
-    if (selected_method == "pearson" && !is.null(raw_alpha_object) &&
-        !is.null(raw_alpha_object$item.stats$raw.r)) {
-      rstats <- raw_alpha_object$item.stats
-      raw_r_vec[rownames(rstats)] <- rstats$raw.r
-    }
+    # Observed item-total correlation is defined for every correlation method:
+    # correlate each prepared variable with the sum of all prepared variables.
+    raw_r_vec <- reliability_observed_item_total_correlation(prepared_data)
 
     item_statistics <- observed_stats %>%
       dplyr::mutate(
