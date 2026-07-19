@@ -626,9 +626,11 @@ ca_build_dimension_summary <- function(metrics, max_dimensions = 5, analysis_typ
   dimensions <- sort(unique(metrics$dimension))
   dimensions <- dimensions[dimensions <= max_dimensions]
 
+  # #37133: show the category value only (no "variable: " prefix) in the dimension
+  # summary's positive/negative category lists.
   join_labels <- function(x) {
     if (nrow(x) == 0) return("")
-    paste(paste0(x$variable, ": ", x$category), collapse = ", ")
+    paste(x$category, collapse = ", ")
   }
 
   purrr::map_dfr(dimensions, function(current_dimension) {
