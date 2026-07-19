@@ -537,16 +537,33 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     }
   }
   else if (type == "contributions") {
-    # PCA report: each variable's percent contribution to each component (issue #37019).
-    # rotation^2 per column normalized to sum 100 (%). Long format. Empty typed tibble for k-means.
+    # PCA report: variable contributions to each component in long format, for the stacked-bar
+    # contribution chart (issue #37132). Two value columns:
+    #   Contribution           - the variable's share of that component (rotation^2 per column
+    #                            normalized to sum 100 (%)); each component sums to 100.
+    #   `Variance Contribution` - that share scaled by the component's explained-variance ratio,
+    #                            i.e. the variable's contribution to the TOTAL data variance (%):
+    #                            height = pc_explained_variance_ratio * variable_contribution_to_pc.
+    #                            Summing a component's segments gives that component's % variance;
+    #                            summing every segment gives the cumulative variance explained.
+    # Long format. Empty typed tibble for k-means.
     if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
-      res <- tibble::tibble(Variable = character(0), Component = character(0), Contribution = numeric(0))
+      res <- tibble::tibble(Variable = character(0), Component = character(0),
+                            Contribution = numeric(0), `Variance Contribution` = numeric(0))
     }
     else {
-      contribution <- x$rotation^2
-      contribution <- sweep(contribution, 2, colSums(contribution), "/") * 100 # each column sums to 100
-      res <- tibble::as_tibble(contribution, rownames = "Variable") %>%
-        tidyr::gather(Component, Contribution, dplyr::starts_with("PC"), convert = TRUE) %>%
+      contribution_fraction <- x$rotation^2
+      contribution_fraction <- sweep(contribution_fraction, 2, colSums(contribution_fraction), "/") # each column sums to 1
+      pct_variance_ratio <- x$sdev^2 / sum(x$sdev^2) # explained-variance ratio per component (fraction)
+      variance_contribution <- sweep(contribution_fraction, 2,
+                                     pct_variance_ratio[seq_len(ncol(contribution_fraction))], "*") * 100 # % of total variance
+      contribution <- contribution_fraction * 100 # each column sums to 100 (%)
+      res_contribution <- tibble::as_tibble(contribution, rownames = "Variable") %>%
+        tidyr::gather(Component, Contribution, dplyr::starts_with("PC"), convert = TRUE)
+      res_variance <- tibble::as_tibble(variance_contribution, rownames = "Variable") %>%
+        tidyr::gather(Component, `Variance Contribution`, dplyr::starts_with("PC"), convert = TRUE)
+      res <- res_contribution %>%
+        dplyr::left_join(res_variance, by = c("Variable", "Component")) %>%
         dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
     }
   }

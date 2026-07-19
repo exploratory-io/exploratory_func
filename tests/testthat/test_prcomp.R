@@ -134,9 +134,15 @@ test_that("component_profiles / loadings_signed / contributions", {
   expect_equal(colnames(res), c("Variable","Component","Loading"))
   expect_true(any(res$Loading < 0))
   res <- model_df %>% tidy_rowwise(model, type = "contributions")
-  expect_equal(colnames(res), c("Variable","Component","Contribution"))
+  expect_equal(colnames(res), c("Variable","Component","Contribution","Variance Contribution"))
   sums <- res %>% dplyr::group_by(Component) %>% dplyr::summarize(s = sum(Contribution)) %>% dplyr::pull(s)
   expect_true(all(abs(sums - 100) < 1e-6))
+  # Each component's Variance Contribution segments sum to that component's % variance, and all
+  # segments together sum to the cumulative variance explained (issue #37132).
+  var_ratio <- model_df$model[[1]]$sdev^2 / sum(model_df$model[[1]]$sdev^2) * 100
+  vc_sums <- res %>% dplyr::group_by(Component) %>%
+    dplyr::summarize(s = sum(`Variance Contribution`)) %>% dplyr::pull(s)
+  expect_true(all(abs(vc_sums - var_ratio[seq_along(vc_sums)]) < 1e-6))
 })
 
 test_that("component_profiles / loadings_signed / contributions empty for kmeans fits", {
@@ -150,7 +156,7 @@ test_that("component_profiles / loadings_signed / contributions empty for kmeans
   expect_equal(colnames(ls), c("Variable","Component","Loading"))
   expect_equal(nrow(ls), 0)
   ct <- km %>% tidy_rowwise(model, type = "contributions")
-  expect_equal(colnames(ct), c("Variable","Component","Contribution"))
+  expect_equal(colnames(ct), c("Variable","Component","Contribution","Variance Contribution"))
   expect_equal(nrow(ct), 0)
 })
 
@@ -196,7 +202,7 @@ PRCOMP_REPORT_TYPE_COLS <- list(
                           "Related Variables", "Pattern",
                           "pattern_status", "dominant_variable", "positive_variables", "negative_variables"),
   loadings_signed     = c("Variable", "Component", "Loading"),
-  contributions       = c("Variable", "Component", "Contribution"),
+  contributions       = c("Variable", "Component", "Contribution", "Variance Contribution"),
   variable_map        = c("measure_name", "PC1", "PC2", "Measures", "Representation 2D"),
   representation       = c("Variable", "Retained", "Judgement", "judgement_status")
 )
