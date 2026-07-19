@@ -429,6 +429,10 @@ build_chaid_tree_nodes <- function(x) {
     })
     class_json <- as.character(jsonlite::toJSON(arr, auto_unbox = TRUE, digits = NA))
 
+    # Split-test stats belong to nodes that actually split; NA everywhere else
+    # (leaves, and nodes whose best candidate failed the alpha_split gate).
+    is_split <- !isTRUE(nodes$is_terminal[i])
+
     edge_row <- which(edges$child_id == id)
     if (length(edge_row) == 1) {
       cond_column <- map_name(edges$split_variable[edge_row])
@@ -458,6 +462,12 @@ build_chaid_tree_nodes <- function(x) {
       sd_value = NA_real_,
       rmse_value = NA_real_,
       dist_json = NA_character_,
+      # CHAID split test at this node (NA for leaves). The interactive tree
+      # renderer shows these on the splitting (parent) node, SPSS-style.
+      p_value = if (is_split) nodes$p_value[i] else NA_real_,
+      adjusted_p_value = if (is_split) nodes$adjusted_p_value[i] else NA_real_,
+      split_statistic = if (is_split) nodes$split_statistic[i] else NA_real_,
+      split_df = if (is_split) nodes$split_df[i] else NA_real_,
       stringsAsFactors = FALSE
     )
   })

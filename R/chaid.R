@@ -86,6 +86,8 @@ chaid_fit <- function(data,
     split_variable = NA_character_,
     p_value = NA_real_,
     adjusted_p_value = NA_real_,
+    split_statistic = NA_real_,
+    split_df = NA_real_,
     rule = 'Root',
     stringsAsFactors = FALSE
   )
@@ -655,6 +657,8 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
       split_variable = NA_character_,
       p_value = NA_real_,
       adjusted_p_value = NA_real_,
+      split_statistic = NA_real_,
+      split_df = NA_real_,
       rule = rule
     )
     state$node_records[[as.character(node.id)]] <- record
@@ -705,6 +709,8 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
     current.record <- state$node_records[[as.character(node.id)]]
     current.record$p_value <- best$p_value
     current.record$adjusted_p_value <- best$adjusted_p_value
+    current.record$split_statistic <- best$test$statistic
+    current.record$split_df <- best$test$df
     state$node_records[[as.character(node.id)]] <- current.record
 
     if (is.na(best$p_value) || best$adjusted_p_value > parameters$alpha_split) {
@@ -769,6 +775,8 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
       split_variable = record$split_variable,
       p_value = record$p_value,
       adjusted_p_value = record$adjusted_p_value,
+      split_statistic = record$split_statistic,
+      split_df = record$split_df,
       rule = record$rule,
       stringsAsFactors = FALSE
     )
