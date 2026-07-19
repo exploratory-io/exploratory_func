@@ -276,18 +276,31 @@ reliability_observed_item_statistics <- function(prepared_data) {
   })
 }
 
-reliability_observed_item_total_correlation <- function(prepared_data) {
-  total_score <- rowSums(prepared_data, na.rm = FALSE)
-  items <- names(prepared_data)
-  stats::setNames(vapply(items, function(item) {
-    x <- prepared_data[[item]]
-    complete <- stats::complete.cases(x, total_score)
-    if (sum(complete) < 2 || stats::sd(x[complete]) == 0 ||
-        stats::sd(total_score[complete]) == 0) {
-      return(NA_real_)
+reliability_extract_key_signs <- function(alpha_object, item_names) {
+  signs <- stats::setNames(rep(1, length(item_names)), item_names)
+  keys <- if (!is.null(alpha_object)) alpha_object$keys else NULL
+  keys <- unlist(keys, use.names = FALSE)
+  if (length(keys) == 0) {
+    return(signs)
+  }
+  for (key in keys) {
+    item_name <- sub("^-", "", key)
+    if (item_name %in% item_names) {
+      signs[[item_name]] <- if (startsWith(key, "-")) -1 else 1
     }
-    stats::cor(x[complete], total_score[complete], method = "pearson")
-  }, numeric(1)), items)
+  }
+  signs
+}
+
+reliability_apply_key_signs <- function(data, key_signs) {
+  for (item_name in names(key_signs)[key_signs < 0]) {
+    values <- data[[item_name]]
+    observed <- values[!is.na(values)]
+    if (length(observed) > 0) {
+      data[[item_name]] <- max(observed) + min(observed) - values
+    }
+  }
+  data
 }
 
 reliability_scale_candidates <- function(current_alpha, alpha_if_deleted, item_count) {
@@ -398,13 +411,26 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
                                     warnings = FALSE)),
       error = function(e) NULL)
 
+    # psych determines reverse keys from the first principal component. Apply
+    # the same keys to every matrix-based statistic, not just alpha itself.
+    key_signs <- reliability_extract_key_signs(matrix_alpha_object, colnames(r))
+    if (isTRUE(check_keys) && any(key_signs < 0)) {
+      key_matrix <- diag(key_signs)
+      r <- key_matrix %*% r %*% key_matrix
+      dimnames(r) <- dimnames(correlation_result$correlation)
+      matrix_alpha_object <- tryCatch(
+        suppressWarnings(psych::alpha(r, n.obs = complete_n, check.keys = FALSE,
+                                      warnings = FALSE)),
+        error = function(e) NULL)
+    }
+
     g6 <- if (!is.null(matrix_alpha_object)) {
       reliability_safe_number(matrix_alpha_object$total[["G6(smc)"]])
     } else NA_real_
 
-    # Pearson uses raw alpha from the data. For polychoric/mixed methods,
-    # psych::alpha on the correlation matrix provides the standardized alpha
-    # and its Feldt/Duhachek interval using n.obs.
+    # Pearson uses raw alpha and the Feldt/Duhachek interval from the data.
+    # Polychoric/mixed methods use the matrix for standardized alpha only;
+    # their raw-data CI is hidden by specification.
     raw_alpha <- NA_real_
     raw_alpha_object <- NULL
     confidence_interval <- tibble::tibble(method = character(), lower = numeric(),
@@ -419,14 +445,15 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
     }
 
     # psych::alpha()$feldt is a list of 1-row data frames
-    # (lower.ci/alpha/upper.ci), each holding a raw_alpha column.
-    ci_alpha_object <- if (selected_method == "pearson") raw_alpha_object else matrix_alpha_object
+    # (lower.ci/alpha/upper.ci), each holding a raw_alpha column. The
+    # specification exposes this interval for Pearson alpha only.
+    ci_alpha_object <- raw_alpha_object
     if (!is.null(ci_alpha_object)) {
       feldt <- ci_alpha_object$feldt
       ci_lower <- reliability_safe_number(feldt$lower.ci$raw_alpha)
       ci_est <- reliability_safe_number(feldt$alpha$raw_alpha)
       ci_upper <- reliability_safe_number(feldt$upper.ci$raw_alpha)
-      if (!is.na(ci_lower) || !is.na(ci_upper)) {
+      if (!is.na(ci_lower) && !is.na(ci_upper)) {
         confidence_interval <- tibble::tibble(
           method = "Feldt", lower = ci_lower, estimate = ci_est, upper = ci_upper)
       }
@@ -436,6 +463,9 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
 
     # Item statistics.
     prepared_data <- correlation_result$prepared_data
+    if (isTRUE(check_keys) && any(key_signs < 0)) {
+      prepared_data <- reliability_apply_key_signs(prepared_data, key_signs)
+    }
     item_rest <- reliability_item_rest_correlation(r)
     std_item_total <- reliability_standardized_item_total(r)
     observed_stats <- reliability_observed_item_statistics(prepared_data)
@@ -446,19 +476,29 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       mstats <- matrix_alpha_object$item.stats
       r_cor_vec[rownames(mstats)] <- mstats$r.cor
     }
-    # Observed item-total correlation is defined for every correlation method:
-    # correlate each prepared variable with the sum of all prepared variables.
-    raw_r_vec <- reliability_observed_item_total_correlation(prepared_data)
+    # raw.r is an observed-data statistic and is exposed for Pearson only.
+    raw_r_vec <- stats::setNames(rep(NA_real_, length(colnames(r))), colnames(r))
+    if (selected_method == "pearson" && !is.null(raw_alpha_object) &&
+        !is.null(raw_alpha_object$item.stats$raw.r)) {
+      rstats <- raw_alpha_object$item.stats
+      raw_names <- sub("-$", "", rownames(rstats))
+      raw_r_vec[raw_names] <- rstats$raw.r
+    }
 
     item_statistics <- observed_stats %>%
       dplyr::mutate(
         std.r = std_item_total[variable],
         r.drop = item_rest[variable],
         r.cor = r_cor_vec[variable],
-        raw.r = raw_r_vec[variable],
         interpretation = reliability_classify_item_total(item_rest[variable])) %>%
-      dplyr::select(variable, r.drop, raw.r, std.r, r.cor, n, missing_n, mean, sd,
+      dplyr::select(variable, r.drop, std.r, r.cor, n, missing_n, mean, sd,
                     interpretation)
+    if (selected_method == "pearson") {
+      item_statistics <- item_statistics %>%
+        dplyr::mutate(raw.r = raw_r_vec[variable]) %>%
+        dplyr::select(variable, r.drop, raw.r, std.r, r.cor, n, missing_n, mean, sd,
+                      interpretation)
+    }
 
     alpha_if_deleted <- reliability_alpha_if_deleted(r, standardized_alpha)
 
@@ -503,6 +543,9 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
           average_r >= 0.15 ~ "Weak relatedness",
           TRUE ~ "Low relatedness"),
         dplyr::if_else(is.na(flagged_item), "None", "Alpha rises if dropped")))
+    if (nrow(confidence_interval) == 0) {
+      summary_table <- summary_table %>% dplyr::filter(Metric != "95% CI")
+    }
 
     scale_candidates <- reliability_scale_candidates(standardized_alpha, alpha_if_deleted,
                                                      ncol(cleaned_df))
@@ -589,7 +632,6 @@ tidy.cronbach_alpha_exploratory <- function(x, type = "summary", pretty.name = F
     res <- x$item_statistics %>%
       dplyr::select(`Variable` = variable,
                     `Item-Rest Correlation` = r.drop,
-                    `Item-Total Correlation` = raw.r,
                     `Standardized Item-Total` = std.r,
                     `Corrected Correlation` = r.cor,
                     `Rows` = n,
@@ -597,6 +639,12 @@ tidy.cronbach_alpha_exploratory <- function(x, type = "summary", pretty.name = F
                     `Mean` = mean,
                     `Standard Deviation` = sd,
                     `Interpretation` = interpretation)
+    if ("raw.r" %in% names(x$item_statistics)) {
+      res <- res %>% dplyr::mutate(`Item-Total Correlation` = x$item_statistics$raw.r) %>%
+        dplyr::select(`Variable`, `Item-Rest Correlation`, `Item-Total Correlation`,
+                      `Standardized Item-Total`, `Corrected Correlation`, `Rows`,
+                      `Missing`, `Mean`, `Standard Deviation`, `Interpretation`)
+    }
   } else if (type == "correlation") {
     res <- x$correlation_long
   } else if (type == "response_distribution") {

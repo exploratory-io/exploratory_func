@@ -78,11 +78,32 @@ test_that("exp_cronbach_alpha auto-selects polychoric for ordered factors (Ordin
   res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
   expect_equal(res$Coefficient, "Ordinal Alpha")
 
-  # Observed item-total correlation is available for every correlation method.
+  # raw.r is hidden for non-Pearson methods by specification.
   res <- model_df %>% tidy_rowwise(model, type = "item_stats")
-  expect_true(all(!is.na(res$`Item-Total Correlation`)))
+  expect_false("Item-Total Correlation" %in% colnames(res))
   # Standardized item-total is still computed from the correlation matrix.
   expect_true(all(!is.na(res$`Standardized Item-Total`)))
+})
+
+test_that("check_keys reverses reverse-worded items across report statistics", {
+  df <- tibble::tibble(
+    q1 = 1:10,
+    q2 = 10:1,
+    q3 = c(2, 3, 2, 4, 5, 6, 7, 8, 9, 10)
+  )
+
+  without_keys <- exp_cronbach_alpha(df, dplyr::everything(),
+                                     correlation_method = "pearson",
+                                     check_keys = FALSE)
+  with_keys <- exp_cronbach_alpha(df, dplyr::everything(),
+                                  correlation_method = "pearson",
+                                  check_keys = TRUE)
+
+  expect_gt(with_keys$model[[1]]$alpha, without_keys$model[[1]]$alpha)
+  stats <- with_keys %>% tidy_rowwise(model, type = "item_stats")
+  expect_true(all(!is.na(stats$`Item-Total Correlation`)))
+  expect_true(all(!is.na(stats$`Item-Rest Correlation`)))
+  expect_true(all(!is.na(with_keys$model[[1]]$alpha_if_deleted$alpha_if_dropped)))
 })
 
 test_that("exp_cronbach_alpha handles mixed correlation", {
@@ -96,15 +117,14 @@ test_that("exp_cronbach_alpha handles mixed correlation", {
   expect_equal(model_df$model[[1]]$selected_method, "mixed")
   res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
   expect_equal(res$Coefficient, "Mixed-Correlation Alpha")
-  expect_false(is.na(res$`CI Lower`))
-  expect_false(is.na(res$`CI Upper`))
+  expect_true(is.na(res$`CI Lower`))
+  expect_true(is.na(res$`CI Upper`))
   res <- model_df %>% tidy_rowwise(model, type = "item_stats")
-  expect_true(all(!is.na(res$`Item-Total Correlation`)))
+  expect_false("Item-Total Correlation" %in% colnames(res))
 
   summary <- model_df %>% tidy_rowwise(model, type = "summary")
   ci_row <- summary %>% dplyr::filter(Metric == "95% CI")
-  expect_equal(nrow(ci_row), 1)
-  expect_true(nzchar(ci_row$Value[[1]]))
+  expect_equal(nrow(ci_row), 0)
 })
 
 test_that("exp_cronbach_alpha errors with fewer than 2 variables", {
