@@ -202,7 +202,7 @@ PRCOMP_REPORT_TYPE_COLS <- list(
                           "Related Variables", "Pattern",
                           "pattern_status", "dominant_variable", "positive_variables", "negative_variables"),
   loadings_signed     = c("Variable", "Component", "Loading"),
-  contributions       = c("Variable", "Component", "Contribution"),
+  contributions       = c("Variable", "Component", "Contribution", "Variance Contribution"),
   variable_map        = c("measure_name", "PC1", "PC2", "Measures", "Representation 2D"),
   representation       = c("Variable", "Retained", "Judgement", "judgement_status")
 )
