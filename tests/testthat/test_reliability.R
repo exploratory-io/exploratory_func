@@ -102,9 +102,11 @@ test_that("exp_cronbach_alpha auto-selects polychoric for ordered factors (Ordin
   res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
   expect_equal(res$Coefficient, "Ordinal Alpha")
 
-  # raw.r is hidden for non-Pearson methods by specification.
+  # Observed item-total correlation is available alongside the matrix-based
+  # ordinal statistics.
   res <- model_df %>% tidy_rowwise(model, type = "item_stats")
-  expect_false("Item-Total Correlation" %in% colnames(res))
+  expect_true("Item-Total Correlation" %in% colnames(res))
+  expect_true(all(!is.na(res$`Item-Total Correlation`)))
   # Standardized item-total is still computed from the correlation matrix.
   expect_true(all(!is.na(res$`Standardized Item-Total`)))
 })
@@ -144,7 +146,8 @@ test_that("exp_cronbach_alpha handles mixed correlation", {
   expect_true(is.na(res$`CI Lower`))
   expect_true(is.na(res$`CI Upper`))
   res <- model_df %>% tidy_rowwise(model, type = "item_stats")
-  expect_false("Item-Total Correlation" %in% colnames(res))
+  expect_true("Item-Total Correlation" %in% colnames(res))
+  expect_true(all(!is.na(res$`Item-Total Correlation`)))
 
   summary <- model_df %>% tidy_rowwise(model, type = "summary")
   ci_row <- summary %>% dplyr::filter(Metric == "95% CI")
