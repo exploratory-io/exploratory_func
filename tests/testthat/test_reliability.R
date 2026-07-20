@@ -69,6 +69,30 @@ test_that("exp_cronbach_alpha Pearson report sections", {
   expect_true(all(colnames(df) %in% colnames(res)))
 })
 
+test_that("response distribution uses Summary View numeric binning", {
+  df <- tibble::tibble(
+    low_cardinality = c(1L, 1L, 2L, 4L, 4L),
+    continuous = seq(0, 100, length.out = 101),
+    missing = rep(NA_real_, 5)
+  )
+
+  res <- reliability_response_distribution(df)
+  low_cardinality <- res %>% dplyr::filter(variable == "low_cardinality")
+  continuous <- res %>% dplyr::filter(variable == "continuous")
+  missing <- res %>% dplyr::filter(variable == "missing")
+
+  # Summary View keeps integer values as separate bars when the range is < 13,
+  # including empty values inside the observed range.
+  expect_equal(low_cardinality$response, c("1", "2", "3", "4"))
+  expect_equal(low_cardinality$count, c(2L, 1L, 0L, 2L))
+
+  # Summary View uses ten equal-width bins for continuous numeric data.
+  expect_equal(nrow(continuous), 10)
+  expect_equal(sum(continuous$count), 101L)
+  expect_equal(sum(continuous$proportion), 1)
+  expect_equal(nrow(missing), 0)
+})
+
 test_that("exp_cronbach_alpha auto-selects polychoric for ordered factors (Ordinal Alpha)", {
   df <- make_reliability_df() %>% dplyr::mutate(dplyr::across(dplyr::everything(), ~ ordered(.x)))
 

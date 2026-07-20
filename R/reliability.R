@@ -250,10 +250,47 @@ reliability_alpha_if_deleted <- function(correlation_matrix, current_alpha) {
   }) %>% dplyr::arrange(alpha_if_dropped)
 }
 
+reliability_numeric_response_values <- function(x) {
+  # Match the Summary View histogram behavior: low-cardinality integer values
+  # remain discrete, while other numeric values use ten equal-width bins.
+  finite_values <- x[is.finite(x)]
+  if (length(finite_values) == 0) {
+    return(factor(character()))
+  }
+
+  numeric_values <- as.numeric(finite_values)
+  min_value <- min(numeric_values)
+  max_value <- max(numeric_values)
+  integer_values <- all(numeric_values == as.integer(numeric_values))
+
+  if (min_value == max_value || (max_value - min_value) < 13 && integer_values) {
+    levels <- as.character(seq.int(floor(min_value), ceiling(max_value)))
+    return(factor(as.character(numeric_values), levels = levels))
+  }
+
+  breaks <- seq(min_value, max_value, length.out = 11)
+  binned_values <- cut(
+    numeric_values,
+    breaks = breaks,
+    include.lowest = TRUE,
+    right = TRUE
+  )
+  format_cut_output(binned_values, decimal.digits = 2, right = TRUE)
+}
+
+reliability_response_values <- function(x) {
+  if (is.numeric(x)) {
+    reliability_numeric_response_values(x)
+  } else {
+    x[!is.na(x)]
+  }
+}
+
 reliability_response_distribution <- function(data) {
   purrr::map_dfr(names(data), function(column_name) {
     x <- data[[column_name]]
-    counts <- as.data.frame(table(x, useNA = "no"), stringsAsFactors = FALSE)
+    response_values <- reliability_response_values(x)
+    counts <- as.data.frame(table(response_values, useNA = "no"), stringsAsFactors = FALSE)
     names(counts) <- c("response", "count")
     non_missing_n <- sum(counts$count)
     counts %>% dplyr::mutate(
