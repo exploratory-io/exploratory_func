@@ -80,4 +80,4 @@ Suggests:
     ranger
 Depends: 
     R (>= 2.10)
-Config/roxygen2/version: 8.0.0
+RoxygenNote: 7.3.3
