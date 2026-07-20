@@ -536,6 +536,28 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
         dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
     }
   }
+  else if (type == "loadings_signed_wide") {
+    # PCA report: signed loadings (主成分負荷量 = cor(cleaned_df, fit$x)) as a WIDE table -- one
+    # row per variable, one column per component -- for the in-cell diverging bar table (issue
+    # #37130). Each PC column header carries that component's % variance (sdev^2 / sum(sdev^2) * 100,
+    # the SAME basis as the "variances_judged" / "component_profiles" branches, so the numbers match
+    # the Variance (%) tab exactly), e.g. "PC1 (43.1%)". Row order = cor() rownames = original
+    # variable order (no reorder). Empty typed tibble for k-means / old saved models.
+    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      res <- tibble::tibble(Variable = character(0))
+    }
+    else {
+      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+      signed_loadings <- cor(cleaned_df, x$x) # variables x components
+      n_comp <- ncol(signed_loadings)
+      eigenvalue <- x$sdev^2
+      pct_variance <- eigenvalue / sum(eigenvalue) * 100
+      pc_labels <- paste0("PC", seq_len(n_comp), " (",
+                          format(round(pct_variance[seq_len(n_comp)], 1), nsmall = 1, trim = TRUE), "%)")
+      res <- tibble::as_tibble(signed_loadings, rownames = "Variable")
+      colnames(res) <- c("Variable", pc_labels)
+    }
+  }
   else if (type == "contributions") {
     # PCA report: variable contributions to each component in long format, for the stacked-bar
     # contribution chart (issue #37132). Two value columns:

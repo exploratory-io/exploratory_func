@@ -160,6 +160,31 @@ test_that("component_profiles / loadings_signed / contributions empty for kmeans
   expect_equal(nrow(ct), 0)
 })
 
+test_that("loadings_signed_wide returns a wide table with %-labeled PC headers (#37130)", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
+  res <- model_df %>% tidy_rowwise(model, type = "loadings_signed_wide")
+  # One row per input variable; first column is Variable, rest are the PC columns.
+  expect_equal(res$Variable, c("mpg","cyl","disp","hp","drat","wt"))
+  pc_cols <- setdiff(colnames(res), "Variable")
+  expect_equal(length(pc_cols), 6L) # 6 variables -> 6 components
+  # Headers carry the contribution % e.g. "PC1 (43.1%)".
+  expect_true(all(grepl("^PC[0-9]+ \\([0-9]+\\.[0-9]%\\)$", pc_cols)))
+  # The %-labels use the SAME basis as variances_judged (sdev^2 / sum * 100).
+  vj <- model_df %>% tidy_rowwise(model, type = "variances_judged")
+  expected_labels <- paste0("PC", seq_len(nrow(vj)), " (",
+                            format(round(vj$`% Variance`, 1), nsmall = 1, trim = TRUE), "%)")
+  expect_equal(pc_cols, expected_labels)
+  # Signed loadings: negatives are expected on non-dominant variables.
+  expect_true(any(unlist(res[, pc_cols]) < 0))
+})
+
+test_that("loadings_signed_wide is empty for kmeans fits (#37130)", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  lw <- km %>% tidy_rowwise(model, type = "loadings_signed_wide")
+  expect_equal(colnames(lw), "Variable")
+  expect_equal(nrow(lw), 0)
+})
+
 test_that("variable_map / representation", {
   model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, retained_components = 2)
   res <- model_df %>% tidy_rowwise(model, type = "variable_map")
