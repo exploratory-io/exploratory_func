@@ -70,7 +70,7 @@ test_that("exp_cronbach_alpha Pearson report sections", {
 })
 
 test_that("response distribution uses Summary View numeric binning", {
-  df <- tibble::tibble(
+  df <- list(
     low_cardinality = c(1L, 1L, 2L, 4L, 4L),
     continuous = seq(0, 100, length.out = 101),
     missing = rep(NA_real_, 5)
