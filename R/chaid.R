@@ -1074,6 +1074,49 @@ chaid_split_summary <- function(model) {
   )
 }
 
+#' Category-error distribution for an ordered-factor CHAID target.
+#'
+#' For an ordered categorical target, reports how far predictions land from the
+#' actual category on the ordinal scale: distance = rank(predicted) -
+#' rank(actual). Returns one row per observed distance value with a count and
+#' percentage. Returns an empty frame when the target is not an ordered factor,
+#' so the report can hide the chart and its ordered-only suggestion. (#37155)
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @return A data frame with `Category Distance`, `Rows`, `Percentage`.
+#' @export
+chaid_category_error_distribution <- function(model) {
+  validate_chaid_model(model)
+  empty <- data.frame(
+    `Category Distance` = integer(),
+    Rows = integer(),
+    Percentage = numeric(),
+    check.names = FALSE
+  )
+  if (!isTRUE(model$is_target_ordered)) {
+    return(empty)
+  }
+  levels_in_order <- model$ordered_levels
+  if (is.null(levels_in_order)) {
+    levels_in_order <- model$class_levels
+  }
+  actual_rank <- match(as.character(model$y), levels_in_order)
+  predicted_rank <- match(as.character(model$predicted_class), levels_in_order)
+  distance <- predicted_rank - actual_rank
+  distance <- distance[!is.na(distance)]
+  if (length(distance) == 0) {
+    return(empty)
+  }
+  full_range <- seq(min(distance), max(distance))
+  counts <- as.integer(table(factor(distance, levels = full_range)))
+  data.frame(
+    `Category Distance` = as.integer(full_range),
+    Rows = counts,
+    Percentage = counts / sum(counts) * 100,
+    check.names = FALSE
+  )
+}
+
 #' Return renderer-friendly tree nodes and edges.
 #'
 #' @param model A fitted `exploratory_chaid` model.

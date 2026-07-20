@@ -92,6 +92,11 @@ exp_chaid <- function(df,
   selected_cols <- stringr::str_sort(selected_cols)
 
   is_target_logical <- is.logical(df[[target_col]])
+  # Capture the target's ordinal nature BEFORE cleaning coerces it to a plain
+  # factor/character. Needed for the category-error distribution (ordinal
+  # distance between predicted and actual category) in the report (#37155).
+  is_target_ordered <- is.ordered(df[[target_col]])
+  target_ordered_levels <- if (is_target_ordered) levels(df[[target_col]]) else NULL
 
   clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols,
                           target_n, predictor_n, map_name = FALSE)
@@ -179,6 +184,8 @@ exp_chaid <- function(df,
       attr(model$formula_terms, ".Environment") <- NULL
       model$orig_target_col <- target_col
       model$is_target_logical <- is_target_logical
+      model$is_target_ordered <- is_target_ordered
+      model$ordered_levels <- target_ordered_levels
       if (!is.null(target_funs)) {
         model$target_funs <- target_funs
       }
@@ -494,7 +501,7 @@ glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
 #' @param x A fitted `exploratory_chaid` model.
 #' @param type One of `evaluation`, `evaluation_by_class`, `conf_mat`,
 #'   `tree_nodes`, `node_summary`, `rules`, `category_merges`, `split_summary`,
-#'   or `importance`.
+#'   `category_error_distribution`, or `importance`.
 #' @param pretty.name Whether to use display-friendly column names.
 #' @param binary_classification_threshold Positive-class threshold (binary).
 #' @param ... Unused.
@@ -544,6 +551,9 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
     },
     split_summary = {
       chaid_split_summary(x)
+    },
+    category_error_distribution = {
+      chaid_category_error_distribution(x)
     },
     importance = {
       if (is.null(x$importance)) chaid_empty_permutation_importance() else x$importance
