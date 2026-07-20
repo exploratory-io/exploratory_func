@@ -142,7 +142,7 @@ test_that("binary classification threshold shifts predicted labels", {
   expect_gte(n_true_low, n_true_high)
 })
 
-test_that("report tidy types return stable schemas and importance errors", {
+test_that("report tidy types return stable schemas and permutation importance", {
   df <- make_multi_df()
   model_df <- suppressWarnings(exp_chaid(df, segment, channel, age_group,
                                          min_split = 20, min_bucket = 5))
@@ -152,8 +152,46 @@ test_that("report tidy types return stable schemas and importance errors", {
   expect_true("Node" %in% colnames(ns))
   expect_true("Rule" %in% colnames(rules))
   expect_true("Node" %in% colnames(splits))
-  expect_error(exploratory:::tidy.exploratory_chaid(model_df$model[[1]], type = "importance"),
-               "not supported")
+  importance <- model_df %>% tidy_rowwise(model, type = "importance")
+  expect_true(all(c("variable", "importance", "std_error", "rank", "metric",
+                    "evaluation_data", "repeats") %in% colnames(importance)))
+  expect_equal(nrow(importance), 2)
+  expect_true(all(importance$metric == "log_loss"))
+  expect_true(all(importance$evaluation_data == "Training"))
+  expect_true(all(importance$repeats == 10))
+})
+
+test_that("permutation importance uses held-out rows in test mode", {
+  set.seed(11)
+  n <- 240
+  plan <- sample(c("A", "B"), n, replace = TRUE)
+  is_churn <- plan == "A"
+  df <- data.frame(
+    is_churn = is_churn,
+    plan = plan,
+    noise = sample(c("x", "y", "z"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model_df <- suppressWarnings(exp_chaid(
+    df, is_churn, plan, noise, test_rate = 0.3,
+    min_split = 10, min_bucket = 3, seed = 17
+  ))
+  importance <- model_df %>% tidy_rowwise(model, type = "importance")
+
+  expect_true(all(importance$evaluation_data == "Test"))
+  expect_true(all(importance$repeats == 10))
+  expect_gt(importance$importance[importance$variable == "plan"], 0)
+})
+
+test_that("permutation importance is reproducible with a fixed seed", {
+  df <- make_binary_df(n = 240)
+  m1 <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                   min_split = 20, min_bucket = 5, seed = 23))
+  m2 <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                   min_split = 20, min_bucket = 5, seed = 23))
+  i1 <- m1 %>% tidy_rowwise(model, type = "importance")
+  i2 <- m2 %>% tidy_rowwise(model, type = "importance")
+  expect_equal(i1, i2)
 })
 
 test_that("prediction on new data handles unseen categories without error", {

@@ -5,8 +5,9 @@
 # decision-tree/model template, and the augment/tidy/glance S3 methods below let
 # the framework's generic preprocessors (prediction(), rf_evaluation_*,
 # tidy_rowwise()) dispatch on an `exploratory_chaid` model. This mirrors the
-# exp_rpart() pattern in randomForest_tidiers.R, minus regression, SMOTE,
-# variable importance, and partial dependence (out of scope for CHAID V1).
+# exp_rpart() pattern in randomForest_tidiers.R, minus regression, SMOTE, and
+# partial dependence. Model-independent permutation importance is calculated
+# from the training or held-out rows and stored as a compact result table.
 
 #' Fit a CHAID classification tree as an Analytics View model data frame.
 #'
@@ -155,6 +156,21 @@ exp_chaid <- function(df,
       # Metadata expected by the framework.
       model$terms_mapping <- names(group_name_map)
       names(model$terms_mapping) <- group_name_map
+
+      importance_data <- if (length(test_index) > 0) {
+        source_data[test_index, , drop = FALSE]
+      } else {
+        df
+      }
+      model$importance <- chaid_permutation_importance(
+        model = model,
+        data = importance_data,
+        target = clean_target_col,
+        predictors = c_cols,
+        evaluation_data = if (length(test_index) > 0) "Test" else "Training",
+        seed = seed,
+        repeats = 10L
+      )
       # formula_terms lets generic evaluation code find the target column name
       # (all.vars(model$formula_terms)[1]) in the test-evaluation path.
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
@@ -252,6 +268,157 @@ chaid_positive_probability <- function(model, all_prediction) {
   } else {
     apply(as.matrix(all_prediction[, prob_cols, drop = FALSE]), 1, max)
   }
+}
+
+#' Return an empty CHAID permutation-importance result.
+#'
+#' @return A data frame with the stable importance schema.
+chaid_empty_permutation_importance <- function() {
+  data.frame(
+    variable = character(),
+    importance = numeric(),
+    std_error = numeric(),
+    rank = integer(),
+    metric = character(),
+    evaluation_data = character(),
+    repeats = integer(),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Calculate multiclass log loss for CHAID predictions.
+#'
+#' @param actual Actual target values.
+#' @param prediction Output of chaid_predict(type = "all").
+#' @param class_levels Model target levels.
+#' @return A scalar log-loss value, or NA_real_ when no valid rows exist.
+chaid_log_loss <- function(actual, prediction, class_levels) {
+  probability_columns <- paste0('.pred_prob_', class_levels)
+  if (!all(probability_columns %in% names(prediction))) {
+    return(NA_real_)
+  }
+  actual_index <- match(as.character(actual), class_levels)
+  probability_matrix <- as.matrix(prediction[, probability_columns, drop = FALSE])
+  valid <- !is.na(actual_index) & apply(probability_matrix, 1, function(row) {
+    all(is.finite(row))
+  })
+  if (!any(valid)) {
+    return(NA_real_)
+  }
+  row_index <- which(valid)
+  probability <- probability_matrix[cbind(row_index, actual_index[valid])]
+  probability <- pmax(pmin(probability, 1 - .Machine$double.eps), .Machine$double.eps)
+  mean(-log(probability))
+}
+
+#' Calculate model-independent permutation importance for a CHAID model.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @param data Evaluation rows containing target and predictors.
+#' @param target Target column name.
+#' @param predictors Predictor column names.
+#' @param evaluation_data Label for the evaluation rows.
+#' @param seed Random seed for reproducible permutations.
+#' @param repeats Number of permutations per predictor.
+#' @return A stable permutation-importance data frame.
+chaid_permutation_importance <- function(model, data, target, predictors,
+                                         evaluation_data = 'Training', seed = 1,
+                                         repeats = 10L) {
+  result <- chaid_empty_permutation_importance()
+  if (!is.data.frame(data) || nrow(data) == 0 ||
+      !target %in% names(data) || length(predictors) == 0) {
+    return(result)
+  }
+
+  actual <- as.character(data[[target]])
+  valid <- !is.na(actual) & actual %in% model$class_levels
+  if (sum(valid) < 2L) {
+    return(result)
+  }
+  evaluation_data_frame <- data[valid, , drop = FALSE]
+  actual <- actual[valid]
+  baseline_prediction <- tryCatch(
+    chaid_predict(model, evaluation_data_frame, type = 'all'),
+    error = function(e) NULL
+  )
+  if (is.null(baseline_prediction)) {
+    return(result)
+  }
+  baseline_loss <- chaid_log_loss(actual, baseline_prediction, model$class_levels)
+  if (!is.finite(baseline_loss)) {
+    return(result)
+  }
+
+  if (length(seed) == 1L && is.finite(seed)) {
+    set.seed(seed)
+  } else {
+    set.seed(1L)
+  }
+  repeat_count <- max(1L, as.integer(repeats))
+  rows <- lapply(predictors, function(variable) {
+    if (!variable %in% names(evaluation_data_frame)) {
+      return(NULL)
+    }
+    drops <- vapply(seq_len(repeat_count), function(iteration) {
+      permuted_data <- evaluation_data_frame
+      permuted_data[[variable]] <- permuted_data[[variable]][
+        sample.int(nrow(permuted_data))
+      ]
+      permuted_prediction <- tryCatch(
+        chaid_predict(model, permuted_data, type = 'all'),
+        error = function(e) NULL
+      )
+      if (is.null(permuted_prediction)) {
+        return(NA_real_)
+      }
+      permuted_loss <- chaid_log_loss(
+        actual, permuted_prediction, model$class_levels
+      )
+      if (is.finite(permuted_loss)) permuted_loss - baseline_loss else NA_real_
+    }, numeric(1))
+    finite_drops <- drops[is.finite(drops)]
+    if (length(finite_drops) == 0L) {
+      importance <- NA_real_
+      std_error <- NA_real_
+    } else {
+      importance <- mean(finite_drops)
+      std_error <- if (length(finite_drops) > 1L) {
+        stats::sd(finite_drops) / sqrt(length(finite_drops))
+      } else {
+        0
+      }
+    }
+    mapped_variable <- if (!is.null(model$terms_mapping) &&
+                           variable %in% names(model$terms_mapping)) {
+      unname(model$terms_mapping[[variable]])
+    } else {
+      variable
+    }
+    data.frame(
+      variable = mapped_variable,
+      importance = importance,
+      std_error = std_error,
+      metric = 'log_loss',
+      evaluation_data = evaluation_data,
+      repeats = as.integer(repeat_count),
+      stringsAsFactors = FALSE
+    )
+  })
+  rows <- Filter(Negate(is.null), rows)
+  if (length(rows) == 0L) {
+    return(result)
+  }
+  result <- dplyr::bind_rows(rows)
+  result$rank <- ifelse(
+    is.finite(result$importance),
+    rank(-result$importance, ties.method = 'min'),
+    NA_integer_
+  )
+  result <- result %>%
+    dplyr::arrange(is.na(rank), rank, variable) %>%
+    dplyr::select(variable, importance, std_error, rank, metric,
+                  evaluation_data, repeats)
+  result
 }
 
 #' Augment data with CHAID predictions (broom S3 method).
@@ -379,7 +546,7 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
       chaid_split_summary(x)
     },
     importance = {
-      stop("Variable importance is not supported for CHAID yet.")
+      if (is.null(x$importance)) chaid_empty_permutation_importance() else x$importance
     },
     {
       stop(paste0("type ", type, " is not defined"))
