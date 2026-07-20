@@ -501,7 +501,7 @@ glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
 #' @param x A fitted `exploratory_chaid` model.
 #' @param type One of `evaluation`, `evaluation_by_class`, `conf_mat`,
 #'   `tree_nodes`, `node_summary`, `rules`, `category_merges`, `split_summary`,
-#'   `category_error_distribution`, or `importance`.
+#'   `category_error_distribution`, `numeric_intervals`, or `importance`.
 #' @param pretty.name Whether to use display-friendly column names.
 #' @param binary_classification_threshold Positive-class threshold (binary).
 #' @param ... Unused.
@@ -554,6 +554,9 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
     },
     category_error_distribution = {
       chaid_category_error_distribution(x)
+    },
+    numeric_intervals = {
+      chaid_numeric_intervals(x)
     },
     importance = {
       if (is.null(x$importance)) chaid_empty_permutation_importance() else x$importance

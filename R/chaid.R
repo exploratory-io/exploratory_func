@@ -1074,6 +1074,61 @@ chaid_split_summary <- function(model) {
   )
 }
 
+#' Numeric-predictor binning result for a CHAID model.
+#'
+#' For each split node whose split variable is numeric, reports the initial
+#' binning (method + bin count) and the final intervals actually used for the
+#' split (the merged bin groups on each child edge). Returns an empty frame when
+#' no numeric predictor was binned. (#37155 §4-5)
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @return A data frame with `Node`, `Variable`, `Initial Binning`,
+#'   `Final Intervals`.
+#' @export
+chaid_numeric_intervals <- function(model) {
+  validate_chaid_model(model)
+  empty <- data.frame(
+    Node = integer(),
+    Variable = character(),
+    `Initial Binning` = character(),
+    `Final Intervals` = character(),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  binmap <- model$numeric_binning_map
+  if (is.null(binmap) || length(binmap) == 0) {
+    return(empty)
+  }
+  numeric_vars <- names(binmap)
+  split_nodes <- model$nodes[!model$nodes$is_terminal, , drop = FALSE]
+  if (nrow(split_nodes) == 0) {
+    return(empty)
+  }
+  edges <- model$edges
+  rows <- lapply(seq_len(nrow(split_nodes)), function(i) {
+    node_id <- split_nodes$node_id[i]
+    variable <- split_nodes$split_variable[i]
+    if (is.na(variable) || !(variable %in% numeric_vars)) {
+      return(NULL)
+    }
+    child_labels <- edges$label[edges$parent_id == node_id]
+    data.frame(
+      Node = node_id,
+      Variable = variable,
+      `Initial Binning` = paste0(binmap[[variable]]$method, ", ",
+                                 length(binmap[[variable]]$labels), " bins"),
+      `Final Intervals` = paste(child_labels, collapse = " / "),
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+  })
+  rows <- rows[!vapply(rows, is.null, logical(1))]
+  if (length(rows) == 0) {
+    return(empty)
+  }
+  do.call(rbind, rows)
+}
+
 #' Category-error distribution for an ordered-factor CHAID target.
 #'
 #' For an ordered categorical target, reports how far predictions land from the

@@ -200,6 +200,43 @@ test_that("category_error_distribution reports ordinal distance for an ordered t
   expect_equal(sum(dist$Percentage), 100, tolerance = 1e-6)
 })
 
+test_that("numeric_intervals reports initial binning + final intervals per numeric split", {
+  set.seed(3); n <- 800
+  df <- data.frame(
+    grade = sample(c("A", "B", "C"), n, replace = TRUE),
+    age = round(rnorm(n, 40, 12)),
+    salary = round(rnorm(n, 500, 150)),
+    overtime = sample(c("Yes", "No"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model_df <- suppressWarnings(exp_chaid(df, grade, age, salary, overtime,
+                                         min_split = 30, min_bucket = 15,
+                                         max_depth = 3))
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  expect_equal(colnames(ni),
+               c("Node", "Variable", "Initial Binning", "Final Intervals"))
+  # Only numeric predictors appear.
+  expect_true(all(ni$Variable %in% c("age", "salary")))
+  expect_true(all(grepl("bins$", ni[["Initial Binning"]])))
+  expect_true(all(nchar(ni[["Final Intervals"]]) > 0))
+})
+
+test_that("numeric_intervals is empty when no numeric predictor is binned", {
+  set.seed(4); n <- 400
+  df <- data.frame(
+    grade = sample(c("A", "B", "C"), n, replace = TRUE),
+    overtime = sample(c("Yes", "No"), n, replace = TRUE),
+    dept = sample(c("X", "Y", "Z"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model_df <- suppressWarnings(exp_chaid(df, grade, overtime, dept,
+                                         min_split = 30, min_bucket = 15))
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  expect_equal(nrow(ni), 0)
+  expect_equal(colnames(ni),
+               c("Node", "Variable", "Initial Binning", "Final Intervals"))
+})
+
 test_that("category_error_distribution is empty for a non-ordered target", {
   df <- make_ordered_df()
   df$grade <- as.character(df$grade) # drop the ordered attribute
