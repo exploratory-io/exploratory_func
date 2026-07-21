@@ -21,6 +21,7 @@
 #' @param missing Missing-value handling (`as_category` or `exclude`).
 #' @param chi_square Chi-square statistic (`pearson` or `likelihood_ratio`).
 #' @param bonferroni Whether to apply Bonferroni correction.
+#' @param allow_resplit Whether merged categories may be split again (stage 3).
 #' @param max_categories Maximum predictor categories before a predictor is skipped.
 #' @param max_nrow Row cap; data is sampled down to this before fitting.
 #' @param target_n,predictor_n Category caps; excess categories are lumped into "Other".
@@ -46,6 +47,7 @@ exp_chaid <- function(df,
                       missing = "as_category",
                       chi_square = "pearson",
                       bonferroni = TRUE,
+                      allow_resplit = FALSE,
                       max_categories = 50,
                       max_nrow = 50000,
                       target_n = 20,
@@ -144,6 +146,7 @@ exp_chaid <- function(df,
         min_node_proportion = min_node_proportion,
         numeric_binning = numeric_binning, numeric_bins = numeric_bins,
         missing = missing, chi_square = chi_square, bonferroni = bonferroni,
+        allow_resplit = allow_resplit,
         max_categories = max_categories
       )
       model$classification_type <- if (model$target_type == "logical") "binary" else "multi"

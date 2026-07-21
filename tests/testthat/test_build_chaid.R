@@ -315,3 +315,105 @@ test_that("exp_chaid validates test split arguments", {
   expect_error(exp_chaid(df, segment, channel, age_group, test_rate = NA_real_),
                "test_rate must be between")
 })
+
+# ---------------------------------------------------------------------------
+# CHAID stage 3: allow_resplit (#23772)
+# ---------------------------------------------------------------------------
+
+# Expand per-category target counts into the raw value/target vectors
+# merge_categories() consumes. Deterministic -- no RNG in the fixtures.
+chaid_resplit_fixture <- function(counts, levels = c("c1", "c2", "c3")) {
+  values <- character(0)
+  target <- character(0)
+  for (nm in names(counts)) {
+    values <- c(values, rep(nm, sum(counts[[nm]])))
+    target <- c(target, rep(levels, counts[[nm]]))
+  }
+  list(values = values, target = target)
+}
+
+chaid_resplit_actions <- function(result) {
+  vapply(result$merge_history, function(h) {
+    if (is.null(h$action)) NA_character_ else h$action
+  }, character(1))
+}
+
+test_that("chaid_resplit_partitions keeps ordered predictors contiguous", {
+  ordered_parts <- chaid_resplit_partitions(c(1L, 2L, 3L, 4L), ordered = TRUE)
+  expect_equal(length(ordered_parts), 3)
+  for (part in ordered_parts) {
+    expect_equal(part$a, sort(part$a))
+    expect_equal(max(part$a) + 1L, min(part$b))   # one contiguous cut
+  }
+  # Nominal enumerates every partition: 2^(k-1) - 1.
+  expect_equal(length(chaid_resplit_partitions(c(1L, 2L, 3L), ordered = FALSE)), 3)
+  # Too small to split, and the combinatorial cap for wide nominal groups.
+  expect_equal(length(chaid_resplit_partitions(c(1L, 2L))), 0)
+  expect_equal(length(chaid_resplit_partitions(1:13, ordered = FALSE)), 0)
+})
+
+test_that("chaid_best_resplit splits a separable compound and leaves a uniform one alone", {
+  separable <- matrix(c(180, 20, 20, 180, 25, 175), nrow = 2,
+                      dimnames = list(c("c1", "c2"), c("A", "B", "C")))
+  col_of <- function(g) if (length(g) == 1L) separable[, g] else rowSums(separable[, g, drop = FALSE])
+  best <- chaid_best_resplit(c(1L, 2L, 3L), col_of, ordered = FALSE,
+                             alpha_merge = 0.05, bonferroni = FALSE)
+  expect_false(is.null(best))
+  expect_equal(sort(c(length(best$a), length(best$b))), c(1, 2))
+  expect_lt(best$adjusted_p_value, 0.05)
+
+  uniform <- matrix(c(100, 100, 101, 99, 99, 101), nrow = 2,
+                    dimnames = list(c("c1", "c2"), c("A", "B", "C")))
+  col_of_uniform <- function(g) if (length(g) == 1L) uniform[, g] else rowSums(uniform[, g, drop = FALSE])
+  expect_null(chaid_best_resplit(c(1L, 2L, 3L), col_of_uniform, ordered = FALSE,
+                                 alpha_merge = 0.05, bonferroni = FALSE))
+})
+
+test_that("allow_resplit = FALSE leaves the greedy merge byte-identical", {
+  fixture <- chaid_resplit_fixture(list(
+    A = c(12, 29, 19), B = c(17, 19, 24), C = c(12, 22, 25), D = c(22, 15, 23),
+    E = c(21, 32, 6), F = c(8, 17, 35), G = c(15, 21, 24)
+  ))
+  off <- merge_categories(fixture$values, fixture$target, alpha_merge = 0.05,
+                          bonferroni = FALSE, chi_square = "pearson",
+                          allow_resplit = FALSE)
+  # Default argument must behave the same as an explicit FALSE.
+  default <- merge_categories(fixture$values, fixture$target, alpha_merge = 0.05,
+                              bonferroni = FALSE, chi_square = "pearson")
+  expect_equal(off$group_labels, default$group_labels)
+  expect_false(any(chaid_resplit_actions(off) %in% "resplit"))
+  expect_true(all(chaid_resplit_actions(off) == "merge"))
+})
+
+test_that("allow_resplit = TRUE breaks apart an over-merged compound", {
+  fixture <- chaid_resplit_fixture(list(
+    A = c(12, 29, 19), B = c(17, 19, 24), C = c(12, 22, 25), D = c(22, 15, 23),
+    E = c(21, 32, 6), F = c(8, 17, 35), G = c(15, 21, 24)
+  ))
+  args <- list(values = fixture$values, target = fixture$target, alpha_merge = 0.05,
+               bonferroni = FALSE, chi_square = "pearson")
+  off <- do.call(merge_categories, c(args, list(allow_resplit = FALSE)))
+  on <- do.call(merge_categories, c(args, list(allow_resplit = TRUE)))
+
+  # The greedy merge fuses five categories into one group; re-splitting repairs it.
+  expect_true(any(chaid_resplit_actions(on) == "resplit"))
+  expect_gt(length(on$groups), length(off$groups))
+  # Every original category is still assigned exactly once.
+  expect_equal(sort(unlist(on$groups)), sort(unlist(off$groups)))
+})
+
+test_that("allow_resplit keeps ordered groups contiguous and terminates", {
+  fixture <- chaid_resplit_fixture(list(
+    A = c(12, 29, 19), B = c(17, 19, 24), C = c(12, 22, 25), D = c(22, 15, 23),
+    E = c(21, 32, 6), F = c(8, 17, 35), G = c(15, 21, 24)
+  ))
+  levels_in_order <- LETTERS[1:7]
+  result <- merge_categories(fixture$values, fixture$target, ordered = TRUE,
+                             ordered_levels = levels_in_order, alpha_merge = 0.05,
+                             bonferroni = FALSE, chi_square = "pearson",
+                             allow_resplit = TRUE)
+  for (group in result$groups) {
+    positions <- sort(match(group, levels_in_order))
+    expect_true(all(diff(positions) == 1))   # no non-contiguous interval
+  }
+})

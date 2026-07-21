@@ -15,6 +15,7 @@
 #' @param missing Missing-value handling method.
 #' @param chi_square Chi-square statistic to use.
 #' @param bonferroni Whether to apply Bonferroni correction.
+#' @param allow_resplit Whether merged categories may be split again (stage 3).
 #' @param ordinal_predictors Predictors to treat as ordered.
 #' @param max_categories Maximum number of predictor categories.
 #' @param verbose Whether to emit diagnostic messages.
@@ -35,6 +36,7 @@ chaid_fit <- function(data,
                       missing = c('as_category', 'exclude'),
                       chi_square = c('pearson', 'likelihood_ratio'),
                       bonferroni = TRUE,
+                      allow_resplit = FALSE,
                       ordinal_predictors = NULL,
                       max_categories = 50,
                       verbose = FALSE) {
@@ -54,6 +56,7 @@ chaid_fit <- function(data,
     missing = missing,
     chi_square = chi_square,
     bonferroni = bonferroni,
+    allow_resplit = allow_resplit,
     ordinal_predictors = ordinal_predictors,
     max_categories = max_categories,
     verbose = verbose
@@ -112,6 +115,7 @@ chaid_fit <- function(data,
       merged_group = character(),
       original_categories = character(),
       merge_p_value = numeric(),
+      action = character(),
       stringsAsFactors = FALSE
     ),
     numeric_binning_map = prepared$numeric_binning_map,
@@ -464,6 +468,104 @@ adjust_p_value_bonferroni <- function(p_values, bonferroni = TRUE,
   pmin(1, p_values * n_tests)
 }
 
+#' Candidate binary partitions of one compound category (CHAID stage 3).
+#'
+#' Ordered predictors may only be cut at a contiguous boundary. A
+#' non-contiguous re-split would produce numeric groups that cannot be written
+#' as an interval, which the tree branch labels, the numeric-interval table and
+#' the Show Detail range filter all require. Nominal predictors allow every
+#' partition, capped because the count is 2^(k-1) - 1.
+#'
+#' @param group.indices Column indices (into `categories`) forming one group.
+#' @param ordered Whether the predictor is ordered.
+#' @param max_resplit_size Largest nominal group that is enumerated.
+#' @return List of `list(a = indices, b = indices)`; empty when not splittable.
+chaid_resplit_partitions <- function(group.indices,
+                                     ordered = FALSE,
+                                     max_resplit_size = 12L) {
+  k <- length(group.indices)
+  if (k < 3L) {
+    return(list())
+  }
+  if (ordered) {
+    return(lapply(seq_len(k - 1L), function(cut) {
+      list(a = group.indices[seq_len(cut)],
+           b = group.indices[seq.int(cut + 1L, k)])
+    }))
+  }
+  if (k > max_resplit_size) {
+    return(list())
+  }
+  # Bit patterns over categories 2..k; category 1 is pinned to side `a` so each
+  # partition is produced once instead of twice (a/b are interchangeable).
+  partitions <- vector('list', bitwShiftL(1L, k - 1L) - 1L)
+  for (mask in seq_len(bitwShiftL(1L, k - 1L) - 1L)) {
+    take <- bitwAnd(bitwShiftR(mask, seq_len(k - 1L) - 1L), 1L) == 1L
+    b.indices <- group.indices[c(FALSE, take)]
+    partitions[[mask]] <- list(
+      a = group.indices[!(group.indices %in% b.indices)],
+      b = b.indices
+    )
+  }
+  partitions
+}
+
+#' Order-independent key for a pair of groups, used as the re-split tabu key.
+#'
+#' @param a,b Column-index vectors of the two groups.
+#' @return Single string identifying the unordered pair.
+chaid_group_pair_key <- function(a, b) {
+  sides <- sort(c(paste(sort(a), collapse = ','), paste(sort(b), collapse = ',')))
+  paste(sides, collapse = '|')
+}
+
+#' Most significant binary split of a compound category, if it clears alpha.
+#'
+#' Mirrors the merge test but in reverse: merging takes the LEAST significant
+#' pair (most similar), re-splitting takes the MOST significant partition (most
+#' different) and only applies it when it is significant at `alpha_merge`.
+#'
+#' @param group.indices Column indices forming the compound category.
+#' @param col_of_group Closure returning a group's target-count column.
+#' @param ordered Whether the predictor is ordered.
+#' @param alpha_merge Significance threshold (shared with the merge stage).
+#' @param bonferroni Whether to correct the p-values.
+#' @param chi_square Chi-square statistic to use.
+#' @param max_resplit_size Largest nominal group that is enumerated.
+#' @return `list(a, b, p_value, adjusted_p_value)` or NULL when it should stand.
+chaid_best_resplit <- function(group.indices,
+                               col_of_group,
+                               ordered = FALSE,
+                               alpha_merge = 0.05,
+                               bonferroni = TRUE,
+                               chi_square = 'pearson',
+                               max_resplit_size = 12L) {
+  partitions <- chaid_resplit_partitions(
+    group.indices, ordered = ordered, max_resplit_size = max_resplit_size
+  )
+  if (length(partitions) == 0L) {
+    return(NULL)
+  }
+  raw.p.values <- vapply(partitions, function(part) {
+    observed <- cbind(col_of_group(part$a), col_of_group(part$b))
+    compute_chisq_from_counts(observed, method = chi_square)$p_value
+  }, numeric(1))
+  adjusted.p.values <- adjust_p_value_bonferroni(
+    raw.p.values, bonferroni = bonferroni, n_tests = length(raw.p.values)
+  )
+  best <- which.min(adjusted.p.values)
+  if (length(best) == 0L || is.na(adjusted.p.values[best]) ||
+      adjusted.p.values[best] >= alpha_merge) {
+    return(NULL)
+  }
+  list(
+    a = partitions[[best]]$a,
+    b = partitions[[best]]$b,
+    p_value = raw.p.values[best],
+    adjusted_p_value = adjusted.p.values[best]
+  )
+}
+
 #' Merge statistically similar predictor categories.
 #'
 #' @param values Predictor categories within one node.
@@ -475,6 +577,9 @@ adjust_p_value_bonferroni <- function(p_values, bonferroni = TRUE,
 #' @param variable Predictor name.
 #' @param node_id Current node ID.
 #' @param chi_square Chi-square statistic to use.
+#' @param allow_resplit Whether a compound category of 3+ original categories may
+#'   be split again when its best binary partition is significant (CHAID stage
+#'   3). Off by default, so the greedy merge behaves exactly as before.
 #' @return Category groups and merge/test metadata.
 merge_categories <- function(values,
                              target,
@@ -484,7 +589,8 @@ merge_categories <- function(values,
                              bonferroni = TRUE,
                              variable = '',
                              node_id = 1L,
-                             chi_square = 'pearson') {
+                             chi_square = 'pearson',
+                             allow_resplit = FALSE) {
   values <- as.character(values)
   target <- as.character(target)
   valid <- !is.na(values) & !is.na(target)
@@ -517,8 +623,20 @@ merge_categories <- function(values,
     }
   }
 
+  # CHAID stage 3 bookkeeping. `resplit.tabu` holds the pairs a re-split has just
+  # undone so the merge step cannot immediately recreate them -- merge and
+  # re-split would otherwise oscillate forever. The iteration cap is a backstop:
+  # an unanswerable R call here would hang RServe rather than return an error.
+  resplit.tabu <- character(0)
+  iteration <- 0L
+  max.iterations <- 4L * length(categories) + 10L
+
   repeat {
     if (length(groups) < 2) {
+      break
+    }
+    iteration <- iteration + 1L
+    if (iteration > max.iterations) {
       break
     }
     candidates <- list()
@@ -526,6 +644,10 @@ merge_categories <- function(values,
     for (i in seq_len(length(groups) - 1L)) {
       for (j in seq.int(i + 1L, length(groups))) {
         if (ordered && j != i + 1L) {
+          next
+        }
+        if (allow_resplit && length(resplit.tabu) > 0L &&
+            chaid_group_pair_key(groups[[i]], groups[[j]]) %in% resplit.tabu) {
           next
         }
         pair.observed <- cbind(col_of_group(groups[[i]]), col_of_group(groups[[j]]))
@@ -559,10 +681,49 @@ merge_categories <- function(values,
       merged_group = paste(original.categories, collapse = ' + '),
       original_categories = original.categories,
       merge_p_value = raw.p.values[best],
-      adjusted_p_value = adjusted.p.values[best]
+      adjusted_p_value = adjusted.p.values[best],
+      action = 'merge'
     )
     groups[[selected$i]] <- c(groups[[selected$i]], groups[[selected$j]])
     groups[[selected$j]] <- NULL
+
+    # Stage 3: the greedy merge is order-dependent, so a pair fused earlier can
+    # become clearly separable once a third category joins it. Re-test every
+    # compound of 3+ categories and break it apart when its best binary
+    # partition is significant.
+    if (allow_resplit) {
+      for (g in seq_along(groups)) {
+        split <- chaid_best_resplit(
+          groups[[g]],
+          col_of_group = col_of_group,
+          ordered = ordered,
+          alpha_merge = alpha_merge,
+          bonferroni = bonferroni,
+          chi_square = chi_square
+        )
+        if (is.null(split)) {
+          next
+        }
+        merge.history[[length(merge.history) + 1L]] <- list(
+          node_id = node_id,
+          variable = variable,
+          merged_group = paste(categories[groups[[g]]], collapse = ' + '),
+          original_categories = categories[groups[[g]]],
+          merge_p_value = split$p_value,
+          adjusted_p_value = split$adjusted_p_value,
+          action = 'resplit'
+        )
+        resplit.tabu <- c(resplit.tabu, chaid_group_pair_key(split$a, split$b))
+        groups[[g]] <- split$a
+        groups[[length(groups) + 1L]] <- split$b
+        if (ordered) {
+          # Keep groups in category order so the "adjacent only" pair scan and
+          # the resulting interval labels stay contiguous.
+          groups <- groups[order(vapply(groups, min, numeric(1)))]
+        }
+        break
+      }
+    }
   }
 
   group.category.lists <- lapply(groups, function(group.indices) categories[group.indices])
@@ -605,7 +766,8 @@ evaluate_predictor <- function(data, target, variable, parameters,
     bonferroni = parameters$bonferroni,
     variable = variable,
     node_id = node_id,
-    chi_square = parameters$chi_square
+    chi_square = parameters$chi_square,
+    allow_resplit = isTRUE(parameters$allow_resplit)
   )
   if (length(merge.result$groups) < 2 || is.na(merge.result$p_value)) {
     return(NULL)
@@ -813,7 +975,7 @@ merge_history_to_data <- function(merge_history) {
     return(data.frame(
       node_id = integer(), variable = character(), merged_group = character(),
       original_categories = character(), merge_p_value = numeric(),
-      adjusted_p_value = numeric(), stringsAsFactors = FALSE
+      adjusted_p_value = numeric(), action = character(), stringsAsFactors = FALSE
     ))
   }
   do.call(rbind, lapply(merge_history, function(record) {
@@ -824,6 +986,8 @@ merge_history_to_data <- function(merge_history) {
       original_categories = paste(record$original_categories, collapse = ' | '),
       merge_p_value = record$merge_p_value,
       adjusted_p_value = record$adjusted_p_value,
+      # Rows predate the stage-3 feature when action is absent; they are merges.
+      action = record$action %||% 'merge',
       stringsAsFactors = FALSE
     )
   }))
@@ -1175,6 +1339,12 @@ chaid_category_merge_table <- function(model) {
     `Merged Category` = merge.data$merged_group,
     `Original Categories` = merge.data$original_categories,
     `Merge p-value` = merge.data$merge_p_value,
+    # 'merge' or 'resplit' (stage 3). Older models carry no column -> all merges.
+    Action = if (is.null(merge.data$action)) {
+      rep('merge', nrow(merge.data))
+    } else {
+      merge.data$action
+    },
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
@@ -1370,6 +1540,7 @@ format_chaid_distribution <- function(distribution) {
 #' @param missing Missing-value handling method.
 #' @param chi_square Chi-square statistic.
 #' @param bonferroni Bonferroni correction flag.
+#' @param allow_resplit Whether merged categories may be split again (stage 3).
 #' @param ordinal_predictors Ordered predictor names.
 #' @param max_categories Maximum category count.
 #' @param verbose Diagnostic flag.
@@ -1389,6 +1560,7 @@ validate_chaid_inputs <- function(data,
                                   missing,
                                   chi_square,
                                   bonferroni,
+                                  allow_resplit = FALSE,
                                   ordinal_predictors,
                                   max_categories,
                                   verbose) {
@@ -1466,6 +1638,9 @@ validate_chaid_inputs <- function(data,
   if (!is.logical(bonferroni) || length(bonferroni) != 1 || is.na(bonferroni)) {
     stop('bonferroni must be TRUE or FALSE')
   }
+  if (!is.logical(allow_resplit) || length(allow_resplit) != 1 || is.na(allow_resplit)) {
+    stop('allow_resplit must be TRUE or FALSE')
+  }
   if (!is.null(ordinal_predictors) &&
       any(!ordinal_predictors %in% predictors)) {
     stop('ordinal_predictors must be included in predictors')
@@ -1489,6 +1664,7 @@ validate_chaid_inputs <- function(data,
       missing = missing.method,
       chi_square = chi.square,
       bonferroni = bonferroni,
+      allow_resplit = allow_resplit,
       ordinal_predictors = ordinal_predictors,
       max_categories = as.integer(max_categories),
       verbose = verbose
