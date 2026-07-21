@@ -1074,6 +1074,104 @@ chaid_split_summary <- function(model) {
   )
 }
 
+#' Numeric-predictor binning result for a CHAID model.
+#'
+#' For each split node whose split variable is numeric, reports the initial
+#' binning (method + bin count) and the final intervals actually used for the
+#' split (the merged bin groups on each child edge). Returns an empty frame when
+#' no numeric predictor was binned. (#37155 §4-5)
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @return A data frame with `Node`, `Variable`, `Initial Binning`,
+#'   `Final Intervals`.
+#' @export
+chaid_numeric_intervals <- function(model) {
+  validate_chaid_model(model)
+  empty <- data.frame(
+    Node = integer(),
+    Variable = character(),
+    `Initial Binning` = character(),
+    `Final Intervals` = character(),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  binmap <- model$numeric_binning_map
+  if (is.null(binmap) || length(binmap) == 0) {
+    return(empty)
+  }
+  numeric_vars <- names(binmap)
+  split_nodes <- model$nodes[!model$nodes$is_terminal, , drop = FALSE]
+  if (nrow(split_nodes) == 0) {
+    return(empty)
+  }
+  edges <- model$edges
+  rows <- lapply(seq_len(nrow(split_nodes)), function(i) {
+    node_id <- split_nodes$node_id[i]
+    variable <- split_nodes$split_variable[i]
+    if (is.na(variable) || !(variable %in% numeric_vars)) {
+      return(NULL)
+    }
+    child_labels <- edges$label[edges$parent_id == node_id]
+    data.frame(
+      Node = node_id,
+      Variable = variable,
+      `Initial Binning` = paste0(binmap[[variable]]$method, ", ",
+                                 length(binmap[[variable]]$labels), " bins"),
+      `Final Intervals` = paste(child_labels, collapse = " / "),
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+  })
+  rows <- rows[!vapply(rows, is.null, logical(1))]
+  if (length(rows) == 0) {
+    return(empty)
+  }
+  do.call(rbind, rows)
+}
+
+#' Category-error distribution for an ordered-factor CHAID target.
+#'
+#' For an ordered categorical target, reports how far predictions land from the
+#' actual category on the ordinal scale: distance = rank(predicted) -
+#' rank(actual). Returns one row per observed distance value with a count and
+#' percentage. Returns an empty frame when the target is not an ordered factor,
+#' so the report can hide the chart and its ordered-only suggestion. (#37155)
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @return A data frame with `Category Distance`, `Rows`, `Percentage`.
+#' @export
+chaid_category_error_distribution <- function(model) {
+  validate_chaid_model(model)
+  empty <- data.frame(
+    `Category Distance` = integer(),
+    Rows = integer(),
+    Percentage = numeric(),
+    check.names = FALSE
+  )
+  if (!isTRUE(model$is_target_ordered)) {
+    return(empty)
+  }
+  levels_in_order <- model$ordered_levels
+  if (is.null(levels_in_order)) {
+    levels_in_order <- model$class_levels
+  }
+  actual_rank <- match(as.character(model$y), levels_in_order)
+  predicted_rank <- match(as.character(model$predicted_class), levels_in_order)
+  distance <- predicted_rank - actual_rank
+  distance <- distance[!is.na(distance)]
+  if (length(distance) == 0) {
+    return(empty)
+  }
+  full_range <- seq(min(distance), max(distance))
+  counts <- as.integer(table(factor(distance, levels = full_range)))
+  data.frame(
+    `Category Distance` = as.integer(full_range),
+    Rows = counts,
+    Percentage = counts / sum(counts) * 100,
+    check.names = FALSE
+  )
+}
+
 #' Return renderer-friendly tree nodes and edges.
 #'
 #' @param model A fitted `exploratory_chaid` model.

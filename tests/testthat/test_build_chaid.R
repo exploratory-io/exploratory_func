@@ -142,7 +142,7 @@ test_that("binary classification threshold shifts predicted labels", {
   expect_gte(n_true_low, n_true_high)
 })
 
-test_that("report tidy types return stable schemas and importance errors", {
+test_that("report tidy types return stable schemas and permutation importance", {
   df <- make_multi_df()
   model_df <- suppressWarnings(exp_chaid(df, segment, channel, age_group,
                                          min_split = 20, min_bucket = 5))
@@ -152,8 +152,134 @@ test_that("report tidy types return stable schemas and importance errors", {
   expect_true("Node" %in% colnames(ns))
   expect_true("Rule" %in% colnames(rules))
   expect_true("Node" %in% colnames(splits))
-  expect_error(exploratory:::tidy.exploratory_chaid(model_df$model[[1]], type = "importance"),
-               "not supported")
+  importance <- model_df %>% tidy_rowwise(model, type = "importance")
+  expect_true(all(c("variable", "importance", "std_error", "rank", "metric",
+                    "evaluation_data", "repeats") %in% colnames(importance)))
+  expect_equal(nrow(importance), 2)
+  expect_true(all(importance$metric == "log_loss"))
+  expect_true(all(importance$evaluation_data == "Training"))
+  expect_true(all(importance$repeats == 10))
+})
+
+make_ordered_df <- function(n = 600, seed = 1) {
+  set.seed(seed)
+  satisfaction <- factor(sample(c("Low", "Mid", "High"), n, replace = TRUE),
+                         levels = c("Low", "Mid", "High"), ordered = TRUE)
+  overtime <- sample(c("Yes", "No"), n, replace = TRUE)
+  score <- ifelse(overtime == "Yes", 1, 0) + as.integer(satisfaction) / 3 +
+    rnorm(n, 0, 0.4)
+  grade <- cut(score, breaks = quantile(score, c(0, 1 / 3, 2 / 3, 1)),
+               labels = c("A", "B", "C"), include.lowest = TRUE)
+  data.frame(
+    grade = factor(as.character(grade), levels = c("A", "B", "C"),
+                   ordered = TRUE),
+    satisfaction = satisfaction,
+    overtime = overtime,
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("category_error_distribution reports ordinal distance for an ordered target", {
+  df <- make_ordered_df()
+  model_df <- suppressWarnings(exp_chaid(df, grade, satisfaction, overtime,
+                                         min_split = 20, min_bucket = 10,
+                                         max_depth = 3))
+  expect_true(isTRUE(model_df$model[[1]]$is_target_ordered))
+  expect_equal(model_df$model[[1]]$ordered_levels, c("A", "B", "C"))
+
+  dist <- model_df %>% tidy_rowwise(model, type = "category_error_distribution")
+  expect_equal(colnames(dist), c("Category Distance", "Rows", "Percentage"))
+  expect_true(nrow(dist) >= 1)
+  # A perfect-distance-0 row must be present, distances are contiguous integers,
+  # and rows account for every scored observation.
+  expect_true(0 %in% dist[["Category Distance"]])
+  expect_equal(dist[["Category Distance"]],
+               seq(min(dist[["Category Distance"]]),
+                   max(dist[["Category Distance"]])))
+  expect_equal(sum(dist$Rows), length(model_df$model[[1]]$y))
+  expect_equal(sum(dist$Percentage), 100, tolerance = 1e-6)
+})
+
+test_that("numeric_intervals reports initial binning + final intervals per numeric split", {
+  set.seed(3); n <- 800
+  df <- data.frame(
+    grade = sample(c("A", "B", "C"), n, replace = TRUE),
+    age = round(rnorm(n, 40, 12)),
+    salary = round(rnorm(n, 500, 150)),
+    overtime = sample(c("Yes", "No"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model_df <- suppressWarnings(exp_chaid(df, grade, age, salary, overtime,
+                                         min_split = 30, min_bucket = 15,
+                                         max_depth = 3))
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  expect_equal(colnames(ni),
+               c("Node", "Variable", "Initial Binning", "Final Intervals"))
+  # Only numeric predictors appear.
+  expect_true(all(ni$Variable %in% c("age", "salary")))
+  expect_true(all(grepl("bins$", ni[["Initial Binning"]])))
+  expect_true(all(nchar(ni[["Final Intervals"]]) > 0))
+})
+
+test_that("numeric_intervals is empty when no numeric predictor is binned", {
+  set.seed(4); n <- 400
+  df <- data.frame(
+    grade = sample(c("A", "B", "C"), n, replace = TRUE),
+    overtime = sample(c("Yes", "No"), n, replace = TRUE),
+    dept = sample(c("X", "Y", "Z"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model_df <- suppressWarnings(exp_chaid(df, grade, overtime, dept,
+                                         min_split = 30, min_bucket = 15))
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  expect_equal(nrow(ni), 0)
+  expect_equal(colnames(ni),
+               c("Node", "Variable", "Initial Binning", "Final Intervals"))
+})
+
+test_that("category_error_distribution is empty for a non-ordered target", {
+  df <- make_ordered_df()
+  df$grade <- as.character(df$grade) # drop the ordered attribute
+  model_df <- suppressWarnings(exp_chaid(df, grade, satisfaction, overtime,
+                                         min_split = 20, min_bucket = 10,
+                                         max_depth = 3))
+  expect_false(isTRUE(model_df$model[[1]]$is_target_ordered))
+  dist <- model_df %>% tidy_rowwise(model, type = "category_error_distribution")
+  expect_equal(nrow(dist), 0)
+  expect_equal(colnames(dist), c("Category Distance", "Rows", "Percentage"))
+})
+
+test_that("permutation importance uses held-out rows in test mode", {
+  set.seed(11)
+  n <- 240
+  plan <- sample(c("A", "B"), n, replace = TRUE)
+  is_churn <- plan == "A"
+  df <- data.frame(
+    is_churn = is_churn,
+    plan = plan,
+    noise = sample(c("x", "y", "z"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model_df <- suppressWarnings(exp_chaid(
+    df, is_churn, plan, noise, test_rate = 0.3,
+    min_split = 10, min_bucket = 3, seed = 17
+  ))
+  importance <- model_df %>% tidy_rowwise(model, type = "importance")
+
+  expect_true(all(importance$evaluation_data == "Test"))
+  expect_true(all(importance$repeats == 10))
+  expect_gt(importance$importance[importance$variable == "plan"], 0)
+})
+
+test_that("permutation importance is reproducible with a fixed seed", {
+  df <- make_binary_df(n = 240)
+  m1 <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                   min_split = 20, min_bucket = 5, seed = 23))
+  m2 <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                   min_split = 20, min_bucket = 5, seed = 23))
+  i1 <- m1 %>% tidy_rowwise(model, type = "importance")
+  i2 <- m2 %>% tidy_rowwise(model, type = "importance")
+  expect_equal(i1, i2)
 })
 
 test_that("prediction on new data handles unseen categories without error", {
