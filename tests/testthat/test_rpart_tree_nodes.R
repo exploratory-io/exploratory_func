@@ -28,13 +28,13 @@ test_that("tree_nodes binary classification (logical target) - shape, sums, TRUE
   expect_true(nrow(nodes) >= 1)
 
   # root
-  root <- nodes[nodes$node_id == 1, ]
+  root <- nodes[is.na(nodes$parent_id), ]
   expect_equal(nrow(root), 1)
   expect_true(is.na(root$parent_id))
   expect_equal(root$depth, 0L)
 
   # every non-root has a parent present in the table
-  non_root <- nodes[nodes$node_id != 1, ]
+  non_root <- nodes[!is.na(nodes$parent_id), ]
   expect_true(all(non_root$parent_id %in% nodes$node_id))
 
   # The LEAVES partition the data (a pruned tree has leaves at varying depths, so
@@ -49,7 +49,7 @@ test_that("tree_nodes binary classification (logical target) - shape, sums, TRUE
 
   # class_json: per-node classes present, TRUE listed FIRST for a logical target
   cls <- parse_classes(nodes$class_json)
-  root_cls <- cls[[which(nodes$node_id == 1)]]
+  root_cls <- cls[[which(is.na(nodes$parent_id))]]
   expect_equal(root_cls$label[1], "TRUE")               # requirement 3
   expect_setequal(root_cls$label, c("TRUE","FALSE"))
   # class counts sum to node n
@@ -65,9 +65,9 @@ test_that("tree_nodes multiclass classification - one class entry per ylevel", {
   nodes <- model_df %>% tidy_rowwise(model, type="tree_nodes")
   expect_equal(colnames(nodes), expected_cols)
   cls <- parse_classes(nodes$class_json)
-  root_cls <- cls[[which(nodes$node_id == 1)]]
+  root_cls <- cls[[which(is.na(nodes$parent_id))]]
   expect_setequal(root_cls$label, c("CA","NY","TX"))
-  expect_equal(sum(root_cls$n), nodes[nodes$node_id==1, ]$n)
+  expect_equal(sum(root_cls$n), nodes$n[is.na(nodes$parent_id)])
   expect_true(all(is.na(nodes$mean_value)))              # not regression
   # classification leaves the regression-only columns NA (requirement 7)
   expect_true(all(is.na(nodes$sd_value)))
@@ -88,7 +88,9 @@ test_that("tree_nodes regression - predicted mean, class_json NA, sd/rmse/dist (
   rp <- model_df$model[[1]]
   fr <- rp$frame
   fr_ids <- as.integer(rownames(fr))
-  ord <- match(nodes$node_id, fr_ids)
+  # node_id is the 0-based breadth-first rank of the rpart heap id, and for heap
+  # indices ascending order IS breadth-first, so rank k is sort(fr_ids)[k + 1].
+  ord <- match(sort(fr_ids)[nodes$node_id + 1L], fr_ids)
   expect_equal(nodes$rmse_value, sqrt(fr$dev[ord] / fr$n[ord]), tolerance = 1e-8)
   sd_expected <- ifelse(fr$n[ord] > 1, sqrt(fr$dev[ord] / (fr$n[ord] - 1)), NA_real_)
   expect_equal(nodes$sd_value, sd_expected, tolerance = 1e-8)
@@ -96,14 +98,15 @@ test_that("tree_nodes regression - predicted mean, class_json NA, sd/rmse/dist (
   # dist_json: shared bins on every node; per-node counts sum to n; an internal
   # node's counts equal the element-wise sum of its two children's.
   parse_dist <- function(j) jsonlite::fromJSON(j)
-  root <- parse_dist(nodes$dist_json[nodes$node_id == 1])
+  root <- parse_dist(nodes$dist_json[is.na(nodes$parent_id)])
   expect_equal(length(root$breaks), 21)                  # ~20 equal-width bins
-  expect_equal(sum(root$counts), nodes$n[nodes$node_id == 1])
+  expect_equal(sum(root$counts), nodes$n[is.na(nodes$parent_id)])
   # breaks identical across all nodes
   all_breaks <- lapply(nodes$dist_json, function(j) parse_dist(j)$breaks)
   for (b in all_breaks) expect_equal(b, root$breaks)
   # children-sum invariant on the root's two children (if the tree split)
-  kids <- nodes[!is.na(nodes$parent_id) & nodes$parent_id == 1, ]
+  root_id <- nodes$node_id[is.na(nodes$parent_id)]
+  kids <- nodes[!is.na(nodes$parent_id) & nodes$parent_id == root_id, ]
   if (nrow(kids) == 2) {
     c1 <- parse_dist(kids$dist_json[1])$counts
     c2 <- parse_dist(kids$dist_json[2])$counts
@@ -120,13 +123,13 @@ test_that("tree_nodes regression - integer/discrete target uses one bin per inte
   model_df <- df %>% exp_rpart(level, x1, x2)
   nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
 
-  root <- jsonlite::fromJSON(nodes$dist_json[nodes$node_id == 1])
+  root <- jsonlite::fromJSON(nodes$dist_json[is.na(nodes$parent_id)])
   # one bin per integer: breaks are consecutive half-integers (width 1, at n +/- 0.5)
   expect_true(all(abs(diff(root$breaks) - 1) < 1e-9))
   expect_true(all(abs((root$breaks %% 1) - 0.5) < 1e-9))
   rng <- range(df$level)
   expect_equal(length(root$counts), as.integer(diff(rng)) + 1L)
-  expect_equal(sum(root$counts), nodes$n[nodes$node_id == 1])
+  expect_equal(sum(root$counts), nodes$n[is.na(nodes$parent_id)])
 })
 
 test_that("tree_nodes multibyte/symbol column with categorical + numeric split", {
@@ -200,4 +203,33 @@ test_that("tree_nodes accepts a plain rpart regression object", {
   expect_true(all(is.na(nodes$class_json)))
   expect_true(all(!is.na(nodes$mean_value)))
   expect_true(all(!is.na(nodes$dist_json)))
+})
+
+test_that("tree_nodes renumbers rpart heap ids to 0-based breadth-first ids", {
+  set.seed(5); n <- 1500
+  df <- data.frame(
+    y  = round(rnorm(n, 6500, 4700)),
+    g  = sample(1:5, n, TRUE),
+    p2 = sample(c("m", "n", "o"), n, TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$y <- df$y + df$g * 3000
+  model_df <- suppressWarnings(df %>% exp_rpart(y, g, p2, maxdepth = 5, cp = 0.005))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+
+  # rpart numbers by heap position (1,2,3,...,7,14,15 once pruned). The tidy must
+  # expose a gapless 0-based sequence instead, so the chart reads 0,1,2,...
+  expect_equal(sort(nodes$node_id), seq_len(nrow(nodes)) - 1L)
+  expect_equal(nodes$node_id[is.na(nodes$parent_id)], 0L)          # SPSS: root = 0
+  expect_equal(nodes$node_id, sort(nodes$node_id))                  # rows in id order
+  # Breadth-first: a parent always precedes its children, and depth never
+  # decreases as the id grows.
+  expect_true(all(is.na(nodes$parent_id) | nodes$parent_id < nodes$node_id))
+  expect_false(is.unsorted(nodes$depth))
+  # Structure survives the renumbering.
+  expect_true(all(is.na(nodes$parent_id) | nodes$parent_id %in% nodes$node_id))
+  for (i in which(!nodes$is_leaf)) {
+    kids <- nodes$n[nodes$parent_id %in% nodes$node_id[i]]
+    expect_equal(sum(kids), nodes$n[i])
+  }
 })

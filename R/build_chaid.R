@@ -537,6 +537,32 @@ glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
 #' @param ... Unused.
 #' @return A data frame whose shape depends on `type`.
 #' @export
+#' Shift node ids to the 0-based numbering shown to users.
+#'
+#' The model numbers nodes from 1 -- root = 1 is assumed in several places
+#' (chaid_assign_nodes seeds its queue with it, root row counts are looked up by
+#' it), so the model keeps 1-based ids and only the tidy output is shifted. SPSS
+#' labels the root "Node 0", and every id the user sees comes through
+#' tidy.exploratory_chaid, so shifting once here keeps the chart, the split /
+#' evidence / merge / interval tables and the rules on one numbering.
+#'
+#' Only genuine id columns are shifted. `Parent Node Rows` (a count) and `Depth`
+#' are deliberately not in the list.
+#'
+#' @param df A tidy output data frame.
+#' @return The same frame with node id columns shifted to 0-based.
+chaid_display_node_ids <- function(df) {
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return(df)
+  }
+  for (col in c('node_id', 'parent_id', 'Node')) {
+    if (col %in% names(df)) {
+      df[[col]] <- as.integer(df[[col]]) - 1L
+    }
+  }
+  df
+}
+
 tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
                                    binary_classification_threshold = 0.5, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
@@ -544,7 +570,7 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
   }
   actual <- x$y
   predicted <- x$predicted_class
-  switch(
+  chaid_display_node_ids(switch(
     type,
     evaluation = {
       if ("error" %in% class(x)) {
@@ -594,7 +620,7 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
     {
       stop(paste0("type ", type, " is not defined"))
     }
-  )
+  ))
 }
 
 #' Build per-node data for the interactive decision tree chart.

@@ -58,7 +58,7 @@ test_that("tree_nodes tidy output matches the renderer schema", {
                      "predicted", "n", "pct", "class_json", "cond_column",
                      "cond_operator", "cond_value")
   expect_true(all(expected_cols %in% colnames(nodes)))
-  root <- nodes[nodes$node_id == 1, ]
+  root <- nodes[is.na(nodes$parent_id), ]
   expect_equal(root$pct, 1)
   expect_true(is.na(root$parent_id))
   # class_json parses to per-class label/n/pct.
@@ -416,4 +416,43 @@ test_that("allow_resplit keeps ordered groups contiguous and terminates", {
     positions <- sort(match(group, levels_in_order))
     expect_true(all(diff(positions) == 1))   # no non-contiguous interval
   }
+})
+
+test_that("chaid tidy exposes 0-based breadth-first node ids on every surface", {
+  set.seed(11); n <- 1200
+  df <- data.frame(
+    y  = sample(c("a", "b", "c"), n, TRUE),
+    p1 = sample(c("x", "y", "z", "w"), n, TRUE),
+    p2 = sample(c("m", "n", "o"), n, TRUE),
+    p3 = round(rnorm(n, 50, 15)),
+    stringsAsFactors = FALSE
+  )
+  df$y <- ifelse(df$p1 %in% c("x", "y") & df$p3 > 55, "a",
+                 ifelse(df$p2 == "m", "b", df$y))
+  model_df <- suppressWarnings(
+    df %>% exp_chaid(y, p1, p2, p3, max_depth = 3, min_split = 20, min_bucket = 5))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+
+  expect_gt(nrow(nodes), 3)                                        # a tree that branches
+  expect_equal(sort(nodes$node_id), seq_len(nrow(nodes)) - 1L)     # gapless, 0-based
+  expect_equal(nodes$node_id[is.na(nodes$parent_id)], 0L)          # SPSS: root = 0
+  # Growth is depth-first, so this ordering only holds because the ids are
+  # renumbered breadth-first afterwards.
+  expect_true(all(is.na(nodes$parent_id) | nodes$parent_id < nodes$node_id))
+  expect_false(is.unsorted(nodes$depth))
+
+  # Every report surface must quote the SAME ids as the chart.
+  valid <- nodes$node_id
+  for (type in c("split_summary", "node_summary", "rules", "category_merges",
+                 "numeric_intervals")) {
+    tbl <- model_df %>% tidy_rowwise(model, type = type)
+    if ("Node" %in% names(tbl) && nrow(tbl) > 0) {
+      expect_true(all(tbl$Node %in% valid), info = type)
+    }
+  }
+
+  # The model itself stays 1-based: chaid_assign_nodes seeds its queue with node
+  # 1 and root row counts are looked up by it, so only the tidy is shifted.
+  expect_equal(model_df$model[[1]]$nodes$node_id[
+    is.na(model_df$model[[1]]$nodes$parent_id)], 1L)
 })

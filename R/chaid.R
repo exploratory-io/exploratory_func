@@ -150,6 +150,7 @@ chaid_fit <- function(data,
       predictor_info = prepared$predictor_info,
       class_levels = class.levels
     )
+    tree <- chaid_renumber_nodes_bfs(tree)
     model$nodes <- tree$nodes
     model$edges <- tree$edges
     model$.node_metadata <- tree$node_metadata
@@ -964,6 +965,81 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
     category_merge_map = merge_history_to_data(state$merge_history),
     low_expected = state$low_expected
   )
+}
+
+#' Renumber tree nodes into breadth-first order (top to bottom, left to right).
+#'
+#' grow_chaid_tree allocates ids as it recurses (depth-first), so a tree that
+#' branches on more than one node per level gets interleaved ids -- level 1 can
+#' read 2, 5, 8 because node 2's whole subtree is numbered before its sibling.
+#' Renumber once, after the tree is grown, so every id the user sees (chart chip,
+#' the node columns in the split / evidence / merge tables, and the node rules)
+#' counts 1, 2, 3 ... down the levels.
+#'
+#' Every structure keyed by node id is remapped together: a partial remap would
+#' desynchronise the report tables from the chart, and prediction reads the same
+#' ids through chaid_build_split_index.
+#'
+#' @param tree The list returned by grow_chaid_tree.
+#' @return The same list with node ids renumbered breadth-first.
+chaid_renumber_nodes_bfs <- function(tree) {
+  nodes <- tree$nodes
+  if (is.null(nodes) || nrow(nodes) < 2) {
+    return(tree)
+  }
+  edges <- tree$edges
+  # Children in creation order, which is the group order = left to right.
+  children.of <- if (is.null(edges) || nrow(edges) == 0) {
+    list()
+  } else {
+    split(as.integer(edges$child_id), as.character(edges$parent_id))
+  }
+
+  visit.order <- integer(0)
+  queue <- 1L
+  while (length(queue) > 0) {
+    current <- queue[1]
+    queue <- queue[-1]
+    visit.order <- c(visit.order, current)
+    kids <- children.of[[as.character(current)]]
+    if (!is.null(kids)) {
+      queue <- c(queue, kids)
+    }
+  }
+  # Defensive: keep the map total even if a node were somehow unreachable, so no
+  # id can silently map to NA.
+  orphans <- setdiff(as.integer(nodes$node_id), visit.order)
+  visit.order <- c(visit.order, sort(orphans))
+
+  new.of <- stats::setNames(seq_along(visit.order), as.character(visit.order))
+  remap <- function(v) {
+    out <- unname(new.of[as.character(v)])
+    as.integer(ifelse(is.na(v), NA_integer_, out))
+  }
+
+  nodes$node_id <- remap(nodes$node_id)
+  nodes$parent_id <- remap(nodes$parent_id)
+  # Reorder rows too; class_distribution is a list column and travels with them.
+  nodes <- nodes[order(nodes$node_id), , drop = FALSE]
+  rownames(nodes) <- NULL
+  tree$nodes <- nodes
+
+  if (!is.null(edges) && nrow(edges) > 0) {
+    edges$parent_id <- remap(edges$parent_id)
+    edges$child_id <- remap(edges$child_id)
+    edges <- edges[order(edges$parent_id, edges$child_id), , drop = FALSE]
+    rownames(edges) <- NULL
+    tree$edges <- edges
+  }
+
+  if (!is.null(tree$category_merge_map) && nrow(tree$category_merge_map) > 0) {
+    tree$category_merge_map$node_id <- remap(tree$category_merge_map$node_id)
+  }
+
+  if (!is.null(tree$node_metadata) && length(tree$node_metadata) > 0) {
+    names(tree$node_metadata) <- as.character(remap(names(tree$node_metadata)))
+  }
+  tree
 }
 
 #' Convert merge-history records to a stable data frame.
