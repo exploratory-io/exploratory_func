@@ -920,33 +920,146 @@ traverse_chaid_tree <- function(row, model) {
   }
 }
 
-#' Predict from a fitted classification CHAID tree.
+#' Build a per-node lookup mapping a prepared predictor value to its child node.
+#'
+#' Precomputes, once per model, what `traverse_chaid_tree()` recomputes for every
+#' row at every tree level (the node row lookup, the split-group scan and the
+#' edge scan). A value maps to `NA` whenever the row-at-a-time traversal would
+#' stop at this node -- the value belongs to no group or to more than one group,
+#' or its edge label does not match exactly one edge.
 #'
 #' @param model A fitted `exploratory_chaid` model.
-#' @param new_data New predictor data.
-#' @param type Prediction output type: `class`, `prob`, `node`, or `all`.
+#' @return A list keyed by node id, each `list(variable, lut)`.
+chaid_build_split_index <- function(model) {
+  index <- list()
+  node.ids <- model$nodes$node_id
+  for (position in seq_along(node.ids)) {
+    node.id <- node.ids[[position]]
+    metadata <- model$.node_metadata[[as.character(node.id)]]
+    if (isTRUE(model$nodes$is_terminal[[position]]) || is.null(metadata) ||
+        is.null(metadata$split_variable) || is.null(metadata$split_groups) ||
+        is.null(metadata$group_labels)) {
+      next
+    }
+    groups <- metadata$split_groups
+    group.sizes <- vapply(groups, length, integer(1))
+    if (sum(group.sizes) == 0) {
+      next
+    }
+    values <- as.character(unlist(groups, use.names = FALSE))
+    group.of <- rep(seq_along(groups), group.sizes)
+    labels.of <- as.character(metadata$group_labels)[group.of]
+
+    is.parent.edge <- model$edges$parent_id == node.id
+    edge.labels <- as.character(model$edges$label[is.parent.edge])
+    edge.children <- as.integer(model$edges$child_id[is.parent.edge])
+    # Mirror the `sum(edge.rows) != 1` guard: only an unambiguous edge advances.
+    child.of <- vapply(labels.of, function(label) {
+      matched <- which(!is.na(label) & edge.labels == label)
+      if (length(matched) == 1L) edge.children[[matched]] else NA_integer_
+    }, integer(1), USE.NAMES = FALSE)
+    # Mirror the `length(group.index) != 1` guard: a value listed in more than
+    # one group is ambiguous, so the row stops here.
+    ambiguous <- duplicated(values) | duplicated(values, fromLast = TRUE)
+    child.of[ambiguous] <- NA_integer_
+
+    keep <- !duplicated(values)
+    lookup <- child.of[keep]
+    names(lookup) <- values[keep]
+    index[[as.character(node.id)]] <- list(
+      variable = metadata$split_variable,
+      lut = lookup
+    )
+  }
+  index
+}
+
+#' Assign prepared rows to their terminal nodes, vectorized over rows.
+#'
+#' Walks the tree once per node instead of once per row: each node maps its own
+#' row block to child nodes with a single vectorized lookup. Produces exactly the
+#' same node ids as calling `traverse_chaid_tree()` per row.
+#'
+#' @param prepared.data Output of `prepare_chaid_new_data()`.
+#' @param model A fitted `exploratory_chaid` model.
+#' @param split.index Optional precomputed `chaid_build_split_index()` result.
+#' @return An integer vector of node ids, one per row.
+chaid_assign_nodes <- function(prepared.data, model, split.index = NULL) {
+  row.count <- nrow(prepared.data)
+  if (row.count == 0) {
+    return(integer())
+  }
+  if (is.null(split.index)) {
+    split.index <- chaid_build_split_index(model)
+  }
+  assigned <- integer(row.count)
+  pending <- list(list(node = 1L, rows = seq_len(row.count)))
+  while (length(pending) > 0) {
+    current <- pending[[length(pending)]]
+    pending[[length(pending)]] <- NULL
+    rows <- current$rows
+    if (length(rows) == 0L) {
+      next
+    }
+    node.id <- current$node
+    if (is.na(match(node.id, model$nodes$node_id))) {
+      assigned[rows] <- 1L
+      next
+    }
+    entry <- split.index[[as.character(node.id)]]
+    if (is.null(entry) || !(entry$variable %in% names(prepared.data))) {
+      assigned[rows] <- as.integer(node.id)
+      next
+    }
+    children <- unname(entry$lut[as.character(prepared.data[[entry$variable]])[rows]])
+    stops.here <- is.na(children)
+    if (any(stops.here)) {
+      assigned[rows[stops.here]] <- as.integer(node.id)
+    }
+    if (!all(stops.here)) {
+      moving.rows <- rows[!stops.here]
+      moving.children <- children[!stops.here]
+      for (child in unique(moving.children)) {
+        pending[[length(pending) + 1L]] <- list(
+          node = as.integer(child),
+          rows = moving.rows[moving.children == child]
+        )
+      }
+    }
+  }
+  assigned
+}
+
+#' Return the node-by-class probability matrix of a fitted CHAID model.
+#'
+#' Built once per call so predictions can index it, instead of `rbind`-ing one
+#' distribution per predicted row.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @return A matrix with one row per tree node.
+chaid_class_distribution_matrix <- function(model) {
+  do.call(rbind, model$nodes$class_distribution)
+}
+
+#' Predict from already-prepared CHAID predictor data.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @param prepared.data Output of `prepare_chaid_new_data()`.
+#' @param type Prediction output type.
+#' @param split.index Optional precomputed `chaid_build_split_index()` result.
 #' @return A vector or data frame of predictions.
-#' @export
-chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'all')) {
-  if (!inherits(model, 'exploratory_chaid')) {
-    stop('model must be an exploratory_chaid object')
-  }
+chaid_predict_prepared <- function(model, prepared.data,
+                                   type = c('class', 'prob', 'node', 'all'),
+                                   split.index = NULL) {
   prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all'))
-  prepared.data <- prepare_chaid_new_data(new_data, model)
-  node.ids <- if (nrow(prepared.data) == 0) {
-    integer()
-  } else {
-    vapply(seq_len(nrow(prepared.data)), function(index) {
-      traverse_chaid_tree(prepared.data[index, , drop = FALSE], model)
-    }, integer(1))
-  }
+  node.ids <- chaid_assign_nodes(prepared.data, model, split.index)
   node.rows <- match(node.ids, model$nodes$node_id)
   predicted.classes <- as.character(model$nodes$predicted_class[node.rows])
   probability.matrix <- if (length(node.ids) == 0) {
     matrix(numeric(), nrow = 0, ncol = length(model$class_levels),
            dimnames = list(NULL, paste0('.pred_prob_', model$class_levels)))
   } else {
-    do.call(rbind, model$nodes$class_distribution[node.rows])
+    chaid_class_distribution_matrix(model)[node.rows, , drop = FALSE]
   }
   colnames(probability.matrix) <- paste0('.pred_prob_', model$class_levels)
 
@@ -968,6 +1081,22 @@ chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'al
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
+}
+
+#' Predict from a fitted classification CHAID tree.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @param new_data New predictor data.
+#' @param type Prediction output type: `class`, `prob`, `node`, or `all`.
+#' @return A vector or data frame of predictions.
+#' @export
+chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'all')) {
+  if (!inherits(model, 'exploratory_chaid')) {
+    stop('model must be an exploratory_chaid object')
+  }
+  prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all'))
+  prepared.data <- prepare_chaid_new_data(new_data, model)
+  chaid_predict_prepared(model, prepared.data, type = prediction.type)
 }
 
 #' Predict using the standard S3 prediction interface.

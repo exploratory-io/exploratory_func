@@ -306,9 +306,9 @@ chaid_log_loss <- function(actual, prediction, class_levels) {
   }
   actual_index <- match(as.character(actual), class_levels)
   probability_matrix <- as.matrix(prediction[, probability_columns, drop = FALSE])
-  valid <- !is.na(actual_index) & apply(probability_matrix, 1, function(row) {
-    all(is.finite(row))
-  })
+  # Vectorized equivalent of apply(probability_matrix, 1, function(row) all(is.finite(row))).
+  # This runs once per predictor per permutation repeat, so the row-wise apply was hot.
+  valid <- !is.na(actual_index) & rowSums(!is.finite(probability_matrix)) == 0
   if (!any(valid)) {
     return(NA_real_)
   }
@@ -344,8 +344,20 @@ chaid_permutation_importance <- function(model, data, target, predictors,
   }
   evaluation_data_frame <- data[valid, , drop = FALSE]
   actual <- actual[valid]
+  # Prepare the predictors and build the split lookup ONCE. Preparation is
+  # element-wise, so permuting a prepared column is identical to preparing a
+  # permuted column -- this just avoids redoing both for every repeat.
+  prepared_data <- tryCatch(
+    prepare_chaid_new_data(evaluation_data_frame, model),
+    error = function(e) NULL
+  )
+  if (is.null(prepared_data)) {
+    return(result)
+  }
+  split_index <- chaid_build_split_index(model)
   baseline_prediction <- tryCatch(
-    chaid_predict(model, evaluation_data_frame, type = 'all'),
+    chaid_predict_prepared(model, prepared_data, type = 'all',
+                           split.index = split_index),
     error = function(e) NULL
   )
   if (is.null(baseline_prediction)) {
@@ -362,17 +374,32 @@ chaid_permutation_importance <- function(model, data, target, predictors,
     set.seed(1L)
   }
   repeat_count <- max(1L, as.integer(repeats))
+  # Permuting a predictor the tree never splits on cannot change a single
+  # prediction, so its drop is exactly 0 on every repeat (importance 0,
+  # std_error 0). Detect those up front and skip their predictions entirely.
+  # The RNG is still advanced identically, so every reported number stays
+  # bit-for-bit the same as the per-predictor-prediction implementation.
+  split_variables <- unique(unlist(
+    lapply(model$.node_metadata, function(metadata) metadata$split_variable),
+    use.names = FALSE
+  ))
+  evaluation_row_count <- nrow(prepared_data)
   rows <- lapply(predictors, function(variable) {
     if (!variable %in% names(evaluation_data_frame)) {
       return(NULL)
     }
+    affects_prediction <- variable %in% split_variables &&
+      variable %in% names(prepared_data)
     drops <- vapply(seq_len(repeat_count), function(iteration) {
-      permuted_data <- evaluation_data_frame
-      permuted_data[[variable]] <- permuted_data[[variable]][
-        sample.int(nrow(permuted_data))
-      ]
+      permutation <- sample.int(evaluation_row_count)
+      if (!affects_prediction) {
+        return(0)
+      }
+      permuted_data <- prepared_data
+      permuted_data[[variable]] <- permuted_data[[variable]][permutation]
       permuted_prediction <- tryCatch(
-        chaid_predict(model, permuted_data, type = 'all'),
+        chaid_predict_prepared(model, permuted_data, type = 'all',
+                               split.index = split_index),
         error = function(e) NULL
       )
       if (is.null(permuted_prediction)) {
