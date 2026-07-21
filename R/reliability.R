@@ -317,6 +317,20 @@ reliability_observed_item_statistics <- function(prepared_data) {
   })
 }
 
+reliability_observed_item_total_correlation <- function(prepared_data) {
+  raw_r_vec <- stats::setNames(rep(NA_real_, ncol(prepared_data)),
+                               colnames(prepared_data))
+  raw_alpha_object <- tryCatch(
+    suppressWarnings(psych::alpha(prepared_data, check.keys = FALSE, warnings = FALSE)),
+    error = function(e) NULL)
+  if (!is.null(raw_alpha_object) && !is.null(raw_alpha_object$item.stats$raw.r)) {
+    raw_stats <- raw_alpha_object$item.stats
+    raw_names <- sub("-$", "", rownames(raw_stats))
+    raw_r_vec[raw_names] <- raw_stats$raw.r
+  }
+  raw_r_vec
+}
+
 reliability_extract_key_signs <- function(alpha_object, item_names) {
   signs <- stats::setNames(rep(1, length(item_names)), item_names)
   keys <- if (!is.null(alpha_object)) alpha_object$keys else NULL
@@ -517,29 +531,20 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       mstats <- matrix_alpha_object$item.stats
       r_cor_vec[rownames(mstats)] <- mstats$r.cor
     }
-    # raw.r is an observed-data statistic and is exposed for Pearson only.
-    raw_r_vec <- stats::setNames(rep(NA_real_, length(colnames(r))), colnames(r))
-    if (selected_method == "pearson" && !is.null(raw_alpha_object) &&
-        !is.null(raw_alpha_object$item.stats$raw.r)) {
-      rstats <- raw_alpha_object$item.stats
-      raw_names <- sub("-$", "", rownames(rstats))
-      raw_r_vec[raw_names] <- rstats$raw.r
-    }
+    # raw.r is the observed-data item-total correlation. It is available for
+    # every correlation method, including mixed and polychoric analyses; the
+    # matrix-based statistics above still use the selected correlation method.
+    raw_r_vec <- reliability_observed_item_total_correlation(prepared_data)
 
     item_statistics <- observed_stats %>%
       dplyr::mutate(
+        raw.r = raw_r_vec[variable],
         std.r = std_item_total[variable],
         r.drop = item_rest[variable],
         r.cor = r_cor_vec[variable],
         interpretation = reliability_classify_item_total(item_rest[variable])) %>%
-      dplyr::select(variable, r.drop, std.r, r.cor, n, missing_n, mean, sd,
+      dplyr::select(variable, r.drop, raw.r, std.r, r.cor, n, missing_n, mean, sd,
                     interpretation)
-    if (selected_method == "pearson") {
-      item_statistics <- item_statistics %>%
-        dplyr::mutate(raw.r = raw_r_vec[variable]) %>%
-        dplyr::select(variable, r.drop, raw.r, std.r, r.cor, n, missing_n, mean, sd,
-                      interpretation)
-    }
 
     alpha_if_deleted <- reliability_alpha_if_deleted(r, standardized_alpha)
 
