@@ -1784,10 +1784,13 @@ adjusted_r_squared <- function(rsq, n_observations, df_residual) {
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#'   NULL (default) evaluates the whole vector, mirroring rmse().
 #' @export
-mae <- function(actual, predicted, is_test_data) {
-  actual <- actual[is_test_data]
-  predicted <- predicted[is_test_data]
+mae <- function(actual, predicted, is_test_data=NULL) {
+  if (!is.null(is_test_data)) {
+    actual <- actual[is_test_data]
+    predicted <- predicted[is_test_data]
+  }
   ret <- mean(abs(actual-predicted), na.rm=TRUE)
   ret
 }
@@ -3213,6 +3216,35 @@ auroc <- function(score, bool) {
   n2 <- sum(bool)
   U  <- sum(rank(score)[!bool]) - n1 * (n1 + 1) / 2
   return(1 - U / n1 / n2)
+}
+
+#' Calculates area under the Precision-Recall curve. (PR AUC)
+#' Unlike ROC AUC, the PR AUC baseline is the positive rate itself, which makes it
+#' a better discrimination measure than ROC AUC when the positive class is rare.
+#' @param score - Vector of predicted score/probability for the positive class.
+#' @param bool - Logical vector. TRUE is the positive class.
+#' @return Area under the PR curve, or NA when it is undefined (no positive or no
+#'   negative case, or nothing left after removing NAs).
+#' @export
+aupr <- function(score, bool) {
+  not_na <- !(is.na(score) | is.na(bool)) # Index to filter out score-bool pairs with NA in either of them.
+  bool <- bool[not_na]
+  score <- score[not_na]
+  # PR AUC is undefined without both classes present.
+  if (length(bool) == 0 || !any(bool) || all(bool)) {
+    return(NA_real_)
+  }
+  ordered <- order(score, decreasing = TRUE)
+  bool <- bool[ordered]
+  tp <- cumsum(bool)
+  fp <- cumsum(!bool)
+  recall <- tp / sum(bool)
+  precision <- tp / (tp + fp)
+  # Trapezoid over the PR curve. The curve starts at recall 0 with precision 1
+  # by convention, so that the first step is measured from there.
+  previous_recall <- c(0, recall[-length(recall)])
+  previous_precision <- c(1, precision[-length(precision)])
+  sum((recall - previous_recall) * (precision + previous_precision) / 2)
 }
 
 #' Calculates time-dependent AUC for survival prediction.

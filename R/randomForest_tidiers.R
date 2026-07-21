@@ -1365,7 +1365,7 @@ rf_evaluation_by_class <- function(data, ...) {
 # Generates Analytics View Summary table for ranger and rpart.
 #' wrapper for tidy type evaluation
 #' @export
-rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, binary_classification_threshold = 0.5, report_metrics = FALSE, ...) {
   # Filter out the rows from failed models.
   # This is working depending on rowwise grouping. (Note for when we move out of it.)
   filtered <- data %>% dplyr::filter(!is.null(model) & !"error" %in% class(model))
@@ -1383,8 +1383,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # though for conf_map, we might want to write one implementation here, to avoid having to write the same thing for each model. TODO: Do it.
   if (!is.null(model)) {
     training_ret <- switch(type,
-                           evaluation = rf_evaluation(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...),
-                           evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...),
+                           evaluation = rf_evaluation(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, report_metrics = report_metrics, ...),
+                           evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, report_metrics = report_metrics, ...),
                            conf_mat = data %>% tidy_rowwise(model, type = "conf_mat", binary_classification_threshold = binary_classification_threshold, ...))
     if (length(test_index) > 0 && nrow(training_ret) > 0) {
       training_ret$is_test_data <- FALSE
@@ -1456,6 +1456,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                                 r_squared = rsq,
                                 n = test_n
                                 )
+              # Mirror the training-side glance.rpart() extra column so the test row
+              # has the same columns (#37156). Without this the bound result would
+              # carry NA for MAE on the test row.
+              if (report_metrics) {
+                ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+              }
 
               if(pretty.name){
                 map = list(
@@ -1464,6 +1470,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                            `Rows` = as.symbol("n")
                            )
                 ret <- ret %>% dplyr::rename(!!!map)
+                if (report_metrics) {
+                  ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+                }
               }
 
               ret
@@ -1481,7 +1490,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                   predicted_probability <- test_pred_ret$predicted_probability
                 }
                 is_rpart <- "rpart" %in% class(model_object)
-                ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = is_rpart)
+                ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = is_rpart, report_metrics = report_metrics)
               }
               else {
                 if ("xgboost_exp" %in% class(model_object)) {
@@ -1492,6 +1501,37 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                 }
                 ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
                                        "predicted", "actual", pretty.name = pretty.name)
+                # Mirror the training-side extra columns (#37156) so training and test
+                # rows share a column set. Balanced accuracy needs labels only. The
+                # Macro AUCs need per-class probabilities, which the model-agnostic
+                # test prediction does not carry, so score the test rows directly when
+                # the model supports it; otherwise the columns stay NA rather than
+                # disappearing.
+                if (report_metrics) {
+                  balanced_accuracy <- multiclass_balanced_accuracy(actual, predicted)
+                  test_probability <- tryCatch({
+                    test_rows <- df$.test_index[[1]]
+                    source_data <- df$source.data[[1]]
+                    if (!is.null(source_data) && length(test_rows) > 0 && "rpart" %in% class(model_object)) {
+                      predict(model_object, newdata = source_data[test_rows, , drop = FALSE], type = "prob")
+                    } else {
+                      NULL
+                    }
+                  }, error = function(e) NULL)
+                  auc_by_class <- multiclass_auc_by_class(actual, test_probability)
+                  macro_roc_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$roc_auc, na.rm = TRUE) else NA_real_
+                  macro_pr_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$pr_auc, na.rm = TRUE) else NA_real_
+                  extra <- if (pretty.name) {
+                    tibble::tibble(`Balanced Accuracy` = balanced_accuracy,
+                                   `Macro ROC AUC` = macro_roc_auc,
+                                   `Macro PR AUC` = macro_pr_auc)
+                  } else {
+                    tibble::tibble(balanced_accuracy = balanced_accuracy,
+                                   macro_roc_auc = macro_roc_auc,
+                                   macro_pr_auc = macro_pr_auc)
+                  }
+                  ret <- dplyr::bind_cols(ret, extra)
+                }
               }
               ret
             }
@@ -1507,7 +1547,23 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
             }
 
-            dplyr::bind_rows(lapply(levels(actual), per_level))
+            ret <- dplyr::bind_rows(lapply(levels(actual), per_level))
+            # Mirror the training-side extra columns (#37156). See the multiclass
+            # evaluation branch above for why the test probabilities are scored here.
+            if (report_metrics && nrow(ret) > 0) {
+              test_probability <- tryCatch({
+                test_rows <- df$.test_index[[1]]
+                source_data <- df$source.data[[1]]
+                if (!is.null(source_data) && length(test_rows) > 0 && "rpart" %in% class(model_object)) {
+                  predict(model_object, newdata = source_data[test_rows, , drop = FALSE], type = "prob")
+                } else {
+                  NULL
+                }
+              }, error = function(e) NULL)
+              ret <- dplyr::bind_cols(ret, evaluate_by_class_report_metrics(
+                actual, predicted, levels(actual), test_probability, pretty.name))
+            }
+            ret
           },
           conf_mat = {
             predicted <- get_test_predicted_labels(model_object, binary_classification_threshold)
@@ -2677,9 +2733,91 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   ret
 }
 
+# Balanced accuracy for a multiclass problem = the unweighted mean of the per-class
+# recall. Unlike plain accuracy it gives a small category the same weight as a large
+# one, so a model that only predicts the majority category cannot score well.
+# Labels only -- no probability needed, so it works for both training and test data.
+# Added for the Decision Tree report (#37156).
+multiclass_balanced_accuracy <- function(actual, predicted) {
+  actual <- as.character(actual)
+  predicted <- as.character(predicted)
+  valid <- !is.na(actual) & !is.na(predicted)
+  actual <- actual[valid]
+  predicted <- predicted[valid]
+  if (length(actual) == 0) {
+    return(NA_real_)
+  }
+  classes <- sort(unique(actual))
+  recalls <- vapply(classes, function(klass) {
+    n_actual <- sum(actual == klass)
+    if (n_actual == 0) NA_real_ else sum(actual == klass & predicted == klass) / n_actual
+  }, FUN.VALUE = numeric(1))
+  mean(recalls, na.rm = TRUE)
+}
+
+# One-vs-Rest ROC AUC / PR AUC per category, from a probability matrix whose columns
+# are named after the categories. Returns a data.frame(class, roc_auc, pr_auc) which
+# is also the basis of the Macro ROC AUC / Macro PR AUC (their unweighted means).
+# Added for the Decision Tree report (#37156).
+multiclass_auc_by_class <- function(actual, probability_matrix) {
+  if (is.null(probability_matrix) || !is.matrix(probability_matrix) || is.null(colnames(probability_matrix))) {
+    return(data.frame(class = character(), roc_auc = numeric(), pr_auc = numeric(), stringsAsFactors = FALSE))
+  }
+  actual <- as.character(actual)
+  classes <- colnames(probability_matrix)
+  rows <- lapply(classes, function(klass) {
+    score <- probability_matrix[, klass]
+    positive <- actual == klass
+    data.frame(class = klass,
+               roc_auc = tryCatch(auroc(score, positive), error = function(e) NA_real_),
+               pr_auc = tryCatch(aupr(score, positive), error = function(e) NA_real_),
+               stringsAsFactors = FALSE)
+  })
+  dplyr::bind_rows(rows)
+}
+
+# Extra per-category columns appended to the "Summary by Class" table for the
+# Decision Tree report (#37156): balanced accuracy, One-vs-Rest ROC AUC / PR AUC,
+# and the category's share of the evaluated rows (which is also the PR curve's
+# baseline precision). Rows come back in the order of `classes` so the caller can
+# bind them next to its own per-class rows.
+# probability_matrix may be NULL, in which case the AUC columns are NA.
+evaluate_by_class_report_metrics <- function(actual, predicted, classes, probability_matrix, pretty.name = FALSE) {
+  actual_chr <- as.character(actual)
+  predicted_chr <- as.character(predicted)
+  valid <- !is.na(actual_chr) & !is.na(predicted_chr)
+  actual_chr <- actual_chr[valid]
+  predicted_chr <- predicted_chr[valid]
+  total <- length(actual_chr)
+  auc_by_class <- multiclass_auc_by_class(actual, probability_matrix)
+  rows <- lapply(classes, function(klass) {
+    tp <- sum(actual_chr == klass & predicted_chr == klass)
+    fn <- sum(actual_chr == klass & predicted_chr != klass)
+    tn <- sum(actual_chr != klass & predicted_chr != klass)
+    fp <- sum(actual_chr != klass & predicted_chr == klass)
+    sensitivity <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
+    specificity <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
+    matched <- auc_by_class[auc_by_class$class == klass, , drop = FALSE]
+    data.frame(
+      balanced_accuracy = if (is.na(sensitivity) || is.na(specificity)) NA_real_ else (sensitivity + specificity) / 2,
+      roc_auc = if (nrow(matched) > 0) matched$roc_auc[[1]] else NA_real_,
+      pr_auc = if (nrow(matched) > 0) matched$pr_auc[[1]] else NA_real_,
+      overall_share = if (total > 0) (tp + fn) / total else NA_real_,
+      stringsAsFactors = FALSE)
+  })
+  ret <- dplyr::bind_rows(rows)
+  if (pretty.name) {
+    ret <- ret %>% dplyr::rename(`Balanced Accuracy` = balanced_accuracy,
+                                 `ROC AUC` = roc_auc,
+                                 `PR AUC` = pr_auc,
+                                 `Overall Share` = overall_share)
+  }
+  ret
+}
+
 #' @export
 # not really an external function but exposing for sharing with rpart.R TODO: find better way.
-evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE, is_rpart = FALSE) {
+evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE, is_rpart = FALSE, report_metrics = FALSE) {
   # calculate AUC from ROC
   if (is_rpart && is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
     # For rpart, level for "TRUE" is 2, and that does not work with the logic in else clause.
@@ -2710,7 +2848,38 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   else { # Because get_classification_type() considers it binary classification only when target is logical, it should never come here, but cowardly keeping the code for now.
     ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
   }
-  if (pretty.name) {
+  # report_metrics is opt-in (Analytics Report for the Decision Tree, #37156).
+  # The extra metrics are appended only when the caller asks for them, so the
+  # Summary table of every other model keeps its current set of columns.
+  # ROC AUC / PR AUC evaluate discrimination across all thresholds, while
+  # specificity and balanced accuracy describe the currently configured threshold.
+  if (report_metrics) {
+    pr_auc <- aupr(predicted_probability, actual_for_roc)
+    # Specificity = TN / (TN + FP). actual_for_roc is TRUE for the positive class,
+    # so the negative side is its complement. predicted is a label vector, which is
+    # compared against the same positive class used for actual_for_roc.
+    predicted_positive <- if (is.logical(predicted)) predicted else as.character(predicted) == "TRUE"
+    valid <- !(is.na(actual_for_roc) | is.na(predicted_positive))
+    tn <- sum(!actual_for_roc[valid] & !predicted_positive[valid], na.rm = TRUE)
+    fp <- sum(!actual_for_roc[valid] & predicted_positive[valid], na.rm = TRUE)
+    tp <- sum(actual_for_roc[valid] & predicted_positive[valid], na.rm = TRUE)
+    fn <- sum(actual_for_roc[valid] & !predicted_positive[valid], na.rm = TRUE)
+    specificity <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
+    sensitivity <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
+    balanced_accuracy <- if (is.na(specificity) || is.na(sensitivity)) NA_real_ else (specificity + sensitivity) / 2
+    if (pretty.name) {
+      # Spec renames AUC to ROC AUC so it reads as a pair with PR AUC.
+      ret <- dplyr::bind_cols(
+        tibble::tibble(`ROC AUC` = auc, `PR AUC` = pr_auc), ret,
+        tibble::tibble(`Balanced Accuracy` = balanced_accuracy, `Specificity` = specificity))
+    }
+    else {
+      ret <- dplyr::bind_cols(
+        tibble::tibble(roc_auc = auc, pr_auc = pr_auc), ret,
+        tibble::tibble(balanced_accuracy = balanced_accuracy, specificity = specificity))
+    }
+  }
+  else if (pretty.name) {
     ret <- dplyr::bind_cols(tibble::tibble(AUC = auc), ret)
   }
   else {
@@ -2968,7 +3137,7 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
 
 # This is used from Analytics View only when classification type is regression.
 #' @export
-glance.rpart <- function(x, pretty.name = FALSE, ...) {
+glance.rpart <- function(x, pretty.name = FALSE, report_metrics = FALSE, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -2982,6 +3151,14 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
     root_mean_square_error = rmse_val,
     n = length(x$y)
   )
+  # Opt-in extra metric for the Decision Tree report (#37156). MAE is the typical
+  # absolute error, which is easier to read than RMSE because it is not inflated
+  # by a few large errors. The matching test-data branch in
+  # rf_evaluation_training_and_test() adds the same column, so training and test
+  # rows keep an identical column set.
+  if (report_metrics) {
+    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+  }
 
   if(pretty.name){
     map = list(
@@ -2991,6 +3168,9 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
+    if (report_metrics) {
+      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+    }
   }
   ret
 }
@@ -4021,7 +4201,7 @@ build_rpart_tree_nodes <- function(x) {
 
 #' @export
 #' @param type "importance", "evaluation", "conf_mat" or "tree_nodes". Feature importance, evaluated scores, confusion matrix of training data, or per-node data for the interactive decision tree chart.
-tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, report_metrics = FALSE, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
     ret <- data.frame()
     return(ret)
@@ -4047,7 +4227,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_class
 
       if(x$classification_type == "regression"){
         actual <- x$y
-        glance(x, pretty.name = pretty.name, ...)
+        glance(x, pretty.name = pretty.name, report_metrics = report_metrics, ...)
       } else {
         actual <- get_actual_class_rpart(x)
         predicted <- if (x$classification_type == "binary") {
@@ -4069,12 +4249,32 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_class
           else {
             predicted_probability <- predict(x)[,1]
           }
-          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = TRUE)
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = TRUE, report_metrics = report_metrics)
         }
         else {
           # multiclass case
           # TODO: rpart returns probability of each class, but we are not fully making use of them.
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+          # Opt-in extra metrics for the Decision Tree report (#37156). Balanced
+          # accuracy comes from the labels; the Macro AUCs average the One-vs-Rest
+          # value of every category, which needs the per-class probabilities that
+          # rpart does return (the TODO above).
+          if (report_metrics) {
+            balanced_accuracy <- multiclass_balanced_accuracy(actual, predicted)
+            auc_by_class <- multiclass_auc_by_class(actual, tryCatch(predict(x), error = function(e) NULL))
+            macro_roc_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$roc_auc, na.rm = TRUE) else NA_real_
+            macro_pr_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$pr_auc, na.rm = TRUE) else NA_real_
+            extra <- if (pretty.name) {
+              tibble::tibble(`Balanced Accuracy` = balanced_accuracy,
+                             `Macro ROC AUC` = macro_roc_auc,
+                             `Macro PR AUC` = macro_pr_auc)
+            } else {
+              tibble::tibble(balanced_accuracy = balanced_accuracy,
+                             macro_roc_auc = macro_roc_auc,
+                             macro_pr_auc = macro_pr_auc)
+            }
+            ret <- dplyr::bind_cols(ret, extra)
+          }
         }
         ret
       }
@@ -4100,7 +4300,15 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, binary_class
       if (length(ylevels) == 2 & all(ylevels == c("FALSE", "TRUE"))) {
         ylevels <- c("TRUE", "FALSE")
       }
-      dplyr::bind_rows(lapply(ylevels, per_level))
+      ret <- dplyr::bind_rows(lapply(ylevels, per_level))
+      # Opt-in extra per-category metrics for the Decision Tree report (#37156).
+      # Balanced accuracy and the share are computed from labels; ROC AUC / PR AUC
+      # are One-vs-Rest and use the per-class probabilities from the model.
+      if (report_metrics && nrow(ret) > 0) {
+        ret <- dplyr::bind_cols(ret, evaluate_by_class_report_metrics(
+          actual, predicted, ylevels, tryCatch(predict(x), error = function(e) NULL), pretty.name))
+      }
+      ret
     },
     conf_mat = {
       # return confusion matrix
