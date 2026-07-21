@@ -234,12 +234,42 @@ reliability_standardized_item_total <- function(r) {
   }, numeric(1)), items)
 }
 
-reliability_alpha_if_deleted <- function(correlation_matrix, current_alpha) {
+# Alpha for each "this item removed" subset.
+#
+# The alpha reported to the user (display_alpha) is the RAW (covariance-based)
+# alpha for the pearson method and the correlation-matrix alpha otherwise. The
+# if-dropped alphas must be produced by the SAME estimator, or the report shows
+# two different scales side by side (issue #37175: the prose said 0.798 while the
+# table said 0.791). Pass `raw_data` for the pearson case to get raw alpha.
+reliability_alpha_if_deleted <- function(correlation_matrix, current_alpha,
+                                         raw_data = NULL, check_keys = FALSE) {
   item_names <- colnames(correlation_matrix)
+  raw_alpha_for_subset <- function(keep_names) {
+    if (is.null(raw_data) || length(keep_names) < 2) {
+      return(NA_real_)
+    }
+    subset_data <- raw_data[, keep_names, drop = FALSE]
+    subset_object <- tryCatch(
+      suppressWarnings(psych::alpha(subset_data, check.keys = check_keys,
+                                    warnings = FALSE)),
+      error = function(e) NULL)
+    if (is.null(subset_object)) {
+      return(NA_real_)
+    }
+    reliability_safe_number(subset_object$total$raw_alpha)
+  }
   purrr::map_dfr(item_names, function(item) {
     keep <- colnames(correlation_matrix) != item
     reduced <- correlation_matrix[keep, keep, drop = FALSE]
-    deleted_alpha <- reliability_alpha_from_correlation(reduced)
+    deleted_alpha <- if (is.null(raw_data)) {
+      reliability_alpha_from_correlation(reduced)
+    } else {
+      raw_alpha_for_subset(item_names[keep])
+    }
+    if (is.na(deleted_alpha)) {
+      # Never leave a hole in the table: fall back to the matrix-based estimate.
+      deleted_alpha <- reliability_alpha_from_correlation(reduced)
+    }
     difference <- deleted_alpha - current_alpha
     tibble::tibble(
       removed_item = item,
@@ -374,7 +404,10 @@ reliability_scale_candidates <- function(current_alpha, alpha_if_deleted, item_c
       recommendation = dplyr::if_else(difference_from_current >= 0.05,
                                       "Recommended", "Consider")
     )
-  dplyr::bind_rows(base, improvements) %>% dplyr::arrange(dplyr::desc(alpha))
+  # "Use all items" is the baseline the user compares against, so it always leads
+  # the table (issue #37175); the drop candidates follow, best alpha first.
+  improvements <- improvements %>% dplyr::arrange(dplyr::desc(alpha))
+  dplyr::bind_rows(base, improvements)
 }
 
 # ------------------------------------------------------------
@@ -546,7 +579,11 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       dplyr::select(variable, r.drop, raw.r, std.r, r.cor, n, missing_n, mean, sd,
                     interpretation)
 
-    alpha_if_deleted <- reliability_alpha_if_deleted(r, standardized_alpha)
+    # Same estimator as the alpha we display, so the report never mixes scales.
+    alpha_if_deleted <- reliability_alpha_if_deleted(
+      r, display_alpha,
+      raw_data = if (selected_method == "pearson") cleaned_df else NULL,
+      check_keys = check_keys)
 
     response_distribution <- reliability_response_distribution(cleaned_df)
 
@@ -593,7 +630,7 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       summary_table <- summary_table %>% dplyr::filter(Metric != "95% CI")
     }
 
-    scale_candidates <- reliability_scale_candidates(standardized_alpha, alpha_if_deleted,
+    scale_candidates <- reliability_scale_candidates(display_alpha, alpha_if_deleted,
                                                      ncol(cleaned_df))
 
     correlation_long <- tibble::as_tibble(as.data.frame(r), rownames = "variable_1") %>%
