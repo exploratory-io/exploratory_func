@@ -290,6 +290,10 @@ reliability_response_distribution <- function(data) {
   purrr::map_dfr(names(data), function(column_name) {
     x <- data[[column_name]]
     response_values <- reliability_response_values(x)
+    if (length(response_values) == 0) {
+      return(tibble::tibble(variable = character(), response = character(),
+                             count = integer(), proportion = double()))
+    }
     counts <- as.data.frame(table(response_values, useNA = "no"), stringsAsFactors = FALSE)
     names(counts) <- c("response", "count")
     non_missing_n <- sum(counts$count)
