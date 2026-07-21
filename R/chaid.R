@@ -1362,7 +1362,9 @@ chaid_node_summary <- function(model) {
   root.n <- model$nodes$n[model$nodes$node_id == 1L]
   data.frame(
     Node = model$nodes$node_id,
-    Rule = model$nodes$rule,
+    # tam #37177: readable form -- no "Root & " prefix, contiguous numeric bins
+    # collapsed to one inequality. The root row reads "All".
+    Rule = chaid_readable_condition(model$nodes$rule),
     Rows = model$nodes$n,
     `%` = model$nodes$n / root.n * 100,
     `Predicted Class` = model$nodes$predicted_class,
@@ -1389,7 +1391,8 @@ chaid_rule_table <- function(model) {
   terminal <- model$nodes$is_terminal
   data.frame(
     Node = model$nodes$node_id[terminal],
-    Rule = model$nodes$rule[terminal],
+    # tam #37177: see chaid_node_summary().
+    Rule = chaid_readable_condition(model$nodes$rule[terminal]),
     Prediction = model$nodes$predicted_class[terminal],
     Probability = vapply(
       model$nodes$class_distribution[terminal],
@@ -1409,6 +1412,24 @@ chaid_rule_table <- function(model) {
 chaid_category_merge_table <- function(model) {
   validate_chaid_model(model)
   merge.data <- model$category_merge_map
+  # tam #37177: a merge chain records every intermediate step, so keep only the
+  # group that survived to the split, and give both category columns a stable
+  # member order (factor level order, else alphabetical). The surviving merged
+  # group additionally collapses contiguous numeric bins into a single range.
+  merge.data <- chaid_keep_final_merges(merge.data)
+  if (nrow(merge.data) > 0) {
+    level.order <- lapply(merge.data$variable, function(variable) {
+      chaid_group_level_order(model, variable)
+    })
+    merge.data$merged_group <- vapply(seq_len(nrow(merge.data)), function(i) {
+      chaid_normalize_group_label(merge.data$merged_group[i], level.order[[i]],
+                                  collapse = TRUE)
+    }, character(1))
+    merge.data$original_categories <- vapply(seq_len(nrow(merge.data)), function(i) {
+      chaid_normalize_group_label(merge.data$original_categories[i], level.order[[i]],
+                                  collapse = FALSE, separator = ' | ')
+    }, character(1))
+  }
   data.frame(
     Node = merge.data$node_id,
     Variable = merge.data$variable,
@@ -1457,7 +1478,7 @@ chaid_split_summary <- function(model) {
 #' no numeric predictor was binned. (#37155 §4-5)
 #'
 #' @param model A fitted `exploratory_chaid` model.
-#' @return A data frame with `Node`, `Variable`, `Initial Binning`,
+#' @return A data frame with `Node`, `Variable`, `Binning Method`, `Initial Bins`,
 #'   `Final Intervals`.
 #' @export
 chaid_numeric_intervals <- function(model) {
@@ -1465,7 +1486,8 @@ chaid_numeric_intervals <- function(model) {
   empty <- data.frame(
     Node = integer(),
     Variable = character(),
-    `Initial Binning` = character(),
+    `Binning Method` = character(),
+    `Initial Bins` = integer(),
     `Final Intervals` = character(),
     check.names = FALSE,
     stringsAsFactors = FALSE
@@ -1487,11 +1509,17 @@ chaid_numeric_intervals <- function(model) {
       return(NULL)
     }
     child_labels <- edges$label[edges$parent_id == node_id]
+    # tam #37177: each child edge's label is a " + "-joined run of bins; show the
+    # range it actually covers. Binning method and bin count are separate columns.
+    child_labels <- vapply(child_labels, function(label) {
+      chaid_normalize_group_label(label, chaid_group_level_order(model, variable),
+                                  collapse = TRUE)
+    }, character(1), USE.NAMES = FALSE)
     data.frame(
       Node = node_id,
       Variable = variable,
-      `Initial Binning` = paste0(binmap[[variable]]$method, ", ",
-                                 length(binmap[[variable]]$labels), " bins"),
+      `Binning Method` = binmap[[variable]]$method,
+      `Initial Bins` = length(binmap[[variable]]$labels),
       `Final Intervals` = paste(child_labels, collapse = " / "),
       check.names = FALSE,
       stringsAsFactors = FALSE

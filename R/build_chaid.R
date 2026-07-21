@@ -100,6 +100,11 @@ exp_chaid <- function(df,
   is_target_ordered <- is.ordered(df[[target_col]])
   target_ordered_levels <- if (is_target_ordered) levels(df[[target_col]]) else NULL
 
+  # tam #37177: cleanup_df() turns every character predictor into a factor whose
+  # levels are just data-appearance order, so factor-ness has to be captured from
+  # the ORIGINAL frame. Report tables keep a real factor's declared level order
+  # and sort everything else alphabetically.
+  original_factor_levels <- lapply(Filter(is.factor, df), levels)
   clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols,
                           target_n, predictor_n, map_name = FALSE)
   clean_df <- clean_ret$clean_df
@@ -150,6 +155,7 @@ exp_chaid <- function(df,
         max_categories = max_categories
       )
       model$classification_type <- if (model$target_type == "logical") "binary" else "multi"
+      model$original_factor_levels <- original_factor_levels
 
       # Store training actual / predicted so tidy() evaluation and conf_mat can
       # reuse the shared model-agnostic evaluation helpers.
