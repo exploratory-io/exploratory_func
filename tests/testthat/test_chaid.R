@@ -279,3 +279,90 @@ test_that('counts-based chi-square matches the raw-vector path', {
   counts_lr <- exploratory:::compute_chisq_from_counts(observed, method = 'likelihood_ratio')
   expect_equal(raw_lr$statistic, counts_lr$statistic)
 })
+
+test_that('vectorized node assignment matches the row-at-a-time traversal', {
+  # chaid_assign_nodes() replaced a per-row traverse_chaid_tree() loop for
+  # performance. Guard the equivalence across the paths that make a row stop
+  # early: numeric binning, NA handling, unseen categories, root-only trees.
+  set.seed(7)
+  n <- 400
+  df <- data.frame(
+    target = sample(c('yes', 'no'), n, replace = TRUE),
+    num = c(rnorm(n - 10), rep(NA_real_, 10)),
+    fac = sample(letters[1:4], n, replace = TRUE),
+    other = sample(letters[1:3], n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$target <- ifelse(df$fac %in% c('a', 'b') & runif(n) < 0.85, 'yes', df$target)
+  df$fac[sample(n, 20)] <- NA
+
+  reference <- function(model, data) {
+    prepared <- prepare_chaid_new_data(data, model)
+    if (nrow(prepared) == 0) {
+      return(integer())
+    }
+    vapply(seq_len(nrow(prepared)), function(index) {
+      traverse_chaid_tree(prepared[index, , drop = FALSE], model)
+    }, integer(1))
+  }
+
+  for (missing_mode in c('as_category', 'exclude')) {
+    model <- suppressWarnings(chaid_fit(df, target = 'target',
+                                        predictors = c('num', 'fac', 'other'),
+                                        missing = missing_mode))
+    prepared <- prepare_chaid_new_data(df, model)
+    expect_identical(chaid_assign_nodes(prepared, model), reference(model, df))
+
+    unseen <- df
+    unseen$fac <- 'never-seen'
+    unseen$num <- unseen$num * 1000
+    expect_identical(
+      chaid_assign_nodes(prepare_chaid_new_data(unseen, model), model),
+      reference(model, unseen)
+    )
+
+    # single row and empty input
+    one <- df[1, , drop = FALSE]
+    expect_identical(chaid_assign_nodes(prepare_chaid_new_data(one, model), model),
+                     reference(model, one))
+    expect_equal(nrow(chaid_predict(model, df[0, , drop = FALSE], type = 'all')), 0)
+  }
+
+  # root-only tree: every row stops at node 1
+  flat <- data.frame(target = sample(c('yes', 'no'), n, replace = TRUE),
+                     g = sample(letters[1:3], n, replace = TRUE),
+                     stringsAsFactors = FALSE)
+  root_only <- suppressWarnings(chaid_fit(flat, target = 'target', predictors = 'g'))
+  expect_identical(chaid_assign_nodes(prepare_chaid_new_data(flat, root_only), root_only),
+                   reference(root_only, flat))
+})
+
+test_that('permutation importance is exactly zero for predictors the tree never splits on', {
+  # Those predictors are skipped without running a prediction; the drop is 0 by
+  # construction, so the reported numbers must stay exactly 0 (not merely small).
+  set.seed(13)
+  n <- 500
+  df <- data.frame(
+    target = sample(c('yes', 'no'), n, replace = TRUE),
+    driver = sample(letters[1:3], n, replace = TRUE),
+    noise1 = sample(letters[1:4], n, replace = TRUE),
+    noise2 = sample(letters[1:5], n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$target <- ifelse(df$driver == 'a' & runif(n) < 0.9, 'yes', df$target)
+  predictors <- c('driver', 'noise1', 'noise2')
+  # max_depth = 1 splits at the root only, so at most one predictor can be used
+  # and the rest are guaranteed to be untouched by the tree.
+  model <- suppressWarnings(chaid_fit(df, target = 'target', predictors = predictors,
+                                      max_depth = 1))
+  used <- unique(unlist(lapply(model$.node_metadata, function(m) m$split_variable),
+                        use.names = FALSE))
+  expect_true(length(setdiff(predictors, used)) > 0)
+
+  importance <- chaid_permutation_importance(model, df, 'target', predictors)
+  unused <- setdiff(predictors, used)
+  unused_rows <- importance[importance$variable %in% unused, , drop = FALSE]
+  expect_true(nrow(unused_rows) > 0)
+  expect_true(all(unused_rows$importance == 0))
+  expect_true(all(unused_rows$std_error == 0))
+})

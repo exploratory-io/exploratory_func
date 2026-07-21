@@ -3795,6 +3795,17 @@ build_rpart_tree_nodes <- function(x) {
   n_node <- nrow(fr)
   root_n <- fr$n[1]
 
+  # rpart numbers nodes by binary-heap position (parent k -> 2k, 2k+1), so pruning
+  # leaves gaps -- a pruned tree shows 1..7 then 14, 15. Renumber to a gapless
+  # sequence in breadth-first order (top to bottom, left to right) so the ids on
+  # the chart read the way CHAID's do. For heap indices ascending numeric order IS
+  # breadth-first order, so the new id is simply the rank of the old id.
+  # NOTE: `ids` stays the rpart id everywhere else -- frame rows, x$splits, csplit
+  # and x$where are all indexed by it; only the EMITTED node_id/parent_id change.
+  # 0-based so the root reads "Node 0", matching SPSS and the CHAID chart.
+  bfs_rank <- stats::setNames(seq_along(sort(ids)) - 1L, as.character(sort(ids)))
+  new_id_of <- function(old_id) unname(bfs_rank[as.character(old_id)])
+
   tm <- x$terms_mapping # named vector: fit-time (dotted) name -> original name
   map_name <- function(v) {
     v <- as.character(v)
@@ -3981,8 +3992,10 @@ build_rpart_tree_nodes <- function(x) {
       dist_json <- NA_character_
     }
     data.frame(
-      node_id = id,
-      parent_id = if (id == 1L) NA_integer_ else as.integer(id %/% 2L),
+      node_id = new_id_of(id),
+      parent_id = if (id == 1L) NA_integer_ else new_id_of(as.integer(id %/% 2L)),
+      # Depth still comes from the heap id; the renumbered id is sequential and
+      # no longer encodes the level.
       depth = as.integer(floor(log2(id))),
       is_leaf = is_leaf,
       edge_label = ec$edge,
@@ -4000,7 +4013,10 @@ build_rpart_tree_nodes <- function(x) {
       stringsAsFactors = FALSE
     )
   })
-  dplyr::bind_rows(rows)
+  out <- dplyr::bind_rows(rows)
+  out <- out[order(out$node_id), , drop = FALSE]
+  rownames(out) <- NULL
+  out
 }
 
 #' @export

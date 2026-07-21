@@ -37,3 +37,19 @@ test_that('CHAID fits 100k x 50 within budget', {
   ))[['elapsed']]
   expect_lt(elapsed, 90)
 })
+
+test_that('permutation importance on 20k x 20 stays fast', {
+  skip_if(Sys.getenv('EXPLORATORY_RUN_PERF') == '', 'perf tests are opt-in')
+  # Before vectorizing prediction this took ~10 minutes (201 predictions, each a
+  # per-row tree walk). Budget is generous relative to the observed ~0.4s.
+  df <- make_chaid_data(20000, 20)
+  predictors <- paste0('v', 1:20)
+  model <- suppressWarnings(
+    chaid_fit(df, target = 'target', predictors = predictors,
+              max_depth = 4, min_split = 200, min_bucket = 50)
+  )
+  elapsed <- system.time(
+    chaid_permutation_importance(model, df, 'target', predictors)
+  )[['elapsed']]
+  expect_lt(elapsed, 30)
+})

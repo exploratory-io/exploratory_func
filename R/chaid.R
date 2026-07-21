@@ -15,6 +15,7 @@
 #' @param missing Missing-value handling method.
 #' @param chi_square Chi-square statistic to use.
 #' @param bonferroni Whether to apply Bonferroni correction.
+#' @param allow_resplit Whether merged categories may be split again (stage 3).
 #' @param ordinal_predictors Predictors to treat as ordered.
 #' @param max_categories Maximum number of predictor categories.
 #' @param verbose Whether to emit diagnostic messages.
@@ -35,6 +36,7 @@ chaid_fit <- function(data,
                       missing = c('as_category', 'exclude'),
                       chi_square = c('pearson', 'likelihood_ratio'),
                       bonferroni = TRUE,
+                      allow_resplit = FALSE,
                       ordinal_predictors = NULL,
                       max_categories = 50,
                       verbose = FALSE) {
@@ -54,6 +56,7 @@ chaid_fit <- function(data,
     missing = missing,
     chi_square = chi_square,
     bonferroni = bonferroni,
+    allow_resplit = allow_resplit,
     ordinal_predictors = ordinal_predictors,
     max_categories = max_categories,
     verbose = verbose
@@ -112,6 +115,7 @@ chaid_fit <- function(data,
       merged_group = character(),
       original_categories = character(),
       merge_p_value = numeric(),
+      action = character(),
       stringsAsFactors = FALSE
     ),
     numeric_binning_map = prepared$numeric_binning_map,
@@ -146,6 +150,7 @@ chaid_fit <- function(data,
       predictor_info = prepared$predictor_info,
       class_levels = class.levels
     )
+    tree <- chaid_renumber_nodes_bfs(tree)
     model$nodes <- tree$nodes
     model$edges <- tree$edges
     model$.node_metadata <- tree$node_metadata
@@ -464,6 +469,104 @@ adjust_p_value_bonferroni <- function(p_values, bonferroni = TRUE,
   pmin(1, p_values * n_tests)
 }
 
+#' Candidate binary partitions of one compound category (CHAID stage 3).
+#'
+#' Ordered predictors may only be cut at a contiguous boundary. A
+#' non-contiguous re-split would produce numeric groups that cannot be written
+#' as an interval, which the tree branch labels, the numeric-interval table and
+#' the Show Detail range filter all require. Nominal predictors allow every
+#' partition, capped because the count is 2^(k-1) - 1.
+#'
+#' @param group.indices Column indices (into `categories`) forming one group.
+#' @param ordered Whether the predictor is ordered.
+#' @param max_resplit_size Largest nominal group that is enumerated.
+#' @return List of `list(a = indices, b = indices)`; empty when not splittable.
+chaid_resplit_partitions <- function(group.indices,
+                                     ordered = FALSE,
+                                     max_resplit_size = 12L) {
+  k <- length(group.indices)
+  if (k < 3L) {
+    return(list())
+  }
+  if (ordered) {
+    return(lapply(seq_len(k - 1L), function(cut) {
+      list(a = group.indices[seq_len(cut)],
+           b = group.indices[seq.int(cut + 1L, k)])
+    }))
+  }
+  if (k > max_resplit_size) {
+    return(list())
+  }
+  # Bit patterns over categories 2..k; category 1 is pinned to side `a` so each
+  # partition is produced once instead of twice (a/b are interchangeable).
+  partitions <- vector('list', bitwShiftL(1L, k - 1L) - 1L)
+  for (mask in seq_len(bitwShiftL(1L, k - 1L) - 1L)) {
+    take <- bitwAnd(bitwShiftR(mask, seq_len(k - 1L) - 1L), 1L) == 1L
+    b.indices <- group.indices[c(FALSE, take)]
+    partitions[[mask]] <- list(
+      a = group.indices[!(group.indices %in% b.indices)],
+      b = b.indices
+    )
+  }
+  partitions
+}
+
+#' Order-independent key for a pair of groups, used as the re-split tabu key.
+#'
+#' @param a,b Column-index vectors of the two groups.
+#' @return Single string identifying the unordered pair.
+chaid_group_pair_key <- function(a, b) {
+  sides <- sort(c(paste(sort(a), collapse = ','), paste(sort(b), collapse = ',')))
+  paste(sides, collapse = '|')
+}
+
+#' Most significant binary split of a compound category, if it clears alpha.
+#'
+#' Mirrors the merge test but in reverse: merging takes the LEAST significant
+#' pair (most similar), re-splitting takes the MOST significant partition (most
+#' different) and only applies it when it is significant at `alpha_merge`.
+#'
+#' @param group.indices Column indices forming the compound category.
+#' @param col_of_group Closure returning a group's target-count column.
+#' @param ordered Whether the predictor is ordered.
+#' @param alpha_merge Significance threshold (shared with the merge stage).
+#' @param bonferroni Whether to correct the p-values.
+#' @param chi_square Chi-square statistic to use.
+#' @param max_resplit_size Largest nominal group that is enumerated.
+#' @return `list(a, b, p_value, adjusted_p_value)` or NULL when it should stand.
+chaid_best_resplit <- function(group.indices,
+                               col_of_group,
+                               ordered = FALSE,
+                               alpha_merge = 0.05,
+                               bonferroni = TRUE,
+                               chi_square = 'pearson',
+                               max_resplit_size = 12L) {
+  partitions <- chaid_resplit_partitions(
+    group.indices, ordered = ordered, max_resplit_size = max_resplit_size
+  )
+  if (length(partitions) == 0L) {
+    return(NULL)
+  }
+  raw.p.values <- vapply(partitions, function(part) {
+    observed <- cbind(col_of_group(part$a), col_of_group(part$b))
+    compute_chisq_from_counts(observed, method = chi_square)$p_value
+  }, numeric(1))
+  adjusted.p.values <- adjust_p_value_bonferroni(
+    raw.p.values, bonferroni = bonferroni, n_tests = length(raw.p.values)
+  )
+  best <- which.min(adjusted.p.values)
+  if (length(best) == 0L || is.na(adjusted.p.values[best]) ||
+      adjusted.p.values[best] >= alpha_merge) {
+    return(NULL)
+  }
+  list(
+    a = partitions[[best]]$a,
+    b = partitions[[best]]$b,
+    p_value = raw.p.values[best],
+    adjusted_p_value = adjusted.p.values[best]
+  )
+}
+
 #' Merge statistically similar predictor categories.
 #'
 #' @param values Predictor categories within one node.
@@ -475,6 +578,9 @@ adjust_p_value_bonferroni <- function(p_values, bonferroni = TRUE,
 #' @param variable Predictor name.
 #' @param node_id Current node ID.
 #' @param chi_square Chi-square statistic to use.
+#' @param allow_resplit Whether a compound category of 3+ original categories may
+#'   be split again when its best binary partition is significant (CHAID stage
+#'   3). Off by default, so the greedy merge behaves exactly as before.
 #' @return Category groups and merge/test metadata.
 merge_categories <- function(values,
                              target,
@@ -484,7 +590,8 @@ merge_categories <- function(values,
                              bonferroni = TRUE,
                              variable = '',
                              node_id = 1L,
-                             chi_square = 'pearson') {
+                             chi_square = 'pearson',
+                             allow_resplit = FALSE) {
   values <- as.character(values)
   target <- as.character(target)
   valid <- !is.na(values) & !is.na(target)
@@ -517,8 +624,20 @@ merge_categories <- function(values,
     }
   }
 
+  # CHAID stage 3 bookkeeping. `resplit.tabu` holds the pairs a re-split has just
+  # undone so the merge step cannot immediately recreate them -- merge and
+  # re-split would otherwise oscillate forever. The iteration cap is a backstop:
+  # an unanswerable R call here would hang RServe rather than return an error.
+  resplit.tabu <- character(0)
+  iteration <- 0L
+  max.iterations <- 4L * length(categories) + 10L
+
   repeat {
     if (length(groups) < 2) {
+      break
+    }
+    iteration <- iteration + 1L
+    if (iteration > max.iterations) {
       break
     }
     candidates <- list()
@@ -526,6 +645,10 @@ merge_categories <- function(values,
     for (i in seq_len(length(groups) - 1L)) {
       for (j in seq.int(i + 1L, length(groups))) {
         if (ordered && j != i + 1L) {
+          next
+        }
+        if (allow_resplit && length(resplit.tabu) > 0L &&
+            chaid_group_pair_key(groups[[i]], groups[[j]]) %in% resplit.tabu) {
           next
         }
         pair.observed <- cbind(col_of_group(groups[[i]]), col_of_group(groups[[j]]))
@@ -559,10 +682,49 @@ merge_categories <- function(values,
       merged_group = paste(original.categories, collapse = ' + '),
       original_categories = original.categories,
       merge_p_value = raw.p.values[best],
-      adjusted_p_value = adjusted.p.values[best]
+      adjusted_p_value = adjusted.p.values[best],
+      action = 'merge'
     )
     groups[[selected$i]] <- c(groups[[selected$i]], groups[[selected$j]])
     groups[[selected$j]] <- NULL
+
+    # Stage 3: the greedy merge is order-dependent, so a pair fused earlier can
+    # become clearly separable once a third category joins it. Re-test every
+    # compound of 3+ categories and break it apart when its best binary
+    # partition is significant.
+    if (allow_resplit) {
+      for (g in seq_along(groups)) {
+        split <- chaid_best_resplit(
+          groups[[g]],
+          col_of_group = col_of_group,
+          ordered = ordered,
+          alpha_merge = alpha_merge,
+          bonferroni = bonferroni,
+          chi_square = chi_square
+        )
+        if (is.null(split)) {
+          next
+        }
+        merge.history[[length(merge.history) + 1L]] <- list(
+          node_id = node_id,
+          variable = variable,
+          merged_group = paste(categories[groups[[g]]], collapse = ' + '),
+          original_categories = categories[groups[[g]]],
+          merge_p_value = split$p_value,
+          adjusted_p_value = split$adjusted_p_value,
+          action = 'resplit'
+        )
+        resplit.tabu <- c(resplit.tabu, chaid_group_pair_key(split$a, split$b))
+        groups[[g]] <- split$a
+        groups[[length(groups) + 1L]] <- split$b
+        if (ordered) {
+          # Keep groups in category order so the "adjacent only" pair scan and
+          # the resulting interval labels stay contiguous.
+          groups <- groups[order(vapply(groups, min, numeric(1)))]
+        }
+        break
+      }
+    }
   }
 
   group.category.lists <- lapply(groups, function(group.indices) categories[group.indices])
@@ -605,7 +767,8 @@ evaluate_predictor <- function(data, target, variable, parameters,
     bonferroni = parameters$bonferroni,
     variable = variable,
     node_id = node_id,
-    chi_square = parameters$chi_square
+    chi_square = parameters$chi_square,
+    allow_resplit = isTRUE(parameters$allow_resplit)
   )
   if (length(merge.result$groups) < 2 || is.na(merge.result$p_value)) {
     return(NULL)
@@ -804,6 +967,81 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
   )
 }
 
+#' Renumber tree nodes into breadth-first order (top to bottom, left to right).
+#'
+#' grow_chaid_tree allocates ids as it recurses (depth-first), so a tree that
+#' branches on more than one node per level gets interleaved ids -- level 1 can
+#' read 2, 5, 8 because node 2's whole subtree is numbered before its sibling.
+#' Renumber once, after the tree is grown, so every id the user sees (chart chip,
+#' the node columns in the split / evidence / merge tables, and the node rules)
+#' counts 1, 2, 3 ... down the levels.
+#'
+#' Every structure keyed by node id is remapped together: a partial remap would
+#' desynchronise the report tables from the chart, and prediction reads the same
+#' ids through chaid_build_split_index.
+#'
+#' @param tree The list returned by grow_chaid_tree.
+#' @return The same list with node ids renumbered breadth-first.
+chaid_renumber_nodes_bfs <- function(tree) {
+  nodes <- tree$nodes
+  if (is.null(nodes) || nrow(nodes) < 2) {
+    return(tree)
+  }
+  edges <- tree$edges
+  # Children in creation order, which is the group order = left to right.
+  children.of <- if (is.null(edges) || nrow(edges) == 0) {
+    list()
+  } else {
+    split(as.integer(edges$child_id), as.character(edges$parent_id))
+  }
+
+  visit.order <- integer(0)
+  queue <- 1L
+  while (length(queue) > 0) {
+    current <- queue[1]
+    queue <- queue[-1]
+    visit.order <- c(visit.order, current)
+    kids <- children.of[[as.character(current)]]
+    if (!is.null(kids)) {
+      queue <- c(queue, kids)
+    }
+  }
+  # Defensive: keep the map total even if a node were somehow unreachable, so no
+  # id can silently map to NA.
+  orphans <- setdiff(as.integer(nodes$node_id), visit.order)
+  visit.order <- c(visit.order, sort(orphans))
+
+  new.of <- stats::setNames(seq_along(visit.order), as.character(visit.order))
+  remap <- function(v) {
+    out <- unname(new.of[as.character(v)])
+    as.integer(ifelse(is.na(v), NA_integer_, out))
+  }
+
+  nodes$node_id <- remap(nodes$node_id)
+  nodes$parent_id <- remap(nodes$parent_id)
+  # Reorder rows too; class_distribution is a list column and travels with them.
+  nodes <- nodes[order(nodes$node_id), , drop = FALSE]
+  rownames(nodes) <- NULL
+  tree$nodes <- nodes
+
+  if (!is.null(edges) && nrow(edges) > 0) {
+    edges$parent_id <- remap(edges$parent_id)
+    edges$child_id <- remap(edges$child_id)
+    edges <- edges[order(edges$parent_id, edges$child_id), , drop = FALSE]
+    rownames(edges) <- NULL
+    tree$edges <- edges
+  }
+
+  if (!is.null(tree$category_merge_map) && nrow(tree$category_merge_map) > 0) {
+    tree$category_merge_map$node_id <- remap(tree$category_merge_map$node_id)
+  }
+
+  if (!is.null(tree$node_metadata) && length(tree$node_metadata) > 0) {
+    names(tree$node_metadata) <- as.character(remap(names(tree$node_metadata)))
+  }
+  tree
+}
+
 #' Convert merge-history records to a stable data frame.
 #'
 #' @param merge_history List of category merge records.
@@ -813,7 +1051,7 @@ merge_history_to_data <- function(merge_history) {
     return(data.frame(
       node_id = integer(), variable = character(), merged_group = character(),
       original_categories = character(), merge_p_value = numeric(),
-      adjusted_p_value = numeric(), stringsAsFactors = FALSE
+      adjusted_p_value = numeric(), action = character(), stringsAsFactors = FALSE
     ))
   }
   do.call(rbind, lapply(merge_history, function(record) {
@@ -824,6 +1062,8 @@ merge_history_to_data <- function(merge_history) {
       original_categories = paste(record$original_categories, collapse = ' | '),
       merge_p_value = record$merge_p_value,
       adjusted_p_value = record$adjusted_p_value,
+      # Rows predate the stage-3 feature when action is absent; they are merges.
+      action = record$action %||% 'merge',
       stringsAsFactors = FALSE
     )
   }))
@@ -920,33 +1160,146 @@ traverse_chaid_tree <- function(row, model) {
   }
 }
 
-#' Predict from a fitted classification CHAID tree.
+#' Build a per-node lookup mapping a prepared predictor value to its child node.
+#'
+#' Precomputes, once per model, what `traverse_chaid_tree()` recomputes for every
+#' row at every tree level (the node row lookup, the split-group scan and the
+#' edge scan). A value maps to `NA` whenever the row-at-a-time traversal would
+#' stop at this node -- the value belongs to no group or to more than one group,
+#' or its edge label does not match exactly one edge.
 #'
 #' @param model A fitted `exploratory_chaid` model.
-#' @param new_data New predictor data.
-#' @param type Prediction output type: `class`, `prob`, `node`, or `all`.
+#' @return A list keyed by node id, each `list(variable, lut)`.
+chaid_build_split_index <- function(model) {
+  index <- list()
+  node.ids <- model$nodes$node_id
+  for (position in seq_along(node.ids)) {
+    node.id <- node.ids[[position]]
+    metadata <- model$.node_metadata[[as.character(node.id)]]
+    if (isTRUE(model$nodes$is_terminal[[position]]) || is.null(metadata) ||
+        is.null(metadata$split_variable) || is.null(metadata$split_groups) ||
+        is.null(metadata$group_labels)) {
+      next
+    }
+    groups <- metadata$split_groups
+    group.sizes <- vapply(groups, length, integer(1))
+    if (sum(group.sizes) == 0) {
+      next
+    }
+    values <- as.character(unlist(groups, use.names = FALSE))
+    group.of <- rep(seq_along(groups), group.sizes)
+    labels.of <- as.character(metadata$group_labels)[group.of]
+
+    is.parent.edge <- model$edges$parent_id == node.id
+    edge.labels <- as.character(model$edges$label[is.parent.edge])
+    edge.children <- as.integer(model$edges$child_id[is.parent.edge])
+    # Mirror the `sum(edge.rows) != 1` guard: only an unambiguous edge advances.
+    child.of <- vapply(labels.of, function(label) {
+      matched <- which(!is.na(label) & edge.labels == label)
+      if (length(matched) == 1L) edge.children[[matched]] else NA_integer_
+    }, integer(1), USE.NAMES = FALSE)
+    # Mirror the `length(group.index) != 1` guard: a value listed in more than
+    # one group is ambiguous, so the row stops here.
+    ambiguous <- duplicated(values) | duplicated(values, fromLast = TRUE)
+    child.of[ambiguous] <- NA_integer_
+
+    keep <- !duplicated(values)
+    lookup <- child.of[keep]
+    names(lookup) <- values[keep]
+    index[[as.character(node.id)]] <- list(
+      variable = metadata$split_variable,
+      lut = lookup
+    )
+  }
+  index
+}
+
+#' Assign prepared rows to their terminal nodes, vectorized over rows.
+#'
+#' Walks the tree once per node instead of once per row: each node maps its own
+#' row block to child nodes with a single vectorized lookup. Produces exactly the
+#' same node ids as calling `traverse_chaid_tree()` per row.
+#'
+#' @param prepared.data Output of `prepare_chaid_new_data()`.
+#' @param model A fitted `exploratory_chaid` model.
+#' @param split.index Optional precomputed `chaid_build_split_index()` result.
+#' @return An integer vector of node ids, one per row.
+chaid_assign_nodes <- function(prepared.data, model, split.index = NULL) {
+  row.count <- nrow(prepared.data)
+  if (row.count == 0) {
+    return(integer())
+  }
+  if (is.null(split.index)) {
+    split.index <- chaid_build_split_index(model)
+  }
+  assigned <- integer(row.count)
+  pending <- list(list(node = 1L, rows = seq_len(row.count)))
+  while (length(pending) > 0) {
+    current <- pending[[length(pending)]]
+    pending[[length(pending)]] <- NULL
+    rows <- current$rows
+    if (length(rows) == 0L) {
+      next
+    }
+    node.id <- current$node
+    if (is.na(match(node.id, model$nodes$node_id))) {
+      assigned[rows] <- 1L
+      next
+    }
+    entry <- split.index[[as.character(node.id)]]
+    if (is.null(entry) || !(entry$variable %in% names(prepared.data))) {
+      assigned[rows] <- as.integer(node.id)
+      next
+    }
+    children <- unname(entry$lut[as.character(prepared.data[[entry$variable]])[rows]])
+    stops.here <- is.na(children)
+    if (any(stops.here)) {
+      assigned[rows[stops.here]] <- as.integer(node.id)
+    }
+    if (!all(stops.here)) {
+      moving.rows <- rows[!stops.here]
+      moving.children <- children[!stops.here]
+      for (child in unique(moving.children)) {
+        pending[[length(pending) + 1L]] <- list(
+          node = as.integer(child),
+          rows = moving.rows[moving.children == child]
+        )
+      }
+    }
+  }
+  assigned
+}
+
+#' Return the node-by-class probability matrix of a fitted CHAID model.
+#'
+#' Built once per call so predictions can index it, instead of `rbind`-ing one
+#' distribution per predicted row.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @return A matrix with one row per tree node.
+chaid_class_distribution_matrix <- function(model) {
+  do.call(rbind, model$nodes$class_distribution)
+}
+
+#' Predict from already-prepared CHAID predictor data.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @param prepared.data Output of `prepare_chaid_new_data()`.
+#' @param type Prediction output type.
+#' @param split.index Optional precomputed `chaid_build_split_index()` result.
 #' @return A vector or data frame of predictions.
-#' @export
-chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'all')) {
-  if (!inherits(model, 'exploratory_chaid')) {
-    stop('model must be an exploratory_chaid object')
-  }
+chaid_predict_prepared <- function(model, prepared.data,
+                                   type = c('class', 'prob', 'node', 'all'),
+                                   split.index = NULL) {
   prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all'))
-  prepared.data <- prepare_chaid_new_data(new_data, model)
-  node.ids <- if (nrow(prepared.data) == 0) {
-    integer()
-  } else {
-    vapply(seq_len(nrow(prepared.data)), function(index) {
-      traverse_chaid_tree(prepared.data[index, , drop = FALSE], model)
-    }, integer(1))
-  }
+  node.ids <- chaid_assign_nodes(prepared.data, model, split.index)
   node.rows <- match(node.ids, model$nodes$node_id)
   predicted.classes <- as.character(model$nodes$predicted_class[node.rows])
   probability.matrix <- if (length(node.ids) == 0) {
     matrix(numeric(), nrow = 0, ncol = length(model$class_levels),
            dimnames = list(NULL, paste0('.pred_prob_', model$class_levels)))
   } else {
-    do.call(rbind, model$nodes$class_distribution[node.rows])
+    chaid_class_distribution_matrix(model)[node.rows, , drop = FALSE]
   }
   colnames(probability.matrix) <- paste0('.pred_prob_', model$class_levels)
 
@@ -968,6 +1321,22 @@ chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'al
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
+}
+
+#' Predict from a fitted classification CHAID tree.
+#'
+#' @param model A fitted `exploratory_chaid` model.
+#' @param new_data New predictor data.
+#' @param type Prediction output type: `class`, `prob`, `node`, or `all`.
+#' @return A vector or data frame of predictions.
+#' @export
+chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'all')) {
+  if (!inherits(model, 'exploratory_chaid')) {
+    stop('model must be an exploratory_chaid object')
+  }
+  prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all'))
+  prepared.data <- prepare_chaid_new_data(new_data, model)
+  chaid_predict_prepared(model, prepared.data, type = prediction.type)
 }
 
 #' Predict using the standard S3 prediction interface.
@@ -1046,6 +1415,12 @@ chaid_category_merge_table <- function(model) {
     `Merged Category` = merge.data$merged_group,
     `Original Categories` = merge.data$original_categories,
     `Merge p-value` = merge.data$merge_p_value,
+    # 'merge' or 'resplit' (stage 3). Older models carry no column -> all merges.
+    Action = if (is.null(merge.data$action)) {
+      rep('merge', nrow(merge.data))
+    } else {
+      merge.data$action
+    },
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
@@ -1241,6 +1616,7 @@ format_chaid_distribution <- function(distribution) {
 #' @param missing Missing-value handling method.
 #' @param chi_square Chi-square statistic.
 #' @param bonferroni Bonferroni correction flag.
+#' @param allow_resplit Whether merged categories may be split again (stage 3).
 #' @param ordinal_predictors Ordered predictor names.
 #' @param max_categories Maximum category count.
 #' @param verbose Diagnostic flag.
@@ -1260,6 +1636,7 @@ validate_chaid_inputs <- function(data,
                                   missing,
                                   chi_square,
                                   bonferroni,
+                                  allow_resplit = FALSE,
                                   ordinal_predictors,
                                   max_categories,
                                   verbose) {
@@ -1337,6 +1714,9 @@ validate_chaid_inputs <- function(data,
   if (!is.logical(bonferroni) || length(bonferroni) != 1 || is.na(bonferroni)) {
     stop('bonferroni must be TRUE or FALSE')
   }
+  if (!is.logical(allow_resplit) || length(allow_resplit) != 1 || is.na(allow_resplit)) {
+    stop('allow_resplit must be TRUE or FALSE')
+  }
   if (!is.null(ordinal_predictors) &&
       any(!ordinal_predictors %in% predictors)) {
     stop('ordinal_predictors must be included in predictors')
@@ -1360,6 +1740,7 @@ validate_chaid_inputs <- function(data,
       missing = missing.method,
       chi_square = chi.square,
       bonferroni = bonferroni,
+      allow_resplit = allow_resplit,
       ordinal_predictors = ordinal_predictors,
       max_categories = as.integer(max_categories),
       verbose = verbose

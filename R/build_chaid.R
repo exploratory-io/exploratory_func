@@ -21,6 +21,7 @@
 #' @param missing Missing-value handling (`as_category` or `exclude`).
 #' @param chi_square Chi-square statistic (`pearson` or `likelihood_ratio`).
 #' @param bonferroni Whether to apply Bonferroni correction.
+#' @param allow_resplit Whether merged categories may be split again (stage 3).
 #' @param max_categories Maximum predictor categories before a predictor is skipped.
 #' @param max_nrow Row cap; data is sampled down to this before fitting.
 #' @param target_n,predictor_n Category caps; excess categories are lumped into "Other".
@@ -46,6 +47,7 @@ exp_chaid <- function(df,
                       missing = "as_category",
                       chi_square = "pearson",
                       bonferroni = TRUE,
+                      allow_resplit = FALSE,
                       max_categories = 50,
                       max_nrow = 50000,
                       target_n = 20,
@@ -144,6 +146,7 @@ exp_chaid <- function(df,
         min_node_proportion = min_node_proportion,
         numeric_binning = numeric_binning, numeric_bins = numeric_bins,
         missing = missing, chi_square = chi_square, bonferroni = bonferroni,
+        allow_resplit = allow_resplit,
         max_categories = max_categories
       )
       model$classification_type <- if (model$target_type == "logical") "binary" else "multi"
@@ -306,9 +309,9 @@ chaid_log_loss <- function(actual, prediction, class_levels) {
   }
   actual_index <- match(as.character(actual), class_levels)
   probability_matrix <- as.matrix(prediction[, probability_columns, drop = FALSE])
-  valid <- !is.na(actual_index) & apply(probability_matrix, 1, function(row) {
-    all(is.finite(row))
-  })
+  # Vectorized equivalent of apply(probability_matrix, 1, function(row) all(is.finite(row))).
+  # This runs once per predictor per permutation repeat, so the row-wise apply was hot.
+  valid <- !is.na(actual_index) & rowSums(!is.finite(probability_matrix)) == 0
   if (!any(valid)) {
     return(NA_real_)
   }
@@ -344,8 +347,20 @@ chaid_permutation_importance <- function(model, data, target, predictors,
   }
   evaluation_data_frame <- data[valid, , drop = FALSE]
   actual <- actual[valid]
+  # Prepare the predictors and build the split lookup ONCE. Preparation is
+  # element-wise, so permuting a prepared column is identical to preparing a
+  # permuted column -- this just avoids redoing both for every repeat.
+  prepared_data <- tryCatch(
+    prepare_chaid_new_data(evaluation_data_frame, model),
+    error = function(e) NULL
+  )
+  if (is.null(prepared_data)) {
+    return(result)
+  }
+  split_index <- chaid_build_split_index(model)
   baseline_prediction <- tryCatch(
-    chaid_predict(model, evaluation_data_frame, type = 'all'),
+    chaid_predict_prepared(model, prepared_data, type = 'all',
+                           split.index = split_index),
     error = function(e) NULL
   )
   if (is.null(baseline_prediction)) {
@@ -362,17 +377,32 @@ chaid_permutation_importance <- function(model, data, target, predictors,
     set.seed(1L)
   }
   repeat_count <- max(1L, as.integer(repeats))
+  # Permuting a predictor the tree never splits on cannot change a single
+  # prediction, so its drop is exactly 0 on every repeat (importance 0,
+  # std_error 0). Detect those up front and skip their predictions entirely.
+  # The RNG is still advanced identically, so every reported number stays
+  # bit-for-bit the same as the per-predictor-prediction implementation.
+  split_variables <- unique(unlist(
+    lapply(model$.node_metadata, function(metadata) metadata$split_variable),
+    use.names = FALSE
+  ))
+  evaluation_row_count <- nrow(prepared_data)
   rows <- lapply(predictors, function(variable) {
     if (!variable %in% names(evaluation_data_frame)) {
       return(NULL)
     }
+    affects_prediction <- variable %in% split_variables &&
+      variable %in% names(prepared_data)
     drops <- vapply(seq_len(repeat_count), function(iteration) {
-      permuted_data <- evaluation_data_frame
-      permuted_data[[variable]] <- permuted_data[[variable]][
-        sample.int(nrow(permuted_data))
-      ]
+      permutation <- sample.int(evaluation_row_count)
+      if (!affects_prediction) {
+        return(0)
+      }
+      permuted_data <- prepared_data
+      permuted_data[[variable]] <- permuted_data[[variable]][permutation]
       permuted_prediction <- tryCatch(
-        chaid_predict(model, permuted_data, type = 'all'),
+        chaid_predict_prepared(model, permuted_data, type = 'all',
+                               split.index = split_index),
         error = function(e) NULL
       )
       if (is.null(permuted_prediction)) {
@@ -507,6 +537,32 @@ glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
 #' @param ... Unused.
 #' @return A data frame whose shape depends on `type`.
 #' @export
+#' Shift node ids to the 0-based numbering shown to users.
+#'
+#' The model numbers nodes from 1 -- root = 1 is assumed in several places
+#' (chaid_assign_nodes seeds its queue with it, root row counts are looked up by
+#' it), so the model keeps 1-based ids and only the tidy output is shifted. SPSS
+#' labels the root "Node 0", and every id the user sees comes through
+#' tidy.exploratory_chaid, so shifting once here keeps the chart, the split /
+#' evidence / merge / interval tables and the rules on one numbering.
+#'
+#' Only genuine id columns are shifted. `Parent Node Rows` (a count) and `Depth`
+#' are deliberately not in the list.
+#'
+#' @param df A tidy output data frame.
+#' @return The same frame with node id columns shifted to 0-based.
+chaid_display_node_ids <- function(df) {
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return(df)
+  }
+  for (col in c('node_id', 'parent_id', 'Node')) {
+    if (col %in% names(df)) {
+      df[[col]] <- as.integer(df[[col]]) - 1L
+    }
+  }
+  df
+}
+
 tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
                                    binary_classification_threshold = 0.5, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
@@ -514,7 +570,7 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
   }
   actual <- x$y
   predicted <- x$predicted_class
-  switch(
+  chaid_display_node_ids(switch(
     type,
     evaluation = {
       if ("error" %in% class(x)) {
@@ -564,7 +620,7 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
     {
       stop(paste0("type ", type, " is not defined"))
     }
-  )
+  ))
 }
 
 #' Build per-node data for the interactive decision tree chart.
