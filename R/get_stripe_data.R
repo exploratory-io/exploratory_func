@@ -1,14 +1,3 @@
-#' Formats a number as a fixed-notation integer string for an API query parameter.
-#' httr composes query values with as.character(), and since R 4.3 as.character() on a
-#' double ignores options(scipen) and picks the shortest representation, so a "round"
-#' value turns into scientific notation (as.character(1782000000) == "1.782e+09").
-#' APIs that expect an integer (e.g. Stripe's created[gte]) reject that.
-#' @param x A numeric value.
-#' @return A character of the value in fixed notation.
-as_integer_param <- function(x) {
-  sprintf("%.0f", x)
-}
-
 #' Get data from stripe API
 #' @param endpoint Name of target data to access under https://api.stripe.com/v1/
 #' e.g. "users", "charges"
@@ -81,7 +70,7 @@ get_stripe_data <- function(endpoint = "balance/history",
 
   get_data <- function(query, body){
     res <- httr::GET(url,
-                     query = query,
+                     query = to_api_query(query),
                      body = body,
                      token
     )
@@ -98,10 +87,10 @@ get_stripe_data <- function(endpoint = "balance/history",
   query <- list(limit = limit)
   if(!is.null(date_since)){
     min_unixtime <- as.numeric(as.POSIXct(date_since))
-    # Stripe rejects a scientific-notation value with
-    # "Invalid integer: 1.782e+09". Which dates hit that depends on the digits of the
-    # unixtime, so it only fails on some days.
-    query[["created[gte]"]] <- as_integer_param(min_unixtime)
+    # to_api_query() at the GET keeps this out of scientific notation. Stripe answers
+    # "Invalid integer: 1.782e+09" otherwise, and which dates hit that depends on the
+    # digits of the unixtime, so it only fails on some days.
+    query[["created[gte]"]] <- min_unixtime
   }
 
   ret <- list()
