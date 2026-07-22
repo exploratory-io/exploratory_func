@@ -341,7 +341,22 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else if (type == "variances") {
-    res <- tibble::as_tibble(t(x$Vaccounted)) %>% dplyr::mutate(Factor=as.factor(1:n()), `% Variance`=100*`Proportion Var`, `Cummulated % Variance`=100*`Cumulative Var`)
+    res <- tibble::as_tibble(t(x$Vaccounted))
+    # With a single factor (nfactors=1), psych::fa()'s Vaccounted matrix only reports "SS
+    # loadings" and "Proportion Var" -- "Cumulative Var" / "Proportion Explained" / "Cumulative
+    # Proportion" are omitted since they are trivially equal to (or 100% for) the one and only
+    # factor. Backfill them with those trivial single-factor values so the mutate below (and the
+    # column shape callers rely on) does not depend on nfactors. (issue #30798)
+    if (!"Cumulative Var" %in% colnames(res)) {
+      res <- res %>% dplyr::mutate(`Cumulative Var` = `Proportion Var`)
+    }
+    if (!"Proportion Explained" %in% colnames(res)) {
+      res <- res %>% dplyr::mutate(`Proportion Explained` = 1)
+    }
+    if (!"Cumulative Proportion" %in% colnames(res)) {
+      res <- res %>% dplyr::mutate(`Cumulative Proportion` = 1)
+    }
+    res <- res %>% dplyr::mutate(Factor=as.factor(1:n()), `% Variance`=100*`Proportion Var`, `Cummulated % Variance`=100*`Cumulative Var`)
   }
   else if (type == "loadings") {
     res <- broom:::tidy.factanal(x) # TODO: This just happens to work. Revisit.
@@ -363,6 +378,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     }, .desc=TRUE))
   }
   else if (type == "biplot") {
+    if (n_factor < 2) {
+      # Biplot plots Factor 1 against Factor 2, so it needs at least 2 factors. With nfactors=1
+      # there is no "Factor 2" to build factor_2_loading_col/factor_2_score_col from below.
+      # Degrade gracefully -- mirroring the type=="correlation" branch's handling of an
+      # unavailable x$Phi below -- instead of erroring on a missing column. Keep the same column
+      # shape the client's `tidy_rowwise(model, type="biplot") %>% dplyr::rename(...)` expects, so
+      # the rename does not itself fail on a missing column. (issue #30798)
+      return(tibble::tibble(.factor_1 = numeric(0), .factor_2 = numeric(0), .factor_2_variable = numeric(0)))
+    }
     factor_1_loading_col <- paste0(factor_loading_prefix, "1")
     factor_2_loading_col <- paste0(factor_loading_prefix, "2")
     factor_1_score_col <- paste0(factor_score_prefix, "1")
