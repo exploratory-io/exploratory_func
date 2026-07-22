@@ -109,6 +109,32 @@ test_that("alpha-if-dropped and scale candidates use the reported alpha's estima
   expect_equal(ordinal_candidates$Alpha[[1]], ordinal_reported, tolerance = 1e-8)
 })
 
+test_that("correlation_method reports the method and why it was chosen (#37175)", {
+  df <- make_reliability_df()
+
+  auto_numeric <- exp_cronbach_alpha(df, dplyr::everything()) %>%
+    tidy_rowwise(model, type = "correlation_method")
+  expect_equal(colnames(auto_numeric), c("Item", "Value"))
+  expect_equal(auto_numeric$Item, c("Correlation Type", "Primary Metric", "Selection Reason"))
+  expect_equal(auto_numeric$Value,
+               c("Pearson Correlation", "Cronbach's Alpha", "All variables are Numeric."))
+
+  ordinal_df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(),
+                                                   ~ factor(.x, ordered = TRUE)))
+  auto_ordinal <- exp_cronbach_alpha(ordinal_df, dplyr::everything()) %>%
+    tidy_rowwise(model, type = "correlation_method")
+  expect_equal(auto_ordinal$Value,
+               c("Polychoric Correlation", "Ordinal Alpha",
+                 "All variables are Factor or Logical."))
+
+  # An explicitly requested method reports the request as the reason.
+  explicit <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "mixed") %>%
+    tidy_rowwise(model, type = "correlation_method")
+  expect_equal(explicit$Value,
+               c("Mixed Correlation", "Mixed-Correlation Alpha",
+                 "Mixed Correlation was specified in the settings."))
+})
+
 test_that("response distribution uses Summary View numeric binning", {
   df <- list(
     low_cardinality = c(1L, 1L, 2L, 4L, 4L),

@@ -728,6 +728,34 @@ tidy.cronbach_alpha_exploratory <- function(x, type = "summary", pretty.name = F
                       `Standardized Item-Total`, `Corrected Correlation`, `Rows`,
                       `Missing`, `Mean`, `Standard Deviation`, `Interpretation`)
     }
+  } else if (type == "correlation_method") {
+    # The "which correlation was used and why" table. English labels only -- the
+    # Analytics report localizes them through the usual translation path.
+    method_label <- switch(x$selected_method,
+      pearson = "Pearson Correlation",
+      polychoric = "Polychoric Correlation",
+      mixed = "Mixed Correlation",
+      x$selected_method)
+    requested <- if (is.null(x$requested_method)) "auto" else x$requested_method
+    reason <- if (requested != "auto") {
+      switch(requested,
+        pearson = "Pearson was specified in the settings.",
+        polychoric = "Polychoric was specified in the settings.",
+        mixed = "Mixed Correlation was specified in the settings.",
+        "Specified in the settings.")
+    } else {
+      unique_types <- unique(unname(x$item_types))
+      if (all(unique_types == "continuous")) {
+        "All variables are Numeric."
+      } else if (all(unique_types %in% c("ordinal", "dichotomous"))) {
+        "All variables are Factor or Logical."
+      } else {
+        "Numeric and Factor/Logical variables are mixed."
+      }
+    }
+    res <- tibble::tibble(
+      `Item` = c("Correlation Type", "Primary Metric", "Selection Reason"),
+      `Value` = c(method_label, x$coefficient_name, reason))
   } else if (type == "correlation") {
     res <- x$correlation_long
   } else if (type == "response_distribution") {
