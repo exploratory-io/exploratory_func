@@ -510,3 +510,30 @@ test_that("a failed estimation degrades to Pearson end to end (issue #26623)", {
   expect_false(is.null(fit$scores))
   expect_false(is.null(fit$parallel))
 })
+
+test_that("Repeat By groups all use the same correlation (issue #26623)", {
+  # Group A is ordinal (would pick Polychoric on its own), group B is continuous (Pearson). One
+  # report describes one correlation, and loadings must be comparable across facets, so the choice
+  # is made once from the whole data.
+  set.seed(31)
+  n <- 200
+  latent_a <- stats::rnorm(n)
+  ordinal_col <- function(latent) {
+    z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
+    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+  }
+  group_a <- data.frame(g = "A", q1 = ordinal_col(latent_a), q2 = ordinal_col(latent_a),
+                        q3 = ordinal_col(latent_a), stringsAsFactors = FALSE)
+  latent_b <- stats::rnorm(n)
+  group_b <- data.frame(g = "B",
+                        q1 = latent_b + stats::rnorm(n), q2 = latent_b + stats::rnorm(n),
+                        q3 = latent_b + stats::rnorm(n), stringsAsFactors = FALSE)
+  grouped <- dplyr::group_by(rbind(group_a, group_b), g)
+
+  model_df <- exp_factanal(grouped, q1, q2, q3, nfactors = 1, rotate = "none", parallel_n_iter = 3)
+  types <- vapply(model_df$model, function(m) m$correlation_type, character(1))
+  expect_equal(length(unique(types)), 1)
+  # And the per-group diagnostics still reflect that one correlation.
+  has_diagnostics <- vapply(model_df$model, function(m) !is.null(m$cor_diagnostics), logical(1))
+  expect_equal(length(unique(has_diagnostics)), 1)
+})

@@ -271,6 +271,22 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     set.seed(seed)
   }
 
+  # Resolve the correlation ONCE, from the whole data, and reuse it for every group. Selecting per
+  # group would let one facet run on Polychoric and another on Pearson while the report describes a
+  # single method, and would make the groups' loadings incomparable. (issue #26623)
+  overall_type <- NULL
+  overall_reason <- NULL
+  if (identical(tolower(trimws(as.character(cor_type))), "auto")) {
+    overall_selection <- tryCatch({
+      candidate_cols <- intersect(selected_cols, colnames(df))
+      if (length(candidate_cols) >= 2) select_factor_correlation_type(as.data.frame(df)[, candidate_cols, drop = FALSE]) else NULL
+    }, error = function(e) NULL)
+    if (!is.null(overall_selection) && !identical(overall_selection$selected_method, "unsupported")) {
+      overall_type <- overall_selection$selected_method
+      overall_reason <- overall_selection$reason
+    }
+  }
+
   each_func <- function(df) {
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
@@ -314,6 +330,13 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     # (e.g. a polychoric fa() next to a Pearson KMO or parallel analysis). (issue #26623)
     selection <- select_factor_correlation_type(cleaned_df)
     resolved <- resolve_factanal_correlation_type(cor_type, selection)
+    # Auto: keep the whole-analysis choice made above, so every group uses the same correlation.
+    # The per-group selection is still what drives the category coding and the diagnostics.
+    if (isTRUE(resolved$auto) && !is.null(overall_type) &&
+        !identical(selection$selected_method, "unsupported")) {
+      resolved$type <- overall_type
+      resolved$reason <- overall_reason
+    }
     # An unsupported variable combination (a nominal category, a constant column) is unsupported
     # whichever correlation was asked for -- picking Pearson manually must not smuggle a nominal
     # column in as arbitrary integer codes. So gate on the SELECTION, not the resolved type.
