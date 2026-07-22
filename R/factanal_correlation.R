@@ -596,6 +596,27 @@ factanal_polychoric_available <- function(selection, data = NULL) {
 # in prose ("less than 5% of the responses" / 「回答が全体の5%未満」) in
 # tam/src/js/components/analysis/templates/markdown/exp_factanal{,_ja}.js. Changing the default here
 # means updating that wording too. (issue #26623)
+# A 6-row "Not Available" diagnostics table, matching compute_polychoric_diagnostics' shape. Used
+# when the real computation fails, so a categorical analysis's diagnostics section never renders as
+# an empty table under its heading. (issue #26623)
+unavailable_polychoric_diagnostics <- function() {
+  tibble::tibble(
+    Diagnostic = c("Number of Categories", "Sparse Categories", "Empty Category Combinations",
+                   "Correlation Estimation Failures", "Positive Definiteness of the Correlation Matrix",
+                   "Smoothing Applied"),
+    Judgement = rep("Not Available", 6),
+    Description = c(
+      "Number of categories in the categorical variables used for the correlation.",
+      "Categorical variables that have a category holding a very small share of the responses. Correlations estimated from categories may become unstable when categories are sparse.",
+      "Variable pairs that have a category combination with no observations.",
+      "Variable pairs whose correlation could not be estimated.",
+      "Whether the estimated correlation matrix was positive definite, which factor analysis assumes, before any smoothing.",
+      "Whether the correlation matrix had to be smoothed to become positive definite."
+    ),
+    status = rep("na", 6)
+  )
+}
+
 compute_polychoric_diagnostics <- function(data, cor_result, selection,
                                            rare_category_prop_cutoff = 0.05) {
   data <- as.data.frame(data)
