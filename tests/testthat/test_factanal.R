@@ -2,6 +2,22 @@
 # devtools::test(filter="factanal")
 context("test factor analysis function, exp_factanal")
 
+# Shared by the tests below (issue tam#30432). The factor score coefficients ARE the weights that
+# turn the standardized variables into the factor scores that type="data" reports, so reconstructing
+# the scores from them is the real correctness check -- and it simultaneously pins the factor column
+# ORDER: if x$weights' columns were in a different order than the "Factor N" IDs every other tidy
+# type emits, the reconstruction would come out scrambled rather than merely mislabeled.
+check_score_coefficients <- function(model_df) {
+  coefs <- model_df %>% tidy_rowwise(model, type="score_coefficients")
+  dat <- model_df %>% tidy_rowwise(model, type="data")
+  factor_cols <- setdiff(colnames(coefs), "variable")
+  expect_gt(length(factor_cols), 0)
+  expect_true(all(factor_cols %in% colnames(dat)))
+  expect_true(all(coefs$variable %in% colnames(dat)))
+  reconstructed <- scale(as.matrix(dat[, coefs$variable])) %*% as.matrix(coefs[, factor_cols])
+  expect_equal(unname(reconstructed), unname(as.matrix(dat[, factor_cols])), tolerance = 1e-6)
+}
+
 test_that("exp_factanal with default orthogonal varimax rotation", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
 
@@ -51,6 +67,11 @@ test_that("exp_factanal with default orthogonal varimax rotation", {
     res <- model_df %>% tidy_rowwise(model, type="communalities_long")
     expect_equal(colnames(res), c("variable", "Component", "Ratio"))
     expect_equal(levels(res$Component), c("Communality", "Uniqueness"))
+    # Factor score coefficients (issue tam#30432).
+    res <- model_df %>% tidy_rowwise(model, type="score_coefficients")
+    expect_equal(colnames(res), c("variable", "Factor 1", "Factor 2", "Factor 3"))
+    expect_setequal(res$variable, c("cyl", "mpg", "hp"))
+    check_score_coefficients(model_df)
   }
 
   model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="minres") 
@@ -120,6 +141,12 @@ test_that("exp_factanal with oblique Promax rotation", {
         "DEST STATE ABR"   ,"DEP TIME"         ,"DEP DELAY"        ,"ARR TIME"         ,"ARR DELAY"        ,"CAN CELLED"    ,  
         "CANCELLATION CODE","AIR TIME"         ,"DIS TANCE"        ,"WEATHER DELAY"    ,"delay ed"         ,"is UA"         ,  
         "is delayed"       ,"end time"         ,"is UA or AA"      ,"Factor 1"         ,"Factor 2"))
+    # Factor score coefficients under an oblique rotation, where psych reorders the factors
+    # (e.g. MR1, MR3, MR2), and with column names containing spaces (issue tam#30432).
+    res <- model_df %>% tidy_rowwise(model, type="score_coefficients")
+    expect_equal(colnames(res), c("variable", "Factor 1", "Factor 2"))
+    expect_setequal(res$variable, c("DAY OF MONTH", "FL NUM", "DEP DELAY", "ARR DELAY", "AIR TIME", "DIS TANCE"))
+    check_score_coefficients(model_df)
   }
 
   model_df <- df %>% exp_factanal(`DAY OF MONTH`, `FL NUM`, `DEP DELAY`, `ARR DELAY`, `AIR TIME`, `DIS TANCE`, nfactors = 2, fm = "minres", scores = "regression", rotate = "Promax", max_nrow = 50000)
@@ -176,6 +203,11 @@ test_that("exp_factanal with strange column name and all-NA column", {
   expect_true(all(c("variable", "Judgement", "judgement_status") %in% colnames(res)))
   res <- model_df %>% tidy_rowwise(model, type="communalities")
   expect_equal(colnames(res), c("variable", "Communality", "Uniqueness", "Judgement", "judgement_status"))
+  # The all-NA column is dropped before fitting, so it must not appear as a coefficient row either.
+  res <- model_df %>% tidy_rowwise(model, type="score_coefficients")
+  expect_equal(colnames(res), c("variable", "Factor 1", "Factor 2"))
+  expect_setequal(res$variable, c("Cy l", "mpg", "hp"))
+  check_score_coefficients(model_df)
 })
 
 test_that("exp_factanal with nfactors=1 (issue #30798)", {

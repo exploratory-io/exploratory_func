@@ -59,15 +59,35 @@ test_that('chaid_readable_condition handles the root and edge shapes', {
   expect_true(is.na(chaid_readable_condition(NA_character_)))
   expect_equal(chaid_readable_condition('Root & 年齢 in {<= 26}'), '年齢 <= 26')
   expect_equal(chaid_readable_condition('Root & 年齢 in {> 50}'), '年齢 > 50')
-  expect_equal(chaid_readable_condition('Root & 部署 in {営業}'), '部署 in (営業)')
   expect_equal(chaid_readable_condition(c('Root', 'Root & 年齢 in {<= 26}')),
                c('All', '年齢 <= 26'))
+})
+
+test_that('a single non-interval member reads as an equality (tam #37177)', {
+  expect_equal(chaid_readable_condition('Root & 部署 in {営業}'), '部署 = 営業')
+  expect_equal(chaid_readable_condition('Root & 残業 in {TRUE}'), '残業 = TRUE')
+  expect_equal(chaid_readable_condition('Root & 残業 in {FALSE}'), '残業 = FALSE')
+  expect_equal(
+    chaid_readable_condition('Root & 残業 in {TRUE} & 給料 in {<= 2695.8}'),
+    '残業 = TRUE & 給料 <= 2695.8')
+  # A contiguous bin run that collapses to ONE interval keeps the inequality
+  # form -- the equality branch is only for non-interval members.
+  expect_equal(
+    chaid_readable_condition('Root & 給料 in {<= 2317.6 + (2317.6, 2695.8]}'),
+    '給料 <= 2695.8')
+  # Multi-member groups keep the in (...) form.
+  expect_equal(
+    chaid_readable_condition('Root & 職種 in {ラボ技術者 + 営業担当}'),
+    '職種 in (ラボ技術者 + 営業担当)')
 })
 
 test_that('a category value containing " & " does not break condition splitting', {
   expect_equal(
     chaid_readable_condition('Root & 部署 in {R & D + 人事} & 年齢 in {<= 26}'),
     '部署 in (R & D + 人事) & 年齢 <= 26')
+  expect_equal(
+    chaid_readable_condition('Root & 部署 in {R & D}'),
+    '部署 = R & D')
 })
 
 test_that('chaid_order_group_parts sorts alphabetically without levels', {

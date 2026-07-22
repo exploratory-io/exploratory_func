@@ -679,8 +679,16 @@ build_chaid_tree_nodes <- function(x) {
     if (length(edge_row) == 1) {
       cond_column <- map_name(edges$split_variable[edge_row])
       original_categories <- strsplit(edges$original_categories[edge_row], " \\| ")[[1]]
-      edge_label <- paste0(cond_column, " = ", paste(original_categories, collapse = ", "))
-      cond_value <- as.character(jsonlite::toJSON(as.character(original_categories)))
+      # tam #37177: a branch built from a run of contiguous numeric bins reads
+      # as the range it covers ("<= 2317.6, (2317.6, 2695.8]" -> "<= 2695.8").
+      # cond_value is collapsed IN LOCKSTEP because DTreeGenerator rebuilds the
+      # edge label from cond_value, and its Show Detail filter
+      # (binLabelsToRangeConditions, min-lo/max-hi) parses the collapsed labels
+      # to the same range -- CHAID merges only ADJACENT ordered bins, so no gap
+      # can make the two differ. Categorical members pass through untouched.
+      display_categories <- chaid_collapse_intervals(original_categories)
+      edge_label <- paste0(cond_column, " = ", paste(display_categories, collapse = ", "))
+      cond_value <- as.character(jsonlite::toJSON(as.character(display_categories)))
     } else {
       cond_column <- NA_character_
       edge_label <- ""

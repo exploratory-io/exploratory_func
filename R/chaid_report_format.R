@@ -181,6 +181,9 @@ chaid_readable_one_condition <- function(condition) {
       }
       return(paste0(interval$lower, ' < ', variable, ' <= ', interval$upper))
     }
+    # tam #37177: a single non-interval member reads as an equality, not a
+    # one-element set -- `残業 = TRUE` / `職種 = 営業` instead of `in (TRUE)`.
+    return(paste0(variable, ' = ', collapsed))
   }
   paste0(variable, ' in (', paste(collapsed, collapse = CHAID_GROUP_SEPARATOR), ')')
 }
