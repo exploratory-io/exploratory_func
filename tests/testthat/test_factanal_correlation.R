@@ -135,7 +135,7 @@ test_that("analysis_method and cor_diagnostics tidy types (issue #26623)", {
   expect_equal(method_tbl$Item, c("Correlation", "Factor Extraction Method", "Rotation", "Target Variables", "Data Rows"))
   expect_equal(method_tbl$Value[[1]], "Polychoric Correlation")
   expect_equal(method_tbl$Value[[2]], "Minimum Residual")
-  expect_equal(method_tbl$Value[[3]], "Varimax")
+  expect_equal(method_tbl$Value[[3]], "Varimax (Orthogonal)")
   expect_equal(method_tbl$Value[[4]], "6")
   expect_equal(method_tbl$Value[[5]], as.character(nrow(df)))
   # Hidden columns the client binds the report explanation from.
@@ -352,4 +352,87 @@ test_that("an unsupported variable combination uses its own error id with the co
   expect_true(grepl("^EXP-ANA-35 :: ", err))
   expect_false(grepl("EXP-ANA-6", err))
   expect_true(grepl('\\["cat"\\]', err))
+})
+
+test_that("verification pass 3 findings (issue #26623)", {
+  df <- factanal_ordinal_fixture(n = 200)
+  selection <- select_factor_correlation_type(df[, 1:3])
+
+  # A failed estimation leaves the PEARSON fallback matrix in hand, so its positive definiteness
+  # and smoothing say nothing about the correlation that failed.
+  failed_result <- list(correlation = diag(3), thresholds = NULL, type = "pearson",
+                        smoothed = FALSE, warnings = "boom", failed = TRUE)
+  failed_diagnostics <- compute_polychoric_diagnostics(df[, 1:3], failed_result, selection)
+  expect_equal(failed_diagnostics$Judgement[[4]], "Estimation failed")
+  expect_equal(failed_diagnostics$Judgement[[5]], "Not Available")
+  expect_equal(failed_diagnostics$Judgement[[6]], "Not Available")
+  expect_equal(failed_diagnostics$status[[5]], "na")
+
+  # The sparse-category description must not name Polychoric: the same row appears in tetrachoric
+  # and mixed analyses.
+  expect_false(any(grepl("Polychoric correlations may become unstable", failed_diagnostics$Description)))
+  expect_true(any(grepl("Correlations estimated from categories", failed_diagnostics$Description)))
+
+  # Counts are singular when there is exactly one hit. Balanced columns, then one rare category
+  # injected into a single variable.
+  balanced <- data.frame(q1 = rep(1:4, 50), q2 = rep(1:4, 50), q3 = rep(1:4, 50))
+  balanced$q1[balanced$q1 == 4] <- 3
+  balanced$q1[1] <- 4   # a single response in the top category (1 of 200 = below the 5% cutoff)
+  balanced_selection <- select_factor_correlation_type(balanced)
+  single <- compute_polychoric_diagnostics(balanced,
+                                           list(correlation = diag(3), thresholds = NULL,
+                                                type = "polychoric", smoothed = FALSE,
+                                                warnings = character(), failed = FALSE),
+                                           balanced_selection)
+  expect_equal(single$Judgement[[2]], "Detected in 1 variable")
+
+  # Category counts come from the DEFINED levels the selection branched on, not observed codes.
+  ordered_df <- data.frame(
+    a = factor(c("low", "mid", "high")[c(1, 2, 1, 2, 1, 2, 1, 2)], levels = c("low", "mid", "high"), ordered = TRUE),
+    b = factor(c("low", "mid", "high")[c(1, 2, 3, 2, 1, 2, 3, 2)], levels = c("low", "mid", "high"), ordered = TRUE),
+    c = factor(c("low", "mid", "high")[c(3, 2, 1, 2, 3, 2, 1, 2)], levels = c("low", "mid", "high"), ordered = TRUE)
+  )
+  ordered_selection <- select_factor_correlation_type(ordered_df)
+  ordered_diagnostics <- compute_polychoric_diagnostics(encode_factanal_data(ordered_df, ordered_selection),
+                                                        list(correlation = diag(3), thresholds = NULL,
+                                                             type = "polychoric", smoothed = FALSE,
+                                                             warnings = character(), failed = FALSE),
+                                                        ordered_selection)
+  # Column `a` never takes its third level, but it still HAS three defined categories.
+  expect_equal(ordered_diagnostics$Judgement[[1]], "All categorical variables have 3 categories")
+
+  # Polychoric stays offered for scale-like data the rating-scale heuristic classifies numeric
+  # (a 1-10 scale, or a 1-5 scale with a gap), and is dropped only for genuine measurements.
+  wide_scale <- data.frame(a = rep(1:10, 20), b = rep(1:10, 20), c = rep(1:10, 20))
+  expect_true(factanal_polychoric_available(select_factor_correlation_type(wide_scale), wide_scale))
+  continuous <- mtcars[, c("mpg", "disp", "drat", "wt")]
+  expect_false(factanal_polychoric_available(select_factor_correlation_type(continuous), continuous))
+
+  # The unknown-correlation-type error lists what the guard actually accepts.
+  expect_error(resolve_factanal_correlation_type("nonsense", selection),
+               "auto, pearson, polychoric, tetrachoric, and mixed")
+})
+
+test_that("the parallel analysis null distribution never mixes in Pearson eigenvalues (issue #26623)", {
+  # A permutation whose polychoric estimation fails returns the Pearson matrix with failed = TRUE.
+  # Those iterations must be dropped, not compared against polychoric eigenvalues.
+  df <- factanal_ordinal_fixture(n = 150)[, 1:3]
+  calls <- 0
+  fake_build <- function(data, correlation_type, ...) {
+    calls <<- calls + 1
+    if (calls %% 2 == 0) {
+      list(correlation = stats::cor(data), thresholds = NULL, type = "pearson",
+           smoothed = FALSE, warnings = "failed", failed = TRUE)
+    } else {
+      list(correlation = diag(ncol(data)), thresholds = NULL, type = correlation_type,
+           smoothed = FALSE, warnings = character(), failed = FALSE)
+    }
+  }
+  original_build <- build_factor_correlation
+  assign("build_factor_correlation", fake_build, envir = environment(compute_parallel_analysis))
+  on.exit(assign("build_factor_correlation", original_build, envir = environment(compute_parallel_analysis)), add = TRUE)
+  result <- compute_parallel_analysis(df, n_iter = 4, cor_type = "polychoric",
+                                      cor_matrix = diag(ncol(df)))
+  # Only the successful iterations (identity matrices) contribute, so every threshold is 1.
+  expect_true(all(abs(result$table$random_eigenvalue_threshold - 1) < 1e-8))
 })

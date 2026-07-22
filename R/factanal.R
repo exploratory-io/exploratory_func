@@ -175,11 +175,20 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
         rm(".Random.seed", envir = .GlobalEnv)
       }
     }, add = TRUE)
-    random_eigen_mat <- replicate(n_iter, {
+    random_eigen_list <- lapply(seq_len(n_iter), function(i) {
       shuffled <- as.data.frame(lapply(x, function(col) col[sample.int(n)]))
       res <- build_factor_correlation(shuffled, cor_type)
+      # build_factor_correlation degrades to Pearson when the estimation fails. Comparing a
+      # polychoric eigenvalue against a Pearson threshold is exactly the mix-up this whole change
+      # exists to prevent, so drop the iteration instead.
+      if (isTRUE(res$failed)) return(NULL)
       eigen(res$correlation, symmetric = TRUE, only.values = TRUE)$values
     })
+    random_eigen_list <- random_eigen_list[!vapply(random_eigen_list, is.null, logical(1))]
+    if (length(random_eigen_list) == 0) {
+      return(NULL) # no usable null distribution; the caller reports the parallel analysis as unavailable
+    }
+    random_eigen_mat <- do.call(cbind, random_eigen_list)
     random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
     return(list(
       recommended_n = sum(actual_eigen > random_threshold),
@@ -193,9 +202,9 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
   # Reuse the analysis's own matrix when it was handed one, so the scree/parallel chart and the
   # fit can never be based on two separately-computed Pearson matrices. (issue #26623)
   actual_eigen <- if (!is.null(cor_matrix)) {
-    eigen(cor_matrix, only.values = TRUE)$values
+    eigen(cor_matrix, symmetric = TRUE, only.values = TRUE)$values
   } else {
-    eigen(cor(x, use = "pairwise.complete.obs"), only.values = TRUE)$values
+    eigen(cor(x, use = "pairwise.complete.obs"), symmetric = TRUE, only.values = TRUE)$values
   }
   # Snapshot the RNG so this null-distribution draw does not perturb the outer deterministic
   # stream that later groups' sampling relies on. Restore afterward.
@@ -344,6 +353,7 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
         resolved$degraded_from <- requested_family
         resolved$reason <- sprintf("%s could not be estimated, so Pearson correlation was used instead.",
                                    factanal_correlation_label(requested_family))
+        # degraded_from stays the TOKEN ("polychoric"/...), which the client renders per language.
       }
       fit <- psych::fa(cor_mat, nfactors = nfactors, n.obs = nrow(encoded_df), fm = fm, rotate = rotate)
       # fa() on a correlation matrix never returns scores, so compute them from the same matrix,
@@ -365,6 +375,8 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     fit$correlation_reason <- resolved$reason
     fit$correlation_degraded_from <- if (is.null(resolved$degraded_from)) "" else resolved$degraded_from
     fit$correlation_selection <- selection
+    # Computed here, while the data is in hand: whether Polychoric is worth offering for this data.
+    fit$correlation_polychoric_available <- factanal_polychoric_available(selection, encoded_df)
     fit$correlation_result <- cor_result[setdiff(names(cor_result), "correlation")]
     fit$nfactors_requested <- nfactors
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
@@ -466,7 +478,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   n_factor <- x$factors # Number of factors.
 
   if (type == "screeplot") {
-    eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
+    eigen_res <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else if (type == "variances") {
@@ -678,7 +690,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # Pearson, so the report can say so instead of inventing a rationale.
       degraded_from = if (is.null(x$correlation_degraded_from)) "" else x$correlation_degraded_from,
       # Whether suggesting Polychoric makes sense for this data at all.
-      polychoric_available = factanal_polychoric_available(x$correlation_selection),
+      polychoric_available = isTRUE(x$correlation_polychoric_available),
       # Language-neutral tokens for the selector's warnings; the client renders the localized text.
       warning_tokens = paste(factanal_selection_warning_tokens(x$correlation_selection), collapse = ","),
       # TRUE also when a polychoric estimation failed and the fit degraded to Pearson, so the
@@ -698,7 +710,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     }
   }
   else if (type == "factor_count") {
-    eig <- eigen(x$correlation, only.values = TRUE)$values
+    eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
     kaiser_n <- sum(eig > 1)
     par <- x$parallel
     parallel_rec <- if (is.null(par)) "Not available" else as.character(par$recommended_n)
@@ -713,7 +725,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     )
   }
   else if (type == "parallel_screeplot") {
-    eig <- eigen(x$correlation, only.values = TRUE)$values
+    eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
     par <- x$parallel
     threshold <- if (is.null(par)) rep(NA_real_, length(eig)) else par$table$random_eigenvalue_threshold
     length(threshold) <- length(eig) # pad/truncate to align with eigenvalue count

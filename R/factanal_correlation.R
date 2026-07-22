@@ -362,7 +362,7 @@ select_factor_correlation_type <- function(data, variables = names(data),
       sparse_variables <- five_category_diagnostics$variable[five_category_diagnostics$rare_category]
       if (length(sparse_variables) > 0) {
         all_warnings <- c(all_warnings, sprintf(
-          "Some categories contain less than %.1f%% of responses: %s. Polychoric correlations may become unstable when categories are sparse.",
+          "Some categories contain less than %.1f%% of responses: %s. Correlations estimated from categories may become unstable when categories are sparse.",
           rare_category_prop_cutoff * 100, paste(sparse_variables, collapse = ", ")))
       }
       if (use_polychoric) {
@@ -471,7 +471,7 @@ resolve_factanal_correlation_type <- function(requested, selection) {
   }
   requested <- tolower(trimws(as.character(requested)))
   if (!requested %in% c("auto", "pearson", "polychoric", "tetrachoric", "mixed")) {
-    stop(sprintf("Unknown correlation type: '%s'. Allowed values are auto, pearson, and polychoric.", requested),
+    stop(sprintf("Unknown correlation type: '%s'. Allowed values are auto, pearson, polychoric, tetrachoric, and mixed.", requested),
          call. = FALSE)
   }
   if (requested != "auto") {
@@ -562,9 +562,27 @@ factanal_selection_warning_tokens <- function(selection) {
 # Is Polychoric a legitimate alternative for this data? Used to decide whether the report should
 # suggest it. All-numeric data has `available_options` of just "pearson", so the suggestion is
 # suppressed there rather than pointing the user at a meaningless (and slow) re-run.
-factanal_polychoric_available <- function(selection) {
-  !is.null(selection) && !is.null(selection$available_options) &&
-    any(c("polychoric", "tetrachoric", "mixed") %in% selection$available_options)
+factanal_polychoric_available <- function(selection, data = NULL) {
+  if (!is.null(selection) && !is.null(selection$available_options) &&
+      any(c("polychoric", "tetrachoric", "mixed") %in% selection$available_options)) {
+    return(TRUE)
+  }
+  # A 1-10 scale, or a 1-5 scale with an unobserved middle value, is classified numeric by the
+  # rating-scale heuristic -- but polychoric is still a legitimate manual choice there, so the
+  # report must keep pointing at it. Genuinely continuous measurements (non-integer values, or
+  # many distinct values) are the only case where the suggestion is dropped.
+  if (is.null(data)) {
+    return(FALSE)
+  }
+  data <- as.data.frame(data)
+  any(vapply(colnames(data), function(col) {
+    values <- data[[col]]
+    if (!is.numeric(values)) return(FALSE)
+    values <- values[is.finite(values)]
+    if (length(values) == 0) return(FALSE)
+    if (any(values != floor(values))) return(FALSE)
+    length(unique(values)) <= 20
+  }, logical(1)))
 }
 
 # -----------------------------------------------------------------------------
@@ -590,8 +608,17 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
   }
 
   # 1. Number of categories
+  # Defined categories, not observed ones: the auto-selection branched on n_defined_categories, so
+  # counting observed codes here would let this row contradict the reason for the method choice
+  # (a declared-but-unobserved level).
+  defined_counts <- if (!is.null(selection) && !is.null(selection$variable_summary)) {
+    stats::setNames(selection$variable_summary$n_defined_categories, selection$variable_summary$variable)
+  } else {
+    NULL
+  }
   category_counts <- vapply(variables, function(v) {
-    length(unique(data[[v]][!is.na(data[[v]])]))
+    defined <- if (!is.null(defined_counts) && v %in% names(defined_counts)) defined_counts[[v]] else NA_real_
+    if (is.na(defined)) length(unique(data[[v]][!is.na(data[[v]])])) else as.numeric(defined)
   }, numeric(1))
   if (length(unique(category_counts)) == 1) {
     # "categorical variables", not "variables": in a mixed analysis the continuous columns are not
@@ -610,7 +637,9 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
     props <- as.numeric(table(x)) / length(x)
     any(props < rare_category_prop_cutoff)
   }, logical(1))]
-  sparse_value <- if (length(sparse_variables) == 0) "None" else sprintf("Detected in %d variables", length(sparse_variables))
+  sparse_value <- if (length(sparse_variables) == 0) "None"
+    else if (length(sparse_variables) == 1) "Detected in 1 variable"
+    else sprintf("Detected in %d variables", length(sparse_variables))
   sparse_status <- if (length(sparse_variables) == 0) "ok" else "caution"
 
   # 3. Empty category combinations (a zero cell in a pair's cross tabulation)
@@ -623,7 +652,9 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
       }
     }
   }
-  empty_value <- if (empty_pairs == 0) "None" else sprintf("Detected in %d variable pairs", empty_pairs)
+  empty_value <- if (empty_pairs == 0) "None"
+    else if (empty_pairs == 1) "Detected in 1 variable pair"
+    else sprintf("Detected in %d variable pairs", empty_pairs)
   empty_status <- if (empty_pairs == 0) "ok" else "caution"
 
   # 4. Correlation estimation failures (NA in the off-diagonal of the matrix)
@@ -640,7 +671,8 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
     failure_value <- "None"
     failure_status <- "ok"
   } else {
-    failure_value <- sprintf("Detected in %d variable pairs", failed_cells)
+    failure_value <- if (failed_cells == 1) "Detected in 1 variable pair"
+      else sprintf("Detected in %d variable pairs", failed_cells)
     failure_status <- "caution"
   }
 
@@ -652,7 +684,10 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
   min_eigen <- tryCatch({
     if (is.null(R) || anyNA(R)) NA_real_ else min(eigen(R, symmetric = TRUE, only.values = TRUE)$values)
   }, error = function(e) NA_real_)
-  if (isTRUE(cor_result$smoothed)) {
+  if (isTRUE(cor_result$failed)) {
+    # The matrix here is the Pearson fallback, so it describes a different correlation entirely.
+    definite_value <- "Not Available"; definite_status <- "na"
+  } else if (isTRUE(cor_result$smoothed)) {
     definite_value <- "Not positive definite"; definite_status <- "caution"
   } else if (is.na(min_eigen)) {
     definite_value <- "Not Available"; definite_status <- "na"
@@ -663,8 +698,10 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
   }
 
   # 6. Whether the matrix had to be smoothed
-  smoothed_value <- if (isTRUE(cor_result$smoothed)) "Applied" else "None"
-  smoothed_status <- if (isTRUE(cor_result$smoothed)) "caution" else "ok"
+  smoothed_value <- if (isTRUE(cor_result$failed)) "Not Available"
+    else if (isTRUE(cor_result$smoothed)) "Applied" else "None"
+  smoothed_status <- if (isTRUE(cor_result$failed)) "na"
+    else if (isTRUE(cor_result$smoothed)) "caution" else "ok"
 
   tibble::tibble(
     Diagnostic = c("Number of Categories", "Sparse Categories", "Empty Category Combinations",
@@ -673,7 +710,7 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
     Judgement = c(category_value, sparse_value, empty_value, failure_value, definite_value, smoothed_value),
     Description = c(
       "Number of categories in the categorical variables used for the correlation.",
-      "Categorical variables that have a category holding less than 5% of the responses. Polychoric correlations may become unstable when categories are sparse.",
+      "Categorical variables that have a category holding less than 5% of the responses. Correlations estimated from categories may become unstable when categories are sparse.",
       "Variable pairs that have a category combination with no observations.",
       "Variable pairs whose correlation could not be estimated.",
       "Whether the estimated correlation matrix was positive definite, which factor analysis assumes, before any smoothing.",
