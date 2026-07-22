@@ -30,7 +30,7 @@ access_api <- function(query, dc, apikey, endpoint){
   while(TRUE){
     url <- paste0("https://", dc,".api.mailchimp.com/3.0/", endpoint)
 
-    res <- httr::GET(url, httr::authenticate("any", apikey), query = query)
+    res <- httr::GET(url, httr::authenticate("any", apikey), query = to_api_query(query))
 
     from_json <- res %>% httr::content(as = "text") %>% jsonlite::fromJSON()
 
