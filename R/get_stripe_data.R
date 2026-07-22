@@ -70,7 +70,7 @@ get_stripe_data <- function(endpoint = "balance/history",
 
   get_data <- function(query, body){
     res <- httr::GET(url,
-                     query = query,
+                     query = to_api_query(query),
                      body = body,
                      token
     )
@@ -87,6 +87,9 @@ get_stripe_data <- function(endpoint = "balance/history",
   query <- list(limit = limit)
   if(!is.null(date_since)){
     min_unixtime <- as.numeric(as.POSIXct(date_since))
+    # to_api_query() at the GET keeps this out of scientific notation. Stripe answers
+    # "Invalid integer: 1.782e+09" otherwise, and which dates hit that depends on the
+    # digits of the unixtime, so it only fails on some days.
     query[["created[gte]"]] <- min_unixtime
   }
 

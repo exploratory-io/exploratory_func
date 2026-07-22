@@ -213,11 +213,13 @@ test_that("numeric_intervals reports initial binning + final intervals per numer
                                          min_split = 30, min_bucket = 15,
                                          max_depth = 3))
   ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  # tam #37177: "Initial Binning" was split into method + bin count.
   expect_equal(colnames(ni),
-               c("Node", "Variable", "Initial Binning", "Final Intervals"))
+               c("Node", "Variable", "Binning Method", "Initial Bins", "Final Intervals"))
   # Only numeric predictors appear.
   expect_true(all(ni$Variable %in% c("age", "salary")))
-  expect_true(all(grepl("bins$", ni[["Initial Binning"]])))
+  expect_true(all(ni[["Binning Method"]] %in% c("quantile", "equal_width")))
+  expect_true(all(ni[["Initial Bins"]] > 0))
   expect_true(all(nchar(ni[["Final Intervals"]]) > 0))
 })
 
@@ -234,7 +236,7 @@ test_that("numeric_intervals is empty when no numeric predictor is binned", {
   ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
   expect_equal(nrow(ni), 0)
   expect_equal(colnames(ni),
-               c("Node", "Variable", "Initial Binning", "Final Intervals"))
+               c("Node", "Variable", "Binning Method", "Initial Bins", "Final Intervals"))
 })
 
 test_that("category_error_distribution is empty for a non-ordered target", {

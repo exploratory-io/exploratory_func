@@ -177,7 +177,7 @@ resolve_milestone <- function(owner, repository, milestone, username, password) 
     page <- 1
     repeat {
       res <- httr::GET(endpoint,
-                       query = list(state = state, per_page = 100, page = page),
+                       query = to_api_query(list(state = state, per_page = 100, page = page)),
                        httr::authenticate(username, password))
       if (httr::status_code(res) != 200) {
         break
@@ -271,7 +271,7 @@ getGithubIssues <- function(username, password, owner, repository,
     if (!is.null(type)) query_params$type <- type
 
     res <- httr::GET(endpoint,
-               query = query_params,
+               query = to_api_query(query_params),
                httr::authenticate(username, password))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
