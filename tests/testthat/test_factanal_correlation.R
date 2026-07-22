@@ -148,7 +148,7 @@ test_that("analysis_method and cor_diagnostics tidy types (issue #26623)", {
                c("Number of Categories", "Sparse Categories", "Empty Category Combinations",
                  "Correlation Estimation Failures", "Positive Definiteness of the Correlation Matrix",
                  "Smoothing Applied"))
-  expect_equal(diagnostics$Judgement[[1]], "All variables have 5 categories")
+  expect_equal(diagnostics$Judgement[[1]], "All categorical variables have 5 categories")
   expect_equal(diagnostics$Judgement[[4]], "None")   # no estimation failure on this fixture
   expect_equal(diagnostics$Judgement[[5]], "No problem")
   expect_equal(diagnostics$Judgement[[6]], "None")
@@ -276,7 +276,80 @@ test_that("mixed-correlation diagnostics only describe the categorical variables
   diagnostics <- tidy(fit, type = "cor_diagnostics")
   # A continuous column has one "category" per distinct value; counting it would report hundreds of
   # categories and flag every variable as sparse and every pair as having empty combinations.
-  expect_equal(diagnostics$Judgement[[1]], "All variables have 5 categories")
+  expect_equal(diagnostics$Judgement[[1]], "All categorical variables have 5 categories")
   expect_equal(diagnostics$Judgement[[2]], "Detected in 3 variables")   # the 3 ordinal ones at most
   expect_false(grepl("Detected in 10 variable pairs", diagnostics$Judgement[[3]]))
+})
+
+test_that("verification pass 2 findings (issue #26623)", {
+  df <- factanal_ordinal_fixture()
+  fit <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
+                      parallel_n_iter = 3)$model[[1]]
+  method_tbl <- tidy(fit, type = "analysis_method")
+
+  # Rotation / extraction labels echo the property dropdown's wording, so the report and the
+  # settings panel cannot disagree about what was run.
+  expect_equal(factanal_rotation_label("varimax"), "Varimax (Orthogonal)")
+  expect_equal(factanal_rotation_label("oblimin"), "Oblimin (Oblique)")
+  expect_equal(factanal_extraction_method_label("gls"), "Generalized Weighted Least Squares")
+
+  # Whether Polychoric is worth suggesting is data-dependent.
+  expect_true(factanal_polychoric_available(select_factor_correlation_type(df)))
+  expect_false(factanal_polychoric_available(select_factor_correlation_type(mtcars[, c("mpg", "hp", "drat", "wt")])))
+  expect_true(method_tbl$polychoric_available[[1]])
+  expect_equal(method_tbl$degraded_from[[1]], "")
+
+  # The category-count row says "categorical variables": in a mixed analysis the continuous
+  # columns are not counted, so "all variables" would contradict the Target Variables row.
+  diagnostics <- tidy(fit, type = "cor_diagnostics")
+  expect_true(grepl("^All categorical variables have", diagnostics$Judgement[[1]]))
+
+  # Selector warnings reach the client as language-neutral tokens (never English prose).
+  sparse_df <- df
+  sparse_df$q1[sparse_df$q1 == 5] <- 4       # make the top category nearly empty
+  sparse_df$q1[seq_len(2)] <- 5              # 2 of 300 responses = below the 5% cutoff
+  tokens <- factanal_selection_warning_tokens(select_factor_correlation_type(sparse_df))
+  expect_true("sparse_categories" %in% tokens)
+  expect_equal(factanal_selection_warning_tokens(select_factor_correlation_type(mtcars[, 1:4])), character())
+
+  # The parallel analysis reuses the analysis's own matrix rather than recomputing a second one.
+  parallel_result <- compute_parallel_analysis(mtcars[, c("mpg", "hp", "drat", "wt")], n_iter = 3,
+                                               cor_type = "pearson",
+                                               cor_matrix = cor(mtcars[, c("mpg", "hp", "drat", "wt")]))
+  expect_equal(parallel_result$table$actual_eigenvalue,
+               eigen(cor(mtcars[, c("mpg", "hp", "drat", "wt")]), only.values = TRUE)$values)
+})
+
+test_that("positive definiteness reports the matrix BEFORE psych's smoothing (issue #26623)", {
+  df <- factanal_ordinal_fixture(n = 200)
+  # psych smooths a non-positive-definite matrix automatically, so testing the returned matrix
+  # would always pass and contradict the "Smoothing Applied" row.
+  smoothed_result <- list(correlation = diag(3), thresholds = NULL, type = "polychoric",
+                          smoothed = TRUE, warnings = character(), failed = FALSE)
+  selection <- select_factor_correlation_type(df[, 1:3])
+  diagnostics <- compute_polychoric_diagnostics(df[, 1:3], smoothed_result, selection)
+  expect_equal(diagnostics$Judgement[[5]], "Not positive definite")
+  expect_equal(diagnostics$Judgement[[6]], "Applied")
+  expect_equal(diagnostics$status[[5]], "caution")
+
+  clean_result <- list(correlation = diag(3), thresholds = NULL, type = "polychoric",
+                       smoothed = FALSE, warnings = character(), failed = FALSE)
+  clean_diagnostics <- compute_polychoric_diagnostics(df[, 1:3], clean_result, selection)
+  expect_equal(clean_diagnostics$Judgement[[5]], "No problem")
+  expect_equal(clean_diagnostics$Judgement[[6]], "None")
+})
+
+test_that("an unsupported variable combination uses its own error id with the column names (issue #26623)", {
+  df <- factanal_ordinal_fixture(n = 150)
+  df$cat <- factor(sample(c("a", "b", "c"), nrow(df), TRUE))
+  # EXP-ANA-6 belongs to PCA's reserved-column-name error; reusing it would show the user a
+  # message about renaming PC1/PC2. The params carry the offending column names.
+  err <- tryCatch({
+    exp_factanal(df, q1, q2, cat, nfactors = 1, parallel_n_iter = 3)
+    NULL
+  }, error = function(e) conditionMessage(e))
+  expect_false(is.null(err))
+  expect_true(grepl("^EXP-ANA-35 :: ", err))
+  expect_false(grepl("EXP-ANA-6", err))
+  expect_true(grepl('\\["cat"\\]', err))
 })

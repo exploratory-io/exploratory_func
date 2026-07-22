@@ -513,17 +513,17 @@ factanal_rotation_label <- function(rotate) {
   rotate <- if (is.null(rotate) || length(rotate) != 1L || is.na(rotate)) "none" else as.character(rotate)
   switch(rotate,
          none = "None",
-         varimax = "Varimax",
-         Promax = "Promax",
+         varimax = "Varimax (Orthogonal)",
+         Promax = "Promax (Oblique)",
          promax = "Promax with Kaiser Normalization",
-         oblimin = "Oblimin",
-         quartimax = "Quartimax",
+         oblimin = "Oblimin (Oblique)",
+         quartimax = "Quartimax (Orthogonal)",
          bentlerT = "Bentler (Orthogonal)",
          bentlerQ = "Bentler (Oblique)",
-         equamax = "Equamax",
+         equamax = "Equamax (Orthogonal)",
          geominT = "Geomin (Orthogonal)",
          geomin = "Geomin (Oblique)",
-         simplimax = "Simplimax",
+         simplimax = "Simplimax (Oblique)",
          cluster = "Cluster (Oblique)",
          rotate)
 }
@@ -535,11 +535,36 @@ factanal_extraction_method_label <- function(fm) {
          pa = "Principal Axis",
          ols = "Ordinary Least Squares",
          wls = "Weighted Least Squares",
-         gls = "Generalized Least Squares",
+         gls = "Generalized Weighted Least Squares",
          minchi = "Minimum Chi-Square",
          minrank = "Minimum Rank",
          alpha = "Alpha Factoring",
          as.character(fm))
+}
+
+
+# Language-neutral tokens for the selector's warnings, so the client can render localized text
+# instead of the English sentences the selector composes for logs. (issue #26623)
+factanal_selection_warning_tokens <- function(selection) {
+  if (is.null(selection) || is.null(selection$warnings) || length(selection$warnings) == 0) {
+    return(character())
+  }
+  tokens <- character()
+  if (any(grepl("less than", selection$warnings, fixed = TRUE))) {
+    tokens <- c(tokens, "sparse_categories")
+  }
+  if (any(grepl("Alphabetical order will be used", selection$warnings, fixed = TRUE))) {
+    tokens <- c(tokens, "alphabetical_category_order")
+  }
+  unique(tokens)
+}
+
+# Is Polychoric a legitimate alternative for this data? Used to decide whether the report should
+# suggest it. All-numeric data has `available_options` of just "pearson", so the suggestion is
+# suppressed there rather than pointing the user at a meaningless (and slow) re-run.
+factanal_polychoric_available <- function(selection) {
+  !is.null(selection) && !is.null(selection$available_options) &&
+    any(c("polychoric", "tetrachoric", "mixed") %in% selection$available_options)
 }
 
 # -----------------------------------------------------------------------------
@@ -569,7 +594,9 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
     length(unique(data[[v]][!is.na(data[[v]])]))
   }, numeric(1))
   if (length(unique(category_counts)) == 1) {
-    category_value <- sprintf("All variables have %d categories", as.integer(category_counts[[1]]))
+    # "categorical variables", not "variables": in a mixed analysis the continuous columns are not
+    # counted here, and saying "all variables" would contradict the Target Variables count above.
+    category_value <- sprintf("All categorical variables have %d categories", as.integer(category_counts[[1]]))
     category_status <- "uniform"
   } else {
     category_value <- sprintf("%d to %d categories", as.integer(min(category_counts)), as.integer(max(category_counts)))
@@ -618,10 +645,16 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
   }
 
   # 5. Positive definiteness of the correlation matrix
+  # psych::polychoric()/tetrachoric() smooth the matrix automatically when it is not positive
+  # definite, so testing the RETURNED matrix would always pass and contradict the "Smoothing
+  # Applied" row below. The smoothing itself is the evidence that the raw estimate was not
+  # positive definite.
   min_eigen <- tryCatch({
     if (is.null(R) || anyNA(R)) NA_real_ else min(eigen(R, symmetric = TRUE, only.values = TRUE)$values)
   }, error = function(e) NA_real_)
-  if (is.na(min_eigen)) {
+  if (isTRUE(cor_result$smoothed)) {
+    definite_value <- "Not positive definite"; definite_status <- "caution"
+  } else if (is.na(min_eigen)) {
     definite_value <- "Not Available"; definite_status <- "na"
   } else if (min_eigen > 1e-8) {
     definite_value <- "No problem"; definite_status <- "ok"
@@ -639,11 +672,11 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
                    "Smoothing Applied"),
     Judgement = c(category_value, sparse_value, empty_value, failure_value, definite_value, smoothed_value),
     Description = c(
-      "Number of categories in the selected variables.",
-      "Variables that have a category holding less than 5% of the responses. Polychoric correlations may become unstable when categories are sparse.",
+      "Number of categories in the categorical variables used for the correlation.",
+      "Categorical variables that have a category holding less than 5% of the responses. Polychoric correlations may become unstable when categories are sparse.",
       "Variable pairs that have a category combination with no observations.",
       "Variable pairs whose correlation could not be estimated.",
-      "Whether the correlation matrix is positive definite, which factor analysis assumes.",
+      "Whether the estimated correlation matrix was positive definite, which factor analysis assumes, before any smoothing.",
       "Whether the correlation matrix had to be smoothed to become positive definite."
     ),
     status = c(category_status, sparse_status, empty_status, failure_status, definite_status, smoothed_status)

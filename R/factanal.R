@@ -190,7 +190,13 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
       )
     ))
   }
-  actual_eigen <- eigen(cor(x, use = "pairwise.complete.obs"), only.values = TRUE)$values
+  # Reuse the analysis's own matrix when it was handed one, so the scree/parallel chart and the
+  # fit can never be based on two separately-computed Pearson matrices. (issue #26623)
+  actual_eigen <- if (!is.null(cor_matrix)) {
+    eigen(cor_matrix, only.values = TRUE)$values
+  } else {
+    eigen(cor(x, use = "pairwise.complete.obs"), only.values = TRUE)$values
+  }
   # Snapshot the RNG so this null-distribution draw does not perturb the outer deterministic
   # stream that later groups' sampling relies on. Restore afterward.
   had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
@@ -303,7 +309,13 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     # whichever correlation was asked for -- picking Pearson manually must not smuggle a nominal
     # column in as arbitrary integer codes. So gate on the SELECTION, not the resolved type.
     if (identical(selection$selected_method, "unsupported") || identical(resolved$type, "unsupported")) {
-      stop(paste0("EXP-ANA-6 :: [] :: ", selection$reason))
+      # EXP-ANA-35 carries the offending column names as its params, so the client can name them.
+      # (EXP-ANA-6 is PCA's reserved-column-name error -- do not reuse it here.)
+      unsupported_vars <- selection$variable_summary$variable[
+        selection$variable_summary$detected_type %in% c("nominal", "invalid")]
+      stop(paste0("EXP-ANA-35 :: ",
+                  jsonlite::toJSON(paste(unsupported_vars, collapse = ", ")),
+                  " :: ", selection$reason))
     }
     # Category-ordered numeric coding. For an all-numeric data frame this is a no-op, so the
     # Pearson path stays bit-for-bit what it was before this change.
@@ -325,8 +337,13 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
       cor_mat <- cor_result$correlation
       if (isTRUE(cor_result$failed)) {
         # build_factor_correlation already degraded to Pearson; keep the reported type honest.
-        # requested_family stays as asked so the diagnostics table can still REPORT the failure.
+        # requested_family stays as asked so the diagnostics table can still REPORT the failure,
+        # and degraded_from lets the report say WHICH correlation failed instead of claiming the
+        # variables were treated as continuous on purpose.
         resolved$type <- "pearson"
+        resolved$degraded_from <- requested_family
+        resolved$reason <- sprintf("%s could not be estimated, so Pearson correlation was used instead.",
+                                   factanal_correlation_label(requested_family))
       }
       fit <- psych::fa(cor_mat, nfactors = nfactors, n.obs = nrow(encoded_df), fm = fm, rotate = rotate)
       # fa() on a correlation matrix never returns scores, so compute them from the same matrix,
@@ -346,6 +363,7 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     fit$correlation_type <- resolved$type
     fit$correlation_is_auto <- isTRUE(resolved$auto)
     fit$correlation_reason <- resolved$reason
+    fit$correlation_degraded_from <- if (is.null(resolved$degraded_from)) "" else resolved$degraded_from
     fit$correlation_selection <- selection
     fit$correlation_result <- cor_result[setdiff(names(cor_result), "correlation")]
     fit$nfactors_requested <- nfactors
@@ -656,6 +674,13 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # part of the rendered Item/Value table.
       correlation_type = cor_type,
       correlation_is_auto = isTRUE(x$correlation_is_auto),
+      # Non-empty when the requested correlation could not be estimated and the fit fell back to
+      # Pearson, so the report can say so instead of inventing a rationale.
+      degraded_from = if (is.null(x$correlation_degraded_from)) "" else x$correlation_degraded_from,
+      # Whether suggesting Polychoric makes sense for this data at all.
+      polychoric_available = factanal_polychoric_available(x$correlation_selection),
+      # Language-neutral tokens for the selector's warnings; the client renders the localized text.
+      warning_tokens = paste(factanal_selection_warning_tokens(x$correlation_selection), collapse = ","),
       # TRUE also when a polychoric estimation failed and the fit degraded to Pearson, so the
       # report still shows the diagnostics table that reports the failure.
       has_diagnostics = !is.null(x$cor_diagnostics) && nrow(x$cor_diagnostics) > 0,
