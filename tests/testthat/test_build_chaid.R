@@ -458,3 +458,33 @@ test_that("chaid tidy exposes 0-based breadth-first node ids on every surface", 
   expect_equal(model_df$model[[1]]$nodes$node_id[
     is.na(model_df$model[[1]]$nodes$parent_id)], 1L)
 })
+
+test_that("tree_nodes edge labels collapse contiguous numeric bins (tam #37177)", {
+  set.seed(11); n <- 700
+  df <- data.frame(
+    salary = round(runif(n, 1000, 15000)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$churn <- df$salary < 4000 | runif(n) < 0.1
+  model_df <- suppressWarnings(exp_chaid(df, churn, salary, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  edges <- nodes[!is.na(nodes$parent_id) & nodes$cond_column == "salary", ]
+  expect_gt(nrow(edges), 0)
+  for (i in seq_len(nrow(edges))) {
+    values <- jsonlite::fromJSON(edges$cond_value[i])
+    # Every numeric branch collapses its contiguous bin run to ONE range label.
+    expect_equal(length(values), 1)
+    expect_true(grepl("^(<=|>|\\()", values))
+    # edge_label mirrors cond_value (DTreeGenerator rebuilds from cond_value).
+    expect_equal(edges$edge_label[i], paste0("salary = ", values))
+  }
+  # A categorical branch keeps its member enumeration untouched.
+  cat_edges <- nodes[!is.na(nodes$parent_id) & nodes$cond_column == "dept", ]
+  if (nrow(cat_edges) > 0) {
+    cat_values <- jsonlite::fromJSON(cat_edges$cond_value[1])
+    expect_true(all(cat_values %in% c("sales", "rnd", "hr")))
+  }
+})
