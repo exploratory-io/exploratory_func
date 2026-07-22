@@ -513,3 +513,57 @@ test_that("exp_rpart(multi) evaluate training and test with impurity importance"
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 })
+# report_metrics is the opt-in switch that adds the extra Summary-table metrics the
+# Decision Tree Analytics Report needs (#37156). The invariants below are what the
+# report depends on: the default output must be untouched, the extra columns must be
+# present for BOTH the training and the test row (the test row is produced by a
+# separate, model-agnostic code path, so it is the easy one to leave behind), and the
+# values must be real numbers rather than NA.
+test_that("exp_rpart report_metrics adds metrics without changing the default output", {
+  target_of <- list(regression = rlang::sym("ARR DELAY"),
+                    binary = rlang::sym("is delayed"),
+                    multiclass = rlang::sym("ORI GIN"))
+  expected_added <- list(regression = "MAE",
+                         binary = c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity"),
+                         multiclass = c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC"))
+
+  data <- flight %>% dplyr::mutate(`is delayed` = `ARR DELAY` > 0)
+
+  for (kind in names(target_of)) {
+    for (test_rate in c(0, 0.3)) {
+      model_df <- data %>% exp_rpart(!!target_of[[kind]], `DIS TANCE`, `DEP TIME`, test_rate = test_rate)
+      base <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
+      with_metrics <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE, report_metrics = TRUE)
+
+      label <- paste0(kind, " test_rate=", test_rate)
+      # Every extra column is present.
+      expect_true(all(expected_added[[kind]] %in% colnames(with_metrics)), info = label)
+      # The default output is untouched, so no other analytics changes.
+      expect_false(any(expected_added[[kind]] %in% colnames(base)), info = label)
+      # Columns the default already had keep their exact values. AUC is intentionally
+      # renamed to ROC AUC for binary, so compare only the columns that remain.
+      kept <- intersect(colnames(base), colnames(with_metrics))
+      expect_equal(as.data.frame(base)[, kept, drop = FALSE],
+                   as.data.frame(with_metrics)[, kept, drop = FALSE], info = label)
+      # Both the training row and (when there is one) the test row carry real values.
+      expect_equal(nrow(with_metrics), if (test_rate > 0) 2 else 1, info = label)
+      expect_false(any(is.na(with_metrics[, expected_added[[kind]], drop = FALSE])), info = label)
+    }
+  }
+
+  # Binary renames AUC to ROC AUC so it reads as a pair with PR AUC.
+  model_df <- data %>% exp_rpart(`is delayed`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
+  with_metrics <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE, report_metrics = TRUE)
+  expect_false("AUC" %in% colnames(with_metrics))
+  # Balanced accuracy is the mean of recall and specificity, by definition.
+  expect_equal(with_metrics$`Balanced Accuracy`[[1]],
+               (with_metrics$Recall[[1]] + with_metrics$Specificity[[1]]) / 2)
+
+  # Summary by Class gains the per-category One-vs-Rest metrics, and the shares of
+  # all categories add up to the whole evaluated data.
+  model_df <- flight %>% exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
+  by_class <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class",
+                                              pretty.name = TRUE, report_metrics = TRUE)
+  expect_true(all(c("Balanced Accuracy", "ROC AUC", "PR AUC", "Overall Share") %in% colnames(by_class)))
+  expect_equal(sum(by_class$`Overall Share`), 1)
+})
