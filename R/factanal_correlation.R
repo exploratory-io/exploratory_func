@@ -448,8 +448,10 @@ build_factor_correlation <- function(data, correlation_type = c("pearson", "poly
       invokeRestart("muffleWarning")
     })
 
-  if (is.null(result) || is.null(result$rho)) {
-    # Degrade to Pearson rather than aborting the whole analysis.
+  if (is.null(result) || is.null(result$rho) || anyNA(result$rho)) {
+    # Degrade to Pearson rather than aborting the whole analysis. A partially-NA matrix counts as a
+    # failure too: psych::fa() refuses to run on one ("missing values (NAs) in the correlation
+    # matrix do not allow me to continue"), so keeping it would abort with a raw psych error.
     return(list(correlation = stats::cor(data, use = use), thresholds = NULL,
                 type = "pearson", smoothed = FALSE, warnings = captured, failed = TRUE))
   }
@@ -657,9 +659,20 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
   # 3. Empty category combinations (a zero cell in a pair's cross tabulation)
   empty_pairs <- 0L
   if (!no_categorical && length(variables) >= 2) {
+    # Cross-tabulate over the DEFINED levels: a level nobody chose makes every pair involving it
+    # structurally empty, but a raw table() never materializes a row/column for it.
+    as_defined_factor <- function(v) {
+      values <- data[[v]]
+      levels_for_v <- if (!is.null(defined_levels) && !is.null(defined_levels[[v]])) {
+        seq_len(length(defined_levels[[v]]))
+      } else {
+        sort(unique(values[!is.na(values)]))
+      }
+      factor(values, levels = levels_for_v)
+    }
     for (i in seq_len(length(variables) - 1)) {
       for (j in seq(i + 1, length(variables))) {
-        tab <- table(data[[variables[[i]]]], data[[variables[[j]]]])
+        tab <- table(as_defined_factor(variables[[i]]), as_defined_factor(variables[[j]]))
         if (any(tab == 0)) empty_pairs <- empty_pairs + 1L
       }
     }
@@ -723,7 +736,7 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
     Judgement = c(category_value, sparse_value, empty_value, failure_value, definite_value, smoothed_value),
     Description = c(
       "Number of categories in the categorical variables used for the correlation.",
-      "Categorical variables that have a category holding less than 5% of the responses. Correlations estimated from categories may become unstable when categories are sparse.",
+      "Categorical variables that have a category holding a very small share of the responses. Correlations estimated from categories may become unstable when categories are sparse.",
       "Variable pairs that have a category combination with no observations.",
       "Variable pairs whose correlation could not be estimated.",
       "Whether the estimated correlation matrix was positive definite, which factor analysis assumes, before any smoothing.",
