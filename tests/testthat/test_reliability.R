@@ -69,6 +69,46 @@ test_that("exp_cronbach_alpha Pearson report sections", {
   expect_true(all(colnames(df) %in% colnames(res)))
 })
 
+test_that("alpha-if-dropped and scale candidates use the reported alpha's estimator (#37175)", {
+  df <- make_reliability_df()
+
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson")
+  reported_alpha <- (model_df %>% glance_rowwise(model, pretty.name = TRUE))$Alpha
+
+  candidates <- model_df %>% tidy_rowwise(model, type = "scale_candidates")
+  # "Use all items" always leads the table, and its alpha is the alpha we report.
+  expect_equal(candidates$Candidate[[1]], "Use all items")
+  expect_equal(candidates$Alpha[[1]], reported_alpha, tolerance = 1e-8)
+  # Drop candidates stay sorted best-alpha-first behind the base row.
+  if (nrow(candidates) > 2) {
+    expect_equal(candidates$Alpha[-1], sort(candidates$Alpha[-1], decreasing = TRUE))
+  }
+
+  dropped <- model_df %>% tidy_rowwise(model, type = "alpha_if_dropped")
+  # Each if-dropped alpha is the RAW alpha of the remaining items, not the
+  # correlation-matrix (standardized) alpha, and the difference is measured
+  # against the same reported alpha.
+  for (i in seq_len(nrow(dropped))) {
+    item <- dropped$`Dropped Item`[[i]]
+    remaining <- as.data.frame(df[, setdiff(colnames(df), item), drop = FALSE])
+    ref <- suppressWarnings(psych::alpha(remaining))$total$raw_alpha
+    expect_equal(dropped$`Alpha if Dropped`[[i]], ref, tolerance = 1e-6)
+    expect_equal(dropped$`Difference from Current`[[i]], ref - reported_alpha,
+                 tolerance = 1e-6)
+  }
+
+  # Polychoric/mixed keep the correlation-matrix estimator, and stay consistent
+  # with the ordinal alpha reported for them.
+  ordinal_df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(),
+                                                   ~ factor(.x, ordered = TRUE)))
+  ordinal_model <- exp_cronbach_alpha(ordinal_df, dplyr::everything(),
+                                      correlation_method = "polychoric")
+  ordinal_reported <- (ordinal_model %>% glance_rowwise(model, pretty.name = TRUE))$Alpha
+  ordinal_candidates <- ordinal_model %>% tidy_rowwise(model, type = "scale_candidates")
+  expect_equal(ordinal_candidates$Candidate[[1]], "Use all items")
+  expect_equal(ordinal_candidates$Alpha[[1]], ordinal_reported, tolerance = 1e-8)
+})
+
 test_that("response distribution uses Summary View numeric binning", {
   df <- list(
     low_cardinality = c(1L, 1L, 2L, 4L, 4L),
