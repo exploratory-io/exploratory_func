@@ -26,6 +26,42 @@ factanal_ordinal_fixture <- function(n = 300, skew = TRUE, seed = 42) {
              q4 = make_col(lat2), q5 = make_col(lat2), q6 = make_col(lat2))
 }
 
+# Swaps build_factor_correlation for a stub and returns a restore function.
+#
+# The package namespace is LOCKED when the tests run against an installed build (Jenkins /
+# R CMD check), so a bare assign() fails there with "cannot change value of locked binding".
+# Mirrors the unlockBinding pattern already used in test_pdf.R. The global-environment copy is
+# patched too, so the suite also works when the R files are source()'d for local iteration --
+# in that case exp_factanal()/compute_parallel_analysis() resolve the helper from globalenv,
+# not from the namespace.
+stub_build_factor_correlation <- function(stub) {
+  restorers <- list()
+
+  ns <- tryCatch(asNamespace("exploratory"), error = function(e) NULL)
+  if (!is.null(ns) && exists("build_factor_correlation", envir = ns, inherits = FALSE)) {
+    original_ns <- get("build_factor_correlation", envir = ns)
+    was_locked <- bindingIsLocked("build_factor_correlation", ns)
+    if (was_locked) unlockBinding("build_factor_correlation", ns)
+    assign("build_factor_correlation", stub, envir = ns)
+    restorers <- c(restorers, function() {
+      assign("build_factor_correlation", original_ns, envir = ns)
+      if (was_locked) lockBinding("build_factor_correlation", ns)
+    })
+  }
+
+  if (exists("build_factor_correlation", envir = globalenv(), inherits = FALSE)) {
+    original_global <- get("build_factor_correlation", envir = globalenv())
+    assign("build_factor_correlation", stub, envir = globalenv())
+    restorers <- c(restorers, function() {
+      assign("build_factor_correlation", original_global, envir = globalenv())
+    })
+  }
+
+  function() {
+    for (restore in restorers) restore()
+  }
+}
+
 test_that("correlation type auto-selection rules (issue #26623)", {
   n <- 300
   set.seed(11)
@@ -428,9 +464,8 @@ test_that("the parallel analysis null distribution never mixes in Pearson eigenv
            smoothed = FALSE, warnings = character(), failed = FALSE)
     }
   }
-  original_build <- build_factor_correlation
-  assign("build_factor_correlation", fake_build, envir = environment(compute_parallel_analysis))
-  on.exit(assign("build_factor_correlation", original_build, envir = environment(compute_parallel_analysis)), add = TRUE)
+  restore <- stub_build_factor_correlation(fake_build)
+  on.exit(restore(), add = TRUE)
   result <- compute_parallel_analysis(df, n_iter = 4, cor_type = "polychoric",
                                       cor_matrix = diag(ncol(df)))
   # Only the successful iterations (identity matrices) contribute, so every threshold is 1.
@@ -486,8 +521,8 @@ test_that("a failed estimation degrades to Pearson end to end (issue #26623)", {
     list(correlation = stats::cor(data, use = use), thresholds = NULL, type = "pearson",
          smoothed = FALSE, warnings = "simulated polychoric failure", failed = TRUE)
   }
-  assign("build_factor_correlation", failing_build, envir = environment(exp_factanal))
-  on.exit(assign("build_factor_correlation", original_build, envir = environment(exp_factanal)), add = TRUE)
+  restore <- stub_build_factor_correlation(failing_build)
+  on.exit(restore(), add = TRUE)
 
   fit <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
                       cor_type = "polychoric", parallel_n_iter = 3)$model[[1]]
