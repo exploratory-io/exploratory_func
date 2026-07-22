@@ -178,6 +178,49 @@ test_that("exp_factanal with strange column name and all-NA column", {
   expect_equal(colnames(res), c("variable", "Communality", "Uniqueness", "Judgement", "judgement_status"))
 })
 
+test_that("exp_factanal with nfactors=1 (issue #30798)", {
+  # Biplot plots Factor 1 vs Factor 2, so it is the only tidy type that structurally cannot
+  # support a single factor. It must degrade gracefully to an empty result with the same column
+  # shape the client expects, instead of erroring on a missing "Factor 2" column. Every other
+  # tidy type must keep working normally with nfactors=1 -- exercise every type used elsewhere in
+  # this test file to guard against a similar nfactors>=2 assumption lurking anywhere else.
+  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+  model_df <- exp_factanal(df, cyl, mpg, hp, drat, max_nrow=30, nfactors=1, fm="minres")
+
+  res <- model_df %>% tidy_rowwise(model, type="biplot")
+  expect_equal(nrow(res), 0)
+  expect_true(all(c(".factor_1", ".factor_2", ".factor_2_variable") %in% colnames(res)))
+  expect_true(is.numeric(res$.factor_1))
+  expect_true(is.numeric(res$.factor_2))
+  expect_true(is.numeric(res$.factor_2_variable))
+
+  # "variances" needs its own value-level check: psych::fa()'s Vaccounted matrix omits
+  # "Cumulative Var" / "Proportion Explained" / "Cumulative Proportion" when nfactors=1 (they are
+  # trivial for a single factor), and factanal.R backfills them. For one factor: cumulative
+  # variance up through "the only factor" equals that factor's own proportion, and that one
+  # factor explains 100% of whatever is explained.
+  variances_res <- model_df %>% tidy_rowwise(model, type="variances")
+  expect_equal(nrow(variances_res), 1)
+  expect_equal(variances_res$`Cumulative Var`, variances_res$`Proportion Var`)
+  expect_equal(variances_res$`Proportion Explained`, 1)
+  expect_equal(variances_res$`Cumulative Proportion`, 1)
+  expect_equal(variances_res$`Cummulated % Variance`, variances_res$`% Variance`)
+
+  # Every other tidy/glance type must run cleanly with nfactors=1 (no other nfactors>=2
+  # assumption should exist elsewhere in this file besides biplot/variances).
+  expect_no_error(model_df %>% glance_rowwise(model, pretty.name=TRUE))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="loadings"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="correlation"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="screeplot"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="data"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="suitability"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="factor_count"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="parallel_screeplot"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="loadings_wide"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="communalities"))
+  expect_no_error(model_df %>% tidy_rowwise(model, type="communalities_long"))
+})
+
 test_that("factor analysis report judgment helpers (issue #37018)", {
   cfg <- factanal_report_config()
 
