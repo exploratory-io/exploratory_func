@@ -592,6 +592,10 @@ factanal_polychoric_available <- function(selection, data = NULL) {
 # section "Data Suitability Diagnostics"). Values are English-canonical strings
 # the client translates; `status` is a language-neutral token.
 # -----------------------------------------------------------------------------
+# NOTE: `rare_category_prop_cutoff` is mirrored in the report templates, which name the percentage
+# in prose ("less than 5% of the responses" / 「回答が全体の5%未満」) in
+# tam/src/js/components/analysis/templates/markdown/exp_factanal{,_ja}.js. Changing the default here
+# means updating that wording too. (issue #26623)
 compute_polychoric_diagnostics <- function(data, cor_result, selection,
                                            rare_category_prop_cutoff = 0.05) {
   data <- as.data.frame(data)
