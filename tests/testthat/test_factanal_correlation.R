@@ -436,3 +436,77 @@ test_that("the parallel analysis null distribution never mixes in Pearson eigenv
   # Only the successful iterations (identity matrices) contribute, so every threshold is 1.
   expect_true(all(abs(result$table$random_eigenvalue_threshold - 1) < 1e-8))
 })
+
+test_that("verification pass 4 findings (issue #26623)", {
+  df <- factanal_ordinal_fixture(n = 200)
+
+  # Manual Polychoric on continuous columns: there is no categorical variable to describe, so the
+  # category rows must report Not Available rather than inventing "400 categories" and flagging
+  # every variable and pair.
+  continuous <- data.frame(a = stats::rnorm(200), b = stats::rnorm(200), c = stats::rnorm(200))
+  continuous_selection <- select_factor_correlation_type(continuous)
+  continuous_diagnostics <- compute_polychoric_diagnostics(
+    continuous, list(correlation = diag(3), thresholds = NULL, type = "polychoric",
+                     smoothed = FALSE, warnings = character(), failed = FALSE),
+    continuous_selection)
+  expect_equal(continuous_diagnostics$Judgement[[1]], "Not Available")
+  expect_equal(continuous_diagnostics$Judgement[[2]], "Not Available")
+  expect_equal(continuous_diagnostics$Judgement[[3]], "Not Available")
+  expect_equal(continuous_diagnostics$status[[1]], "na")
+
+  # A DECLARED category with zero responses is the sparsest case there is; table() never shows it,
+  # so it has to be padded in from the defined levels.
+  zero_level_df <- data.frame(
+    a = factor(c("low", "mid", "high")[c(1, 2, 1, 2, 1, 2, 1, 2)], levels = c("low", "mid", "high"), ordered = TRUE),
+    b = factor(c("low", "mid", "high")[c(1, 2, 3, 2, 1, 2, 3, 2)], levels = c("low", "mid", "high"), ordered = TRUE),
+    c = factor(c("low", "mid", "high")[c(3, 2, 1, 2, 3, 2, 1, 2)], levels = c("low", "mid", "high"), ordered = TRUE)
+  )
+  zero_selection <- select_factor_correlation_type(zero_level_df)
+  zero_diagnostics <- compute_polychoric_diagnostics(
+    encode_factanal_data(zero_level_df, zero_selection),
+    list(correlation = diag(3), thresholds = NULL, type = "polychoric",
+         smoothed = FALSE, warnings = character(), failed = FALSE),
+    zero_selection)
+  expect_equal(zero_diagnostics$Judgement[[1]], "All categorical variables have 3 categories")
+  # Column `a` never takes its third level -> 0% of the responses -> sparse.
+  expect_equal(zero_diagnostics$Judgement[[2]], "Detected in 1 variable")
+})
+
+test_that("a failed estimation degrades to Pearson end to end (issue #26623)", {
+  # The degrade path mutates `resolved` after construction and re-points the diagnostics and the
+  # parallel analysis; exercise it through exp_factanal, not just the helper.
+  df <- factanal_ordinal_fixture(n = 150)
+  original_build <- build_factor_correlation
+  failing_build <- function(data, correlation_type = c("pearson", "polychoric", "tetrachoric", "mixed"),
+                            use = "pairwise.complete.obs", correct = 0.5) {
+    correlation_type <- match.arg(correlation_type)
+    if (identical(correlation_type, "pearson")) {
+      return(original_build(data, correlation_type, use = use, correct = correct))
+    }
+    list(correlation = stats::cor(data, use = use), thresholds = NULL, type = "pearson",
+         smoothed = FALSE, warnings = "simulated polychoric failure", failed = TRUE)
+  }
+  assign("build_factor_correlation", failing_build, envir = environment(exp_factanal))
+  on.exit(assign("build_factor_correlation", original_build, envir = environment(exp_factanal)), add = TRUE)
+
+  fit <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
+                      cor_type = "polychoric", parallel_n_iter = 3)$model[[1]]
+  # The fit itself falls back to Pearson...
+  expect_equal(fit$correlation_type, "pearson")
+  # ...but the report can still say WHICH correlation failed, and still shows the diagnostics.
+  expect_equal(fit$correlation_degraded_from, "polychoric")
+  expect_true(grepl("could not be estimated", fit$correlation_reason))
+  expect_false(is.null(fit$cor_diagnostics))
+  method_tbl <- tidy(fit, type = "analysis_method")
+  expect_equal(method_tbl$Value[[1]], "Pearson Correlation")
+  expect_equal(method_tbl$degraded_from[[1]], "polychoric")
+  expect_true(method_tbl$has_diagnostics[[1]])
+  diagnostics <- tidy(fit, type = "cor_diagnostics")
+  expect_equal(diagnostics$Judgement[[4]], "Estimation failed")
+  # The Pearson fallback matrix says nothing about the correlation that failed.
+  expect_equal(diagnostics$Judgement[[5]], "Not Available")
+  expect_equal(diagnostics$Judgement[[6]], "Not Available")
+  # Scores and the parallel analysis still come out of the fallback matrix, not a half-built one.
+  expect_false(is.null(fit$scores))
+  expect_false(is.null(fit$parallel))
+})

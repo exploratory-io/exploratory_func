@@ -220,7 +220,7 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
   }, add = TRUE)
   random_eigen_mat <- replicate(n_iter, {
     rd <- matrix(stats::rnorm(n * p), nrow = n, ncol = p)
-    eigen(cor(rd), only.values = TRUE)$values
+    eigen(cor(rd), symmetric = TRUE, only.values = TRUE)$values
   })
   random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
   list(

@@ -603,9 +603,10 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
     colnames(data)
   }
   variables <- intersect(colnames(data), categorical_variables)
-  if (length(variables) == 0) {
-    variables <- colnames(data)
-  }
+  # No categorical variable at all (e.g. Polychoric forced onto continuous columns): the category
+  # diagnostics have nothing to describe. Reporting them over continuous columns would invent
+  # "400 categories", flag every variable sparse and every pair empty.
+  no_categorical <- length(variables) == 0
 
   # 1. Number of categories
   # Defined categories, not observed ones: the auto-selection branched on n_defined_categories, so
@@ -616,11 +617,14 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
   } else {
     NULL
   }
-  category_counts <- vapply(variables, function(v) {
+  category_counts <- if (no_categorical) numeric() else vapply(variables, function(v) {
     defined <- if (!is.null(defined_counts) && v %in% names(defined_counts)) defined_counts[[v]] else NA_real_
     if (is.na(defined)) length(unique(data[[v]][!is.na(data[[v]])])) else as.numeric(defined)
   }, numeric(1))
-  if (length(unique(category_counts)) == 1) {
+  if (no_categorical) {
+    category_value <- "Not Available"
+    category_status <- "na"
+  } else if (length(unique(category_counts)) == 1) {
     # "categorical variables", not "variables": in a mixed analysis the continuous columns are not
     # counted here, and saying "all variables" would contradict the Target Variables count above.
     category_value <- sprintf("All categorical variables have %d categories", as.integer(category_counts[[1]]))
@@ -631,20 +635,28 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
   }
 
   # 2. Sparse categories (a category holding less than the cutoff share of responses)
-  sparse_variables <- variables[vapply(variables, function(v) {
+  defined_levels <- if (!is.null(selection) && !is.null(selection$category_levels)) selection$category_levels else NULL
+  sparse_variables <- if (no_categorical) character() else variables[vapply(variables, function(v) {
     x <- data[[v]][!is.na(data[[v]])]
     if (length(x) == 0) return(FALSE)
-    props <- as.numeric(table(x)) / length(x)
-    any(props < rare_category_prop_cutoff)
+    counts <- as.numeric(table(x))
+    # A declared level with zero responses never shows up in table(), yet it is the sparsest case
+    # there is. Pad the counts out to the number of DEFINED categories so it is caught.
+    n_defined <- if (!is.null(defined_levels) && !is.null(defined_levels[[v]])) length(defined_levels[[v]]) else length(counts)
+    if (n_defined > length(counts)) {
+      counts <- c(counts, rep(0, n_defined - length(counts)))
+    }
+    any(counts / length(x) < rare_category_prop_cutoff)
   }, logical(1))]
-  sparse_value <- if (length(sparse_variables) == 0) "None"
+  sparse_value <- if (no_categorical) "Not Available"
+    else if (length(sparse_variables) == 0) "None"
     else if (length(sparse_variables) == 1) "Detected in 1 variable"
     else sprintf("Detected in %d variables", length(sparse_variables))
-  sparse_status <- if (length(sparse_variables) == 0) "ok" else "caution"
+  sparse_status <- if (no_categorical) "na" else if (length(sparse_variables) == 0) "ok" else "caution"
 
   # 3. Empty category combinations (a zero cell in a pair's cross tabulation)
   empty_pairs <- 0L
-  if (length(variables) >= 2) {
+  if (!no_categorical && length(variables) >= 2) {
     for (i in seq_len(length(variables) - 1)) {
       for (j in seq(i + 1, length(variables))) {
         tab <- table(data[[variables[[i]]]], data[[variables[[j]]]])
@@ -652,10 +664,11 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
       }
     }
   }
-  empty_value <- if (empty_pairs == 0) "None"
+  empty_value <- if (no_categorical) "Not Available"
+    else if (empty_pairs == 0) "None"
     else if (empty_pairs == 1) "Detected in 1 variable pair"
     else sprintf("Detected in %d variable pairs", empty_pairs)
-  empty_status <- if (empty_pairs == 0) "ok" else "caution"
+  empty_status <- if (no_categorical) "na" else if (empty_pairs == 0) "ok" else "caution"
 
   # 4. Correlation estimation failures (NA in the off-diagonal of the matrix)
   R <- cor_result$correlation
