@@ -538,6 +538,25 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     length(threshold) <- length(eig) # pad/truncate to align with eigenvalue count
     res <- tibble::tibble(Factor = 1:length(eig), Eigenvalue = eig, `Random Data Eigenvalue` = threshold)
   }
+  else if (type == "score_coefficients") {
+    # Factor score coefficients (因子得点係数 / SPSS's Factor Score Coefficient Matrix) -- the weights
+    # that turn the standardized variables into factor scores (issue tam#30432). psych::fa returns
+    # them in x$weights (variables x factors); verified against a live fit that
+    # scale(df) %*% weights equals x$scores exactly.
+    # The column order of x$weights is the SAME importance order as x$loadings / x$scores /
+    # broom's tidy.factanal + augment.factanal -- they all come straight off the same psych fit
+    # (confirmed for rotate = none / varimax / Promax, where all five agree on MR1, MR3, MR2).
+    # So the positional rename to "Factor 1".."Factor N" lines up with the factor IDs every other
+    # tidy type here emits. Rows stay in the original variable order, matching how SPSS prints it.
+    w <- x$weights
+    if (is.null(w) || ncol(w) != n_factor) { # Defensive: models saved by older versions.
+      res <- tibble::tibble(variable = character(0))
+    }
+    else {
+      colnames(w) <- stringr::str_c("Factor ", 1:n_factor)
+      res <- tibble::as_tibble(w, rownames = "variable")
+    }
+  }
   else { # should be data
     scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
