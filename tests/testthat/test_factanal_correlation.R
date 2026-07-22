@@ -218,3 +218,65 @@ test_that("build_factor_correlation returns one matrix for the whole analysis (i
   expect_equal(manual$type, "polychoric")
   expect_false(manual$auto)
 })
+
+test_that("verification pass 1 findings (issue #26623)", {
+  df <- factanal_ordinal_fixture()
+
+  # The "Type of Scores" property must not become a no-op on the correlation-matrix path.
+  expect_equal(factanal_score_method("regression"), "Thurstone")   # fa()'s name for the same method
+  expect_equal(factanal_score_method("Bartlett"), "Bartlett")
+  expect_equal(factanal_score_method("tenBerge"), "tenBerge")
+  expect_equal(factanal_score_method(NULL), "Thurstone")
+  regression_fit <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
+                                 scores = "regression", parallel_n_iter = 3)$model[[1]]
+  bartlett_fit <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
+                               scores = "Bartlett", parallel_n_iter = 3)$model[[1]]
+  expect_false(isTRUE(all.equal(regression_fit$scores, bartlett_fit$scores)))
+
+  # Rotation names are mapped, not title-cased: "bentlerT" must not render as "Bentlert".
+  expect_equal(factanal_rotation_label("bentlerT"), "Bentler (Orthogonal)")
+  expect_equal(factanal_rotation_label("geominT"), "Geomin (Orthogonal)")
+  expect_equal(factanal_rotation_label("promax"), "Promax with Kaiser Normalization")
+  expect_equal(factanal_rotation_label("none"), "None")
+  rotated <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "bentlerT",
+                          cor_type = "polychoric", parallel_n_iter = 3)$model[[1]]
+  expect_equal(tidy(rotated, type = "analysis_method")$Value[[3]], "Bentler (Orthogonal)")
+
+  # A manual choice must not be reported as an automatic one, and must not read "Correlation
+  # correlation".
+  expect_equal(rotated$correlation_reason, "Polychoric Correlation was selected manually.")
+  expect_false(rotated$correlation_is_auto)
+  method_tbl <- tidy(rotated, type = "analysis_method")
+  expect_false(method_tbl$correlation_is_auto[[1]])
+  expect_true(method_tbl$has_diagnostics[[1]])
+
+  # An unsupported variable combination stays unsupported when the correlation is chosen manually:
+  # picking Pearson must not smuggle a nominal column in as arbitrary integer codes.
+  nominal_df <- df
+  nominal_df$cat <- factor(sample(c("a", "b", "c"), nrow(df), TRUE))
+  expect_error(exp_factanal(nominal_df, q1, q2, cat, nfactors = 1, cor_type = "pearson", parallel_n_iter = 3),
+               "Nominal categorical variables")
+  expect_error(exp_factanal(nominal_df, q1, q2, cat, nfactors = 1, cor_type = "polychoric", parallel_n_iter = 3),
+               "Nominal categorical variables")
+})
+
+test_that("mixed-correlation diagnostics only describe the categorical variables (issue #26623)", {
+  set.seed(21)
+  n <- 300
+  lat1 <- stats::rnorm(n); lat2 <- stats::rnorm(n)
+  ordinal_col <- function(latent) {
+    z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
+    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+  }
+  mixed_df <- data.frame(x1 = lat1 + stats::rnorm(n, 0, .5), x2 = lat1 + stats::rnorm(n, 0, .5),
+                         q1 = ordinal_col(lat2), q2 = ordinal_col(lat2), q3 = ordinal_col(lat2))
+  fit <- exp_factanal(mixed_df, x1, x2, q1, q2, q3, nfactors = 2, rotate = "varimax",
+                      parallel_n_iter = 3)$model[[1]]
+  expect_equal(fit$correlation_type, "mixed")
+  diagnostics <- tidy(fit, type = "cor_diagnostics")
+  # A continuous column has one "category" per distinct value; counting it would report hundreds of
+  # categories and flag every variable as sparse and every pair as having empty combinations.
+  expect_equal(diagnostics$Judgement[[1]], "All variables have 5 categories")
+  expect_equal(diagnostics$Judgement[[2]], "Detected in 3 variables")   # the 3 ordinal ones at most
+  expect_false(grepl("Detected in 10 variable pairs", diagnostics$Judgement[[3]]))
+})

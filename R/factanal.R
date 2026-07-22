@@ -224,8 +224,9 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
 #'        Tetrachoric / Polychoric / Mixed from the variable types and response distributions,
 #'        "pearson" and "polychoric" force that correlation. The SAME matrix drives fa(), KMO,
 #'        Bartlett, the eigenvalues, the parallel analysis and the factor scores. (issue #26623)
-#' @param parallel_n_iter Iterations of the parallel analysis null distribution. Polychoric-family
-#'        correlations are far more expensive per iteration, so they use a smaller default.
+#' @param parallel_n_iter Iterations of the parallel analysis null distribution (default 100 for
+#'        every correlation type). Polychoric-family correlations re-estimate the correlation on
+#'        each iteration, so this is the dominant cost of a polychoric run.
 exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1,
                          cor_type = "auto", parallel_n_iter = NULL) {
   # this evaluates select arguments like starts_with
@@ -298,12 +299,19 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     # (e.g. a polychoric fa() next to a Pearson KMO or parallel analysis). (issue #26623)
     selection <- select_factor_correlation_type(cleaned_df)
     resolved <- resolve_factanal_correlation_type(cor_type, selection)
-    if (identical(resolved$type, "unsupported")) {
+    # An unsupported variable combination (a nominal category, a constant column) is unsupported
+    # whichever correlation was asked for -- picking Pearson manually must not smuggle a nominal
+    # column in as arbitrary integer codes. So gate on the SELECTION, not the resolved type.
+    if (identical(selection$selected_method, "unsupported") || identical(resolved$type, "unsupported")) {
       stop(paste0("EXP-ANA-6 :: [] :: ", selection$reason))
     }
     # Category-ordered numeric coding. For an all-numeric data frame this is a no-op, so the
     # Pearson path stays bit-for-bit what it was before this change.
     encoded_df <- encode_factanal_data(cleaned_df, selection)
+    # The correlation family that was ASKED for. It differs from resolved$type only when the
+    # estimation fails and we degrade to Pearson, and the diagnostics table needs the asked-for
+    # one so the failure is reported instead of silently disappearing with the table.
+    requested_family <- resolved$type
 
     if (identical(resolved$type, "pearson")) {
       fit <- psych::fa(encoded_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
@@ -313,17 +321,25 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     } else {
       # Correlation-matrix based fit. n.obs is mandatory here: without it psych assumes 100 rows
       # and every sample-size dependent fit index would be wrong.
-      cor_result <- build_factor_correlation(encoded_df, resolved$type)
+      cor_result <- build_factor_correlation(encoded_df, requested_family)
       cor_mat <- cor_result$correlation
       if (isTRUE(cor_result$failed)) {
         # build_factor_correlation already degraded to Pearson; keep the reported type honest.
+        # requested_family stays as asked so the diagnostics table can still REPORT the failure.
         resolved$type <- "pearson"
       }
       fit <- psych::fa(cor_mat, nfactors = nfactors, n.obs = nrow(encoded_df), fm = fm, rotate = rotate)
-      # fa() on a correlation matrix never returns scores, so compute them from the same matrix.
+      # fa() on a correlation matrix never returns scores, so compute them from the same matrix,
+      # honoring the "Type of Scores" property instead of hardcoding one method.
       fit$scores <- tryCatch({
-        psych::factor.scores(as.matrix(encoded_df), fit, rho = cor_mat, method = "Thurstone")$scores
+        psych::factor.scores(as.matrix(encoded_df), fit, rho = cor_mat,
+                             method = factanal_score_method(scores))$scores
       }, error = function(e) NULL)
+      if (is.null(fit$scores)) {
+        # Keep the shape so the score-consuming outputs (Data tab, biplot) degrade to NA columns
+        # instead of aborting inside broom's augment().
+        fit$scores <- matrix(NA_real_, nrow = nrow(encoded_df), ncol = nfactors)
+      }
     }
 
     fit$correlation <- cor_mat # For creating scree plot later.
@@ -350,7 +366,9 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     fit$parallel <- tryCatch(compute_parallel_analysis(encoded_df, n_iter = n_iter,
                                                        cor_type = resolved$type, cor_matrix = cor_mat),
                              error = function(e) NULL)
-    fit$cor_diagnostics <- if (identical(resolved$type, "pearson")) NULL else {
+    # Keyed off the REQUESTED family, so a failed polychoric estimation still shows the table with
+    # its "Estimation failed" row rather than hiding the only signal the user has.
+    fit$cor_diagnostics <- if (identical(requested_family, "pearson")) NULL else {
       tryCatch(compute_polychoric_diagnostics(encoded_df, cor_result, selection), error = function(e) NULL)
     }
     class(fit) <- c("fa_exploratory", class(fit))
@@ -630,7 +648,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       Value = c(
         factanal_correlation_label(cor_type),
         factanal_extraction_method_label(x$fm),
-        stringr::str_to_title(as.character(rotation)),
+        factanal_rotation_label(rotation),
         if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A",
         if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
       ),
@@ -638,6 +656,9 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # part of the rendered Item/Value table.
       correlation_type = cor_type,
       correlation_is_auto = isTRUE(x$correlation_is_auto),
+      # TRUE also when a polychoric estimation failed and the fit degraded to Pearson, so the
+      # report still shows the diagnostics table that reports the failure.
+      has_diagnostics = !is.null(x$cor_diagnostics) && nrow(x$cor_diagnostics) > 0,
       reason = if (is.null(x$correlation_reason)) "" else x$correlation_reason
     )
   }

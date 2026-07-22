@@ -476,7 +476,7 @@ resolve_factanal_correlation_type <- function(requested, selection) {
   }
   if (requested != "auto") {
     return(list(type = requested, auto = FALSE,
-                reason = sprintf("%s correlation was selected manually.",
+                reason = sprintf("%s was selected manually.",
                                  factanal_correlation_label(requested))))
   }
   list(type = selection$selected_method, auto = TRUE, reason = selection$reason)
@@ -490,6 +490,42 @@ factanal_correlation_label <- function(type) {
          tetrachoric = "Tetrachoric Correlation",
          mixed = "Mixed Correlation",
          "Unsupported")
+}
+
+# The "Type of Scores" property values are psych::fa() `scores` values. When the fit is built from
+# a correlation matrix the scores come from psych::factor.scores(), whose `method` uses a different
+# spelling for the default: fa()'s "regression" is factor.scores()'s "Thurstone". Everything else
+# passes through, and anything unknown falls back to the default rather than erroring.
+factanal_score_method <- function(scores) {
+  scores <- if (is.null(scores) || length(scores) != 1L || is.na(scores)) "regression" else as.character(scores)
+  switch(scores,
+         regression = "Thurstone",
+         Thurstone = "Thurstone",
+         Bartlett = "Bartlett",
+         tenBerge = "tenBerge",
+         Anderson = "Anderson",
+         "Thurstone")
+}
+
+# Rotation names for the report's Analysis Method table. A generic title-case would turn the
+# camel-cased psych names into non-words ("bentlerT" -> "Bentlert"), so they are mapped explicitly.
+factanal_rotation_label <- function(rotate) {
+  rotate <- if (is.null(rotate) || length(rotate) != 1L || is.na(rotate)) "none" else as.character(rotate)
+  switch(rotate,
+         none = "None",
+         varimax = "Varimax",
+         Promax = "Promax",
+         promax = "Promax with Kaiser Normalization",
+         oblimin = "Oblimin",
+         quartimax = "Quartimax",
+         bentlerT = "Bentler (Orthogonal)",
+         bentlerQ = "Bentler (Oblique)",
+         equamax = "Equamax",
+         geominT = "Geomin (Orthogonal)",
+         geomin = "Geomin (Oblique)",
+         simplimax = "Simplimax",
+         cluster = "Cluster (Oblique)",
+         rotate)
 }
 
 factanal_extraction_method_label <- function(fm) {
@@ -514,7 +550,19 @@ factanal_extraction_method_label <- function(fm) {
 compute_polychoric_diagnostics <- function(data, cor_result, selection,
                                            rare_category_prop_cutoff = 0.05) {
   data <- as.data.frame(data)
-  variables <- colnames(data)
+  # Category-shape diagnostics only make sense for the CATEGORICAL variables. In a mixed analysis
+  # a continuous column would otherwise report one "category" per distinct value, flag every one
+  # of them as sparse, and make every pair look like it has empty combinations. (issue #26623)
+  categorical_variables <- if (!is.null(selection) && !is.null(selection$variable_summary)) {
+    summary_df <- selection$variable_summary
+    summary_df$variable[summary_df$detected_type %in% c("binary", "ordinal")]
+  } else {
+    colnames(data)
+  }
+  variables <- intersect(colnames(data), categorical_variables)
+  if (length(variables) == 0) {
+    variables <- colnames(data)
+  }
 
   # 1. Number of categories
   category_counts <- vapply(variables, function(v) {
