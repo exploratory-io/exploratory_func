@@ -138,7 +138,13 @@ judge_loading <- function(loadings, cfg = factanal_report_config()) {
 
 # Horn's parallel analysis: compares actual correlation-matrix eigenvalues against the
 # quantile of eigenvalues from random normal data of the same shape. (issue #37018 spec 3.4)
-compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95) {
+#' @param cor_type Correlation type the whole analysis uses. For anything other than "pearson" both the
+#'        actual and the random-data eigenvalues are computed with that same correlation, so the parallel
+#'        analysis never silently falls back to Pearson. (issue #26623)
+#' @param cor_matrix Correlation matrix already built for the analysis. Reused for the actual eigenvalues
+#'        so the scree/parallel chart matches the matrix `fa()` was fitted on.
+compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
+                                      cor_type = "pearson", cor_matrix = NULL) {
   if (length(n_iter) != 1L || is.na(n_iter) || n_iter < 1 || n_iter != as.integer(n_iter)) {
     stop("n_iter must be a positive integer")
   }
@@ -149,6 +155,41 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95) {
   x <- as.data.frame(x)
   n <- nrow(x)
   p <- ncol(x)
+  if (!identical(cor_type, "pearson")) {
+    # Polychoric/tetrachoric/mixed: the null distribution is built by shuffling each column
+    # independently, which keeps every variable's category marginals but destroys the association,
+    # and the SAME correlation method is applied to it. Drawing normal deviates instead would
+    # compare a polychoric eigenvalue against a Pearson one.
+    actual_eigen <- if (!is.null(cor_matrix)) {
+      eigen(cor_matrix, symmetric = TRUE, only.values = TRUE)$values
+    } else {
+      eigen(build_factor_correlation(x, cor_type)$correlation, symmetric = TRUE, only.values = TRUE)$values
+    }
+    had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    old_seed <- if (had_seed) get(".Random.seed", envir = .GlobalEnv) else NULL
+    set.seed(1234)
+    on.exit({
+      if (had_seed) {
+        assign(".Random.seed", old_seed, envir = .GlobalEnv)
+      } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+        rm(".Random.seed", envir = .GlobalEnv)
+      }
+    }, add = TRUE)
+    random_eigen_mat <- replicate(n_iter, {
+      shuffled <- as.data.frame(lapply(x, function(col) col[sample.int(n)]))
+      res <- build_factor_correlation(shuffled, cor_type)
+      eigen(res$correlation, symmetric = TRUE, only.values = TRUE)$values
+    })
+    random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
+    return(list(
+      recommended_n = sum(actual_eigen > random_threshold),
+      table = tibble::tibble(
+        factor_number = seq_along(actual_eigen),
+        actual_eigenvalue = actual_eigen,
+        random_eigenvalue_threshold = random_threshold
+      )
+    ))
+  }
   actual_eigen <- eigen(cor(x, use = "pairwise.complete.obs"), only.values = TRUE)$values
   # Snapshot the RNG so this null-distribution draw does not perturb the outer deterministic
   # stream that later groups' sampling relies on. Restore afterward.
@@ -179,7 +220,14 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95) {
 
 #' Function for Factor Analysis Analytics View
 #' @export
-exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1) {
+#' @param cor_type Correlation used for the whole analysis. "auto" (default) picks Pearson /
+#'        Tetrachoric / Polychoric / Mixed from the variable types and response distributions,
+#'        "pearson" and "polychoric" force that correlation. The SAME matrix drives fa(), KMO,
+#'        Bartlett, the eigenvalues, the parallel analysis and the factor scores. (issue #26623)
+#' @param parallel_n_iter Iterations of the parallel analysis null distribution. Polychoric-family
+#'        correlations are far more expensive per iteration, so they use a smaller default.
+exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1,
+                         cor_type = "auto", parallel_n_iter = NULL) {
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   if (length(selected_cols) < nfactors) {
@@ -245,10 +293,46 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
         return(NULL)
       }
     }
-    fit <- psych::fa(cleaned_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
+    # Decide which correlation the whole analysis runs on, and build that ONE matrix. Every
+    # downstream computation below reads it, so the report can never mix Pearson and Polychoric
+    # (e.g. a polychoric fa() next to a Pearson KMO or parallel analysis). (issue #26623)
+    selection <- select_factor_correlation_type(cleaned_df)
+    resolved <- resolve_factanal_correlation_type(cor_type, selection)
+    if (identical(resolved$type, "unsupported")) {
+      stop(paste0("EXP-ANA-6 :: [] :: ", selection$reason))
+    }
+    # Category-ordered numeric coding. For an all-numeric data frame this is a no-op, so the
+    # Pearson path stays bit-for-bit what it was before this change.
+    encoded_df <- encode_factanal_data(cleaned_df, selection)
 
-    cor_mat <- cor(cleaned_df)
+    if (identical(resolved$type, "pearson")) {
+      fit <- psych::fa(encoded_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
+      cor_result <- list(correlation = cor(encoded_df), thresholds = NULL, type = "pearson",
+                         smoothed = FALSE, warnings = character(), failed = FALSE)
+      cor_mat <- cor_result$correlation
+    } else {
+      # Correlation-matrix based fit. n.obs is mandatory here: without it psych assumes 100 rows
+      # and every sample-size dependent fit index would be wrong.
+      cor_result <- build_factor_correlation(encoded_df, resolved$type)
+      cor_mat <- cor_result$correlation
+      if (isTRUE(cor_result$failed)) {
+        # build_factor_correlation already degraded to Pearson; keep the reported type honest.
+        resolved$type <- "pearson"
+      }
+      fit <- psych::fa(cor_mat, nfactors = nfactors, n.obs = nrow(encoded_df), fm = fm, rotate = rotate)
+      # fa() on a correlation matrix never returns scores, so compute them from the same matrix.
+      fit$scores <- tryCatch({
+        psych::factor.scores(as.matrix(encoded_df), fit, rho = cor_mat, method = "Thurstone")$scores
+      }, error = function(e) NULL)
+    }
+
     fit$correlation <- cor_mat # For creating scree plot later.
+    fit$correlation_type <- resolved$type
+    fit$correlation_is_auto <- isTRUE(resolved$auto)
+    fit$correlation_reason <- resolved$reason
+    fit$correlation_selection <- selection
+    fit$correlation_result <- cor_result[setdiff(names(cor_result), "correlation")]
+    fit$nfactors_requested <- nfactors
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
@@ -257,9 +341,18 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     # guarded so a singular/degenerate correlation matrix degrades to NA instead of aborting.
     fit$n_rows_used <- nrow(cleaned_df)
     fit$n_variables <- ncol(cleaned_df)
+    # KMO and Bartlett take the correlation MATRIX (never the raw data): passing raw data would
+    # make psych recompute a Pearson correlation internally and silently contradict a polychoric
+    # fit. cortest.bartlett also needs n explicitly, or it assumes n = 100. (issue #26623)
     fit$kmo <- tryCatch(as.numeric(psych::KMO(cor_mat)$MSA), error = function(e) NA_real_)
-    fit$bartlett <- tryCatch(psych::cortest.bartlett(cor_mat, n = nrow(cleaned_df)), error = function(e) NULL)
-    fit$parallel <- tryCatch(compute_parallel_analysis(cleaned_df), error = function(e) NULL)
+    fit$bartlett <- tryCatch(psych::cortest.bartlett(cor_mat, n = nrow(encoded_df)), error = function(e) NULL)
+    n_iter <- if (!is.null(parallel_n_iter)) parallel_n_iter else 100
+    fit$parallel <- tryCatch(compute_parallel_analysis(encoded_df, n_iter = n_iter,
+                                                       cor_type = resolved$type, cor_matrix = cor_mat),
+                             error = function(e) NULL)
+    fit$cor_diagnostics <- if (identical(resolved$type, "pearson")) NULL else {
+      tryCatch(compute_polychoric_diagnostics(encoded_df, cor_result, selection), error = function(e) NULL)
+    }
     class(fit) <- c("fa_exploratory", class(fit))
     fit
   }
@@ -363,6 +456,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     }, .desc=TRUE))
   }
   else if (type == "biplot") {
+    if (n_factor < 2) {
+      # Biplot plots Factor 1 against Factor 2, so it needs at least 2 factors. With nfactors=1
+      # there is no "Factor 2" to build factor_2_loading_col/factor_2_score_col from below.
+      # Degrade gracefully -- mirroring the type=="correlation" branch's handling of an
+      # unavailable x$Phi above -- instead of erroring on a missing column. Keep the same column
+      # shape the client's `tidy_rowwise(model, type="biplot") %>% dplyr::rename(...)` expects, so
+      # the rename does not itself fail on a missing column. (issue #30798)
+      return(tibble::tibble(.factor_1 = numeric(0), .factor_2 = numeric(0), .factor_2_variable = numeric(0)))
+    }
     factor_1_loading_col <- paste0(factor_loading_prefix, "1")
     factor_2_loading_col <- paste0(factor_loading_prefix, "2")
     factor_1_score_col <- paste0(factor_score_prefix, "1")
@@ -515,6 +617,39 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
                       "Number of variables used in the analysis."),
       status = c(kj$status, bj$status, "", "")
     )
+  }
+  else if (type == "analysis_method") {
+    # Report header table: what the numbers below were actually computed with. (issue #26623)
+    cor_type <- if (is.null(x$correlation_type)) "pearson" else x$correlation_type
+    rotation <- if (!is.null(x$rotation)) x$rotation else "none"
+    res <- tibble::tibble(
+      # NOTE: "Target Variables" / "Data Rows" instead of the shorter "Variables" / "Rows":
+      # the client's shared translation map already binds those two keys to different wordings
+      # for other tables, and a direct-map key can only have one translation. (issue #26623)
+      Item = c("Correlation", "Factor Extraction Method", "Rotation", "Target Variables", "Data Rows"),
+      Value = c(
+        factanal_correlation_label(cor_type),
+        factanal_extraction_method_label(x$fm),
+        stringr::str_to_title(as.character(rotation)),
+        if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A",
+        if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
+      ),
+      # Hidden columns. The client reads them to bind the report's explanation text; they are not
+      # part of the rendered Item/Value table.
+      correlation_type = cor_type,
+      correlation_is_auto = isTRUE(x$correlation_is_auto),
+      reason = if (is.null(x$correlation_reason)) "" else x$correlation_reason
+    )
+  }
+  else if (type == "cor_diagnostics") {
+    # Polychoric-family data suitability diagnostics. Empty tibble (with the same columns) when
+    # the analysis ran on Pearson, so the client can hide the section. (issue #26623)
+    res <- if (is.null(x$cor_diagnostics)) {
+      tibble::tibble(Diagnostic = character(), Judgement = character(),
+                     Description = character(), status = character())
+    } else {
+      x$cor_diagnostics
+    }
   }
   else if (type == "factor_count") {
     eig <- eigen(x$correlation, only.values = TRUE)$values
