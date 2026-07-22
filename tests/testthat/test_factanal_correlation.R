@@ -537,3 +537,35 @@ test_that("Repeat By groups all use the same correlation (issue #26623)", {
   has_diagnostics <- vapply(model_df$model, function(m) !is.null(m$cor_diagnostics), logical(1))
   expect_equal(length(unique(has_diagnostics)), 1)
 })
+
+test_that("an unsupported facet is skipped, not fatal, under Repeat By (issue #26623)", {
+  # Mirrors the not-enough-columns guard: one degenerate facet must not abort the whole run.
+  # Facet "good" sees only two distinct answers for q1 (binary -> supported); facet "bad" sees
+  # three (nominal -> unsupported), so the unsupported branch is reached per group.
+  set.seed(77)
+  n <- 120
+  latent <- stats::rnorm(n)
+  ordinal_col <- function() {
+    z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
+    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+  }
+  good <- data.frame(g = "good", q1 = sample(c("yes", "no"), n, TRUE),
+                     q2 = ordinal_col(), q3 = ordinal_col(), stringsAsFactors = FALSE)
+  bad <- data.frame(g = "bad", q1 = sample(c("yes", "no", "maybe"), n, TRUE),
+                    q2 = ordinal_col(), q3 = ordinal_col(), stringsAsFactors = FALSE)
+  grouped <- dplyr::group_by(rbind(good, bad), g)
+
+  model_df <- exp_factanal(grouped, q1, q2, q3, nfactors = 1, rotate = "none", parallel_n_iter = 3)
+  # The good facet still produced a model; the unsupported one was skipped (NULL model, the same
+  # shape the not-enough-columns guard produces), not fatal.
+  expect_true("good" %in% model_df$g)
+  good_model <- model_df$model[[which(model_df$g == "good")]]
+  expect_false(is.null(good_model))
+  if ("bad" %in% model_df$g) {
+    expect_true(is.null(model_df$model[[which(model_df$g == "bad")]]))
+  }
+
+  # Without Repeat By the same unsupported data still raises the error, so nothing is swallowed.
+  expect_error(exp_factanal(dplyr::select(bad, q1, q2, q3), q1, q2, q3, nfactors = 1, parallel_n_iter = 3),
+               "EXP-ANA-35")
+})

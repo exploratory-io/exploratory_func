@@ -341,6 +341,12 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     # whichever correlation was asked for -- picking Pearson manually must not smuggle a nominal
     # column in as arbitrary integer codes. So gate on the SELECTION, not the resolved type.
     if (identical(selection$selected_method, "unsupported") || identical(resolved$type, "unsupported")) {
+      if (length(grouped_cols) > 0) {
+        # With Repeat By, skip just this group -- mirroring the not-enough-columns guard above.
+        # One facet whose columns degenerate (e.g. a single observed value plus NAs) must not
+        # abort every other facet. (issue #26623)
+        return(NULL)
+      }
       # EXP-ANA-35 carries the offending column names as its params, so the client can name them.
       # (EXP-ANA-6 is PCA's reserved-column-name error -- do not reuse it here.)
       unsupported_vars <- selection$variable_summary$variable[
@@ -527,15 +533,6 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     }, .desc=TRUE))
   }
   else if (type == "biplot") {
-    if (n_factor < 2) {
-      # Biplot plots Factor 1 against Factor 2, so it needs at least 2 factors. With nfactors=1
-      # there is no "Factor 2" to build factor_2_loading_col/factor_2_score_col from below.
-      # Degrade gracefully -- mirroring the type=="correlation" branch's handling of an
-      # unavailable x$Phi above -- instead of erroring on a missing column. Keep the same column
-      # shape the client's `tidy_rowwise(model, type="biplot") %>% dplyr::rename(...)` expects, so
-      # the rename does not itself fail on a missing column. (issue #30798)
-      return(tibble::tibble(.factor_1 = numeric(0), .factor_2 = numeric(0), .factor_2_variable = numeric(0)))
-    }
     factor_1_loading_col <- paste0(factor_loading_prefix, "1")
     factor_2_loading_col <- paste0(factor_loading_prefix, "2")
     factor_1_score_col <- paste0(factor_score_prefix, "1")
