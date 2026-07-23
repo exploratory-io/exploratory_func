@@ -143,6 +143,28 @@ test_that("do_cor with polychoric method", {
   expect_equal(diag_row$p_value, 0) # Diagonal P value is 0.
 })
 
+test_that("do_cor automatic method selects the specified correlation family", {
+  ordinal <- ordered(rep(1:5, each = 20))
+  expect_identical(resolve_correlation_method(data.frame(x = 1:100, y = 101:200), "auto"), "pearson")
+  expect_identical(resolve_correlation_method(data.frame(x = ordinal, y = rev(ordinal)), "auto"), "polychoric")
+  expect_identical(resolve_correlation_method(data.frame(x = 1:100, y = ordinal), "auto"), "mixed")
+})
+
+test_that("do_cor supports automatic and mixed correlations with factor inputs", {
+  set.seed(456)
+  n <- 100
+  ordinal <- ordered(cut(rnorm(n), breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
+  df <- data.frame(continuous = rnorm(n), ordinal = ordinal)
+
+  auto <- df %>% do_cor(continuous, ordinal, method = "auto", distinct = FALSE, diag = TRUE, return_type = "model") %>% tidy_rowwise(model, type = "cor")
+  mixed <- df %>% do_cor(continuous, ordinal, method = "mixed", distinct = FALSE, diag = TRUE, return_type = "model") %>% tidy_rowwise(model, type = "cor")
+
+  expect_equal(nrow(auto), 4)
+  expect_equal(nrow(mixed), 4)
+  expect_true(is.finite(auto$correlation[auto$pair.name.x != auto$pair.name.y][1]))
+  expect_true(is.finite(mixed$correlation[mixed$pair.name.x != mixed$pair.name.y][1]))
+})
+
 test_that("do_cor with polychoric method handles a constant column without error", {
   set.seed(123)
   n <- 100

@@ -45,7 +45,7 @@ do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
 #' @param dimension A column you want to use as a dimension to calculate the correlations.
 #' @param value A column for the values you want to use to calculate the correlations.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
-#' @param method Method of calculation. This can be one of "pearson", "kendall", "spearman", or "polychoric".
+#' @param method Method of calculation. This can be one of "auto", "pearson", "kendall", "spearman", "polychoric", or "mixed".
 #' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @return correlations between pairs of groups
@@ -175,7 +175,7 @@ do_cor.kv_ <- function(df,
 #' @param df data frame in tidy format
 #' @param ... Arguments to select columns to calculate correlation.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
-#' @param method Method of calculation. This can be one of "pearson", "kendall", "spearman", or "polychoric".
+#' @param method Method of calculation. This can be one of "auto", "pearson", "kendall", "spearman", "polychoric", or "mixed".
 #' @return correlations between pairs of columns
 #' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
@@ -205,10 +205,9 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
         stop("More than 1 row are required to calculate correlations.")
       }
     }
-    mat <- dplyr::select(df, !!!select_dots) %>%
-      # Convert logical to numeric explicitly, since implicit conversion by as.matrix does not happen if all the columns are logical.
-      dplyr::mutate(across(where(is.logical), as.numeric)) %>%
-      as.matrix()
+    # Keep the source column types here. Auto and mixed correlation need to distinguish
+    # continuous numeric variables from ordinal (factor/logical) variables.
+    mat <- dplyr::select(df, !!!select_dots) %>% as.data.frame()
 
     ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=TRUE)
 
@@ -253,30 +252,73 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 }
 
 
+resolve_correlation_method <- function(mat, method) {
+  if (!identical(method, "auto")) {
+    return(method)
+  }
+
+  is_ordinal <- vapply(mat, function(x) is.factor(x) || is.logical(x), logical(1))
+  is_continuous <- vapply(mat, is.numeric, logical(1))
+
+  if (all(is_continuous)) {
+    return("pearson")
+  }
+  if (all(is_ordinal)) {
+    return("polychoric")
+  }
+  if (all(is_continuous | is_ordinal)) {
+    return("mixed")
+  }
+
+  warning("Could not determine all variable types for automatic correlation; using Pearson.")
+  "pearson"
+}
+
+as_numeric_correlation_matrix <- function(df) {
+  as.matrix(as.data.frame(lapply(df, function(x) {
+    if (is.logical(x)) {
+      as.numeric(x)
+    } else if (is.factor(x)) {
+      as.numeric(x)
+    } else {
+      x
+    }
+  })))
+}
+
+as_hetcor_data_frame <- function(df, force_ordinal = FALSE) {
+  ret <- as.data.frame(lapply(df, function(x) {
+    if (force_ordinal || is.factor(x) || is.logical(x)) {
+      ordered(x)
+    } else {
+      x
+    }
+  }))
+  colnames(ret) <- colnames(df)
+  ret
+}
+
 do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
   # Sort the column name.
   # Now that we sort the variables based on correlation result or input order, this might not be as meaningful,
   # but I'm hoping this might still help align the result between Mac and Windows if there are ties in the mean correlations.
   # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
   sorted_colnames <- stringr::str_sort(colnames(mat))
-  mat <- mat[,sorted_colnames]
+  mat <- as.data.frame(mat[, sorted_colnames, drop = FALSE])
+  method <- resolve_correlation_method(mat, method)
 
   # Create a matrix of P-values for Analytics View case.
   dim <- length(sorted_colnames)
 
-  if (identical(method, "polychoric")) {
+  if (method %in% c("polychoric", "mixed")) {
     # Polychoric correlation is for ordinal variables (e.g. survey scales 1-5).
     # stats::cor()/cor.test() do not support it, so we use polycor::hetcor(), which
     # returns the full correlation matrix and the matrix of standard errors in one call.
-    # We coerce every column to an ordered factor so that polychoric (not Pearson or
-    # polyserial) is used for every pair, and derive a two-sided z-test P value from
-    # rho / SE. Non-estimable pairs (constant or near-perfect columns) come back as NA,
-    # which the UI treats as not-significant.
+    # Polychoric coerces every column to ordered so every pair uses the ordinal model.
+    # Mixed preserves continuous numerics and converts factor/logical columns to ordered,
+    # allowing hetcor() to select Pearson, polyserial, or polychoric per pair.
     loadNamespace("polycor")
-    ordered_df <- as.data.frame(lapply(seq_len(dim), function(k) {
-      ordered(mat[, k])
-    }))
-    colnames(ordered_df) <- sorted_colnames
+    ordered_df <- as_hetcor_data_frame(mat, force_ordinal = identical(method, "polychoric"))
     # hetcor only supports "complete.obs" and "pairwise.complete.obs", while the other
     # methods (via cor()/cor.test()) also accept "everything", "all.obs", and
     # "na.or.complete". Map those to pairwise (the do_cor default) so polychoric does not
@@ -290,13 +332,14 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
     diag(tvalue_mat) <- Inf # For i=j case, statistic should be Inf and P value 0.
     diag(pvalue_mat) <- 0
   } else {
-    cor_mat <- cor(mat, use = use, method = method)
+    numeric_mat <- as_numeric_correlation_matrix(mat)
+    cor_mat <- cor(numeric_mat, use = use, method = method)
     pvalue_mat <- matrix(NA, dim, dim)
     tvalue_mat <- matrix(NA, dim, dim)
     for (i in 2:dim) {
       for (j in 1:(i-1)) {
         tryCatch({
-          cor_test_res <- cor.test(mat[,i], mat[,j], method = method)
+          cor_test_res <- cor.test(numeric_mat[,i], numeric_mat[,j], method = method)
           pvalue_mat[i, j] <- cor_test_res$p.value
           tvalue_mat[i, j] <- cor_test_res$statistic
         }, error = function(e) {
