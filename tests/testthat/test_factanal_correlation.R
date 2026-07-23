@@ -176,7 +176,7 @@ test_that("analysis_method and cor_diagnostics tidy types (issue #26623)", {
   expect_equal(method_tbl$Value[[5]], as.character(nrow(df)))
   # Hidden columns the client binds the report explanation from.
   expect_equal(unique(method_tbl$correlation_type), "polychoric")
-  expect_true(all(method_tbl$correlation_is_auto))
+  expect_true(all(method_tbl$correlation_is_auto == "TRUE"))
   expect_true(nchar(method_tbl$reason[[1]]) > 0)
 
   diagnostics <- tidy(poly, type = "cor_diagnostics")
@@ -283,8 +283,8 @@ test_that("verification pass 1 findings (issue #26623)", {
   expect_equal(rotated$correlation_reason, "Polychoric Correlation was selected manually.")
   expect_false(rotated$correlation_is_auto)
   method_tbl <- tidy(rotated, type = "analysis_method")
-  expect_false(method_tbl$correlation_is_auto[[1]])
-  expect_true(method_tbl$has_diagnostics[[1]])
+  expect_equal(method_tbl$correlation_is_auto[[1]], "FALSE")
+  expect_equal(method_tbl$has_diagnostics[[1]], "TRUE")
 
   # An unsupported variable combination stays unsupported when the correlation is chosen manually:
   # picking Pearson must not smuggle a nominal column in as arbitrary integer codes.
@@ -332,7 +332,7 @@ test_that("verification pass 2 findings (issue #26623)", {
   # Whether Polychoric is worth suggesting is data-dependent.
   expect_true(factanal_polychoric_available(select_factor_correlation_type(df)))
   expect_false(factanal_polychoric_available(select_factor_correlation_type(mtcars[, c("mpg", "hp", "drat", "wt")])))
-  expect_true(method_tbl$polychoric_available[[1]])
+  expect_equal(method_tbl$polychoric_available[[1]], "TRUE")
   expect_equal(method_tbl$degraded_from[[1]], "")
 
   # The category-count row says "categorical variables": in a mixed analysis the continuous
@@ -535,7 +535,7 @@ test_that("a failed estimation degrades to Pearson end to end (issue #26623)", {
   method_tbl <- tidy(fit, type = "analysis_method")
   expect_equal(method_tbl$Value[[1]], "Pearson Correlation")
   expect_equal(method_tbl$degraded_from[[1]], "polychoric")
-  expect_true(method_tbl$has_diagnostics[[1]])
+  expect_equal(method_tbl$has_diagnostics[[1]], "TRUE")
   diagnostics <- tidy(fit, type = "cor_diagnostics")
   expect_equal(diagnostics$Judgement[[4]], "Estimation failed")
   # The Pearson fallback matrix says nothing about the correlation that failed.
@@ -603,4 +603,27 @@ test_that("an unsupported facet is skipped, not fatal, under Repeat By (issue #2
   # Without Repeat By the same unsupported data still raises the error, so nothing is swallowed.
   expect_error(exp_factanal(dplyr::select(bad, q1, q2, q3), q1, q2, q3, nfactors = 1, parallel_n_iter = 3),
                "EXP-ANA-35")
+})
+
+test_that("a categorical correlation always yields a non-empty diagnostics table (issue #26623)", {
+  # The report ALWAYS shows the diagnostics section for a categorical correlation, so cor_diagnostics
+  # must never be NULL there -- otherwise the section renders a heading over an empty table, or (with
+  # the old has_diagnostics-only gate) vanishes entirely on a real polychoric analysis.
+  df <- factanal_ordinal_fixture()
+  poly <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
+                       cor_type = "polychoric", parallel_n_iter = 3)$model[[1]]
+  expect_false(is.null(poly$cor_diagnostics))
+  expect_equal(nrow(poly$cor_diagnostics), 6)
+  # The analysis_method table reports it as available, as an explicit "TRUE" string (not a logical
+  # that could serialize as "1"/"0" and read falsy on the client).
+  method_tbl <- tidy(poly, type = "analysis_method")
+  expect_equal(method_tbl$has_diagnostics[[1]], "TRUE")
+  expect_true(method_tbl$has_diagnostics[[1]] %in% c("TRUE", "FALSE"))
+
+  # If the diagnostics computation itself fails, the fallback keeps the section non-empty rather
+  # than returning NULL.
+  fallback <- unavailable_polychoric_diagnostics()
+  expect_equal(nrow(fallback), 6)
+  expect_true(all(fallback$Judgement == "Not Available"))
+  expect_equal(fallback$Diagnostic, poly$cor_diagnostics$Diagnostic)
 })

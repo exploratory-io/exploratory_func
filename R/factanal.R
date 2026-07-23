@@ -428,7 +428,12 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     # Keyed off the REQUESTED family, so a failed polychoric estimation still shows the table with
     # its "Estimation failed" row rather than hiding the only signal the user has.
     fit$cor_diagnostics <- if (identical(requested_family, "pearson")) NULL else {
-      tryCatch(compute_polychoric_diagnostics(encoded_df, cor_result, selection), error = function(e) NULL)
+      # For a categorical correlation the report ALWAYS shows the diagnostics section, so this must
+      # never be NULL -- a NULL would leave the section's heading over an empty table. If the
+      # computation fails, degrade to a 6-row "Not Available" table so the section stays honest and
+      # non-empty. (issue #26623)
+      tryCatch(compute_polychoric_diagnostics(encoded_df, cor_result, selection),
+               error = function(e) unavailable_polychoric_diagnostics())
     }
     class(fit) <- c("fa_exploratory", class(fit))
     fit
@@ -727,19 +732,23 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
         if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
       ),
       # Hidden columns. The client reads them to bind the report's explanation text; they are not
-      # part of the rendered Item/Value table.
+      # part of the rendered Item/Value table. The booleans are emitted as EXPLICIT "TRUE"/"FALSE"
+      # STRINGS, not R logicals: a logical column can reach the client serialized as "1"/"0" (or a
+      # boolean) depending on the pivot pipeline, and the client's isTrue() only accepts
+      # "TRUE"/"true"/true -- a "1" would read as false and, before the gate was hardened, hide a
+      # real polychoric analysis's diagnostics. Strings remove that ambiguity. (issue #26623)
       correlation_type = cor_type,
-      correlation_is_auto = isTRUE(x$correlation_is_auto),
+      correlation_is_auto = if (isTRUE(x$correlation_is_auto)) "TRUE" else "FALSE",
       # Non-empty when the requested correlation could not be estimated and the fit fell back to
       # Pearson, so the report can say so instead of inventing a rationale.
       degraded_from = if (is.null(x$correlation_degraded_from)) "" else x$correlation_degraded_from,
       # Whether suggesting Polychoric makes sense for this data at all.
-      polychoric_available = isTRUE(x$correlation_polychoric_available),
+      polychoric_available = if (isTRUE(x$correlation_polychoric_available)) "TRUE" else "FALSE",
       # Language-neutral tokens for the selector's warnings; the client renders the localized text.
       warning_tokens = paste(factanal_selection_warning_tokens(x$correlation_selection), collapse = ","),
-      # TRUE also when a polychoric estimation failed and the fit degraded to Pearson, so the
+      # "TRUE" also when a polychoric estimation failed and the fit degraded to Pearson, so the
       # report still shows the diagnostics table that reports the failure.
-      has_diagnostics = !is.null(x$cor_diagnostics) && nrow(x$cor_diagnostics) > 0,
+      has_diagnostics = if (!is.null(x$cor_diagnostics) && nrow(x$cor_diagnostics) > 0) "TRUE" else "FALSE",
       reason = if (is.null(x$correlation_reason)) "" else x$correlation_reason
     )
   }
