@@ -151,6 +151,8 @@ test_that("do_cor automatic method selects the specified correlation family", {
 })
 
 test_that("do_cor supports automatic and mixed correlations with factor inputs", {
+  skip_if_not_installed("polycor")
+
   set.seed(456)
   n <- 100
   ordinal <- ordered(cut(rnorm(n), breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))

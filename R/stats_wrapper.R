@@ -317,7 +317,13 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
     # Polychoric coerces every column to ordered so every pair uses the ordinal model.
     # Mixed preserves continuous numerics and converts factor/logical columns to ordered,
     # allowing hetcor() to select Pearson, polyserial, or polychoric per pair.
-    loadNamespace("polycor")
+    if (!requireNamespace("polycor", quietly = TRUE)) {
+      stop(
+        "The 'polycor' package is required for polychoric and mixed correlations. ",
+        "Install it before using this method.",
+        call. = FALSE
+      )
+    }
     ordered_df <- as_hetcor_data_frame(mat, force_ordinal = identical(method, "polychoric"))
     # hetcor only supports "complete.obs" and "pairwise.complete.obs", while the other
     # methods (via cor()/cor.test()) also accept "everything", "all.obs", and
