@@ -534,6 +534,12 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     resid_df <- resid_df %>% tibble::rownames_to_column(var = x$var1)
     resid_df <- resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
 
+    # Keep the cell statistic and multiplicity correction aligned with the
+    # Correspondence Analysis report.
+    adjusted_resid_df <- as.data.frame(x$stdres)
+    adjusted_resid_df <- adjusted_resid_df %>% tibble::rownames_to_column(var = x$var1)
+    adjusted_resid_df <- adjusted_resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "adjusted_standardized_residual", -!!rlang::sym(x$var1))
+
     resid_raw_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
     resid_raw_df <- resid_raw_df %>% tibble::rownames_to_column(var = x$var1)
     resid_raw_df <- resid_raw_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual_raw", -!!rlang::sym(x$var1))
@@ -544,6 +550,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 
     ret <- obs_df %>% left_join(expected_df, by=c(x$var1, x$var2)) # join expected column 
     ret <- ret %>% left_join(resid_df, by=c(x$var1, x$var2)) # join expected column
+    ret <- ret %>% left_join(adjusted_resid_df, by=c(x$var1, x$var2))
     ret <- ret %>% left_join(resid_raw_df, by=c(x$var1, x$var2)) # join residual_raw column
     ret <- ret %>% left_join(resid_ratio_df, by=c(x$var1, x$var2)) # join residual_ratio column
     if (is.nan(x$statistic) || x$statistic <= 0) {
@@ -552,6 +559,11 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     else {
       ret <- ret %>% mutate(contrib = 100*residual^2/(!!(x$statistic))) # add percent contribution too.
     }
+    ret <- ret %>%
+      mutate(
+        adjusted_p_value = 2 * stats::pnorm(abs(adjusted_standardized_residual), lower.tail = FALSE),
+        adjusted_p_value = stats::p.adjust(adjusted_p_value, method = "holm")
+      )
 
     if (!is.null(x$var1_levels)) {
       ret[[x$var1]] <- factor(ret[[x$var1]], levels=x$var1_levels)

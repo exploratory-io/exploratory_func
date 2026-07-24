@@ -291,6 +291,17 @@ test_that("test exp_chisq", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
+  expect_true(all(c("adjusted_standardized_residual", "adjusted_p_value") %in% colnames(residuals)))
+  expect_equal(
+    residuals$adjusted_standardized_residual,
+    as.vector(ret$model[[1]]$stdres),
+    tolerance = 1e-12
+  )
+  expect_equal(
+    residuals$adjusted_p_value,
+    p.adjust(2 * pnorm(abs(residuals$adjusted_standardized_residual), lower.tail = FALSE), method = "holm"),
+    tolerance = 1e-12
+  )
   expect_true(all(c("Cramer's V","Chi-Square","DF","P Value","Cohen's W",
                     "Power", "Type 2 Error","Rows") %in% colnames(summary)
   ))
