@@ -45,6 +45,7 @@ Imports:
     pwr,
     readr
 Suggests:
+    polycor,
     testthat,
     twitteR,
     sentimentr,
