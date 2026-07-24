@@ -233,6 +233,41 @@ test_that("exp_cronbach_alpha rejects nominal (unordered, 3+ level) factor colum
                "nominal")
 })
 
+test_that("exp_cronbach_alpha treats all-factor Likert columns as ordinal under auto/polychoric", {
+  df <- make_reliability_df() %>%
+    dplyr::mutate(dplyr::across(dplyr::everything(), ~ factor(.x)))
+
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "auto")
+  expect_equal(model_df$model[[1]]$selected_method, "polychoric")
+  res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
+  expect_equal(res$Coefficient, "Ordinal Alpha")
+  expect_false(is.na(res$Alpha))
+
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "polychoric")
+  expect_equal(model_df$model[[1]]$selected_method, "polychoric")
+})
+
+test_that("exp_cronbach_alpha retries polychoric with correct=0 on sparse tables", {
+  set.seed(1)
+  df <- tibble::tibble(
+    a = ordered(sample(1:5, 12, replace = TRUE)),
+    b = ordered(sample(1:5, 12, replace = TRUE)),
+    c = ordered(sample(1:5, 12, replace = TRUE)),
+    d = ordered(sample(1:5, 12, replace = TRUE)),
+    e = ordered(sample(1:5, 12, replace = TRUE)),
+    f = ordered(sample(1:5, 12, replace = TRUE)),
+    g = ordered(sample(1:5, 12, replace = TRUE)),
+    h = ordered(sample(1:5, 12, replace = TRUE))
+  )
+
+  # Default psych::polychoric(correct=0.5) fails on this sparse case with
+  # "attempt to set 'rownames' on an object with no dimensions".
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "polychoric")
+  expect_equal(model_df$model[[1]]$selected_method, "polychoric")
+  expect_false(is.na(model_df$model[[1]]$alpha))
+  expect_true(any(grepl("continuity correction of 0", model_df$model[[1]]$warnings)))
+})
+
 test_that("exp_cronbach_alpha drops constant columns and errors when fewer than 2 remain", {
   # One constant column is dropped; 3 valid items remain -> report still builds.
   df <- make_reliability_df() %>% dplyr::mutate(`定数` = 3L)

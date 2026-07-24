@@ -432,23 +432,44 @@ build_factor_correlation <- function(data, correlation_type = c("pearson", "poly
                 type = "pearson", smoothed = FALSE, warnings = character(), failed = FALSE))
   }
 
+  # psych::polychoric / tetrachoric / mixedCor can fail on sparse contingency tables when the
+  # continuity correction (default correct=0.5) produces empty pairwise results. psych itself
+  # suggests retrying with correct=0; without that retry we used to degrade straight to Pearson
+  # even though the polychoric-family estimate was recoverable (same root cause as the
+  # Cronbach's Alpha fix).
   captured <- character()
-  result <- withCallingHandlers(
-    tryCatch({
-      switch(correlation_type,
-        polychoric = psych::polychoric(data, correct = correct),
-        tetrachoric = psych::tetrachoric(data, correct = correct),
-        mixed = psych::mixedCor(data))
-    }, error = function(e) {
-      captured <<- c(captured, conditionMessage(e))
-      NULL
-    }),
-    warning = function(w) {
-      captured <<- c(captured, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    })
+  run_psych_correlation <- function(corr) {
+    withCallingHandlers(
+      tryCatch({
+        switch(correlation_type,
+          polychoric = psych::polychoric(data, correct = corr),
+          tetrachoric = psych::tetrachoric(data, correct = corr),
+          mixed = psych::mixedCor(data, correct = corr))
+      }, error = function(e) {
+        captured <<- c(captured, conditionMessage(e))
+        NULL
+      }),
+      warning = function(w) {
+        captured <<- c(captured, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      })
+  }
+  correlation_ok <- function(obj) {
+    !is.null(obj) && !is.null(obj$rho) && !anyNA(obj$rho)
+  }
 
-  if (is.null(result) || is.null(result$rho) || anyNA(result$rho)) {
+  result <- run_psych_correlation(correct)
+  if (!correlation_ok(result) && correct != 0) {
+    result <- run_psych_correlation(0)
+    if (correlation_ok(result)) {
+      captured <- c(
+        captured,
+        sprintf("%s used continuity correction of 0 because the default correction failed.",
+                factanal_correlation_label(correlation_type)))
+    }
+  }
+
+  if (!correlation_ok(result)) {
     # Degrade to Pearson rather than aborting the whole analysis. A partially-NA matrix counts as a
     # failure too: psych::fa() refuses to run on one ("missing values (NAs) in the correlation
     # matrix do not allow me to continue"), so keeping it would abort with a raw psych error.
