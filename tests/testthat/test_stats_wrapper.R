@@ -121,6 +121,8 @@ test_that("do_cor should skip group with only one row.", {
 })
 
 test_that("do_cor with polychoric method", {
+  skip_if_not_installed("polycor")
+
   # Polychoric correlation is for ordinal variables. The latent variables behind x and y
   # are correlated at 0.7, while z is independent of them.
   set.seed(123)
@@ -168,6 +170,8 @@ test_that("do_cor supports automatic and mixed correlations with factor inputs",
 })
 
 test_that("do_cor with polychoric method handles a constant column without error", {
+  skip_if_not_installed("polycor")
+
   set.seed(123)
   n <- 100
   cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
@@ -184,6 +188,8 @@ test_that("do_cor with polychoric method handles a constant column without error
 })
 
 test_that("do_cor with polychoric method handles complex column names", {
+  skip_if_not_installed("polycor")
+
   set.seed(123)
   n <- 100
   cut5 <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.84, -0.25, 0.25, 0.84, Inf)))
@@ -200,6 +206,8 @@ test_that("do_cor with polychoric method handles complex column names", {
 })
 
 test_that("do_cor with polychoric method accepts use values hetcor does not support", {
+  skip_if_not_installed("polycor")
+
   # hetcor only accepts "complete.obs" and "pairwise.complete.obs", but the public
   # do_cor API (and the other methods via cor()/cor.test()) also accept "everything",
   # "all.obs", and "na.or.complete". Those must be mapped, not passed through as an error.
@@ -218,6 +226,8 @@ test_that("do_cor with polychoric method accepts use values hetcor does not supp
 })
 
 test_that("do_cor with polychoric method for grouped (repeat-by) data", {
+  skip_if_not_installed("polycor")
+
   # Repeat By on Analytics View maps to group_by(). Each group must get its own
   # polychoric correlation. Group A has a positive relationship, group B a negative one.
   set.seed(123)
@@ -238,6 +248,8 @@ test_that("do_cor with polychoric method for grouped (repeat-by) data", {
 })
 
 test_that("do_cor with polychoric method handles NA values via pairwise complete obs", {
+  skip_if_not_installed("polycor")
+
   # Survey data routinely has missing responses (NA). The default use="pairwise.complete.obs"
   # must drop NAs pairwise rather than error, so every pair is still estimated.
   set.seed(123)
