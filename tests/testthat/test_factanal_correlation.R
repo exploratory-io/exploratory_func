@@ -507,6 +507,33 @@ test_that("verification pass 4 findings (issue #26623)", {
   expect_equal(zero_diagnostics$Judgement[[2]], "Detected in 1 variable")
 })
 
+test_that("build_factor_correlation retries with correct=0 before degrading", {
+  # Same sparse contingency pattern that makes psych::polychoric(correct=0.5) throw
+  # "attempt to set 'rownames' on an object with no dimensions", while correct=0 succeeds.
+  set.seed(1)
+  df <- data.frame(lapply(1:8, function(i) as.integer(sample(1:5, 12, replace = TRUE))))
+  names(df) <- paste0("q", 1:8)
+
+  expect_true(inherits(
+    suppressWarnings(tryCatch(psych::polychoric(df, correct = 0.5), error = function(e) e)),
+    "error"))
+  expect_false(inherits(
+    suppressWarnings(tryCatch(psych::polychoric(df, correct = 0), error = function(e) e)),
+    "error"))
+
+  result <- build_factor_correlation(df, "polychoric")
+  expect_equal(result$type, "polychoric")
+  expect_false(result$failed)
+  expect_equal(dim(result$correlation), c(8L, 8L))
+  expect_true(any(grepl("continuity correction of 0", result$warnings)))
+
+  # End-to-end: exp_factanal must keep polychoric rather than degrade to Pearson.
+  fit <- exp_factanal(df, q1, q2, q3, q4, q5, q6, q7, q8, nfactors = 2, rotate = "varimax",
+                      cor_type = "polychoric", parallel_n_iter = 3)$model[[1]]
+  expect_equal(fit$correlation_type, "polychoric")
+  expect_equal(fit$correlation_degraded_from, "")
+})
+
 test_that("a failed estimation degrades to Pearson end to end (issue #26623)", {
   # The degrade path mutates `resolved` after construction and re-points the diagnostics and the
   # parallel analysis; exercise it through exp_factanal, not just the helper.
