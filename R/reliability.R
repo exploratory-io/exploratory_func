@@ -165,6 +165,75 @@ reliability_prepare_correlation_data <- function(data, item_types) {
 # Correlation matrix builder
 # ------------------------------------------------------------
 
+# psych::polychoric / mixedCor can fail on sparse contingency tables when the
+# continuity correction (default correct=0.5) produces empty pairwise results.
+# psych itself suggests retrying with correct=0; without that retry the failure
+# surfaces as cryptic errors like "attempt to set 'rownames' on an object with
+# no dimensions" or "supply both 'x' and 'y' or a matrix-like 'x'".
+reliability_valid_rho <- function(rho, expected_n = NULL) {
+  rho <- tryCatch(as.matrix(rho), error = function(e) NULL)
+  if (is.null(rho) || is.null(dim(rho)) || any(dim(rho) == 0)) {
+    return(FALSE)
+  }
+  if (!is.null(expected_n) && (nrow(rho) != expected_n || ncol(rho) != expected_n)) {
+    return(FALSE)
+  }
+  TRUE
+}
+
+reliability_estimate_polychoric_rho <- function(prepared_data, correct = 0.5) {
+  expected_n <- ncol(prepared_data)
+  run <- function(corr) {
+    obj <- suppressWarnings(psych::polychoric(prepared_data, correct = corr,
+                                              smooth = FALSE, global = FALSE))
+    obj$rho
+  }
+  warnings_list <- character()
+  rho <- tryCatch(run(correct), error = function(e) NULL)
+  if (!reliability_valid_rho(rho, expected_n) && correct != 0) {
+    rho <- tryCatch(run(0), error = function(e) NULL)
+    if (reliability_valid_rho(rho, expected_n)) {
+      warnings_list <- c(
+        warnings_list,
+        "Polychoric correlation used continuity correction of 0 because the default correction failed.")
+    }
+  }
+  if (!reliability_valid_rho(rho, expected_n)) {
+    stop("Failed to estimate polychoric correlations. Check that items are ordinal ",
+         "with enough responses across categories.")
+  }
+  list(rho = rho, warnings = warnings_list)
+}
+
+reliability_estimate_mixed_rho <- function(prepared_data, item_types, correct = 0.5) {
+  expected_n <- ncol(prepared_data)
+  continuous_index <- match(names(item_types)[item_types == "continuous"], names(prepared_data))
+  polytomous_index <- match(names(item_types)[item_types == "ordinal"], names(prepared_data))
+  dichotomous_index <- match(names(item_types)[item_types == "dichotomous"], names(prepared_data))
+  run <- function(corr) {
+    obj <- suppressWarnings(psych::mixedCor(
+      prepared_data,
+      c = continuous_index, p = polytomous_index, d = dichotomous_index,
+      correct = corr, global = FALSE))
+    obj$rho
+  }
+  warnings_list <- character()
+  rho <- tryCatch(run(correct), error = function(e) NULL)
+  if (!reliability_valid_rho(rho, expected_n) && correct != 0) {
+    rho <- tryCatch(run(0), error = function(e) NULL)
+    if (reliability_valid_rho(rho, expected_n)) {
+      warnings_list <- c(
+        warnings_list,
+        "Mixed correlation used continuity correction of 0 because the default correction failed.")
+    }
+  }
+  if (!reliability_valid_rho(rho, expected_n)) {
+    stop("Failed to estimate mixed correlations. Check that items have enough ",
+         "responses across categories.")
+  }
+  list(rho = rho, warnings = warnings_list)
+}
+
 reliability_build_correlation <- function(data, item_types, method,
                                           smooth = TRUE, correct = 0.5) {
   prepared_data <- reliability_prepare_correlation_data(data, item_types)
@@ -174,17 +243,14 @@ reliability_build_correlation <- function(data, item_types, method,
     correlation_matrix <- stats::cor(prepared_data, use = "pairwise.complete.obs",
                                      method = "pearson")
   } else if (method == "polychoric") {
-    obj <- suppressWarnings(psych::polychoric(prepared_data, correct = correct,
-                                              smooth = FALSE, global = FALSE))
-    correlation_matrix <- obj$rho
+    poly_result <- reliability_estimate_polychoric_rho(prepared_data, correct = correct)
+    correlation_matrix <- poly_result$rho
+    warnings_list <- c(warnings_list, poly_result$warnings)
   } else if (method == "mixed") {
-    continuous_index <- match(names(item_types)[item_types == "continuous"], names(prepared_data))
-    polytomous_index <- match(names(item_types)[item_types == "ordinal"], names(prepared_data))
-    dichotomous_index <- match(names(item_types)[item_types == "dichotomous"], names(prepared_data))
-    obj <- suppressWarnings(psych::mixedCor(prepared_data,
-                           c = continuous_index, p = polytomous_index, d = dichotomous_index,
-                           correct = correct, global = FALSE))
-    correlation_matrix <- obj$rho
+    mixed_result <- reliability_estimate_mixed_rho(prepared_data, item_types,
+                                                   correct = correct)
+    correlation_matrix <- mixed_result$rho
+    warnings_list <- c(warnings_list, mixed_result$warnings)
   } else {
     stop("Unsupported correlation method: ", method)
   }
@@ -466,6 +532,16 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
 
     item_types <- vapply(cleaned_df, reliability_detect_item_type, character(1))
     names(item_types) <- colnames(cleaned_df)
+
+    # Exploratory often stores Likert items as unordered factors. Treat those as
+    # ordinal when the user asks for polychoric/mixed, or when every selected
+    # item is categorical (auto -> Ordinal Alpha). Keep rejecting nominal when
+    # mixed with continuous items under auto/pearson.
+    if (correlation_method %in% c("polychoric", "mixed") ||
+        (correlation_method == "auto" &&
+         all(item_types %in% c("nominal", "ordinal", "dichotomous")))) {
+      item_types[item_types == "nominal"] <- "ordinal"
+    }
 
     unsupported <- names(item_types)[item_types %in% c("nominal", "unsupported")]
     if (length(unsupported) > 0) {
