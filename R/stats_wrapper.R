@@ -283,7 +283,7 @@ as_numeric_correlation_matrix <- function(df) {
     } else {
       x
     }
-  })))
+  }), check.names = FALSE))
 }
 
 as_hetcor_data_frame <- function(df, force_ordinal = FALSE) {
@@ -304,7 +304,9 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
   # but I'm hoping this might still help align the result between Mac and Windows if there are ties in the mean correlations.
   # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
   sorted_colnames <- stringr::str_sort(colnames(mat))
-  mat <- as.data.frame(mat[, sorted_colnames, drop = FALSE])
+  # `as.data.frame.matrix()` otherwise changes numeric matrix column names such
+  # as "1" to "X1", breaking the key-value correlation output contract.
+  mat <- as.data.frame(mat[, sorted_colnames, drop = FALSE], check.names = FALSE)
   method <- resolve_correlation_method(mat, method)
 
   # Create a matrix of P-values for Analytics View case.
