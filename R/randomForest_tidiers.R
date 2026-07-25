@@ -2892,12 +2892,9 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
         ret,
         tibble::tibble(balanced_accuracy = balanced_accuracy, specificity = specificity))
       cols <- names(ret)
-      if ("f_measure" %in% cols && "balanced_accuracy" %in% cols) {
+      if ("f_score" %in% cols && "balanced_accuracy" %in% cols) {
         cols <- cols[cols != "balanced_accuracy"]
-        cols <- append(cols, "balanced_accuracy", after = match("f_measure", cols))
-      } else if ("f1" %in% cols && "balanced_accuracy" %in% cols) {
-        cols <- cols[cols != "balanced_accuracy"]
-        cols <- append(cols, "balanced_accuracy", after = match("f1", cols))
+        cols <- append(cols, "balanced_accuracy", after = match("f_score", cols))
       }
       if ("recall" %in% cols && "specificity" %in% cols) {
         cols <- cols[cols != "specificity"]
