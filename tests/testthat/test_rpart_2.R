@@ -555,12 +555,12 @@ test_that("exp_rpart report_metrics adds metrics without changing the default ou
   model_df <- data %>% exp_rpart(`is delayed`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   with_metrics <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE, report_metrics = TRUE)
   expect_false("AUC" %in% colnames(with_metrics))
-  # #37252: Balanced Accuracy after PR AUC; Specificity after Recall.
+  # #37252: Balanced Accuracy between F1 and Accuracy; Specificity after Recall.
   expect_equal(
-    intersect(c("ROC AUC", "PR AUC", "Balanced Accuracy", "F1 Score", "Accuracy Rate",
+    intersect(c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
                 "Misclass. Rate", "Precision", "Recall", "Specificity"),
               colnames(with_metrics)),
-    c("ROC AUC", "PR AUC", "Balanced Accuracy", "F1 Score", "Accuracy Rate",
+    c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
       "Misclass. Rate", "Precision", "Recall", "Specificity"))
   # Balanced accuracy is the mean of recall and specificity, by definition.
   expect_equal(with_metrics$`Balanced Accuracy`[[1]],

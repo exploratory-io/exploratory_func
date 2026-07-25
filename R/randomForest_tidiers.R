@@ -2869,30 +2869,41 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     balanced_accuracy <- if (is.na(specificity) || is.na(sensitivity)) NA_real_ else (specificity + sensitivity) / 2
     if (pretty.name) {
       # Spec renames AUC to ROC AUC so it reads as a pair with PR AUC.
-      # #37252 column order: ROC AUC, PR AUC, Balanced Accuracy, F1..Recall,
-      # Specificity, Rows (TRUE), Rows (FALSE) [, Rows].
+      # #37252 column order (from issue screenshots):
+      # ROC AUC, PR AUC, F1, Balanced Accuracy, Accuracy..Recall, Specificity, Rows…
       ret <- dplyr::bind_cols(
-        tibble::tibble(`ROC AUC` = auc, `PR AUC` = pr_auc, `Balanced Accuracy` = balanced_accuracy),
+        tibble::tibble(`ROC AUC` = auc, `PR AUC` = pr_auc),
         ret,
-        tibble::tibble(`Specificity` = specificity))
-      if ("Recall" %in% names(ret) && "Specificity" %in% names(ret)) {
-        cols <- names(ret)
+        tibble::tibble(`Balanced Accuracy` = balanced_accuracy, `Specificity` = specificity))
+      cols <- names(ret)
+      if ("F1 Score" %in% cols && "Balanced Accuracy" %in% cols) {
+        cols <- cols[cols != "Balanced Accuracy"]
+        cols <- append(cols, "Balanced Accuracy", after = match("F1 Score", cols))
+      }
+      if ("Recall" %in% cols && "Specificity" %in% cols) {
         cols <- cols[cols != "Specificity"]
         cols <- append(cols, "Specificity", after = match("Recall", cols))
-        ret <- ret[, cols, drop = FALSE]
       }
+      ret <- ret[, cols, drop = FALSE]
     }
     else {
       ret <- dplyr::bind_cols(
-        tibble::tibble(roc_auc = auc, pr_auc = pr_auc, balanced_accuracy = balanced_accuracy),
+        tibble::tibble(roc_auc = auc, pr_auc = pr_auc),
         ret,
-        tibble::tibble(specificity = specificity))
-      if ("recall" %in% names(ret) && "specificity" %in% names(ret)) {
-        cols <- names(ret)
+        tibble::tibble(balanced_accuracy = balanced_accuracy, specificity = specificity))
+      cols <- names(ret)
+      if ("f_measure" %in% cols && "balanced_accuracy" %in% cols) {
+        cols <- cols[cols != "balanced_accuracy"]
+        cols <- append(cols, "balanced_accuracy", after = match("f_measure", cols))
+      } else if ("f1" %in% cols && "balanced_accuracy" %in% cols) {
+        cols <- cols[cols != "balanced_accuracy"]
+        cols <- append(cols, "balanced_accuracy", after = match("f1", cols))
+      }
+      if ("recall" %in% cols && "specificity" %in% cols) {
         cols <- cols[cols != "specificity"]
         cols <- append(cols, "specificity", after = match("recall", cols))
-        ret <- ret[, cols, drop = FALSE]
       }
+      ret <- ret[, cols, drop = FALSE]
     }
   }
   else if (pretty.name) {
