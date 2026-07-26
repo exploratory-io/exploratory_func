@@ -113,6 +113,44 @@ test_that("rf_evaluation_training_and_test produces training and test metrics", 
   expect_true("is_test_data" %in% colnames(summary) || any(grepl("Test", colnames(summary))) || nrow(summary) >= 2)
 })
 
+test_that("exp_chaid report_metrics adds ROC AUC / PR AUC like CART", {
+  expected_binary <- c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity")
+  expected_multi <- c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC")
+
+  for (test_rate in c(0, 0.3)) {
+    df <- make_binary_df(n = 500, seed = 21)
+    model_df <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                           test_rate = test_rate, min_split = 20, min_bucket = 5))
+    base <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
+    with_metrics <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE,
+                                                    report_metrics = TRUE)
+    label <- paste0("binary test_rate=", test_rate)
+    expect_true(all(expected_binary %in% colnames(with_metrics)), info = label)
+    expect_false(any(expected_binary %in% colnames(base)), info = label)
+    expect_false("AUC" %in% colnames(with_metrics), info = label)
+    expect_equal(nrow(with_metrics), if (test_rate > 0) 2 else 1, info = label)
+    expect_false(any(is.na(with_metrics[, expected_binary, drop = FALSE])), info = label)
+    expect_equal(
+      intersect(c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+                  "Misclass. Rate", "Precision", "Recall", "Specificity"),
+                colnames(with_metrics)),
+      c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+        "Misclass. Rate", "Precision", "Recall", "Specificity"),
+      info = label
+    )
+  }
+
+  df <- make_multi_df(n = 500, seed = 22)
+  model_df <- suppressWarnings(exp_chaid(df, segment, channel, age_group,
+                                         min_split = 20, min_bucket = 5))
+  with_metrics <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE,
+                                                  report_metrics = TRUE)
+  expect_true(all(expected_multi %in% colnames(with_metrics)))
+  by_class <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class",
+                                              pretty.name = TRUE, report_metrics = TRUE)
+  expect_true(all(c("Balanced Accuracy", "ROC AUC", "PR AUC", "Overall Share") %in% colnames(by_class)))
+})
+
 test_that("confusion matrix tidy returns actual/predicted/count", {
   df <- make_binary_df()
   model_df <- suppressWarnings(exp_chaid(df, is_churn, plan, region,

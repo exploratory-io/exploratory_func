@@ -1514,6 +1514,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                     source_data <- df$source.data[[1]]
                     if (!is.null(source_data) && length(test_rows) > 0 && "rpart" %in% class(model_object)) {
                       predict(model_object, newdata = source_data[test_rows, , drop = FALSE], type = "prob")
+                    } else if (!is.null(source_data) && length(test_rows) > 0 &&
+                               inherits(model_object, "exploratory_chaid")) {
+                      chaid_as_probability_matrix(
+                        predict(model_object, newdata = source_data[test_rows, , drop = FALSE], type = "prob"),
+                        model_object$class_levels
+                      )
                     } else {
                       NULL
                     }
@@ -1556,6 +1562,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                 source_data <- df$source.data[[1]]
                 if (!is.null(source_data) && length(test_rows) > 0 && "rpart" %in% class(model_object)) {
                   predict(model_object, newdata = source_data[test_rows, , drop = FALSE], type = "prob")
+                } else if (!is.null(source_data) && length(test_rows) > 0 &&
+                           inherits(model_object, "exploratory_chaid")) {
+                  chaid_as_probability_matrix(
+                    predict(model_object, newdata = source_data[test_rows, , drop = FALSE], type = "prob"),
+                    model_object$class_levels
+                  )
                 } else {
                   NULL
                 }

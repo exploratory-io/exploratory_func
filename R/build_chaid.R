@@ -175,6 +175,11 @@ exp_chaid <- function(df,
         model, train_all, binary_classification_threshold
       )
       model$predicted_prob <- chaid_positive_probability(model, train_all)
+      # Full class-probability matrix for report_metrics (Macro / One-vs-Rest AUCs).
+      # Column names are the raw class levels so multiclass_auc_by_class() can use them.
+      model$predicted_prob_matrix <- chaid_as_probability_matrix(
+        train_all, model$class_levels
+      )
 
       # Metadata expected by the framework.
       model$terms_mapping <- names(group_name_map)
@@ -315,6 +320,37 @@ chaid_positive_probability <- function(model, all_prediction) {
   } else {
     apply(as.matrix(all_prediction[, prob_cols, drop = FALSE]), 1, max)
   }
+}
+
+#' Convert CHAID probability output to a class-named matrix.
+#'
+#' `chaid_predict(type = "prob"|"all")` uses `.pred_prob_<class>` columns. The
+#' shared Decision Tree report helpers (`multiclass_auc_by_class`,
+#' `evaluate_by_class_report_metrics`) expect colnames to be the class levels.
+#'
+#' @param prediction A data frame / matrix from `chaid_predict`, or NULL.
+#' @param class_levels Optional class order; columns are reordered when present.
+#' @return A numeric matrix, or NULL when conversion is not possible.
+chaid_as_probability_matrix <- function(prediction, class_levels = NULL) {
+  if (is.null(prediction)) {
+    return(NULL)
+  }
+  if (is.data.frame(prediction) || is.matrix(prediction)) {
+    mat <- as.matrix(prediction)
+  } else {
+    return(NULL)
+  }
+  if (ncol(mat) == 0) {
+    return(NULL)
+  }
+  colnames(mat) <- sub("^\\.pred_prob_", "", colnames(mat))
+  if (!is.null(class_levels) && length(class_levels) > 0) {
+    if (!all(class_levels %in% colnames(mat))) {
+      return(NULL)
+    }
+    mat <- mat[, class_levels, drop = FALSE]
+  }
+  mat
 }
 
 #' Return an empty CHAID permutation-importance result.
@@ -684,14 +720,17 @@ augment.exploratory_chaid <- function(x, data = NULL, newdata = NULL,
 #'
 #' @param x A fitted `exploratory_chaid` model.
 #' @param pretty.name Whether to use display-friendly column names.
+#' @param report_metrics Whether to include Decision Tree report extras
+#'   (ROC AUC / PR AUC / …).
 #' @param ... Unused.
 #' @return A one-row model summary data frame.
 #' @export
-glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
+glance.exploratory_chaid <- function(x, pretty.name = FALSE, report_metrics = FALSE, ...) {
   if ("error" %in% class(x)) {
     return(data.frame(Note = x$message))
   }
-  tidy.exploratory_chaid(x, type = "evaluation", pretty.name = pretty.name, ...)
+  tidy.exploratory_chaid(x, type = "evaluation", pretty.name = pretty.name,
+                         report_metrics = report_metrics, ...)
 }
 
 #' tidy for a CHAID model (broom S3 method).
@@ -703,6 +742,9 @@ glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
 #'   `partial_dependence`.
 #' @param pretty.name Whether to use display-friendly column names.
 #' @param binary_classification_threshold Positive-class threshold (binary).
+#' @param report_metrics Whether to include Decision Tree report extras
+#'   (ROC AUC / PR AUC / Balanced Accuracy / Specificity for binary;
+#'   Macro AUCs for multiclass; One-vs-Rest AUCs for evaluation_by_class).
 #' @param ... Unused.
 #' @return A data frame whose shape depends on `type`.
 #' @export
@@ -733,12 +775,23 @@ chaid_display_node_ids <- function(df) {
 }
 
 tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
-                                   binary_classification_threshold = 0.5, ...) {
+                                   binary_classification_threshold = 0.5,
+                                   report_metrics = FALSE, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
     return(data.frame())
   }
   actual <- x$y
-  predicted <- x$predicted_class
+  # Re-threshold binary labels so Settings → cut point updates F1 / Accuracy etc.
+  # (ROC / PR AUC use predicted_prob and are threshold-independent.)
+  predicted <- if (identical(x$classification_type, "binary") &&
+                     !is.null(x$predicted_prob)) {
+    factor(
+      ifelse(x$predicted_prob >= binary_classification_threshold, "TRUE", "FALSE"),
+      levels = x$class_levels
+    )
+  } else {
+    x$predicted_class
+  }
   chaid_display_node_ids(switch(
     type,
     evaluation = {
@@ -747,17 +800,41 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
       }
       if (identical(x$classification_type, "binary")) {
         evaluate_binary_classification(actual, predicted, x$predicted_prob,
-                                       pretty.name = pretty.name, is_rpart = FALSE)
+                                       pretty.name = pretty.name, is_rpart = FALSE,
+                                       report_metrics = report_metrics)
       } else {
-        evaluate_multi_(data.frame(predicted = predicted, actual = actual),
-                        "predicted", "actual", pretty.name = pretty.name)
+        ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
+                               "predicted", "actual", pretty.name = pretty.name)
+        # Mirror tidy.rpart: Macro ROC/PR AUC for the Decision Tree report (#37156).
+        if (report_metrics) {
+          balanced_accuracy <- multiclass_balanced_accuracy(actual, predicted)
+          auc_by_class <- multiclass_auc_by_class(actual, x$predicted_prob_matrix)
+          macro_roc_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$roc_auc, na.rm = TRUE) else NA_real_
+          macro_pr_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$pr_auc, na.rm = TRUE) else NA_real_
+          extra <- if (pretty.name) {
+            tibble::tibble(`Balanced Accuracy` = balanced_accuracy,
+                           `Macro ROC AUC` = macro_roc_auc,
+                           `Macro PR AUC` = macro_pr_auc)
+          } else {
+            tibble::tibble(balanced_accuracy = balanced_accuracy,
+                           macro_roc_auc = macro_roc_auc,
+                           macro_pr_auc = macro_pr_auc)
+          }
+          ret <- dplyr::bind_cols(ret, extra)
+        }
+        ret
       }
     },
     evaluation_by_class = {
       per_level <- function(level) {
         evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
       }
-      dplyr::bind_rows(lapply(x$class_levels, per_level))
+      ret <- dplyr::bind_rows(lapply(x$class_levels, per_level))
+      if (report_metrics && nrow(ret) > 0) {
+        ret <- dplyr::bind_cols(ret, evaluate_by_class_report_metrics(
+          actual, predicted, x$class_levels, x$predicted_prob_matrix, pretty.name))
+      }
+      ret
     },
     conf_mat = {
       calc_conf_mat(actual, predicted)
