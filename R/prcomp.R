@@ -347,7 +347,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       # #37268: rename Rows Used / Variables Used; drop redundant Rows vs Variables row;
       # refresh Description copy (and English-canonical strings for the client translator).
       res <- tibble::tibble(
-        Metric = c("Number of Rows", "Rows Excluded", "Number of Variables", "Excluded Variables",
+        Metric = c("Row Count", "Rows Excluded", "Number of Variables", "Excluded Variables",
                    "Normalization", "SD Ratio (Max/Min)"),
         Value = c(
           as.character(d$analyzed_row_count),
