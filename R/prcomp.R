@@ -338,40 +338,40 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       normalized <- isTRUE(x$normalize_data)
       variables_used <- length(d$variable_sd)
       excluded_names <- d$excluded_variables
-      excluded_display <- if (length(excluded_names) == 0) "-" else paste(excluded_names, collapse = ", ")
+      # #37268: show "None" (JA: なし) when nothing was excluded, not "-".
+      excluded_display <- if (length(excluded_names) == 0) "None" else paste(excluded_names, collapse = ", ")
       excluded_pct <- d$excluded_row_rate * 100
       scale_ratio <- d$scale_ratio
       scale_display <- if (is.na(scale_ratio)) "-" else format(round(scale_ratio, 1), nsmall = 1)
       scale_status <- if (!normalized && is.finite(scale_ratio) && scale_ratio >= cfg$scale_ratio_warning) "scale_warning" else "ok"
+      # #37268: rename Rows Used / Variables Used; drop redundant Rows vs Variables row;
+      # refresh Description copy (and English-canonical strings for the client translator).
       res <- tibble::tibble(
-        Metric = c("Rows Used", "Rows Excluded", "Variables Used", "Excluded Variables",
-                   "Normalization", "SD Ratio (Max/Min)", "Rows vs Variables"),
+        Metric = c("Number of Rows", "Rows Excluded", "Number of Variables", "Excluded Variables",
+                   "Normalization", "SD Ratio (Max/Min)"),
         Value = c(
           as.character(d$analyzed_row_count),
           paste0(d$excluded_row_count, " (", format(round(excluded_pct, 1), nsmall = 1), "%)"),
           as.character(variables_used),
           excluded_display,
           if (normalized) "Yes" else "No",
-          scale_display,
-          paste0(d$analyzed_row_count, " rows / ", variables_used, " variables")
+          scale_display
         ),
         Description = c(
-          "Number of rows used after removing missing values.",
+          "Number of rows used in the analysis.",
           "Number and rate of rows removed because of missing values.",
           "Number of variables used in the analysis.",
-          "Variables dropped before analysis because they had only NA or a single value.",
-          "Whether variables were scaled to unit variance before analysis.",
-          "Ratio of the largest to the smallest variable standard deviation.",
-          "Number of rows compared with the number of variables."
+          "Variables dropped before analysis because they were all missing or had only one unique value.",
+          "Whether variables were standardized before analysis.",
+          "Ratio of the maximum to the minimum standard deviation across all variables."
         ),
         status = c(
-          "ok",
+          if (d$analyzed_row_count <= variables_used) "few_rows" else "ok",
           if (d$excluded_row_rate >= cfg$na_exclusion_warning) "high_na_exclusion" else "ok",
           "ok",
           if (length(excluded_names) == 0) "na" else "ok",
           "ok",
-          scale_status,
-          if (d$analyzed_row_count <= variables_used) "few_rows" else "ok"
+          scale_status
         )
       )
     }

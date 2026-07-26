@@ -93,7 +93,15 @@ test_that("new report tidy types return expected columns and tokens", {
   model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
   res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
   expect_equal(colnames(res), c("Metric", "Value", "Description", "status"))
-  expect_true(all(c("Rows Used","Variables Used","Normalization","SD Ratio (Max/Min)") %in% res$Metric))
+  expect_true(all(c("Number of Rows","Number of Variables","Normalization","SD Ratio (Max/Min)") %in% res$Metric))
+  expect_false("Rows vs Variables" %in% res$Metric)
+  expect_false("Rows Used" %in% res$Metric)
+  expect_false("Variables Used" %in% res$Metric)
+  # #37268: empty excluded-variables cell is "None" (JA: なし), not "-".
+  excluded_row <- res[res$Metric == "Excluded Variables", , drop = FALSE]
+  if (nrow(excluded_row) == 1 && identical(excluded_row$status, "na")) {
+    expect_equal(excluded_row$Value, "None")
+  }
   res <- model_df %>% tidy_rowwise(model, type = "parallel_screeplot")
   expect_equal(colnames(res), c("Component", "Eigenvalue", "Random Data Eigenvalue"))
   res <- model_df %>% tidy_rowwise(model, type = "variances_judged")
