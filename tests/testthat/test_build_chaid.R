@@ -113,6 +113,44 @@ test_that("rf_evaluation_training_and_test produces training and test metrics", 
   expect_true("is_test_data" %in% colnames(summary) || any(grepl("Test", colnames(summary))) || nrow(summary) >= 2)
 })
 
+test_that("exp_chaid report_metrics adds ROC AUC / PR AUC like CART", {
+  expected_binary <- c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity")
+  expected_multi <- c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC")
+
+  for (test_rate in c(0, 0.3)) {
+    df <- make_binary_df(n = 500, seed = 21)
+    model_df <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                           test_rate = test_rate, min_split = 20, min_bucket = 5))
+    base <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
+    with_metrics <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE,
+                                                    report_metrics = TRUE)
+    label <- paste0("binary test_rate=", test_rate)
+    expect_true(all(expected_binary %in% colnames(with_metrics)), info = label)
+    expect_false(any(expected_binary %in% colnames(base)), info = label)
+    expect_false("AUC" %in% colnames(with_metrics), info = label)
+    expect_equal(nrow(with_metrics), if (test_rate > 0) 2 else 1, info = label)
+    expect_false(any(is.na(with_metrics[, expected_binary, drop = FALSE])), info = label)
+    expect_equal(
+      intersect(c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+                  "Misclass. Rate", "Precision", "Recall", "Specificity"),
+                colnames(with_metrics)),
+      c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+        "Misclass. Rate", "Precision", "Recall", "Specificity"),
+      info = label
+    )
+  }
+
+  df <- make_multi_df(n = 500, seed = 22)
+  model_df <- suppressWarnings(exp_chaid(df, segment, channel, age_group,
+                                         min_split = 20, min_bucket = 5))
+  with_metrics <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE,
+                                                  report_metrics = TRUE)
+  expect_true(all(expected_multi %in% colnames(with_metrics)))
+  by_class <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class",
+                                              pretty.name = TRUE, report_metrics = TRUE)
+  expect_true(all(c("Balanced Accuracy", "ROC AUC", "PR AUC", "Overall Share") %in% colnames(by_class)))
+})
+
 test_that("confusion matrix tidy returns actual/predicted/count", {
   df <- make_binary_df()
   model_df <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
@@ -478,8 +516,13 @@ test_that("tree_nodes edge labels collapse contiguous numeric bins (tam #37177)"
     # Every numeric branch collapses its contiguous bin run to ONE range label.
     expect_equal(length(values), 1)
     expect_true(grepl("^(<=|>|\\()", values))
-    # edge_label mirrors cond_value (DTreeGenerator rebuilds from cond_value).
-    expect_equal(edges$edge_label[i], paste0("salary = ", values))
+    # cond_value stays machine-parseable bin labels; edge_label is readable
+    # (CHAID report Condition / tree chart — not "salary = <= x").
+    expect_equal(
+      edges$edge_label[i],
+      chaid_readable_one_condition(paste0("salary in {", values, "}"))
+    )
+    expect_false(grepl(" = <=| = \\(| = >", edges$edge_label[i]))
   }
   # A categorical branch keeps its member enumeration untouched.
   cat_edges <- nodes[!is.na(nodes$parent_id) & nodes$cond_column == "dept", ]
@@ -487,4 +530,43 @@ test_that("tree_nodes edge labels collapse contiguous numeric bins (tam #37177)"
     cat_values <- jsonlite::fromJSON(cat_edges$cond_value[1])
     expect_true(all(cat_values %in% c("sales", "rnd", "hr")))
   }
+})
+
+test_that("exp_chaid stores partial dependence for rf_partial_dependence()", {
+  skip_if_not_installed("mmpf")
+  df <- make_binary_df(n = 500, seed = 42)
+  model_df <- suppressWarnings(
+    exp_chaid(df, is_churn, plan, region, tenure,
+              min_split = 20, min_bucket = 5, max_pd_vars = 3,
+              pd_with_bin_means = TRUE)
+  )
+  model <- model_df$model[[1]]
+  expect_false(is.null(model$partial_dependence))
+  expect_gt(nrow(model$partial_dependence), 0)
+  expect_true(length(model$imp_vars) >= 1)
+  expect_true(length(model$imp_vars) <= 3)
+  expect_false(is.null(model$partial_binning))
+
+  pd <- model_df %>% rf_partial_dependence()
+  expect_gt(nrow(pd), 0)
+  expect_true(all(c("x_name", "x_value", "y_name", "y_value") %in% names(pd)))
+  expect_true(any(pd$y_name %in% c("Predicted", "Actual")))
+})
+
+test_that("chaid_partial_dependence_vars prefers importance order", {
+  predictors <- c("a", "b", "c", "d")
+  terms_mapping <- c(a = "A", b = "B", c = "C", d = "D")
+  importance <- data.frame(
+    variable = c("C", "A", "D", "B"),
+    importance = c(0.4, 0.3, 0.2, 0.1),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(
+    chaid_partial_dependence_vars(importance, predictors, terms_mapping, 2),
+    c("c", "a")
+  )
+  expect_equal(
+    chaid_partial_dependence_vars(NULL, predictors, terms_mapping, 2),
+    c("a", "b")
+  )
 })
