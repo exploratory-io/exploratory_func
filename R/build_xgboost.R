@@ -1593,7 +1593,7 @@ exp_xgboost <- function(df,
 
 # This is used from Analytics View only when classification type is regression.
 #' @export
-glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
+glance.xgboost_exp <- function(x, pretty.name = FALSE, report_metrics = FALSE, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -1604,7 +1604,7 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
   else {
     stop("glance.xgboost_exp should not be called for classification")
   }
-  ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
+  ret <- glance.ranger.method(x, pretty.name = pretty.name, report_metrics = report_metrics, ...)
   
   # Add note about Inf removal if applicable
   if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
@@ -1619,7 +1619,7 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
 }
 
 #' @export
-glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
+glance.xgboost_exp.regression <- function(x, pretty.name, report_metrics = FALSE, ...) {
   predicted <- extract_predicted(x)
   actual <- extract_actual(x)
   root_mean_square_error <- rmse(predicted, actual)
@@ -1632,6 +1632,9 @@ glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
     root_mean_square_error = root_mean_square_error,
     n = n
   )
+  if (isTRUE(report_metrics)) {
+    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+  }
 
   if(pretty.name){
     map = list(
@@ -1641,13 +1644,16 @@ glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
+    if (isTRUE(report_metrics)) {
+      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+    }
   }
   ret
 }
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, report_metrics = FALSE, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
     ret <- data.frame()
     return(ret)
@@ -1672,16 +1678,34 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       # get evaluation scores from training data
       actual <- extract_actual(x)
       if(is.numeric(actual)){
-        glance(x, pretty.name = pretty.name, ...)
+        glance(x, pretty.name = pretty.name, report_metrics = report_metrics, ...)
       } else {
         if (x$classification_type == "binary") {
           predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
           predicted_probability <- extract_predicted(x)
-          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+          # Pass report_metrics for Analytics Report Summary ROC AUC / PR AUC (#37256).
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, report_metrics = report_metrics)
         }
         else {
           predicted <- extract_predicted_multiclass_labels(x)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+          if (report_metrics) {
+            balanced_accuracy <- multiclass_balanced_accuracy(actual, predicted)
+            # prediction_training for multiclass is a probability matrix with class colnames.
+            auc_by_class <- multiclass_auc_by_class(actual, tryCatch(extract_predicted(x), error = function(e) NULL))
+            macro_roc_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$roc_auc, na.rm = TRUE) else NA_real_
+            macro_pr_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$pr_auc, na.rm = TRUE) else NA_real_
+            extra <- if (pretty.name) {
+              tibble::tibble(`Balanced Accuracy` = balanced_accuracy,
+                             `Macro ROC AUC` = macro_roc_auc,
+                             `Macro PR AUC` = macro_pr_auc)
+            } else {
+              tibble::tibble(balanced_accuracy = balanced_accuracy,
+                             macro_roc_auc = macro_roc_auc,
+                             macro_pr_auc = macro_pr_auc)
+            }
+            ret <- dplyr::bind_cols(ret, extra)
+          }
         }
         # Add note about Inf removal if applicable
         if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
@@ -1707,7 +1731,12 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         ret <- evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
         ret
       }
-      dplyr::bind_rows(lapply(levels(actual), per_level))
+      ret <- dplyr::bind_rows(lapply(levels(actual), per_level))
+      if (report_metrics && nrow(ret) > 0) {
+        ret <- dplyr::bind_cols(ret, evaluate_by_class_report_metrics(
+          actual, predicted, levels(actual), tryCatch(extract_predicted(x), error = function(e) NULL), pretty.name))
+      }
+      ret
     },
     conf_mat = {
       # return confusion matrix

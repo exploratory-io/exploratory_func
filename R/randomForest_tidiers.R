@@ -2934,7 +2934,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, report_metrics = FALSE, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
     ret <- data.frame()
     return(ret)
@@ -2972,16 +2972,34 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       # get evaluation scores from training data
       actual <- x$y
       if(is.numeric(actual)){
-        glance(x, pretty.name = pretty.name, ...)
+        glance(x, pretty.name = pretty.name, report_metrics = report_metrics, ...)
       } else {
         if (x$classification_type == "binary") {
           predicted <- predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
           predicted_probability <- x$prediction_training$predictions[,1]
-          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+          # Pass report_metrics so Analytics Report Summary gets ROC AUC / PR AUC
+          # (and Balanced Accuracy / Specificity) like tidy.rpart (#37256).
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, report_metrics = report_metrics)
         }
         else {
           predicted <- predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+          if (report_metrics) {
+            balanced_accuracy <- multiclass_balanced_accuracy(actual, predicted)
+            auc_by_class <- multiclass_auc_by_class(actual, x$prediction_training$predictions)
+            macro_roc_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$roc_auc, na.rm = TRUE) else NA_real_
+            macro_pr_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$pr_auc, na.rm = TRUE) else NA_real_
+            extra <- if (pretty.name) {
+              tibble::tibble(`Balanced Accuracy` = balanced_accuracy,
+                             `Macro ROC AUC` = macro_roc_auc,
+                             `Macro PR AUC` = macro_pr_auc)
+            } else {
+              tibble::tibble(balanced_accuracy = balanced_accuracy,
+                             macro_roc_auc = macro_roc_auc,
+                             macro_pr_auc = macro_pr_auc)
+            }
+            ret <- dplyr::bind_cols(ret, extra)
+          }
         }
         # Add note about Inf removal if applicable
         if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
@@ -3008,7 +3026,12 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         ret <- evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
         ret
       }
-      dplyr::bind_rows(lapply(levels(actual), per_level))
+      ret <- dplyr::bind_rows(lapply(levels(actual), per_level))
+      if (report_metrics && nrow(ret) > 0) {
+        ret <- dplyr::bind_cols(ret, evaluate_by_class_report_metrics(
+          actual, predicted, levels(actual), x$prediction_training$predictions, pretty.name))
+      }
+      ret
     },
     conf_mat = {
       # return confusion matrix
@@ -3062,7 +3085,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
 
 # This is used from Analytics View only when classification type is regression.
 #' @export
-glance.ranger <- function(x, pretty.name = FALSE, ...) {
+glance.ranger <- function(x, pretty.name = FALSE, report_metrics = FALSE, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -3071,7 +3094,7 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
                                         "Classification" = glance.ranger.classification,
                                         "Probability estimation" = glance.ranger.classification,
                                         "Regression" = glance.ranger.regression)
-  ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
+  ret <- glance.ranger.method(x, pretty.name = pretty.name, report_metrics = report_metrics, ...)
   
   # Add note about Inf removal if applicable
   if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
@@ -3086,7 +3109,7 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
 }
 
 #' @export
-glance.ranger.regression <- function(x, pretty.name, ...) {
+glance.ranger.regression <- function(x, pretty.name, report_metrics = FALSE, ...) {
   predicted <- x$prediction_training$predictions
   actual <- x$y
   root_mean_square_error <- rmse(predicted, actual)
@@ -3099,6 +3122,10 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
     root_mean_square_error = root_mean_square_error,
     n = n
   )
+  # Opt-in MAE for Analytics Report parity with glance.rpart (#37256).
+  if (isTRUE(report_metrics)) {
+    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+  }
 
   if(pretty.name){
     map = list(
@@ -3108,6 +3135,9 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
+    if (isTRUE(report_metrics)) {
+      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+    }
   }
   ret
 }

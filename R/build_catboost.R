@@ -1377,7 +1377,7 @@ exp_catboost <- function(df,
 }
 
 #' @export
-glance.catboost_exp <- function(x, pretty.name = FALSE, ...) {
+glance.catboost_exp <- function(x, pretty.name = FALSE, report_metrics = FALSE, ...) {
   if ("error" %in% class(x)) {
     return(data.frame(Note = x$message))
   }
@@ -1390,9 +1390,15 @@ glance.catboost_exp <- function(x, pretty.name = FALSE, ...) {
   rsq <- r_squared(actual, predicted)
   n <- length(actual)
   ret <- data.frame(r_squared = rsq, root_mean_square_error = root_mean_square_error, n = n)
+  if (isTRUE(report_metrics)) {
+    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+  }
   if (pretty.name) {
     map <- list(`R Squared` = as.symbol("r_squared"), `RMSE` = as.symbol("root_mean_square_error"), `Rows` = as.symbol("n"))
     ret <- ret %>% dplyr::rename(!!!map)
+    if (isTRUE(report_metrics)) {
+      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+    }
   }
   if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
     ret$Note <- x$inf_removed_message
@@ -1444,7 +1450,7 @@ catboost_prediction_training_and_test <- function(x, binary_classification_thres
 
 #' @export
 #' @param type "importance", "evaluation", "conf_mat", "partial_dependence", "partial_binning", "evaluation_log"
-tidy.catboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+tidy.catboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, report_metrics = FALSE, ...) {
   if ("error" %in% class(x) && type != "evaluation") {
     return(data.frame())
   }
@@ -1463,14 +1469,31 @@ tidy.catboost_exp <- function(x, type = "importance", pretty.name = FALSE, binar
       }
       actual <- extract_actual(x)
       if ("catboost_reg" %in% class(x) || identical(x$classification_type, "regression")) {
-        ret <- glance(x, pretty.name = pretty.name, ...)
+        ret <- glance(x, pretty.name = pretty.name, report_metrics = report_metrics, ...)
       } else if ("catboost_binary" %in% class(x) || identical(x$classification_type, "binary")) {
         predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
         predicted_probability <- extract_predicted(x)
-        ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+        # Pass report_metrics for Analytics Report Summary ROC AUC / PR AUC (#37256).
+        ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, report_metrics = report_metrics)
       } else {
         predicted <- extract_predicted_multiclass_labels(x)
         ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual), "predicted", "actual", pretty.name = pretty.name)
+        if (report_metrics) {
+          balanced_accuracy <- multiclass_balanced_accuracy(actual, predicted)
+          auc_by_class <- multiclass_auc_by_class(actual, tryCatch(extract_predicted(x), error = function(e) NULL))
+          macro_roc_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$roc_auc, na.rm = TRUE) else NA_real_
+          macro_pr_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$pr_auc, na.rm = TRUE) else NA_real_
+          extra <- if (pretty.name) {
+            tibble::tibble(`Balanced Accuracy` = balanced_accuracy,
+                           `Macro ROC AUC` = macro_roc_auc,
+                           `Macro PR AUC` = macro_pr_auc)
+          } else {
+            tibble::tibble(balanced_accuracy = balanced_accuracy,
+                           macro_roc_auc = macro_roc_auc,
+                           macro_pr_auc = macro_pr_auc)
+          }
+          ret <- dplyr::bind_cols(ret, extra)
+        }
       }
       if (!is.null(x$inf_removed_rows) && x$inf_removed_rows > 0) {
         ret$Note <- if ("Note" %in% colnames(ret)) paste(ret$Note, x$inf_removed_message, sep = " ") else x$inf_removed_message
@@ -1487,7 +1510,12 @@ tidy.catboost_exp <- function(x, type = "importance", pretty.name = FALSE, binar
       per_level <- function(level) {
         evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
       }
-      dplyr::bind_rows(lapply(levels(actual), per_level))
+      ret <- dplyr::bind_rows(lapply(levels(actual), per_level))
+      if (report_metrics && nrow(ret) > 0) {
+        ret <- dplyr::bind_cols(ret, evaluate_by_class_report_metrics(
+          actual, predicted, levels(actual), tryCatch(extract_predicted(x), error = function(e) NULL), pretty.name))
+      }
+      ret
     },
     conf_mat = ,
     confusion_matrix = {
