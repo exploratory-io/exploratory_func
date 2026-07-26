@@ -1345,7 +1345,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
 
 #' special version of glance.lm function to use with build_lm.fast.
 #' @export
-glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification_threshold = 0.5, ...) { #TODO: add test
+glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification_threshold = 0.5, report_metrics = FALSE, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -1406,6 +1406,32 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
     ret$positives <- sum(x$y == 1, na.rm = TRUE)
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
+
+    # Opt-in Analytics Report metrics (#37256 / #37156). Same extras as
+    # evaluate_binary_classification(report_metrics=TRUE); default stays FALSE so
+    # existing Logistic Summary tables are unchanged.
+    if (isTRUE(report_metrics)) {
+      actual_for_roc <- as.integer(x$y) == 1
+      pr_auc <- aupr(x$fitted.value, actual_for_roc)
+      predicted_positive <- as.integer(predicted) == 1
+      valid <- !(is.na(actual_for_roc) | is.na(predicted_positive))
+      tn <- sum(!actual_for_roc[valid] & !predicted_positive[valid], na.rm = TRUE)
+      fp <- sum(!actual_for_roc[valid] & predicted_positive[valid], na.rm = TRUE)
+      tp <- sum(actual_for_roc[valid] & predicted_positive[valid], na.rm = TRUE)
+      fn <- sum(actual_for_roc[valid] & !predicted_positive[valid], na.rm = TRUE)
+      specificity <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
+      sensitivity <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
+      balanced_accuracy <- if (is.na(specificity) || is.na(sensitivity)) NA_real_ else (specificity + sensitivity) / 2
+      if (pretty.name) {
+        ret$`PR AUC` <- pr_auc
+        ret$`Balanced Accuracy` <- balanced_accuracy
+        ret$`Specificity` <- specificity
+      } else {
+        ret$pr_auc <- pr_auc
+        ret$balanced_accuracy <- balanced_accuracy
+        ret$specificity <- specificity
+      }
+    }
   }
 
   # Add Max VIF if VIF is available.
@@ -1424,9 +1450,23 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
       colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
       colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
-      colnames(ret)[colnames(ret) == "auc"] <- "AUC"
-      
-      ret <- ret %>% dplyr::select(AUC, `F1 Score`, `Accuracy Rate`, `Misclass. Rate`, `Precision`, `Recall`, `P Value`, `Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Residual DF`, `Null Deviance`, `Null Model DF`, everything())
+      if (isTRUE(report_metrics) && "auc" %in% colnames(ret)) {
+        # Pair with PR AUC like evaluate_binary_classification (#37252 order).
+        colnames(ret)[colnames(ret) == "auc"] <- "ROC AUC"
+        pred_cols <- intersect(
+          c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+            "Misclass. Rate", "Precision", "Recall", "Specificity"),
+          colnames(ret))
+        stat_cols <- intersect(
+          c("P Value", "Rows", "positives", "negatives", "Log Likelihood", "AIC", "BIC",
+            "Residual Deviance", "Residual DF", "Null Deviance", "Null Model DF"),
+          colnames(ret))
+        other_cols <- setdiff(colnames(ret), c(pred_cols, stat_cols))
+        ret <- ret[, c(pred_cols, stat_cols, other_cols), drop = FALSE]
+      } else {
+        colnames(ret)[colnames(ret) == "auc"] <- "AUC"
+        ret <- ret %>% dplyr::select(AUC, `F1 Score`, `Accuracy Rate`, `Misclass. Rate`, `Precision`, `Recall`, `P Value`, `Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Residual DF`, `Null Deviance`, `Null Model DF`, everything())
+      }
 
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]

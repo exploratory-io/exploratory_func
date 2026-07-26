@@ -350,9 +350,9 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
 # Generates Analytics View Summary Table for logistic/binomial regression. Handles Test Mode.
 #' @export
-evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_score", pretty.name = FALSE){
+evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_score", pretty.name = FALSE, report_metrics = FALSE){
   actual_val_col <- col_name(substitute(actual_val)) # Get name of column as string.
-  training_ret <- df %>% glance_rowwise(model, binary_classification_threshold = threshold)
+  training_ret <- df %>% glance_rowwise(model, binary_classification_threshold = threshold, report_metrics = report_metrics)
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
@@ -378,6 +378,31 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
                              dplyr::select(auc = AUC, f_score, accuracy_rate,
                                            misclassification_rate, precision, recall,
                                            n, positives, negatives)
+        # Match training-side report_metrics extras so bind_rows keeps real values
+        # on the test row (#37256; same invariant as rf_evaluation_training_and_test).
+        if (isTRUE(report_metrics)) {
+          actual_raw <- test_pred_ret[[actual_val_col]]
+          actual_for_roc <- binary_label(actual_raw)
+          pred_prob <- test_pred_ret[["predicted_probability"]]
+          threshold_value <- if (is.numeric(threshold)) {
+            threshold
+          } else if (!is.null(eret$threshold)) {
+            eret$threshold[[1]]
+          } else {
+            0.5
+          }
+          predicted_positive <- pred_prob >= threshold_value
+          valid <- !(is.na(actual_for_roc) | is.na(predicted_positive) | is.na(pred_prob))
+          tn <- sum(!actual_for_roc[valid] & !predicted_positive[valid], na.rm = TRUE)
+          fp <- sum(!actual_for_roc[valid] & predicted_positive[valid], na.rm = TRUE)
+          tp <- sum(actual_for_roc[valid] & predicted_positive[valid], na.rm = TRUE)
+          fn <- sum(actual_for_roc[valid] & !predicted_positive[valid], na.rm = TRUE)
+          specificity <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
+          sensitivity <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
+          test_ret$pr_auc <- aupr(pred_prob, actual_for_roc)
+          test_ret$balanced_accuracy <- if (is.na(specificity) || is.na(sensitivity)) NA_real_ else (specificity + sensitivity) / 2
+          test_ret$specificity <- specificity
+        }
         test_ret$is_test_data <- TRUE
         test_ret
       }, error = function(e){
@@ -396,9 +421,18 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
   }
 
   # sort column order
-  ret <- ret %>% dplyr::select(auc, f_score, accuracy_rate, misclassification_rate, precision,
-                               recall, p.value, positives, negatives, n, logLik, AIC, BIC, # The order of positives, negatives, n is made the same as random forest and decision tree.
-                               deviance, null.deviance, df.null, df.residual, everything())
+  if (isTRUE(report_metrics)) {
+    ret <- ret %>% dplyr::select(dplyr::any_of(c(
+      "auc", "roc_auc", "pr_auc", "f_score", "balanced_accuracy", "accuracy_rate",
+      "misclassification_rate", "precision", "recall", "specificity",
+      "p.value", "positives", "negatives", "n", "logLik", "AIC", "BIC",
+      "deviance", "null.deviance", "df.null", "df.residual")),
+      everything())
+  } else {
+    ret <- ret %>% dplyr::select(auc, f_score, accuracy_rate, misclassification_rate, precision,
+                                 recall, p.value, positives, negatives, n, logLik, AIC, BIC, # The order of positives, negatives, n is made the same as random forest and decision tree.
+                                 deviance, null.deviance, df.null, df.residual, everything())
+  }
 
   # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
   if (!is.null(ret$is_test_data)) {
@@ -421,7 +455,14 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
     colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclass. Rate"
     colnames(ret)[colnames(ret) == "precision"] <- "Precision"
     colnames(ret)[colnames(ret) == "recall"] <- "Recall"
-    colnames(ret)[colnames(ret) == "auc"] <- "AUC"
+    if (isTRUE(report_metrics)) {
+      colnames(ret)[colnames(ret) == "auc"] <- "ROC AUC"
+      colnames(ret)[colnames(ret) == "pr_auc"] <- "PR AUC"
+      colnames(ret)[colnames(ret) == "balanced_accuracy"] <- "Balanced Accuracy"
+      colnames(ret)[colnames(ret) == "specificity"] <- "Specificity"
+    } else {
+      colnames(ret)[colnames(ret) == "auc"] <- "AUC"
+    }
     colnames(ret)[colnames(ret) == "n"] <- "Rows"
     colnames(ret)[colnames(ret) == "positives"] <- "Rows (TRUE)"
     colnames(ret)[colnames(ret) == "negatives"] <- "Rows (FALSE)"

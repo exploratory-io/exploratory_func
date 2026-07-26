@@ -310,6 +310,41 @@ test_that("evaluate binary classification model by training and test", {
   })
 })
 
+test_that("evaluate_binary_training_and_test report_metrics adds ROC/PR/Balanced/Specificity (#37256)", {
+  test_data <- structure(
+    list(
+      `CANCELLED X` = c(0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      ARR_TIME = c(1:20) * 10,
+      DERAY_TIME = c(1:20),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", "Atlantic Southeast Airlines", "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines")
+    ),
+    row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame")
+  )
+  ret <- test_data %>% build_lm.fast(`CANCELLED X`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     family = "binomial",
+                                     model_type = "glm",
+                                     test_rate = 0.5)
+  suppressWarnings({
+    base <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
+    with_metrics <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE, report_metrics = TRUE)
+  })
+  expect_false(any(c("PR AUC", "Balanced Accuracy", "Specificity", "ROC AUC") %in% colnames(base)))
+  expect_true(all(c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity") %in% colnames(with_metrics)))
+  expect_false("AUC" %in% colnames(with_metrics))
+  # Statistical model metrics stay present alongside the new prediction metrics.
+  expect_true(all(c("P Value", "AIC", "BIC", "Log Likelihood") %in% colnames(with_metrics)))
+  expect_equal(nrow(with_metrics), 2)
+  expect_false(any(is.na(with_metrics[, c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity"), drop = FALSE])))
+  # Default output columns keep the same values.
+  kept <- intersect(colnames(base), colnames(with_metrics))
+  expect_equal(as.data.frame(base)[, kept, drop = FALSE],
+               as.data.frame(with_metrics)[, kept, drop = FALSE])
+})
+
 
 test_that("Group evaluate binary classification model by training and test", {
   group_data <- test_data %>% group_by(klass)
