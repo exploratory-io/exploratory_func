@@ -488,3 +488,42 @@ test_that("tree_nodes edge labels collapse contiguous numeric bins (tam #37177)"
     expect_true(all(cat_values %in% c("sales", "rnd", "hr")))
   }
 })
+
+test_that("exp_chaid stores partial dependence for rf_partial_dependence()", {
+  skip_if_not_installed("mmpf")
+  df <- make_binary_df(n = 500, seed = 42)
+  model_df <- suppressWarnings(
+    exp_chaid(df, is_churn, plan, region, tenure,
+              min_split = 20, min_bucket = 5, max_pd_vars = 3,
+              pd_with_bin_means = TRUE)
+  )
+  model <- model_df$model[[1]]
+  expect_false(is.null(model$partial_dependence))
+  expect_gt(nrow(model$partial_dependence), 0)
+  expect_true(length(model$imp_vars) >= 1)
+  expect_true(length(model$imp_vars) <= 3)
+  expect_false(is.null(model$partial_binning))
+
+  pd <- model_df %>% rf_partial_dependence()
+  expect_gt(nrow(pd), 0)
+  expect_true(all(c("x_name", "x_value", "y_name", "y_value") %in% names(pd)))
+  expect_true(any(pd$y_name %in% c("Predicted", "Actual")))
+})
+
+test_that("chaid_partial_dependence_vars prefers importance order", {
+  predictors <- c("a", "b", "c", "d")
+  terms_mapping <- c(a = "A", b = "B", c = "C", d = "D")
+  importance <- data.frame(
+    variable = c("C", "A", "D", "B"),
+    importance = c(0.4, 0.3, 0.2, 0.1),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(
+    chaid_partial_dependence_vars(importance, predictors, terms_mapping, 2),
+    c("c", "a")
+  )
+  expect_equal(
+    chaid_partial_dependence_vars(NULL, predictors, terms_mapping, 2),
+    c("a", "b")
+  )
+})

@@ -4,10 +4,11 @@
 # per group: `model`, `.test_index`, `source.data`) used by every Analytics View
 # decision-tree/model template, and the augment/tidy/glance S3 methods below let
 # the framework's generic preprocessors (prediction(), rf_evaluation_*,
-# tidy_rowwise()) dispatch on an `exploratory_chaid` model. This mirrors the
-# exp_rpart() pattern in randomForest_tidiers.R, minus regression, SMOTE, and
-# partial dependence. Model-independent permutation importance is calculated
-# from the training or held-out rows and stored as a compact result table.
+# tidy_rowwise(), rf_partial_dependence()) dispatch on an `exploratory_chaid`
+# model. This mirrors the exp_rpart() pattern in randomForest_tidiers.R, minus
+# regression and SMOTE. Model-independent permutation importance is calculated
+# from the training or held-out rows; partial dependence for the report chart
+# is stored on the model the same way as CART.
 
 #' Fit a CHAID classification tree as an Analytics View model data frame.
 #'
@@ -26,6 +27,10 @@
 #' @param max_nrow Row cap; data is sampled down to this before fitting.
 #' @param target_n,predictor_n Category caps; excess categories are lumped into "Other".
 #' @param binary_classification_threshold Probability threshold for the positive class.
+#' @param max_pd_vars Max number of predictors for partial dependence charts.
+#' @param pd_sample_size Row sample size used when computing partial dependence.
+#' @param pd_grid_resolution Grid resolution for numeric partial dependence.
+#' @param pd_with_bin_means Whether to overlay binned actual means on PD charts.
 #' @param seed Random seed for sampling / splitting reproducibility.
 #' @param test_rate Fraction of rows held out as test data.
 #' @param test_split_type `random` or `ordered`.
@@ -53,6 +58,10 @@ exp_chaid <- function(df,
                       target_n = 20,
                       predictor_n = 12,
                       binary_classification_threshold = 0.5,
+                      max_pd_vars = 20,
+                      pd_sample_size = 500,
+                      pd_grid_resolution = 20,
+                      pd_with_bin_means = FALSE,
                       seed = 1,
                       test_rate = 0.0,
                       test_split_type = "random") {
@@ -185,6 +194,28 @@ exp_chaid <- function(df,
         seed = seed,
         repeats = 10L
       )
+
+      # Partial dependence for Analytics Report {{variable_effect}} /
+      # local_importance_binary (same contract as exp_rpart).
+      if (is.null(max_pd_vars) || !is.finite(max_pd_vars) || max_pd_vars < 1) {
+        max_pd_vars_eff <- 20
+      } else {
+        max_pd_vars_eff <- as.integer(max_pd_vars)
+      }
+      imp_vars <- chaid_partial_dependence_vars(
+        model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
+      )
+      model$partial_dependence <- partial_dependence.exploratory_chaid(
+        model, clean_target_col, vars = imp_vars, data = df,
+        n = c(pd_grid_resolution, min(nrow(df), pd_sample_size))
+      )
+      model$imp_vars <- imp_vars
+      if (isTRUE(pd_with_bin_means) && isTRUE(is_target_logical)) {
+        model$partial_binning <- calc_partial_binning_data(
+          df, clean_target_col, imp_vars
+        )
+      }
+
       # formula_terms lets generic evaluation code find the target column name
       # (all.vars(model$formula_terms)[1]) in the test-evaluation path.
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
@@ -464,6 +495,137 @@ chaid_permutation_importance <- function(model, data, target, predictors,
   result
 }
 
+
+
+#' Choose predictor columns for CHAID partial dependence, by importance order.
+#'
+#' @param importance Importance table from `chaid_permutation_importance()`.
+#' @param predictors Clean predictor column names present in the training frame.
+#' @param terms_mapping Named character vector mapping clean -> display names.
+#' @param max_pd_vars Maximum number of variables to keep.
+#' @return Character vector of clean predictor names.
+chaid_partial_dependence_vars <- function(importance, predictors, terms_mapping,
+                                          max_pd_vars = 20L) {
+  predictors <- as.character(predictors)
+  max_pd_vars <- max(1L, as.integer(max_pd_vars))
+  if (length(predictors) == 0L) {
+    return(character())
+  }
+  if (is.null(importance) || !is.data.frame(importance) ||
+      nrow(importance) == 0L || !"variable" %in% names(importance)) {
+    return(predictors[seq_len(min(length(predictors), max_pd_vars))])
+  }
+
+  display_ordered <- as.character(importance$variable)
+  clean_ordered <- vapply(display_ordered, function(display_name) {
+    if (!is.null(terms_mapping) && length(terms_mapping) > 0) {
+      hits <- names(terms_mapping)[terms_mapping == display_name]
+      if (length(hits) >= 1L) {
+        return(hits[[1]])
+      }
+    }
+    display_name
+  }, character(1), USE.NAMES = FALSE)
+  clean_ordered <- unique(clean_ordered[clean_ordered %in% predictors])
+  if (length(clean_ordered) == 0L) {
+    return(predictors[seq_len(min(length(predictors), max_pd_vars))])
+  }
+  clean_ordered[seq_len(min(length(clean_ordered), max_pd_vars))]
+}
+
+#' Build a partial-dependence object for an `exploratory_chaid` model.
+#'
+#' Mirrors `partial_dependence.rpart()` so `handle_partial_dependence()` and
+#' the Analytics View `rf_partial_dependence()` preprocessor work unchanged.
+#'
+#' @param fit A fitted `exploratory_chaid` model.
+#' @param target Clean target column name.
+#' @param vars Predictor column names to evaluate.
+#' @param n Grid / sample sizes passed to `mmpf::marginalPrediction`.
+#' @param interaction Whether to compute interactions (unused; always FALSE).
+#' @param uniform Unused; kept for API parity with the rpart helper.
+#' @param data Training data frame used for the grid and sampling.
+#' @param ... Additional arguments forwarded to `mmpf::marginalPrediction`.
+#' @return A `pd` data frame with attributes, or NULL if mmpf is unavailable.
+partial_dependence.exploratory_chaid <- function(fit, target,
+                                                 vars = colnames(data),
+                                                 n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L),
+                                                       nrow(data)),
+                                                 interaction = FALSE,
+                                                 uniform = TRUE,
+                                                 data, ...) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
+  if (length(vars) == 0L) {
+    return(NULL)
+  }
+
+  # Default S3 predict() returns class labels; PD needs class probabilities with
+  # the same column names (TRUE/FALSE or class levels) that handle_partial_dependence
+  # expects from rpart/ranger.
+  predict.fun <- function(object, newdata) {
+    prob <- as.data.frame(
+      predict(object, newdata, type = "prob"),
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+    colnames(prob) <- sub("^\\.pred_prob_", "", colnames(prob))
+    as.matrix(prob)
+  }
+
+  points <- list()
+  quantile_points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      minv <- min(coldata, na.rm = TRUE)
+      maxv <- max(coldata, na.rm = TRUE)
+      grid <- minv + (0:20) / 20 * (maxv - minv)
+      quantile_grid <- stats::quantile(coldata, probs = 1:24 / 25)
+      quantile_points[[cname]] <- quantile_grid
+      points[[cname]] <- sort(unique(c(grid, quantile_grid)))
+    } else {
+      points[[cname]] <- unique(data[[cname]])
+    }
+  }
+
+  args <- list(
+    data = data,
+    vars = vars,
+    n = n,
+    model = fit,
+    points = points,
+    predict.fun = predict.fun,
+    ...
+  )
+
+  if (length(vars) > 1L && !isTRUE(interaction)) {
+    pd <- data.table::rbindlist(sapply(vars, function(x) {
+      args$vars <- x
+      if ("points" %in% names(args)) {
+        args$points <- args$points[x]
+      }
+      do.call(mmpf::marginalPrediction, args)
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd <- do.call(mmpf::marginalPrediction, args)
+  }
+
+  attr(pd, "class") <- c("pd", "data.frame")
+  attr(pd, "interaction") <- isTRUE(interaction)
+  attr(pd, "target") <- if (identical(fit$classification_type, "binary")) {
+    target
+  } else {
+    fit$class_levels
+  }
+  attr(pd, "vars") <- vars
+  attr(pd, "points") <- points
+  attr(pd, "quantile_points") <- quantile_points
+  pd
+}
+
 #' Augment data with CHAID predictions (broom S3 method).
 #'
 #' Supports both the `data =` and `newdata =` calling conventions used by
@@ -537,7 +699,8 @@ glance.exploratory_chaid <- function(x, pretty.name = FALSE, ...) {
 #' @param x A fitted `exploratory_chaid` model.
 #' @param type One of `evaluation`, `evaluation_by_class`, `conf_mat`,
 #'   `tree_nodes`, `node_summary`, `rules`, `category_merges`, `split_summary`,
-#'   `category_error_distribution`, `numeric_intervals`, or `importance`.
+#'   `category_error_distribution`, `numeric_intervals`, `importance`, or
+#'   `partial_dependence`.
 #' @param pretty.name Whether to use display-friendly column names.
 #' @param binary_classification_threshold Positive-class threshold (binary).
 #' @param ... Unused.
@@ -622,6 +785,9 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
     },
     importance = {
       if (is.null(x$importance)) chaid_empty_permutation_importance() else x$importance
+    },
+    partial_dependence = {
+      handle_partial_dependence(x)
     },
     {
       stop(paste0("type ", type, " is not defined"))
