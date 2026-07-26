@@ -478,8 +478,13 @@ test_that("tree_nodes edge labels collapse contiguous numeric bins (tam #37177)"
     # Every numeric branch collapses its contiguous bin run to ONE range label.
     expect_equal(length(values), 1)
     expect_true(grepl("^(<=|>|\\()", values))
-    # edge_label mirrors cond_value (DTreeGenerator rebuilds from cond_value).
-    expect_equal(edges$edge_label[i], paste0("salary = ", values))
+    # cond_value stays machine-parseable bin labels; edge_label is readable
+    # (CHAID report Condition / tree chart — not "salary = <= x").
+    expect_equal(
+      edges$edge_label[i],
+      chaid_readable_one_condition(paste0("salary in {", values, "}"))
+    )
+    expect_false(grepl(" = <=| = \\(| = >", edges$edge_label[i]))
   }
   # A categorical branch keeps its member enumeration untouched.
   cat_edges <- nodes[!is.na(nodes$parent_id) & nodes$cond_column == "dept", ]
