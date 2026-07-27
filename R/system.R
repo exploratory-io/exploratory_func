@@ -1037,7 +1037,7 @@ applyOracleClientEnv <- function(explicitDir = Sys.getenv("EXPLORATORY_ORACLE_CL
 # Single source of truth for the Oracle (OCI) connection pool key so that getDBConnection
 # and clearDBConnection can never drift apart. Every component is normalized here because
 # paste() silently drops NULL, which would produce a key that no clear call can match.
-oracleOCIPoolKey <- function(host, port, databaseName, username, timezone, bulkRead, connectString) {
+oracleOCIPoolKey <- function(host, port, databaseName, username, timezone, bulkRead, connectionString) {
   normalize <- function(value) {
     if (is.null(value) || length(value) == 0 || is.na(value[[1]])) "" else as.character(value[[1]])
   }
@@ -1046,7 +1046,7 @@ oracleOCIPoolKey <- function(host, port, databaseName, username, timezone, bulkR
     timezone <- "UTC" # matches the default applied when connecting.
   }
   paste("oracleoci", normalize(host), normalize(port), normalize(databaseName),
-        normalize(username), timezone, normalize(bulkRead), normalize(connectString), sep = ":")
+        normalize(username), timezone, normalize(bulkRead), normalize(connectionString), sep = ":")
 }
 
 # Oracle rejects a trailing semicolon through OCI, unlike most SQL consoles, so drop one
@@ -2262,25 +2262,25 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 #' This is the Oracle (OCI) data source. The ODBC based Oracle data source goes through
 #' queryODBC() with type = "oracle" instead.
 #' @export
-#' @param host Host name. Ignored when connectString is provided.
-#' @param port Listener port. Ignored when connectString is provided.
-#' @param databaseName Service name. Ignored when connectString is provided.
+#' @param host Host name. Ignored when connectionString is provided.
+#' @param port Listener port. Ignored when connectionString is provided.
+#' @param databaseName Service name. Ignored when connectionString is provided.
 #' @param username
 #' @param password
 #' @param numOfRows default is -1, which means all rows
 #' @param query
 #' @param timezone Time zone the database values are in. Defaults to UTC.
 #' @param bulkRead Rows fetched per OCI round trip. Larger values make large imports faster.
-#' @param connectString (optional) TNS alias, full connect descriptor, or EZConnect string.
+#' @param connectionString (optional) TNS alias, full connect descriptor, or EZConnect string.
 #'   When provided it is used as is and host, port and databaseName are ignored.
 queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username = "", password = "",
-                           numOfRows = -1, query, timezone = "", bulkRead = 10000, connectString = "", ...) {
+                           numOfRows = -1, query, timezone = "", bulkRead = 10000, connectionString = "", ...) {
   if (!requireNamespace("ROracle")) { stop("package ROracle must be installed.") }
   if (!requireNamespace("DBI")) { stop("package DBI must be installed.") }
 
   conn <- getDBConnection(type = "oracleoci", host = host, port = port, databaseName = databaseName,
                           username = username, password = password, timezone = timezone,
-                          bulkRead = bulkRead, connectionString = connectString)
+                          bulkRead = bulkRead, connectionString = connectionString)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not package environment
@@ -2290,7 +2290,7 @@ queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username =
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("oracleoci", host, port, databaseName, username, timezone = timezone,
-                      bulkRead = bulkRead, connectionString = connectString)
+                      bulkRead = bulkRead, connectionString = connectionString)
     stop(err)
   })
   ROracle::dbClearResult(resultSet)
