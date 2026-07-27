@@ -347,3 +347,158 @@ test_that("coefficients tidy type returns rotation weights (long, signed)", {
   expect_equal(nrow(r2), 0)
   expect_equal(colnames(r2), c("Variable", "Component", "Coefficient"))
 })
+
+# ---------------------------------------------------------------------------
+# Polychoric correlation support (issue #37294)
+# ---------------------------------------------------------------------------
+
+# Deterministic ordinal (1-5 Likert) fixture driven by two latent factors, so the polychoric
+# solution has a known two-component structure.
+make_ordinal_survey <- function(n = 300, seed = 37294) {
+  set.seed(seed)
+  latent_a <- rnorm(n)
+  latent_b <- rnorm(n)
+  to_five <- function(z) as.integer(cut(z, breaks = c(-Inf, -1, -0.3, 0.3, 1, Inf), labels = FALSE))
+  data.frame(
+    q1 = to_five(latent_a + rnorm(n, 0, 0.6)), q2 = to_five(latent_a + rnorm(n, 0, 0.6)),
+    q3 = to_five(latent_a + rnorm(n, 0, 0.6)), q4 = to_five(latent_b + rnorm(n, 0, 0.6)),
+    q5 = to_five(latent_b + rnorm(n, 0, 0.6)), q6 = to_five(latent_b + rnorm(n, 0, 0.6))
+  )
+}
+
+test_that("do_prcomp cor_type='polychoric' fits from the correlation matrix", {
+  df <- make_ordinal_survey()
+  model_df <- df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric")
+  fit <- model_df$model[[1]]
+  expect_equal(fit$correlation_type, "polychoric")
+  expect_true(isTRUE(fit$is_categorical_correlation))
+  # Eigen-decomposition of a correlation matrix: the eigenvalues sum to the variable count.
+  expect_equal(sum(fit$sdev^2), 6, tolerance = 1e-8)
+  expect_equal(dim(fit$x), c(nrow(df), 6L))
+  expect_equal(colnames(fit$rotation), paste0("PC", 1:6))
+})
+
+test_that("do_prcomp polychoric scores are scale(data) %*% eigenvectors (issue #37294)", {
+  df <- make_ordinal_survey()
+  fit <- (df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric"))$model[[1]]
+  # The approximation the issue specifies. Sign stabilization sweeps rotation and x together,
+  # so the identity survives it.
+  expected <- scale(as.matrix(df)) %*% fit$rotation
+  expect_equal(unname(expected), unname(fit$x), tolerance = 1e-10)
+})
+
+test_that("do_prcomp polychoric report branches all render", {
+  df <- make_ordinal_survey()
+  model_df <- df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric")
+  for (ty in c("variances", "loadings", "biplot", "screeplot", "analysis_conditions",
+               "parallel_screeplot", "variances_judged", "component_profiles",
+               "loadings_signed", "loadings_signed_wide", "contributions", "coefficients",
+               "variable_map", "representation", "data")) {
+    res <- model_df %>% tidy_rowwise(model, type = ty)
+    expect_gt(nrow(res), 0)
+  }
+})
+
+test_that("do_prcomp polychoric loadings come from the polychoric solution, not a fresh Pearson", {
+  df <- make_ordinal_survey()
+  fit <- (df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric"))$model[[1]]
+  loadings <- exploratory:::prcomp_signed_loadings(fit)
+  # Component loading of a correlation-matrix PCA == eigenvector * sqrt(eigenvalue).
+  expect_equal(unname(loadings),
+               unname(fit$rotation %*% diag(fit$sdev, nrow = length(fit$sdev))), tolerance = 1e-10)
+  # And it is NOT the Pearson cross-correlation the pre-#37294 branches recomputed.
+  pearson_loadings <- cor(as.matrix(df), fit$x)
+  expect_false(isTRUE(all.equal(unname(loadings), unname(pearson_loadings), tolerance = 1e-6)))
+})
+
+test_that("do_prcomp accepts ordered factor columns under polychoric", {
+  df <- make_ordinal_survey()
+  numeric_fit <- (df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric"))$model[[1]]
+  for (column in names(df)) df[[column]] <- factor(df[[column]], levels = 1:5, ordered = TRUE)
+  model_df <- df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric")
+  factor_fit <- model_df$model[[1]]
+  # Category coding turns the ordered factor back into the same 1..5 codes.
+  expect_equal(factor_fit$sdev, numeric_fit$sdev, tolerance = 1e-10)
+  # The branches that used to call cor() directly would have failed on a factor column.
+  expect_equal(nrow(model_df %>% tidy_rowwise(model, type = "loadings_signed_wide")), 6)
+  expect_equal(nrow(model_df %>% tidy_rowwise(model, type = "representation")), 6)
+})
+
+test_that("do_prcomp analysis_method / cor_diagnostics tidy types", {
+  df <- make_ordinal_survey()
+  poly <- df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric")
+  method <- poly %>% tidy_rowwise(model, type = "analysis_method")
+  expect_equal(method$Item, c("Correlation", "Normalization", "Target Variables", "Data Rows"))
+  expect_equal(unique(method$correlation_type), "polychoric")
+  # Booleans must be the literal strings the client's isTrue() accepts.
+  expect_equal(unique(method$correlation_is_auto), "FALSE")
+  expect_equal(unique(method$has_diagnostics), "TRUE")
+  expect_equal(unique(method$degraded_from), "")
+  expect_equal(nrow(poly %>% tidy_rowwise(model, type = "cor_diagnostics")), 6)
+
+  pearson <- df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "pearson")
+  method_pearson <- pearson %>% tidy_rowwise(model, type = "analysis_method")
+  expect_equal(unique(method_pearson$correlation_type), "pearson")
+  expect_equal(unique(method_pearson$has_diagnostics), "FALSE")
+  # Pearson shows no diagnostics section, but the columns keep their shape.
+  diagnostics <- pearson %>% tidy_rowwise(model, type = "cor_diagnostics")
+  expect_equal(nrow(diagnostics), 0)
+  expect_equal(colnames(diagnostics), c("Diagnostic", "Judgement", "Description", "status"))
+})
+
+test_that("do_prcomp cor_type='auto' picks polychoric for ordinal data and Pearson for continuous", {
+  set.seed(37294)
+  n <- 300
+  latent_a <- rnorm(n); latent_b <- rnorm(n)
+  to_four <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.6, 0, 0.6, Inf), labels = FALSE))
+  ordinal <- data.frame(a = to_four(latent_a + rnorm(n, 0, 0.5)), b = to_four(latent_a + rnorm(n, 0, 0.5)),
+                        c = to_four(latent_b + rnorm(n, 0, 0.5)), e = to_four(latent_b + rnorm(n, 0, 0.5)))
+  ordinal_fit <- (ordinal %>% do_prcomp(a, b, c, e))$model[[1]]
+  expect_equal(ordinal_fit$correlation_type, "polychoric")
+  expect_true(isTRUE(ordinal_fit$correlation_is_auto))
+
+  continuous <- data.frame(a = rnorm(n), b = rnorm(n), c = rnorm(n), e = rnorm(n))
+  continuous_fit <- (continuous %>% do_prcomp(a, b, c, e))$model[[1]]
+  expect_equal(continuous_fit$correlation_type, "pearson")
+  expect_false(isTRUE(continuous_fit$is_categorical_correlation))
+})
+
+test_that("do_prcomp Pearson output is unchanged by the polychoric support (issue #37294)", {
+  set.seed(37294)
+  n <- 200
+  df <- data.frame(a = rnorm(n), b = rnorm(n), c = rnorm(n), d = rnorm(n))
+  df$b <- df$b + 0.7 * df$a
+  df$d <- df$d - 0.5 * df$c
+  fit <- (df %>% do_prcomp(a, b, c, d))$model[[1]]
+  reference <- prcomp(df, scale. = TRUE)
+  # Same decomposition as a plain prcomp() on the raw data (up to the sign stabilization sweep).
+  expect_equal(fit$sdev, reference$sdev, tolerance = 1e-10)
+  expect_equal(abs(unname(fit$rotation)), abs(unname(reference$rotation)), tolerance = 1e-10)
+  # The Pearson path keeps recomputing the loadings from the data, so no cache is attached.
+  expect_null(fit$signed_loadings)
+})
+
+test_that("do_prcomp rejects nominal categorical variables", {
+  df <- make_ordinal_survey()
+  df$region <- factor(sample(c("East", "West", "North"), nrow(df), replace = TRUE))
+  expect_error(df %>% do_prcomp(q1, q2, region), "EXP-ANA-35")
+})
+
+test_that("do_prcomp polychoric works with Repeat By", {
+  df <- make_ordinal_survey()
+  df$grp <- rep(c("A", "B"), each = nrow(df) / 2)
+  model_df <- df %>% dplyr::group_by(grp) %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric")
+  expect_equal(nrow(model_df), 2)
+  # Every facet must run on the same correlation, or the groups' loadings are incomparable.
+  expect_equal(unique(vapply(model_df$model, function(f) f$correlation_type, character(1))), "polychoric")
+  expect_equal(nrow(model_df %>% tidy_rowwise(model, type = "variances_judged")), 12)
+})
+
+test_that("exp_kmeans is unaffected by the PCA correlation-type support", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  fit <- km$model[[1]]
+  # with_report_data = FALSE keeps the raw-data prcomp() path and adds no method metadata.
+  expect_null(fit$correlation_type)
+  expect_null(fit$is_categorical_correlation)
+  expect_null(fit$signed_loadings)
+})

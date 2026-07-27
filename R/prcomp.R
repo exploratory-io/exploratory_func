@@ -64,12 +64,69 @@ select_pca_related_variables <- function(loadings, contributions, cfg = prcomp_r
        display_text = paste(labels, collapse = ", "))
 }
 
+#' Build a prcomp-shaped fit from a correlation matrix. (issue #37294)
+#'
+#' prcomp() cannot take a correlation matrix, so a Polychoric / Tetrachoric / Mixed PCA is the
+#' eigen-decomposition of that matrix. That yields eigenvalues (-> sdev), principal component
+#' coefficients (-> rotation) and contribution ratios directly, but NO observation scores: a
+#' correlation matrix carries no rows. Per the issue, the scores are APPROXIMATED as
+#'
+#'   scores <- scale(numeric_data) %*% eigenvectors
+#'
+#' i.e. the ordinal answers coded to numbers, standardized, then projected onto the components.
+#' They are NOT the latent continuous values the polychoric model assumes -- the report says so.
+#'
+#' @param encoded_df numeric data frame (ordinal categories already coded 1..k)
+#' @param cor_mat the resolved correlation matrix, variables x variables
+#' @return an object of class "prcomp" (sdev / rotation / center / scale / x)
+prcomp_build_categorical_fit <- function(encoded_df, cor_mat) {
+  eg <- eigen(cor_mat, symmetric = TRUE)
+  # A smoothed correlation matrix can carry tiny negative eigenvalues; sqrt() of those is NaN.
+  values <- pmax(eg$values, 0)
+  rotation <- eg$vectors
+  rownames(rotation) <- colnames(cor_mat)
+  colnames(rotation) <- paste0("PC", seq_len(ncol(rotation)))
+  scaled <- scale(as.matrix(encoded_df))
+  # A constant column would give scale 0 -> NaN. Columns with a single unique value are already
+  # dropped upstream, but a degenerate group can still get here; keep those variables at 0.
+  scaled[!is.finite(scaled)] <- 0
+  scores <- scaled %*% rotation
+  colnames(scores) <- colnames(rotation)
+  fit <- list(
+    sdev = sqrt(values),
+    rotation = rotation,
+    center = attr(scaled, "scaled:center"),
+    scale = attr(scaled, "scaled:scale"),
+    x = scores
+  )
+  class(fit) <- "prcomp"
+  fit
+}
+
+#' Signed principal component loadings (主成分負荷量), variables x components. (issue #37294)
+#'
+#' Historically every report branch recomputed cor(cleaned_df, x$x) -- a FRESH PEARSON
+#' cross-correlation. Under a Polychoric fit that would (a) error on a factor column and
+#' (b) silently mix correlation types inside one report. Routing every branch through this one
+#' helper keeps the whole report on the correlation the analysis actually ran on.
+#'
+#' For the Pearson path the two are equal by construction: with scale. = TRUE,
+#' cor(cleaned_df, fit$x) == rotation %*% diag(sdev).
+prcomp_signed_loadings <- function(x) {
+  if (!is.null(x$signed_loadings)) {
+    return(x$signed_loadings)
+  }
+  cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
+  cor(cleaned_df, x$x)
+}
+
 #' do PCA
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
 #' retained_components - Number of principal components the report treats as retained. NULL = auto (use parallel analysis recommendation). Clamped to [1, number of components].
 #' with_report_data - Whether to compute and attach the redesigned PCA report data (parallel analysis, Kaiser, retained/diagnostics) AND apply sign stabilization. Pure-PCA only; exp_kmeans passes FALSE so k-means fits are neither given report data nor sign-flipped. (issue #37019)
+#' cor_type - Correlation the analysis runs on: "auto" (decide from the variable types and the shape of their distributions), "pearson", "polychoric", "tetrachoric" or "mixed". Anything other than Pearson eigen-decomposes that correlation matrix instead of calling prcomp() on the raw data, and the observation scores become APPROXIMATE (see prcomp_build_categorical_fit). Pure-PCA only -- honored when with_report_data is TRUE, so exp_kmeans is unaffected. (issue #37294)
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE, retained_components = NULL, with_report_data = TRUE) {
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE, retained_components = NULL, with_report_data = TRUE, cor_type = "auto") {
   all_cols <- colnames(df)
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -97,6 +154,22 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
 
   if(!is.null(seed)) { # Set seed before starting to call sample_n.
     set.seed(seed)
+  }
+
+  # Resolve the correlation ONCE, from the whole data, and reuse it for every group. Selecting per
+  # group would let one facet run on Polychoric and another on Pearson while the report describes a
+  # single method, and would make the groups' loadings incomparable. Mirrors exp_factanal. (#37294)
+  overall_type <- NULL
+  overall_reason <- NULL
+  if (with_report_data && identical(tolower(trimws(as.character(cor_type))), "auto")) {
+    overall_selection <- tryCatch({
+      candidate_cols <- intersect(selected_cols, colnames(df))
+      if (length(candidate_cols) >= 2) select_factor_correlation_type(as.data.frame(df)[, candidate_cols, drop = FALSE]) else NULL
+    }, error = function(e) NULL)
+    if (!is.null(overall_selection) && !identical(overall_selection$selected_method, "unsupported")) {
+      overall_type <- overall_selection$selected_method
+      overall_reason <- overall_selection$reason
+    }
   }
 
   each_func <- function(df) {
@@ -152,9 +225,76 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
         return(NULL)
       }
     }
-    # "scale." is an argument name. There is no such operator like ".=". 
-    fit <- prcomp(cleaned_df, scale.=normalize_data)
-    fit$correlation <- cor(cleaned_df) # Calculate correlation for screeplot.
+    # Decide which correlation the whole analysis runs on, and build that ONE matrix. Every
+    # downstream computation reads it, so the report can never mix Pearson and Polychoric
+    # (e.g. polychoric eigenvalues next to Pearson loadings). Pure-PCA only: exp_kmeans passes
+    # with_report_data = FALSE and keeps the original raw-data prcomp() path untouched. (#37294)
+    selection <- NULL
+    resolved <- list(type = "pearson", auto = FALSE, reason = "", degraded_from = NULL)
+    cor_result <- NULL
+    encoded_df <- cleaned_df
+    if (with_report_data) {
+      selection <- select_factor_correlation_type(cleaned_df)
+      resolved <- resolve_factanal_correlation_type(cor_type, selection)
+      # Auto: keep the whole-analysis choice made above, so every group uses the same correlation.
+      if (isTRUE(resolved$auto) && !is.null(overall_type) &&
+          !identical(selection$selected_method, "unsupported")) {
+        resolved$type <- overall_type
+        resolved$reason <- overall_reason
+      }
+      # An unsupported variable combination (a nominal category, a constant column) is unsupported
+      # whichever correlation was asked for -- picking Pearson manually must not smuggle a nominal
+      # column in as arbitrary integer codes. So gate on the SELECTION, not the resolved type.
+      if (identical(selection$selected_method, "unsupported") || identical(resolved$type, "unsupported")) {
+        if (length(grouped_cols) > 0) {
+          # With Repeat By, skip just this group -- mirroring the not-enough-columns guard above.
+          return(NULL)
+        }
+        # EXP-ANA-35 carries the offending column names as its params, so the client can name them.
+        # (EXP-ANA-6 is PCA's reserved-column-name error -- do not reuse it here.)
+        unsupported_vars <- selection$variable_summary$variable[
+          selection$variable_summary$detected_type %in% c("nominal", "invalid")]
+        stop(paste0("EXP-ANA-35 :: ",
+                    jsonlite::toJSON(paste(unsupported_vars, collapse = ", ")),
+                    " :: ", selection$reason))
+      }
+      # Category-ordered numeric coding. For an all-numeric data frame this is a no-op, so the
+      # Pearson path stays bit-for-bit what it was before this change.
+      encoded_df <- encode_factanal_data(cleaned_df, selection)
+    }
+
+    requested_family <- resolved$type
+    if (identical(resolved$type, "pearson")) {
+      # "scale." is an argument name. There is no such operator like ".=".
+      fit <- prcomp(encoded_df, scale.=normalize_data)
+      cor_mat <- cor(encoded_df) # Calculate correlation for screeplot.
+    }
+    else {
+      cor_result <- build_factor_correlation(encoded_df, requested_family)
+      cor_mat <- cor_result$correlation
+      if (isTRUE(cor_result$failed)) {
+        # build_factor_correlation already degraded to Pearson; keep the reported type honest.
+        # requested_family stays as asked so the diagnostics table can still REPORT the failure,
+        # and degraded_from lets the report say WHICH correlation failed instead of claiming the
+        # variables were treated as continuous on purpose.
+        resolved$type <- "pearson"
+        resolved$degraded_from <- requested_family
+        resolved$reason <- sprintf("%s could not be estimated, so Pearson correlation was used instead.",
+                                   factanal_correlation_label(requested_family))
+        fit <- prcomp(encoded_df, scale.=TRUE)
+        cor_mat <- cor(encoded_df)
+      }
+      else {
+        fit <- prcomp_build_categorical_fit(encoded_df, cor_mat)
+      }
+    }
+    fit$correlation <- cor_mat
+    if (with_report_data) {
+      # Non-Pearson correlations eigen-decompose cor_mat, so the scores are APPROXIMATE
+      # (scale(numeric_data) %*% eigenvectors) rather than exact prcomp() scores; the report says
+      # so. Set only for pure PCA -- exp_kmeans fits must not grow new fields. (issue #37294)
+      fit$is_categorical_correlation <- !identical(resolved$type, "pearson")
+    }
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
@@ -169,7 +309,13 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       # text stable across runs. Compute in a guard so a degenerate correlation leaves signs
       # untouched (all-1 multiplier is a no-op sweep).
       sign_multiplier <- tryCatch({
-        variable_pc_correlations <- cor(cleaned_df, fit$x)
+        variable_pc_correlations <- if (isTRUE(fit$is_categorical_correlation)) {
+          # A correlation-matrix PCA has no exact scores to correlate against; the component
+          # loading IS eigenvector * sqrt(eigenvalue), which is that same correlation.
+          fit$rotation %*% diag(fit$sdev, nrow = length(fit$sdev))
+        } else {
+          cor(encoded_df, fit$x)
+        }
         vapply(seq_len(ncol(variable_pc_correlations)), function(i) {
           col <- variable_pc_correlations[, i]
           strongest <- col[which.max(abs(col))]
@@ -179,9 +325,27 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       fit$rotation <- sweep(fit$rotation, 2, sign_multiplier, "*")
       fit$x <- sweep(fit$x, 2, sign_multiplier, "*")
 
-      fit$parallel <- tryCatch(compute_parallel_analysis(cleaned_df), error = function(e) NULL)
+      if (isTRUE(fit$is_categorical_correlation)) {
+        # Cache the signed loadings AFTER the sign sweep. Every report branch reads them through
+        # prcomp_signed_loadings() so no branch silently recomputes a FRESH PEARSON
+        # cor(cleaned_df, x$x) on top of a polychoric solution -- and so a factor column, which
+        # cor() cannot take at all, never reaches cor(). (issue #37294)
+        fit$signed_loadings <- tryCatch({
+          loadings <- fit$rotation %*% diag(fit$sdev, nrow = length(fit$sdev))
+          dimnames(loadings) <- list(rownames(fit$rotation), colnames(fit$rotation))
+          loadings
+        }, error = function(e) NULL)
+      }
+
+      fit$parallel <- tryCatch(
+        compute_parallel_analysis(encoded_df, cor_type = resolved$type, cor_matrix = fit$correlation),
+        error = function(e) NULL)
       fit$kaiser_components <- tryCatch(
-        if (normalize_data) as.integer(sum(eigen(fit$correlation)$values >= 1)) else NA_integer_,
+        # A correlation matrix is standardized by construction, so under a categorical correlation
+        # the Kaiser criterion applies whatever normalize_data says.
+        if (normalize_data || isTRUE(fit$is_categorical_correlation)) {
+          as.integer(sum(eigen(fit$correlation)$values >= 1))
+        } else NA_integer_,
         error = function(e) NA_integer_)
       fit$recommended_components <- if (!is.null(fit$parallel)) fit$parallel$recommended_n else NA_integer_
       n_comp <- length(fit$sdev)
@@ -192,8 +356,24 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       }
       fit$retained_is_auto <- is.null(retained_components)
       fit$normalize_data <- normalize_data
+      # Method metadata. Same field names as exp_factanal so the client-side extraction of the
+      # report's explanation text is the same shape for both analytics. (issue #37294)
+      fit$correlation_type <- resolved$type
+      fit$correlation_is_auto <- isTRUE(resolved$auto)
+      fit$correlation_reason <- if (is.null(resolved$reason)) "" else resolved$reason
+      fit$correlation_degraded_from <- if (is.null(resolved$degraded_from)) "" else resolved$degraded_from
+      fit$correlation_selection <- selection
+      fit$correlation_polychoric_available <- tryCatch(
+        factanal_polychoric_available(selection, encoded_df), error = function(e) FALSE)
+      fit$cor_diagnostics <- tryCatch({
+        if (identical(requested_family, "pearson")) NULL
+        else compute_polychoric_diagnostics(encoded_df, cor_result, selection)
+      }, error = function(e) unavailable_polychoric_diagnostics())
+
       fit$input_diagnostics <- tryCatch({
-        variable_sd <- vapply(cleaned_df, sd, numeric(1))
+        # sd() over the ENCODED frame: a factor column has no sd(), and these names are what the
+        # report branches use to reconstruct the analyzed variables.
+        variable_sd <- vapply(encoded_df, sd, numeric(1))
         original_row_count <- nrow(df)
         analyzed_row_count <- nrow(cleaned_df)
         excluded_row_count <- original_row_count - analyzed_row_count
@@ -335,7 +515,10 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     }
     else {
       d <- x$input_diagnostics
-      normalized <- isTRUE(x$normalize_data)
+      # A categorical correlation is standardized by construction (the analysis runs on the
+      # correlation matrix), so normalize_data is inert there -- report it as normalized rather
+      # than letting a stale FALSE trigger a bogus SD-ratio warning. (issue #37294)
+      normalized <- isTRUE(x$normalize_data) || isTRUE(x$is_categorical_correlation)
       variables_used <- length(d$variable_sd)
       excluded_names <- d$excluded_variables
       # #37268: show "None" (JA: なし) when nothing was excluded, not "-".
@@ -374,6 +557,55 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
           scale_status
         )
       )
+    }
+  }
+  else if (type == "analysis_method") {
+    # Report header table: which correlation the numbers below were actually computed with.
+    # (issue #37294; mirrors exp_factanal's table of the same name so the client-side extraction
+    # of the explanation text is one shared shape.)
+    cor_type <- if (is.null(x$correlation_type)) "pearson" else x$correlation_type
+    d <- x$input_diagnostics
+    n_variables <- if (!is.null(d)) length(d$variable_sd) else NA_integer_
+    n_rows_used <- if (!is.null(d)) d$analyzed_row_count else NA_integer_
+    normalized <- isTRUE(x$normalize_data) || isTRUE(x$is_categorical_correlation)
+    res <- tibble::tibble(
+      # NOTE: "Target Variables" / "Data Rows" instead of the shorter "Variables" / "Rows":
+      # the client's shared translation map already binds those two keys to different wordings
+      # for other tables, and a direct-map key can only have one translation. (issue #26623)
+      Item = c("Correlation", "Normalization", "Target Variables", "Data Rows"),
+      Value = c(
+        factanal_correlation_label(cor_type),
+        if (normalized) "Yes" else "No",
+        if (length(n_variables) == 1L && !is.na(n_variables)) as.character(n_variables) else "N/A",
+        if (length(n_rows_used) == 1L && !is.na(n_rows_used)) as.character(n_rows_used) else "N/A"
+      ),
+      # Hidden columns. The client reads them to bind the report's explanation text; they are not
+      # part of the rendered Item/Value table. The booleans are emitted as EXPLICIT "TRUE"/"FALSE"
+      # STRINGS, not R logicals: a logical column can reach the client serialized as "1"/"0"
+      # depending on the pivot pipeline, and the client's isTrue() only accepts "TRUE"/"true"/true.
+      correlation_type = cor_type,
+      correlation_is_auto = if (isTRUE(x$correlation_is_auto)) "TRUE" else "FALSE",
+      # Non-empty when the requested correlation could not be estimated and the fit fell back to
+      # Pearson, so the report can say so instead of inventing a rationale.
+      degraded_from = if (is.null(x$correlation_degraded_from)) "" else x$correlation_degraded_from,
+      # Whether suggesting Polychoric makes sense for this data at all.
+      polychoric_available = if (isTRUE(x$correlation_polychoric_available)) "TRUE" else "FALSE",
+      # Language-neutral tokens for the selector's warnings; the client renders the localized text.
+      warning_tokens = paste(factanal_selection_warning_tokens(x$correlation_selection), collapse = ","),
+      # "TRUE" also when a polychoric estimation failed and the fit degraded to Pearson, so the
+      # report still shows the diagnostics table that reports the failure.
+      has_diagnostics = if (!is.null(x$cor_diagnostics) && nrow(x$cor_diagnostics) > 0) "TRUE" else "FALSE",
+      reason = if (is.null(x$correlation_reason)) "" else x$correlation_reason
+    )
+  }
+  else if (type == "cor_diagnostics") {
+    # Polychoric-family data suitability diagnostics. Empty tibble (with the same columns) when
+    # the analysis ran on Pearson, so the client can hide the section. (issue #37294)
+    res <- if (is.null(x$cor_diagnostics)) {
+      tibble::tibble(Diagnostic = character(), Judgement = character(),
+                     Description = character(), status = character())
+    } else {
+      x$cor_diagnostics
     }
   }
   else if (type == "parallel_screeplot") {
@@ -485,11 +717,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     }
     else {
       cfg <- prcomp_report_config()
-      # Reconstruct the used numeric variables. variable_sd is named over exactly those columns
-      # (== rownames(x$rotation)), the SAME reconstruction the fit uses for cor(cleaned_df, fit$x).
-      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
       # 主成分負荷量 = correlation between variable and score (signed), variables x components.
-      signed_loadings <- cor(cleaned_df, x$x)
+      # Via prcomp_signed_loadings() so a Polychoric fit is not re-correlated with Pearson. (#37294)
+      signed_loadings <- prcomp_signed_loadings(x)
       # Eigenvalue / % Variance / Cummulated % Variance from x$sdev^2 -- SAME basis as "variances".
       eigenvalue <- x$sdev^2
       total_variance <- sum(eigenvalue)
@@ -529,8 +759,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       res <- tibble::tibble(Variable = character(0), Component = character(0), Loading = numeric(0))
     }
     else {
-      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
-      signed_loadings <- cor(cleaned_df, x$x)
+      signed_loadings <- prcomp_signed_loadings(x)
       res <- tibble::as_tibble(signed_loadings, rownames = "Variable") %>%
         tidyr::gather(Component, Loading, dplyr::starts_with("PC"), convert = TRUE) %>%
         dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
@@ -547,8 +776,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       res <- tibble::tibble(Variable = character(0))
     }
     else {
-      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
-      signed_loadings <- cor(cleaned_df, x$x) # variables x components
+      signed_loadings <- prcomp_signed_loadings(x) # variables x components
       n_comp <- ncol(signed_loadings)
       eigenvalue <- x$sdev^2
       pct_variance <- eigenvalue / sum(eigenvalue) * 100
@@ -625,10 +853,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       )
     }
     else {
-      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
       # cor(variable, score) -- signed correlations, variables x components. Same basis the fit
       # uses for sign stabilization and the component_profiles / loadings_signed branches.
-      signed_loadings <- cor(cleaned_df, x$x)
+      signed_loadings <- prcomp_signed_loadings(x)
       n_comp <- ncol(signed_loadings)
       cor_pc1 <- signed_loadings[, 1]
       # Guard: needs >= 2 components. With only 1 component PC2 has no meaning -- use 0 (a point on
@@ -665,8 +892,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     }
     else {
       cfg <- prcomp_report_config()
-      cleaned_df <- x$df[, names(x$input_diagnostics$variable_sd), drop = FALSE]
-      sq <- cor(cleaned_df, x$x)^2 # squared correlations, variables x components.
+      sq <- prcomp_signed_loadings(x)^2 # squared correlations, variables x components.
       # Cumulative across components per variable. apply(..., 1, cumsum) returns components x
       # variables, so transpose back to variables x components. cumsum of non-negative squared
       # correlations is monotone non-decreasing; clamp+scale (a monotone map) preserves that order.
