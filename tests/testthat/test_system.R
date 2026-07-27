@@ -1216,3 +1216,87 @@ test_that("test searchAndReadParquetFiles", {
     "no file"
   )
 })
+
+test_that("stripTrailingSemicolon", {
+  # Oracle rejects a trailing semicolon through OCI, so it has to be dropped.
+  expect_equal(exploratory:::stripTrailingSemicolon("select * from t;"), "select * from t")
+  expect_equal(exploratory:::stripTrailingSemicolon("select * from t ;  "), "select * from t")
+  expect_equal(exploratory:::stripTrailingSemicolon("select * from t"), "select * from t")
+  # A semicolon inside the statement must be left alone.
+  expect_equal(exploratory:::stripTrailingSemicolon("select ';' from t"), "select ';' from t")
+})
+
+test_that("oracleOCIPoolKey builds identical keys from getDBConnection and clearDBConnection defaults", {
+  # getDBConnection passes connectionString = NULL by default while clearDBConnection passes "".
+  # paste() silently drops NULL, so without normalization these two would produce different keys
+  # and a connection could never be evicted from the pool.
+  fromGet <- exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, NULL)
+  fromClear <- exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "UTC", 10000, "")
+  expect_equal(fromGet, fromClear)
+  expect_equal(fromGet, "oracleoci:host:1521:svc:user:UTC:10000:")
+
+  # Every component that changes the connection must change the key.
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "Asia/Tokyo", 10000, ""))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 5000, ""))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, "tns_alias"))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("other", 1521, "svc", "user", "", 10000, ""))
+})
+
+test_that("findOracleClientLibDir handles both Oracle client layouts", {
+  base <- tempfile()
+  dir.create(base)
+
+  # Instant Client zip layout: the library sits directly in the directory.
+  zipLayout <- file.path(base, "instantclient_23_9")
+  dir.create(zipLayout)
+  file.create(file.path(zipLayout, "libclntsh.dylib.23.1"))
+
+  # Oracle home / Homebrew keg layout: the library sits in a lib subdirectory.
+  homeLayout <- file.path(base, "client64")
+  dir.create(file.path(homeLayout, "lib"), recursive = TRUE)
+  file.create(file.path(homeLayout, "lib", "libclntsh.so.23.1"))
+
+  emptyDir <- file.path(base, "nothing")
+  dir.create(emptyDir)
+
+  expect_equal(exploratory:::findOracleClientLibDir(zipLayout), zipLayout)
+  expect_equal(exploratory:::findOracleClientLibDir(homeLayout), file.path(homeLayout, "lib"))
+  expect_equal(exploratory:::findOracleClientLibDir(emptyDir), "")
+  expect_equal(exploratory:::findOracleClientLibDir(""), "")
+  expect_equal(exploratory:::findOracleClientLibDir(NULL), "")
+  expect_equal(exploratory:::findOracleClientLibDir(NA), "")
+})
+
+test_that("resolveOracleClientLocation only reports an ORACLE_HOME for the lib subdirectory layout", {
+  base <- tempfile()
+  dir.create(base)
+
+  homeLayout <- file.path(base, "client64")
+  dir.create(file.path(homeLayout, "lib"), recursive = TRUE)
+  file.create(file.path(homeLayout, "lib", "libclntsh.so.23.1"))
+
+  zipLayout <- file.path(base, "instantclient_23_9")
+  dir.create(zipLayout)
+  file.create(file.path(zipLayout, "libclntsh.dylib.23.1"))
+
+  # ROracle only ever looks at $ORACLE_HOME/lib, so home is the parent of the lib directory.
+  resolved <- exploratory:::resolveOracleClientLocation(homeLayout)
+  expect_equal(resolved$libDir, file.path(homeLayout, "lib"))
+  expect_equal(resolved$home, homeLayout)
+
+  # The zip layout cannot be expressed as an ORACLE_HOME, so home stays empty and the
+  # caller falls back to loading the library directly.
+  resolvedZip <- exploratory:::resolveOracleClientLocation(zipLayout)
+  expect_equal(resolvedZip$libDir, zipLayout)
+  expect_equal(resolvedZip$home, "")
+})
+
+test_that("applyOracleClientEnv reports FALSE when no Oracle client can be found", {
+  # An unusable explicit directory falls through to the well known locations, so this can
+  # only assert the not-found path on a machine that has no Oracle client installed.
+  skip_if(exploratory:::resolveOracleClientLocation("")$libDir != "",
+          "an Oracle client is installed on this machine")
+  emptyDir <- tempfile()
+  dir.create(emptyDir)
+  expect_false(exploratory:::applyOracleClientEnv(emptyDir))
+})

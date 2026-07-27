@@ -939,12 +939,129 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
   rm(list = key, envir = connection_pool)
 }
 
+# File name patterns of the Oracle client library, per platform.
+# ROracle 1.5-0 and later loads the Oracle client dynamically at connect time, so the
+# client only has to be findable - it is not linked at build time.
+oracleClientLibPatterns <- c("libclntsh.dylib*", "libclntsh.so*", "oci.dll")
+
+# Returns the directory that actually holds the Oracle client library for the given
+# directory, which is either the directory itself (Oracle Instant Client zip layout) or
+# its lib subdirectory (Oracle home / Homebrew keg layout). Returns "" when neither has it.
+findOracleClientLibDir <- function(dir) {
+  if (is.null(dir) || length(dir) != 1 || is.na(dir) || dir == "") {
+    return("")
+  }
+  for (candidate in c(dir, file.path(dir, "lib"))) {
+    if (length(Sys.glob(file.path(candidate, oracleClientLibPatterns))) > 0) {
+      return(candidate)
+    }
+  }
+  ""
+}
+
+# Well known Oracle client locations to probe when the user has not configured one.
+defaultOracleClientDirs <- function() {
+  sysname <- Sys.info()[["sysname"]]
+  if (sysname == "Darwin") {
+    c(Sys.glob("/opt/homebrew/Cellar/instantclient-*basic*/*"),
+      Sys.glob("/usr/local/Cellar/instantclient-*basic*/*"),
+      "/opt/homebrew", "/usr/local",
+      Sys.glob("/opt/oracle/instantclient*"))
+  } else if (sysname == "Windows") {
+    c(Sys.glob("C:/oracle/instantclient*"),
+      Sys.glob("C:/instantclient*"),
+      Sys.glob("C:/Program Files/Oracle/instantclient*"),
+      Sys.glob("C:/oracle/product/*/client*"))
+  } else {
+    # Linux. /lib/oracle/<ver>/client64 is where the Collaboration Server keeps the client.
+    c(Sys.glob("/lib/oracle/*/client64"),
+      Sys.glob("/usr/lib/oracle/*/client64"),
+      Sys.glob("/opt/oracle/instantclient*"))
+  }
+}
+
+#' Resolves where the Oracle client library lives.
+#' Returns a list with libDir (the directory holding the library, "" when not found) and
+#' home (the directory to use as ORACLE_HOME, "" when the layout does not suit ORACLE_HOME).
+#' ROracle only ever looks at ORACLE_HOME/lib, so home is set only when the library sits in
+#' a lib subdirectory.
+resolveOracleClientLocation <- function(explicitDir = Sys.getenv("EXPLORATORY_ORACLE_CLIENT_DIR")) {
+  candidates <- c(explicitDir, Sys.getenv("ORACLE_HOME"), defaultOracleClientDirs())
+  for (candidate in candidates) {
+    libDir <- findOracleClientLibDir(candidate)
+    if (libDir != "") {
+      home <- if (basename(libDir) == "lib") dirname(libDir) else ""
+      return(list(libDir = libDir, home = home))
+    }
+  }
+  list(libDir = "", home = "")
+}
+
+# Makes the Oracle client library loadable by ROracle for the current R session.
+# ROracle searches, in order, its own module directory, the OS default search path and
+# (on non Windows platforms only) $ORACLE_HOME/lib. So:
+#   - Windows: prepend the client directory to PATH, which LoadLibrary honors at call time.
+#   - macOS / Linux with a lib subdirectory: point ORACLE_HOME at its parent.
+#   - macOS / Linux with the library directly in the directory: ORACLE_HOME cannot express
+#     that layout, so load the library into the process ourselves and let the OS hand the
+#     already loaded image back to ROracle's dlopen. Setting DYLD_LIBRARY_PATH would not
+#     work here because macOS reads it once at process start.
+applyOracleClientEnv <- function(explicitDir = Sys.getenv("EXPLORATORY_ORACLE_CLIENT_DIR")) {
+  location <- resolveOracleClientLocation(explicitDir)
+  if (location$libDir == "") {
+    return(invisible(FALSE))
+  }
+  if (Sys.info()[["sysname"]] == "Windows") {
+    currentPath <- Sys.getenv("PATH")
+    normalizedLibDir <- gsub("/", "\\\\", location$libDir)
+    if (!grepl(normalizedLibDir, currentPath, fixed = TRUE)) {
+      Sys.setenv(PATH = paste(normalizedLibDir, currentPath, sep = .Platform$path.sep))
+    }
+  } else if (location$home != "") {
+    if (Sys.getenv("ORACLE_HOME") != location$home) {
+      Sys.setenv(ORACLE_HOME = location$home)
+    }
+  } else {
+    libFiles <- Sys.glob(file.path(location$libDir, oracleClientLibPatterns))
+    # Prefer the versioned library (libclntsh.dylib.23.1) over a bare symlink name.
+    libFiles <- libFiles[order(nchar(libFiles), decreasing = TRUE)]
+    tryCatch({
+      dyn.load(libFiles[[1]], local = FALSE, now = FALSE)
+    }, error = function(e) {
+    }, warning = function(w) {
+    })
+  }
+  invisible(TRUE)
+}
+
+# Single source of truth for the Oracle (OCI) connection pool key so that getDBConnection
+# and clearDBConnection can never drift apart. Every component is normalized here because
+# paste() silently drops NULL, which would produce a key that no clear call can match.
+oracleOCIPoolKey <- function(host, port, databaseName, username, timezone, bulkRead, connectString) {
+  normalize <- function(value) {
+    if (is.null(value) || length(value) == 0 || is.na(value[[1]])) "" else as.character(value[[1]])
+  }
+  timezone <- normalize(timezone)
+  if (timezone == "") {
+    timezone <- "UTC" # matches the default applied when connecting.
+  }
+  paste("oracleoci", normalize(host), normalize(port), normalize(databaseName),
+        normalize(username), timezone, normalize(bulkRead), normalize(connectString), sep = ":")
+}
+
+# Oracle rejects a trailing semicolon through OCI, unlike most SQL consoles, so drop one
+# if the user pasted their query from such a tool.
+stripTrailingSemicolon <- function(query) {
+  sub("[[:space:]]*;[[:space:]]*$", "", query)
+}
+
 #' Returns specified connection from pool if it exists in the pool.
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
-                            subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "", role = "", authMethod = "", secretKeyFile = "", secretKeyFilePassword = "") {
+                            subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "", role = "", authMethod = "", secretKeyFile = "", secretKeyFilePassword = "",
+                            bulkRead = 10000) {
 
   drv = NULL
   conn = NULL
@@ -1817,6 +1934,75 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connection_pool[[key]] <- conn
       }
     }
+  } else if (type == "oracleoci") {
+    if (!requireNamespace("DBI")) {
+      stop("package DBI must be installed.")
+    }
+    if (!requireNamespace("ROracle")) {
+      stop("package ROracle must be installed.")
+    }
+    if (timezone == "") {
+      timezone <- "UTC" # if timezone is not provided use UTC as default, same as the ODBC based Oracle data source.
+    }
+    key <- oracleOCIPoolKey(host, port, databaseName, username, timezone, bulkRead, connectionString)
+    # Only reuse a pooled connection when connection pooling is on (e.g. while the data source
+    # dialog is open), and always probe it first. Same reasoning as the oracle branch above. (tam#36429)
+    conn <- NULL
+    if (user_env$pool_connection) {
+      conn <- connection_pool[[key]]
+    }
+    if (!is.null(conn)) {
+      tryCatch({
+        # test connection. Oracle has no bare "select 1", it needs the dual table.
+        result <- DBI::dbGetQuery(conn, "select 1 from dual")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <<- NULL # <<- so the outer conn is reset; the handler is a separate function scope
+        # fall through to getting new connection.
+      })
+    }
+    # Guard dbIsValid() in tryCatch: on a dead external pointer it throws instead of returning FALSE.
+    if (is.null(conn) || !isTRUE(tryCatch(DBI::dbIsValid(conn), error = function(e) FALSE))) {
+      # ROracle loads the Oracle client library lazily at connect time, so make it findable first.
+      applyOracleClientEnv()
+      # dbname is whatever follows the @ sign in a SQL*Plus connect string. When the user
+      # provided a connect string (TNS alias, full descriptor, or their own EZConnect string)
+      # use it as is, otherwise build an EZConnect string from host, port and service name.
+      if (!is.null(connectionString) && !is.na(connectionString) && connectionString != "") {
+        dbname <- connectionString
+      } else {
+        dbname <- stringr::str_c(host, ":", port, "/", databaseName)
+      }
+      bulkReadRows <- suppressWarnings(as.integer(bulkRead))
+      if (is.na(bulkReadRows) || bulkReadRows <= 0) {
+        bulkReadRows <- 10000L
+      }
+      conn <- ROracle::dbConnect(
+        ROracle::Oracle(unicode_as_utf8 = TRUE),
+        username = username,
+        password = password,
+        dbname = dbname,
+        # Rows fetched per OCI round trip. This is the main reason this data source is faster
+        # than the ODBC based one, so it is exposed on the connection as a user setting.
+        bulk_read = bulkReadRows
+      )
+      if (user_env$pool_connection) {
+        connection_pool[[key]] <- conn
+      }
+    }
   }
   conn
 }
@@ -1827,7 +2013,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
-                              sslClientCertKey = "", sslCA = "", subType = NULL, driver = "", sslMode = '', role = '') {
+                              sslClientCertKey = "", sslCA = "", subType = NULL, driver = "", sslMode = '', role = '',
+                              bulkRead = 10000) {
   key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
@@ -1916,6 +2103,9 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, role, sep = ":")
   } else if (type %in% c("oracle")) {
     key <- paste("oracle", host, port, databaseName, username, timezone, sep = ":")
+  } else if (type %in% c("oracleoci")) {
+    # Built through the same helper getDBConnection uses, so the keys cannot drift apart.
+    key <- oracleOCIPoolKey(host, port, databaseName, username, timezone, bulkRead, connectionString)
   }
   rm(list = key, envir = connection_pool) # Even if there is no matching key, this is harmless.
 }
@@ -2065,6 +2255,59 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   })
   RMariaDB::dbClearResult(resultSet)
   colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8") # Work around to read multibyte column names without getting garbled.
+  df
+}
+
+#' Queries an Oracle Database through OCI with the ROracle package.
+#' This is the Oracle (OCI) data source. The ODBC based Oracle data source goes through
+#' queryODBC() with type = "oracle" instead.
+#' @export
+#' @param host Host name. Ignored when connectString is provided.
+#' @param port Listener port. Ignored when connectString is provided.
+#' @param databaseName Service name. Ignored when connectString is provided.
+#' @param username
+#' @param password
+#' @param numOfRows default is -1, which means all rows
+#' @param query
+#' @param timezone Time zone the database values are in. Defaults to UTC.
+#' @param bulkRead Rows fetched per OCI round trip. Larger values make large imports faster.
+#' @param connectString (optional) TNS alias, full connect descriptor, or EZConnect string.
+#'   When provided it is used as is and host, port and databaseName are ignored.
+queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username = "", password = "",
+                           numOfRows = -1, query, timezone = "", bulkRead = 10000, connectString = "", ...) {
+  if (!requireNamespace("ROracle")) { stop("package ROracle must be installed.") }
+  if (!requireNamespace("DBI")) { stop("package DBI must be installed.") }
+
+  conn <- getDBConnection(type = "oracleoci", host = host, port = port, databaseName = databaseName,
+                          username = username, password = password, timezone = timezone,
+                          bulkRead = bulkRead, connectionString = connectString)
+  tryCatch({
+    query <- convertUserInputToUtf8(query)
+    # set envir = parent.frame() to get variables from users environment, not package environment
+    query <- glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame())
+    resultSet <- ROracle::dbSendQuery(conn, stripTrailingSemicolon(query))
+    df <- ROracle::dbFetch(resultSet, n = numOfRows)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection("oracleoci", host, port, databaseName, username, timezone = timezone,
+                      bulkRead = bulkRead, connectionString = connectString)
+    stop(err)
+  })
+  ROracle::dbClearResult(resultSet)
+  # ROracle returns timestamps as POSIXct in the R session time zone. Reinterpret them in the
+  # connection time zone, keeping the wall clock the database stored. This mirrors what the
+  # timezone / timezone_out arguments do for the ODBC based Oracle data source.
+  if (timezone == "") {
+    timezone <- "UTC"
+  }
+  posixColumns <- vapply(df, function(column) { inherits(column, "POSIXct") }, logical(1))
+  if (any(posixColumns)) {
+    df[posixColumns] <- lapply(df[posixColumns], function(column) {
+      attr(column, "tzone") <- timezone
+      column
+    })
+  }
+  colnames(df) <- iconv(colnames(df), from = "utf8", to = "utf8") # Work around to read multibyte column names without getting garbled.
   df
 }
 
