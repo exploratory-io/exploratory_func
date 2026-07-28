@@ -1046,6 +1046,64 @@ applyOracleClientEnv <- function(explicitDir = Sys.getenv("EXPLORATORY_ORACLE_CL
 #   *.AL32UTF8                   -> correct UTF-8.
 # So the character set has to be forced, not merely defaulted: a user who set NLS_LANG for the
 # ODBC based Oracle data source would otherwise silently corrupt Oracle (OCI) results.
+# Parses the Oracle (OCI) additional parameters field ("key1=value1;key2=value2") into a list
+# of arguments for ROracle::dbConnect.
+#
+# Unlike the ODBC based Oracle data source, where unrecognized keys are still handed to the
+# driver, ROracle's dbConnect swallows anything it does not declare: the method signature is
+# (username, password, dbname, prefetch, bulk_read, bulk_write, stmt_cache,
+# external_credentials, sysdba, ...) and the ... is dropped rather than forwarded. A typo would
+# therefore be silently ignored, so unknown keys are rejected here instead.
+#
+# Types are converted because ROracle rejects strings outright ("argument 'prefetch' must be a
+# single logical value and cannot be 'TRUE'"), and it also refuses stmt_cache unless prefetch is
+# enabled ("prefetch should be enabled for statement cache"), so that pairing is checked here to
+# give a clearer message than the driver's.
+ORACLE_OCI_LOGICAL_PARAMS <- c("prefetch", "external_credentials", "sysdba")
+ORACLE_OCI_INTEGER_PARAMS <- c("bulk_read", "bulk_write", "stmt_cache")
+
+parseOracleOCIAdditionalParams <- function(additionalParams) {
+  if (is.null(additionalParams) || length(additionalParams) == 0 ||
+      is.na(additionalParams[[1]]) || trimws(additionalParams[[1]]) == "") {
+    return(list())
+  }
+  entries <- strsplit(as.character(additionalParams[[1]]), ";", fixed = TRUE)[[1]]
+  entries <- trimws(entries)
+  entries <- entries[entries != ""]
+  supported <- c(ORACLE_OCI_LOGICAL_PARAMS, ORACLE_OCI_INTEGER_PARAMS)
+  result <- list()
+  for (entry in entries) {
+    if (!grepl("=", entry, fixed = TRUE)) {
+      stop(paste0("Invalid Oracle (OCI) additional parameter '", entry,
+                  "'. Use the form key=value, separated by semicolons."))
+    }
+    key <- trimws(sub("=.*$", "", entry))
+    value <- trimws(sub("^[^=]*=", "", entry))
+    if (!(key %in% supported)) {
+      stop(paste0("Unknown Oracle (OCI) additional parameter '", key, "'. Supported parameters are: ",
+                  paste(supported, collapse = ", "), "."))
+    }
+    if (key %in% ORACLE_OCI_LOGICAL_PARAMS) {
+      upperValue <- toupper(value)
+      if (!(upperValue %in% c("TRUE", "FALSE", "T", "F"))) {
+        stop(paste0("Oracle (OCI) additional parameter '", key, "' must be TRUE or FALSE, but was '", value, "'."))
+      }
+      result[[key]] <- upperValue %in% c("TRUE", "T")
+    } else {
+      number <- suppressWarnings(as.integer(value))
+      if (is.na(number)) {
+        stop(paste0("Oracle (OCI) additional parameter '", key, "' must be a whole number, but was '", value, "'."))
+      }
+      result[[key]] <- number
+    }
+  }
+  # ROracle fails the connection outright when a statement cache is requested without prefetch.
+  if (!is.null(result$stmt_cache) && result$stmt_cache > 0 && !isTRUE(result$prefetch)) {
+    stop("Oracle (OCI) additional parameter 'stmt_cache' requires 'prefetch=TRUE'.")
+  }
+  result
+}
+
 oracleOCINlsLang <- function(currentNlsLang = Sys.getenv("NLS_LANG")) {
   if (is.null(currentNlsLang) || length(currentNlsLang) == 0 || is.na(currentNlsLang[[1]]) ||
       currentNlsLang[[1]] == "") {
@@ -1062,7 +1120,8 @@ oracleOCINlsLang <- function(currentNlsLang = Sys.getenv("NLS_LANG")) {
 # Single source of truth for the Oracle (OCI) connection pool key so that getDBConnection
 # and clearDBConnection can never drift apart. Every component is normalized here because
 # paste() silently drops NULL, which would produce a key that no clear call can match.
-oracleOCIPoolKey <- function(host, port, databaseName, username, timezone, bulkRead, connectionString) {
+oracleOCIPoolKey <- function(host, port, databaseName, username, timezone, bulkRead, connectionString,
+                             additionalParams = "") {
   normalize <- function(value) {
     if (is.null(value) || length(value) == 0 || is.na(value[[1]])) "" else as.character(value[[1]])
   }
@@ -1071,7 +1130,8 @@ oracleOCIPoolKey <- function(host, port, databaseName, username, timezone, bulkR
     timezone <- "UTC" # matches the default applied when connecting.
   }
   paste("oracleoci", normalize(host), normalize(port), normalize(databaseName),
-        normalize(username), timezone, normalize(bulkRead), normalize(connectionString), sep = ":")
+        normalize(username), timezone, normalize(bulkRead), normalize(connectionString),
+        normalize(additionalParams), sep = ":")
 }
 
 # Oracle rejects a trailing semicolon through OCI, unlike most SQL consoles, so drop one
@@ -1969,7 +2029,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (timezone == "") {
       timezone <- "UTC" # if timezone is not provided use UTC as default, same as the ODBC based Oracle data source.
     }
-    key <- oracleOCIPoolKey(host, port, databaseName, username, timezone, bulkRead, connectionString)
+    key <- oracleOCIPoolKey(host, port, databaseName, username, timezone, bulkRead, connectionString,
+                            additionalParams)
     # Only reuse a pooled connection when connection pooling is on (e.g. while the data source
     # dialog is open), and always probe it first. Same reasoning as the oracle branch above. (tam#36429)
     conn <- NULL
@@ -2025,15 +2086,23 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       on.exit({
         if (previousNlsLang == "") Sys.unsetenv("NLS_LANG") else Sys.setenv(NLS_LANG = previousNlsLang)
       }, add = TRUE)
-      conn <- ROracle::dbConnect(
-        ROracle::Oracle(unicode_as_utf8 = TRUE),
-        username = username,
-        password = password,
-        dbname = dbname,
-        # Rows fetched per OCI round trip. This is the main reason this data source is faster
-        # than the ODBC based one, so it is exposed on the connection as a user setting.
-        bulk_read = bulkReadRows
-      )
+      # Additional parameters are validated and type converted before they reach the driver.
+      # bulk_read has its own field on the connection, so that field wins and an additional
+      # parameter of the same name is ignored rather than silently overriding the visible value.
+      extraArgs <- parseOracleOCIAdditionalParams(additionalParams)
+      extraArgs$bulk_read <- NULL
+      conn <- do.call(ROracle::dbConnect, c(
+        list(
+          ROracle::Oracle(unicode_as_utf8 = TRUE),
+          username = username,
+          password = password,
+          dbname = dbname,
+          # Rows fetched per OCI round trip. This is the main reason this data source is faster
+          # than the ODBC based one, so it is exposed on the connection as a user setting.
+          bulk_read = bulkReadRows
+        ),
+        extraArgs
+      ))
       if (user_env$pool_connection) {
         connection_pool[[key]] <- conn
       }
@@ -2140,7 +2209,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     key <- paste("oracle", host, port, databaseName, username, timezone, sep = ":")
   } else if (type %in% c("oracleoci")) {
     # Built through the same helper getDBConnection uses, so the keys cannot drift apart.
-    key <- oracleOCIPoolKey(host, port, databaseName, username, timezone, bulkRead, connectionString)
+    key <- oracleOCIPoolKey(host, port, databaseName, username, timezone, bulkRead, connectionString,
+                            additionalParams)
   }
   rm(list = key, envir = connection_pool) # Even if there is no matching key, this is harmless.
 }
@@ -2309,13 +2379,15 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 #' @param connectionString (optional) TNS alias, full connect descriptor, or EZConnect string.
 #'   When provided it is used as is and host, port and databaseName are ignored.
 queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username = "", password = "",
-                           numOfRows = -1, query, timezone = "", bulkRead = 200000, connectionString = "", ...) {
+                           numOfRows = -1, query, timezone = "", bulkRead = 200000, connectionString = "",
+                           additionalParams = "", ...) {
   if (!requireNamespace("ROracle")) { stop("package ROracle must be installed.") }
   if (!requireNamespace("DBI")) { stop("package DBI must be installed.") }
 
   conn <- getDBConnection(type = "oracleoci", host = host, port = port, databaseName = databaseName,
                           username = username, password = password, timezone = timezone,
-                          bulkRead = bulkRead, connectionString = connectionString)
+                          bulkRead = bulkRead, connectionString = connectionString,
+                          additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not package environment
@@ -2328,7 +2400,8 @@ queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username =
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("oracleoci", host, port, databaseName, username, timezone = timezone,
-                      bulkRead = bulkRead, connectionString = connectionString)
+                      bulkRead = bulkRead, connectionString = connectionString,
+                      additionalParams = additionalParams)
     stop(err)
   })
   ROracle::dbClearResult(resultSet)

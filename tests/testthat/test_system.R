@@ -1233,13 +1233,15 @@ test_that("oracleOCIPoolKey builds identical keys from getDBConnection and clear
   fromGet <- exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, NULL)
   fromClear <- exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "UTC", 10000, "")
   expect_equal(fromGet, fromClear)
-  expect_equal(fromGet, "oracleoci:host:1521:svc:user:UTC:10000:")
+  # The trailing empty component is the additional parameters, which default to none.
+  expect_equal(fromGet, "oracleoci:host:1521:svc:user:UTC:10000::")
 
   # Every component that changes the connection must change the key.
   expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "Asia/Tokyo", 10000, ""))
   expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 5000, ""))
   expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, "tns_alias"))
   expect_false(fromGet == exploratory:::oracleOCIPoolKey("other", 1521, "svc", "user", "", 10000, ""))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, "", "prefetch=TRUE"))
 })
 
 test_that("findOracleClientLibDir handles both Oracle client layouts", {
@@ -1320,4 +1322,43 @@ test_that("oracleOCINlsLang always forces the AL32UTF8 character set", {
 
   # A territory containing a dot must not confuse the character set split.
   expect_equal(exploratory:::oracleOCINlsLang("A_B.C.JA16SJIS"), "A_B.C.AL32UTF8")
+})
+
+test_that("parseOracleOCIAdditionalParams accepts an empty setting", {
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams(""), list())
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams(NULL), list())
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams(NA), list())
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams("   "), list())
+})
+
+test_that("parseOracleOCIAdditionalParams converts values to the types ROracle expects", {
+  # dbConnect wants a logical for prefetch and an integer for stmt_cache. Passing the raw
+  # strings through would silently change behaviour, so they are converted here.
+  res <- exploratory:::parseOracleOCIAdditionalParams("prefetch=TRUE;stmt_cache=20")
+  expect_identical(res$prefetch, TRUE)
+  expect_identical(res$stmt_cache, 20L)
+  expect_identical(exploratory:::parseOracleOCIAdditionalParams("sysdba=false")$sysdba, FALSE)
+  # Written by hand, so tolerate case and spacing.
+  expect_identical(exploratory:::parseOracleOCIAdditionalParams(" prefetch = true ")$prefetch, TRUE)
+})
+
+test_that("parseOracleOCIAdditionalParams rejects anything dbConnect would silently drop", {
+  # ROracle::dbConnect ignores arguments it does not declare, so an unknown key would look
+  # like it took effect. Reject it here instead.
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("FWC=T"), "Unknown Oracle \\(OCI\\) additional parameter")
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("prefetch"), "Use the form key=value")
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("prefetch=YES"), "must be TRUE or FALSE")
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("prefetch=TRUE;stmt_cache=abc"), "must be a whole number")
+})
+
+test_that("parseOracleOCIAdditionalParams requires prefetch for a statement cache", {
+  # ROracle only honours stmt_cache in prefetch mode.
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("stmt_cache=20"), "requires 'prefetch=TRUE'")
+  expect_silent(exploratory:::parseOracleOCIAdditionalParams("prefetch=TRUE;stmt_cache=20"))
+})
+
+test_that("oracleOCIPoolKey separates connections that differ only by additional parameters", {
+  base <- exploratory:::oracleOCIPoolKey("h", 1521, "SVC", "u", "UTC", 200000, "", "")
+  withPrefetch <- exploratory:::oracleOCIPoolKey("h", 1521, "SVC", "u", "UTC", 200000, "", "prefetch=TRUE")
+  expect_false(identical(base, withPrefetch))
 })
