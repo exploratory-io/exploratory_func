@@ -1,5 +1,6 @@
 # =============================================================================
-# Correlation type selection / construction for Factor Analysis (issue #26623)
+# Correlation type selection / construction, shared by Factor Analysis (issue #26623) and
+# PCA (issue #37294). Keep the user-facing strings analysis-neutral -- both render them.
 #
 # Automatic selection rules (spec):
 #
@@ -323,7 +324,7 @@ select_factor_correlation_type <- function(data, variables = names(data),
   if (any(detected_types == "nominal")) {
     nominal_variables <- variable_summary$variable[detected_types == "nominal"]
     warning_message <- sprintf(
-      "Nominal categorical variables cannot be used directly in this factor analysis: %s",
+      "Nominal categorical variables cannot be used directly in this analysis: %s",
       paste(nominal_variables, collapse = ", "))
     return(build_result("unsupported", "Unsupported", NA_character_, character(),
                         warning_message, c(all_warnings, warning_message)))
@@ -631,7 +632,7 @@ unavailable_polychoric_diagnostics <- function() {
       "Categorical variables that have a category holding a very small share of the responses. Correlations estimated from categories may become unstable when categories are sparse.",
       "Variable pairs that have a category combination with no observations.",
       "Variable pairs whose correlation could not be estimated.",
-      "Whether the estimated correlation matrix was positive definite, which factor analysis assumes, before any smoothing.",
+      "Whether the estimated correlation matrix was positive definite, which the analysis assumes, before any smoothing.",
       "Whether the correlation matrix had to be smoothed to become positive definite."
     ),
     status = rep("na", 6)
@@ -785,7 +786,7 @@ compute_polychoric_diagnostics <- function(data, cor_result, selection,
       "Categorical variables that have a category holding a very small share of the responses. Correlations estimated from categories may become unstable when categories are sparse.",
       "Variable pairs that have a category combination with no observations.",
       "Variable pairs whose correlation could not be estimated.",
-      "Whether the estimated correlation matrix was positive definite, which factor analysis assumes, before any smoothing.",
+      "Whether the estimated correlation matrix was positive definite, which the analysis assumes, before any smoothing.",
       "Whether the correlation matrix had to be smoothed to become positive definite."
     ),
     status = c(category_status, sparse_status, empty_status, failure_status, definite_status, smoothed_status)
