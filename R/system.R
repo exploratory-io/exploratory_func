@@ -1086,7 +1086,7 @@ stripTrailingSemicolon <- function(query) {
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
                             subType = NULL, sslClientCertKey = "", sslCA = "", sslMode = "", role = "", authMethod = "", secretKeyFile = "", secretKeyFilePassword = "",
-                            bulkRead = 10000) {
+                            bulkRead = 200000) {
 
   drv = NULL
   conn = NULL
@@ -2013,7 +2013,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
       bulkReadRows <- suppressWarnings(as.integer(bulkRead))
       if (is.na(bulkReadRows) || bulkReadRows <= 0) {
-        bulkReadRows <- 10000L
+        bulkReadRows <- 200000L
       }
       # Force the NLS_LANG character set to AL32UTF8 for the duration of the connect, then put
       # the user's own value back. OCI fixes the client character set when it creates its
@@ -2049,7 +2049,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
                               sslClientCertKey = "", sslCA = "", subType = NULL, driver = "", sslMode = '', role = '',
-                              bulkRead = 10000) {
+                              bulkRead = 200000) {
   key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
@@ -2309,7 +2309,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 #' @param connectionString (optional) TNS alias, full connect descriptor, or EZConnect string.
 #'   When provided it is used as is and host, port and databaseName are ignored.
 queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username = "", password = "",
-                           numOfRows = -1, query, timezone = "", bulkRead = 10000, connectionString = "", ...) {
+                           numOfRows = -1, query, timezone = "", bulkRead = 200000, connectionString = "", ...) {
   if (!requireNamespace("ROracle")) { stop("package ROracle must be installed.") }
   if (!requireNamespace("DBI")) { stop("package DBI must be installed.") }
 
