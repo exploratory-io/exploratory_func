@@ -1216,3 +1216,149 @@ test_that("test searchAndReadParquetFiles", {
     "no file"
   )
 })
+
+test_that("stripTrailingSemicolon", {
+  # Oracle rejects a trailing semicolon through OCI, so it has to be dropped.
+  expect_equal(exploratory:::stripTrailingSemicolon("select * from t;"), "select * from t")
+  expect_equal(exploratory:::stripTrailingSemicolon("select * from t ;  "), "select * from t")
+  expect_equal(exploratory:::stripTrailingSemicolon("select * from t"), "select * from t")
+  # A semicolon inside the statement must be left alone.
+  expect_equal(exploratory:::stripTrailingSemicolon("select ';' from t"), "select ';' from t")
+})
+
+test_that("oracleOCIPoolKey builds identical keys from getDBConnection and clearDBConnection defaults", {
+  # getDBConnection passes connectionString = NULL by default while clearDBConnection passes "".
+  # paste() silently drops NULL, so without normalization these two would produce different keys
+  # and a connection could never be evicted from the pool.
+  fromGet <- exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, NULL)
+  fromClear <- exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "UTC", 10000, "")
+  expect_equal(fromGet, fromClear)
+  # The trailing empty component is the additional parameters, which default to none.
+  expect_equal(fromGet, "oracleoci:host:1521:svc:user:UTC:10000::")
+
+  # Every component that changes the connection must change the key.
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "Asia/Tokyo", 10000, ""))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 5000, ""))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, "tns_alias"))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("other", 1521, "svc", "user", "", 10000, ""))
+  expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, "", "prefetch=TRUE"))
+})
+
+test_that("findOracleClientLibDir handles both Oracle client layouts", {
+  base <- tempfile()
+  dir.create(base)
+
+  # Instant Client zip layout: the library sits directly in the directory.
+  zipLayout <- file.path(base, "instantclient_23_9")
+  dir.create(zipLayout)
+  file.create(file.path(zipLayout, "libclntsh.dylib.23.1"))
+
+  # Oracle home / Homebrew keg layout: the library sits in a lib subdirectory.
+  homeLayout <- file.path(base, "client64")
+  dir.create(file.path(homeLayout, "lib"), recursive = TRUE)
+  file.create(file.path(homeLayout, "lib", "libclntsh.so.23.1"))
+
+  emptyDir <- file.path(base, "nothing")
+  dir.create(emptyDir)
+
+  expect_equal(exploratory:::findOracleClientLibDir(zipLayout), zipLayout)
+  expect_equal(exploratory:::findOracleClientLibDir(homeLayout), file.path(homeLayout, "lib"))
+  expect_equal(exploratory:::findOracleClientLibDir(emptyDir), "")
+  expect_equal(exploratory:::findOracleClientLibDir(""), "")
+  expect_equal(exploratory:::findOracleClientLibDir(NULL), "")
+  expect_equal(exploratory:::findOracleClientLibDir(NA), "")
+})
+
+test_that("resolveOracleClientLocation only reports an ORACLE_HOME for the lib subdirectory layout", {
+  base <- tempfile()
+  dir.create(base)
+
+  homeLayout <- file.path(base, "client64")
+  dir.create(file.path(homeLayout, "lib"), recursive = TRUE)
+  file.create(file.path(homeLayout, "lib", "libclntsh.so.23.1"))
+
+  zipLayout <- file.path(base, "instantclient_23_9")
+  dir.create(zipLayout)
+  file.create(file.path(zipLayout, "libclntsh.dylib.23.1"))
+
+  # ROracle only ever looks at $ORACLE_HOME/lib, so home is the parent of the lib directory.
+  resolved <- exploratory:::resolveOracleClientLocation(homeLayout)
+  expect_equal(resolved$libDir, file.path(homeLayout, "lib"))
+  expect_equal(resolved$home, homeLayout)
+
+  # The zip layout cannot be expressed as an ORACLE_HOME, so home stays empty and the
+  # caller falls back to loading the library directly.
+  resolvedZip <- exploratory:::resolveOracleClientLocation(zipLayout)
+  expect_equal(resolvedZip$libDir, zipLayout)
+  expect_equal(resolvedZip$home, "")
+})
+
+test_that("applyOracleClientEnv reports FALSE when no Oracle client can be found", {
+  # An unusable explicit directory falls through to the well known locations, so this can
+  # only assert the not-found path on a machine that has no Oracle client installed.
+  skip_if(exploratory:::resolveOracleClientLocation("")$libDir != "",
+          "an Oracle client is installed on this machine")
+  emptyDir <- tempfile()
+  dir.create(emptyDir)
+  expect_false(exploratory:::applyOracleClientEnv(emptyDir))
+})
+
+test_that("oracleOCINlsLang always forces the AL32UTF8 character set", {
+  # Measured against a real database: an unset or US7ASCII NLS_LANG makes the server replace
+  # every non-ASCII character with "?" before it reaches the client, and JA16SJIS returns
+  # Shift-JIS bytes even though the driver is asked for UTF-8. Only AL32UTF8 is safe, so the
+  # character set is forced rather than merely defaulted.
+  expect_equal(exploratory:::oracleOCINlsLang(""), "American_America.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang(NULL), "American_America.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang(NA), "American_America.AL32UTF8")
+
+  # A user's language and territory are preserved; only the character set is replaced.
+  expect_equal(exploratory:::oracleOCINlsLang("Japanese_Japan.JA16SJIS"), "Japanese_Japan.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang("American_America.US7ASCII"), "American_America.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang("Japanese_Japan.AL32UTF8"), "Japanese_Japan.AL32UTF8")
+
+  # Language and territory with no character set part at all.
+  expect_equal(exploratory:::oracleOCINlsLang("Japanese_Japan"), "Japanese_Japan.AL32UTF8")
+
+  # A territory containing a dot must not confuse the character set split.
+  expect_equal(exploratory:::oracleOCINlsLang("A_B.C.JA16SJIS"), "A_B.C.AL32UTF8")
+})
+
+test_that("parseOracleOCIAdditionalParams accepts an empty setting", {
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams(""), list())
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams(NULL), list())
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams(NA), list())
+  expect_equal(exploratory:::parseOracleOCIAdditionalParams("   "), list())
+})
+
+test_that("parseOracleOCIAdditionalParams converts values to the types ROracle expects", {
+  # dbConnect wants a logical for prefetch and an integer for stmt_cache. Passing the raw
+  # strings through would silently change behaviour, so they are converted here.
+  res <- exploratory:::parseOracleOCIAdditionalParams("prefetch=TRUE;stmt_cache=20")
+  expect_identical(res$prefetch, TRUE)
+  expect_identical(res$stmt_cache, 20L)
+  expect_identical(exploratory:::parseOracleOCIAdditionalParams("sysdba=false")$sysdba, FALSE)
+  # Written by hand, so tolerate case and spacing.
+  expect_identical(exploratory:::parseOracleOCIAdditionalParams(" prefetch = true ")$prefetch, TRUE)
+})
+
+test_that("parseOracleOCIAdditionalParams rejects anything dbConnect would silently drop", {
+  # ROracle::dbConnect ignores arguments it does not declare, so an unknown key would look
+  # like it took effect. Reject it here instead.
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("FWC=T"), "Unknown Oracle \\(OCI\\) additional parameter")
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("prefetch"), "Use the form key=value")
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("prefetch=YES"), "must be TRUE or FALSE")
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("prefetch=TRUE;stmt_cache=abc"), "must be a whole number")
+})
+
+test_that("parseOracleOCIAdditionalParams requires prefetch for a statement cache", {
+  # ROracle only honours stmt_cache in prefetch mode.
+  expect_error(exploratory:::parseOracleOCIAdditionalParams("stmt_cache=20"), "requires 'prefetch=TRUE'")
+  expect_silent(exploratory:::parseOracleOCIAdditionalParams("prefetch=TRUE;stmt_cache=20"))
+})
+
+test_that("oracleOCIPoolKey separates connections that differ only by additional parameters", {
+  base <- exploratory:::oracleOCIPoolKey("h", 1521, "SVC", "u", "UTC", 200000, "", "")
+  withPrefetch <- exploratory:::oracleOCIPoolKey("h", 1521, "SVC", "u", "UTC", 200000, "", "prefetch=TRUE")
+  expect_false(identical(base, withPrefetch))
+})
