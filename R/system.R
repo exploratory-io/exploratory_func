@@ -2286,7 +2286,10 @@ queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username =
     # set envir = parent.frame() to get variables from users environment, not package environment
     query <- glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame())
     resultSet <- ROracle::dbSendQuery(conn, stripTrailingSemicolon(query))
-    df <- ROracle::dbFetch(resultSet, n = numOfRows)
+    # DBI::dbFetch rather than ROracle::dbFetch: ROracle implements the method but does not
+    # export the symbol, unlike dbSendQuery and dbClearResult. S4 dispatch on the result set
+    # still reaches ROracle's method.
+    df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("oracleoci", host, port, databaseName, username, timezone = timezone,
