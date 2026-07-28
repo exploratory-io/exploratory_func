@@ -1300,3 +1300,24 @@ test_that("applyOracleClientEnv reports FALSE when no Oracle client can be found
   dir.create(emptyDir)
   expect_false(exploratory:::applyOracleClientEnv(emptyDir))
 })
+
+test_that("oracleOCINlsLang always forces the AL32UTF8 character set", {
+  # Measured against a real database: an unset or US7ASCII NLS_LANG makes the server replace
+  # every non-ASCII character with "?" before it reaches the client, and JA16SJIS returns
+  # Shift-JIS bytes even though the driver is asked for UTF-8. Only AL32UTF8 is safe, so the
+  # character set is forced rather than merely defaulted.
+  expect_equal(exploratory:::oracleOCINlsLang(""), "American_America.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang(NULL), "American_America.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang(NA), "American_America.AL32UTF8")
+
+  # A user's language and territory are preserved; only the character set is replaced.
+  expect_equal(exploratory:::oracleOCINlsLang("Japanese_Japan.JA16SJIS"), "Japanese_Japan.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang("American_America.US7ASCII"), "American_America.AL32UTF8")
+  expect_equal(exploratory:::oracleOCINlsLang("Japanese_Japan.AL32UTF8"), "Japanese_Japan.AL32UTF8")
+
+  # Language and territory with no character set part at all.
+  expect_equal(exploratory:::oracleOCINlsLang("Japanese_Japan"), "Japanese_Japan.AL32UTF8")
+
+  # A territory containing a dot must not confuse the character set split.
+  expect_equal(exploratory:::oracleOCINlsLang("A_B.C.JA16SJIS"), "A_B.C.AL32UTF8")
+})

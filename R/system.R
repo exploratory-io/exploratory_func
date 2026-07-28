@@ -1034,6 +1034,31 @@ applyOracleClientEnv <- function(explicitDir = Sys.getenv("EXPLORATORY_ORACLE_CL
   invisible(TRUE)
 }
 
+# Returns an NLS_LANG value whose character set is AL32UTF8, preserving the language and
+# territory the user configured (if any).
+#
+# The character set half of NLS_LANG decides how the Oracle server converts character data
+# before it reaches the client, and getting it wrong loses data rather than merely mislabeling
+# it. Measured against a real database, with a column holding Japanese text:
+#   NLS_LANG unset / *.US7ASCII  -> every non-ASCII character arrives as "?" (0x3f). Gone.
+#   *.JA16SJIS                   -> Shift-JIS bytes, even though the driver is asked for UTF-8
+#                                   via unicode_as_utf8, so the strings are then mislabeled.
+#   *.AL32UTF8                   -> correct UTF-8.
+# So the character set has to be forced, not merely defaulted: a user who set NLS_LANG for the
+# ODBC based Oracle data source would otherwise silently corrupt Oracle (OCI) results.
+oracleOCINlsLang <- function(currentNlsLang = Sys.getenv("NLS_LANG")) {
+  if (is.null(currentNlsLang) || length(currentNlsLang) == 0 || is.na(currentNlsLang[[1]]) ||
+      currentNlsLang[[1]] == "") {
+    return("American_America.AL32UTF8")
+  }
+  value <- as.character(currentNlsLang[[1]])
+  if (!grepl(".", value, fixed = TRUE)) {
+    # Language and territory only, no character set part.
+    return(paste0(value, ".AL32UTF8"))
+  }
+  paste0(sub("\\.[^.]*$", "", value), ".AL32UTF8")
+}
+
 # Single source of truth for the Oracle (OCI) connection pool key so that getDBConnection
 # and clearDBConnection can never drift apart. Every component is normalized here because
 # paste() silently drops NULL, which would produce a key that no clear call can match.
@@ -1990,6 +2015,16 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       if (is.na(bulkReadRows) || bulkReadRows <= 0) {
         bulkReadRows <- 10000L
       }
+      # Force the NLS_LANG character set to AL32UTF8 for the duration of the connect, then put
+      # the user's own value back. OCI fixes the client character set when it creates its
+      # environment, which happens on this first connect, so restoring afterwards leaves this
+      # connection (and every later one in the session) reading UTF-8 while the ODBC based
+      # Oracle data source keeps whatever NLS_LANG the user configured for it.
+      previousNlsLang <- Sys.getenv("NLS_LANG")
+      Sys.setenv(NLS_LANG = oracleOCINlsLang(previousNlsLang))
+      on.exit({
+        if (previousNlsLang == "") Sys.unsetenv("NLS_LANG") else Sys.setenv(NLS_LANG = previousNlsLang)
+      }, add = TRUE)
       conn <- ROracle::dbConnect(
         ROracle::Oracle(unicode_as_utf8 = TRUE),
         username = username,
@@ -2311,6 +2346,17 @@ queryOracleOCI <- function(host = "", port = 1521, databaseName = "", username =
     })
   }
   colnames(df) <- iconv(colnames(df), from = "utf8", to = "utf8") # Work around to read multibyte column names without getting garbled.
+  # The connection forces the NLS_LANG character set to AL32UTF8, so character data is UTF-8
+  # here. ROracle leaves it unmarked ("unknown"), which R then reads in the session's native
+  # encoding - wrong whenever that is not UTF-8, as on a machine running an en_US locale.
+  # Marking it keeps multibyte values intact through the rest of the pipeline.
+  characterColumns <- vapply(df, is.character, logical(1))
+  if (any(characterColumns)) {
+    df[characterColumns] <- lapply(df[characterColumns], function(column) {
+      Encoding(column) <- "UTF-8"
+      column
+    })
+  }
   df
 }
 
