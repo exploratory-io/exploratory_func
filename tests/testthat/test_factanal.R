@@ -338,10 +338,12 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   set.seed(1)
   pa <- compute_parallel_analysis(mtcars[, c("mpg","cyl","disp","hp","drat","wt","qsec")], n_iter = 20)
   expect_true(is.numeric(pa$recommended_n))
-  expect_equal(colnames(pa$table), c("factor_number", "actual_eigenvalue", "random_eigenvalue_threshold"))
+  expect_equal(colnames(pa$table), c("factor_number", "actual_eigenvalue", "random_eigenvalue_threshold", "retained"))
   # method defaults to "factor_model" (issue tam#37332).
   expect_equal(pa$method, "factor_model")
   expect_equal(pa$factor_extraction_method, "minres")
+  expect_equal(pa$quantile_prob, 0.95)
+  expect_equal(pa$table$retained, seq_len(nrow(pa$table)) <= pa$recommended_n)
   set.seed(99)
   before <- .Random.seed
   compute_parallel_analysis(mtcars[, 1:3], n_iter = 2)

@@ -299,7 +299,7 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
     return(NULL) # no usable null distribution; the caller reports the parallel analysis as unavailable
   }
   random_eigen_mat <- do.call(cbind, random_eigen_list)
-  random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
+  random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob, na.rm = TRUE)
   recommended_n <- compute_parallel_recommended_n(actual_eigen, random_threshold)
 
   list(
@@ -308,11 +308,13 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
     requested_n_iter = n_iter,
     successful_n_iter = length(random_eigen_list),
     failed_n_iter = n_iter - length(random_eigen_list),
+    quantile_prob = quantile_prob,
     recommended_n = recommended_n,
     table = tibble::tibble(
       factor_number = seq_along(actual_eigen),
       actual_eigenvalue = actual_eigen,
-      random_eigenvalue_threshold = random_threshold
+      random_eigenvalue_threshold = random_threshold,
+      retained = seq_along(actual_eigen) <= recommended_n
     )
   )
 }
