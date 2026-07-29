@@ -35,6 +35,9 @@ test_that("MCA branch: 3 variables produce mca_exploratory with all new tidy typ
   rc <- m %>% tidy_rowwise(model, type = "residual_cells")
   expect_true(all(c("row_category", "column_category", "adjusted_standardized_residual",
                     "final_judgement", "heatmap_fill_value") %in% colnames(rc)))
+  # #37308: judgement simplified to exactly 3 outcomes, no more sparse-suppressed p-values.
+  expect_true(all(rc$final_judgement %in% c("significantly_more", "significantly_less", "no_clear_difference")))
+  expect_true(all(!is.na(rc$cell_adjusted_p_value)))
   expect_true(nrow(m %>% tidy_rowwise(model, type = "dimension_summary")) >= 1)
   expect_true(all(c("variable", "category", "dimension", "coordinate", "contribution_pct", "cos2")
                   %in% colnames(m %>% tidy_rowwise(model, type = "dimension_matrix"))))

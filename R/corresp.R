@@ -8,10 +8,8 @@
 exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp = 5,
                     quanti_sups = NULL, seed = 1,
                     overall_adjust_method = "holm", cell_adjust_method = "holm", alpha = 0.05,
-                    missing_method = "listwise", featured_rule = "statistical",
-                    simulation_count = 20000, suppress_cell_p_when_sparse = TRUE,
-                    practical_ratio_upper = 1.20, practical_ratio_lower = 0.80,
-                    practical_minimum_difference = NULL, require_overall_significance = TRUE) {
+                    missing_method = "listwise",
+                    simulation_count = 20000) {
   all_cols <- colnames(df)
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_cols <- grouped_by(df)
@@ -127,11 +125,7 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
         data = association_data, variables = effective_vars,
         overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
         alpha = alpha, missing_method = missing_method, simulation_count = simulation_count,
-        seed = seed, suppress_cell_p_when_sparse = suppress_cell_p_when_sparse,
-        featured_rule = featured_rule, practical_ratio_upper = practical_ratio_upper,
-        practical_ratio_lower = practical_ratio_lower,
-        practical_minimum_difference = practical_minimum_difference,
-        require_overall_significance = require_overall_significance
+        seed = seed
       )
     } else {
       fit$association <- list(

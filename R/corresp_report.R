@@ -80,9 +80,7 @@ ca_create_significance_marker <- function(adjusted_p_value) {
 # ------------------------------------------------------------
 ca_analyze_one_variable_pair <- function(
   data, variable_1, variable_2, pair_index,
-  cell_adjust_method, alpha, simulation_count, seed,
-  suppress_cell_p_when_sparse,
-  practical_ratio_upper, practical_ratio_lower, practical_minimum_difference
+  cell_adjust_method, alpha, simulation_count, seed
 ) {
   pair_data <- data %>%
     dplyr::transmute(
@@ -168,12 +166,6 @@ ca_analyze_one_variable_pair <- function(
   names(cell_results) <- c("row_category", "column_category", "observed_count")
   n <- sum(contingency_table)
 
-  minimum_difference <- if (is.null(practical_minimum_difference)) {
-    max(5, 0.005 * n)
-  } else {
-    practical_minimum_difference
-  }
-
   cell_results <- cell_results %>%
     dplyr::mutate(
       expected_count = as.vector(pearson_test$expected),
@@ -189,13 +181,8 @@ ca_analyze_one_variable_pair <- function(
       cell_p_value = 2 * pnorm(abs(adjusted_standardized_residual), lower.tail = FALSE)
     )
 
-  if (!asymptotic_approximation_ok && suppress_cell_p_when_sparse) {
-    cell_results <- cell_results %>%
-      dplyr::mutate(cell_p_value = NA_real_, cell_adjusted_p_value = NA_real_)
-  } else {
-    cell_results <- cell_results %>%
-      dplyr::mutate(cell_adjusted_p_value = p.adjust(cell_p_value, method = cell_adjust_method))
-  }
+  cell_results <- cell_results %>%
+    dplyr::mutate(cell_adjusted_p_value = p.adjust(cell_p_value, method = cell_adjust_method))
 
   cell_results <- cell_results %>%
     dplyr::mutate(
@@ -204,10 +191,6 @@ ca_analyze_one_variable_pair <- function(
         adjusted_standardized_residual > 0 ~ "more_than_expected",
         adjusted_standardized_residual < 0 ~ "less_than_expected",
         TRUE ~ "as_expected"
-      ),
-      practical_difference = (
-        (observed_expected_ratio >= practical_ratio_upper | observed_expected_ratio <= practical_ratio_lower) &
-          absolute_count_difference >= minimum_difference
       ),
       significance_marker = ca_create_significance_marker(cell_adjusted_p_value),
       cell_label = paste0(sprintf("%.2f", adjusted_standardized_residual), significance_marker)
@@ -218,7 +201,6 @@ ca_analyze_one_variable_pair <- function(
       n = n, test_method = test_method,
       expected_count_warning = !asymptotic_approximation_ok,
       cell_adjust_method = cell_adjust_method,
-      practical_minimum_difference = minimum_difference,
       .before = 1
     )
 
@@ -251,16 +233,9 @@ build_pairwise_association_results <- function(
   alpha = 0.05,
   missing_method = c("listwise", "pairwise"),
   simulation_count = 20000,
-  seed = 123,
-  suppress_cell_p_when_sparse = TRUE,
-  featured_rule = c("statistical", "statistical_and_practical"),
-  practical_ratio_upper = 1.20,
-  practical_ratio_lower = 0.80,
-  practical_minimum_difference = NULL,
-  require_overall_significance = TRUE
+  seed = 123
 ) {
   missing_method <- match.arg(missing_method)
-  featured_rule <- match.arg(featured_rule)
 
   supported_adjust_methods <- c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")
   if (!overall_adjust_method %in% supported_adjust_methods) stop("overall_adjust_method is invalid.")
@@ -286,11 +261,7 @@ build_pairwise_association_results <- function(
       ca_analyze_one_variable_pair(
         data = analysis_data, variable_1 = pair[[1]], variable_2 = pair[[2]],
         pair_index = pair_index, cell_adjust_method = cell_adjust_method,
-        alpha = alpha, simulation_count = simulation_count, seed = seed,
-        suppress_cell_p_when_sparse = suppress_cell_p_when_sparse,
-        practical_ratio_upper = practical_ratio_upper,
-        practical_ratio_lower = practical_ratio_lower,
-        practical_minimum_difference = practical_minimum_difference
+        alpha = alpha, simulation_count = simulation_count, seed = seed
       )
     }
   )
@@ -324,11 +295,7 @@ build_pairwise_association_results <- function(
   settings <- list(
     variables = variables, analysis_n = nrow(analysis_data),
     overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
-    alpha = alpha, missing_method = missing_method, simulation_count = simulation_count,
-    suppress_cell_p_when_sparse = suppress_cell_p_when_sparse, featured_rule = featured_rule,
-    practical_ratio_upper = practical_ratio_upper, practical_ratio_lower = practical_ratio_lower,
-    practical_minimum_difference = practical_minimum_difference,
-    require_overall_significance = require_overall_significance
+    alpha = alpha, missing_method = missing_method, simulation_count = simulation_count
   )
 
   if (nrow(residual_heatmap_data) == 0) {
@@ -353,22 +320,13 @@ build_pairwise_association_results <- function(
     ) %>%
     dplyr::mutate(
       statistically_featured = (
-        cell_significant & !expected_count_warning &
-          (!require_overall_significance | pair_significant)
+        cell_significant & !expected_count_warning
       ),
-      # featured_rule is a scalar: "statistical" -> statistically_featured;
-      # "statistical_and_practical" -> also require practical_difference.
-      featured_combination = statistically_featured &
-        (featured_rule == "statistical" | practical_difference),
+      featured_combination = statistically_featured,
       # language-neutral final judgement enum
       final_judgement = dplyr::case_when(
-        expected_count_warning & suppress_cell_p_when_sparse ~ "sparse_suppressed",
-        require_overall_significance & !pair_significant ~ "exploratory_pair_not_significant",
-        !cell_significant ~ "no_clear_difference",
-        adjusted_standardized_residual > 0 & practical_difference ~ "significantly_more",
-        adjusted_standardized_residual < 0 & practical_difference ~ "significantly_less",
-        adjusted_standardized_residual > 0 ~ "more_but_small",
-        adjusted_standardized_residual < 0 ~ "less_but_small",
+        cell_significant & adjusted_standardized_residual > 0 ~ "significantly_more",
+        cell_significant & adjusted_standardized_residual < 0 ~ "significantly_less",
         TRUE ~ "no_clear_difference"
       ),
       heatmap_fill_value = adjusted_standardized_residual,
@@ -391,7 +349,7 @@ build_pairwise_association_results <- function(
       pair_index, pair_id, variable_1, variable_2, rank_within_pair, category_pair,
       row_category, column_category, observed_count, expected_count, count_difference,
       observed_expected_ratio, adjusted_standardized_residual, cell_p_value,
-      cell_adjusted_p_value, practical_difference, final_judgement, n, cramers_v, association_strength
+      cell_adjusted_p_value, final_judgement, n, cramers_v, association_strength
     )
 
   list(
