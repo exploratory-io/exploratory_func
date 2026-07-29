@@ -339,6 +339,9 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   pa <- compute_parallel_analysis(mtcars[, c("mpg","cyl","disp","hp","drat","wt","qsec")], n_iter = 20)
   expect_true(is.numeric(pa$recommended_n))
   expect_equal(colnames(pa$table), c("factor_number", "actual_eigenvalue", "random_eigenvalue_threshold"))
+  # method defaults to "factor_model" (issue tam#37332).
+  expect_equal(pa$method, "factor_model")
+  expect_equal(pa$factor_extraction_method, "minres")
   set.seed(99)
   before <- .Random.seed
   compute_parallel_analysis(mtcars[, 1:3], n_iter = 2)
@@ -347,4 +350,93 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   before <- .Random.seed
   expect_error(compute_parallel_analysis(mtcars[, 1:3], n_iter = 0), "positive integer")
   expect_equal(.Random.seed, before)
+})
+
+test_that("parallel analysis method: factor_model vs smc (issue #37332)", {
+  df <- mtcars[, c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec")]
+
+  # compute_parallel_factor_eigenvalues: both methods return one eigenvalue per variable, and the
+  # two methods must disagree on a real correlation matrix (smc is a strictly reduced-diagonal
+  # matrix vs a one-factor communality estimate -- they are not expected to coincide).
+  cor_mat <- stats::cor(df)
+  eig_factor_model <- compute_parallel_factor_eigenvalues(cor_mat, method = "factor_model", fm = "minres", n_obs = nrow(df))
+  eig_smc <- compute_parallel_factor_eigenvalues(cor_mat, method = "smc")
+  expect_equal(length(eig_factor_model), ncol(df))
+  expect_equal(length(eig_smc), ncol(df))
+  expect_false(isTRUE(all.equal(eig_factor_model, eig_smc)))
+  # method must be one of the two allowed values.
+  expect_error(compute_parallel_factor_eigenvalues(cor_mat, method = "bogus"))
+  # A non-square matrix is rejected before any estimation is attempted.
+  expect_error(compute_parallel_factor_eigenvalues(cor_mat[, 1:3], method = "smc"), "square matrix")
+  expect_error(compute_parallel_factor_eigenvalues(matrix(c(1, NA, NA, 1), 2, 2), method = "smc"), "non-finite")
+
+  # compute_parallel_recommended_n: counts only the LEADING run of TRUE, not a simple sum.
+  expect_equal(compute_parallel_recommended_n(c(2, 2, 0.5, 2), c(1, 1, 1, 1)), 2)
+  expect_equal(compute_parallel_recommended_n(c(2, 2, 2, 2), c(1, 1, 1, 1)), 4)
+  expect_equal(compute_parallel_recommended_n(c(0.5, 2, 2, 2), c(1, 1, 1, 1)), 0)
+
+  # compute_parallel_analysis dispatches on method and applies it to BOTH the actual data and the
+  # random-data null distribution -- confirmed by the two methods producing different results on
+  # the same data/seed.
+  set.seed(7)
+  pa_factor_model <- compute_parallel_analysis(df, n_iter = 15, method = "factor_model", fm = "minres")
+  set.seed(7)
+  pa_smc <- compute_parallel_analysis(df, n_iter = 15, method = "smc")
+  expect_equal(pa_factor_model$method, "factor_model")
+  expect_equal(pa_smc$method, "smc")
+  expect_false(isTRUE(all.equal(pa_factor_model$table$actual_eigenvalue, pa_smc$table$actual_eigenvalue)))
+  expect_false(isTRUE(all.equal(pa_factor_model$table$random_eigenvalue_threshold, pa_smc$table$random_eigenvalue_threshold)))
+
+  # exp_factanal(): parallel_method defaults to factor_model, is forwarded to compute_parallel_analysis,
+  # is stored on the fit even when parallel itself is unavailable, and match.arg rejects bogus values.
+  model_df <- exp_factanal(df, mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 2, fm = "minres", parallel_n_iter = 10)
+  fit <- model_df$model[[1]]
+  expect_equal(fit$parallel_method, "factor_model")
+  expect_equal(fit$parallel_factor_extraction_method, "minres")
+  expect_equal(fit$parallel$method, "factor_model")
+
+  smc_model_df <- exp_factanal(df, mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 2, fm = "minres",
+                               parallel_n_iter = 10, parallel_method = "smc")
+  smc_fit <- smc_model_df$model[[1]]
+  expect_equal(smc_fit$parallel_method, "smc")
+  expect_equal(smc_fit$parallel$method, "smc")
+
+  expect_error(exp_factanal(df, mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 2, parallel_method = "bogus"))
+
+  # parallel_screeplot: the actual-data curve must be the SAME eigenvalues the parallel analysis
+  # itself used (method-aware), not a fresh plain correlation-matrix eigen() -- so it must equal
+  # fit$parallel$table$actual_eigenvalue and must NOT equal the plain screeplot's eigenvalues, since
+  # factor-model/SMC eigenvalues differ from PCA-style correlation-matrix eigenvalues.
+  screeplot_res <- model_df %>% tidy_rowwise(model, type = "screeplot")
+  parallel_screeplot_res <- model_df %>% tidy_rowwise(model, type = "parallel_screeplot")
+  expect_equal(parallel_screeplot_res$Eigenvalue, fit$parallel$table$actual_eigenvalue)
+  expect_false(isTRUE(all.equal(parallel_screeplot_res$Eigenvalue, screeplot_res$eigenvalue)))
+  # The normal (non-parallel) scree plot is untouched by the method selection (issue #37332 section 10).
+  expect_equal(screeplot_res$eigenvalue, eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values)
+
+  # factor_count description names the method actually used.
+  fc_factor_model <- model_df %>% tidy_rowwise(model, type = "factor_count")
+  expect_equal(fc_factor_model$Description[[2]], "Number of factors whose factor-model eigenvalue exceeds the random-data threshold.")
+  fc_smc <- smc_model_df %>% tidy_rowwise(model, type = "factor_count")
+  expect_equal(fc_smc$Description[[2]], "Number of factors whose SMC-based factor eigenvalue exceeds the random-data threshold.")
+
+  # analysis_method table carries the new row.
+  am_factor_model <- model_df %>% tidy_rowwise(model, type = "analysis_method")
+  expect_equal(am_factor_model$Item[[4]], "Parallel Analysis Method")
+  expect_equal(am_factor_model$Value[[4]], "Factor Model")
+  am_smc <- smc_model_df %>% tidy_rowwise(model, type = "analysis_method")
+  expect_equal(am_smc$Value[[4]], "Diagonal SMC")
+
+  # factanal_parallel_method_label: NULL degrades to the factor_model default; unknown -> Not Available.
+  expect_equal(factanal_parallel_method_label(NULL), "Factor Model")
+  expect_equal(factanal_parallel_method_label("factor_model"), "Factor Model")
+  expect_equal(factanal_parallel_method_label("smc"), "Diagonal SMC")
+  expect_equal(factanal_parallel_method_label("something_else"), "Not Available")
+
+  # A model saved before issue #37332 has no parallel_method field at all; the report must still
+  # show a sensible default rather than erroring or showing NA/blank.
+  legacy_fit <- fit
+  legacy_fit$parallel_method <- NULL
+  legacy_am <- tidy(legacy_fit, type = "analysis_method")
+  expect_equal(legacy_am$Value[[4]], "Factor Model")
 })
