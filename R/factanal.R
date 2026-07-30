@@ -835,7 +835,10 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       `Cummulated % Variance` = cumsum(pct_variance),
       `Parallel Analysis` = parallel_label,
       `Kaiser Criterion` = ifelse(kaiser_adopted, "Adopted", "Not Adopted"),
-      Selected = ifelse(selected_adopted, "Adopted", "Not Adopted"),
+      # Column name "Adoption", not PCA's "Selected": the cells read "Adopted" / "Not Adopted", so a
+      # "Selected" header would not agree with its own values in the English report. Both map to
+      # 採否 / 採用 / 非採用 in Japanese. (tam#37340)
+      Adoption = ifelse(selected_adopted, "Adopted", "Not Adopted"),
       parallel_status = parallel_status,
       kaiser_status = ifelse(kaiser_adopted, "adopted", "not_adopted"),
       selected_status = ifelse(selected_adopted, "adopted", "not_adopted")

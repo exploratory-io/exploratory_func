@@ -360,7 +360,7 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   judged <- tidy(fit, type = "variances_judged")
   expect_equal(colnames(judged),
                c("Factor", "Eigenvalue", "% Variance", "Cummulated % Variance",
-                 "Parallel Analysis", "Kaiser Criterion", "Selected",
+                 "Parallel Analysis", "Kaiser Criterion", "Adoption",
                  "parallel_status", "kaiser_status", "selected_status"))
   n_var <- length(fit$communality)
   expect_equal(nrow(judged), n_var)
@@ -377,7 +377,7 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   expect_false(any(judged$kaiser_status == "na"))
   # Selected = the factors this analysis actually extracted (nfactors), first rows only.
   expect_equal(judged$selected_status, ifelse(seq_len(n_var) <= 2, "adopted", "not_adopted"))
-  expect_equal(judged$Selected, ifelse(seq_len(n_var) <= 2, "Adopted", "Not Adopted"))
+  expect_equal(judged$Adoption, ifelse(seq_len(n_var) <= 2, "Adopted", "Not Adopted"))
   # Labels stay English-canonical; the client translates them. "Adopted" (not PCA's "Adopt") so the
   # English report reads as a judgment against "Not Adopted".
   expect_true(all(judged$`Parallel Analysis` %in% c("Adopted", "Not Adopted", "Not Available")))
