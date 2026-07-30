@@ -608,7 +608,10 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
           paste0(d$excluded_row_count, " (", format(round(excluded_pct, 1), nsmall = 1), "%)"),
           as.character(variables_used),
           excluded_display,
-          if (normalized) "Yes" else "No",
+          # English-canonical boolean string, not "Yes"/"No" (issue #27224 follow-up): matches
+          # the plain TRUE/FALSE convention this file's own analysis_method hidden columns
+          # already use, and reads unambiguously as a raw boolean value in the report table.
+          if (normalized) "TRUE" else "FALSE",
           score_scale_display,
           scale_display
         ),
