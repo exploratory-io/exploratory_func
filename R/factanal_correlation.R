@@ -566,6 +566,17 @@ factanal_extraction_method_label <- function(fm) {
          as.character(fm))
 }
 
+# NULL (a model saved before issue tam#37332) is treated as the "factor_model" default -- the
+# analysis actually ran with that behavior even though the field did not exist yet. Any other
+# unrecognized value is a genuine anomaly, so it is reported as "Not Available" rather than guessed.
+factanal_parallel_method_label <- function(method) {
+  method <- if (is.null(method) || length(method) != 1L || is.na(method)) "factor_model" else as.character(method)
+  switch(method,
+         factor_model = "Factor Model",
+         smc = "Diagonal SMC",
+         "Not Available")
+}
+
 
 # Language-neutral tokens for the selector's warnings, so the client can render localized text
 # instead of the English sentences the selector composes for logs. (issue #26623)

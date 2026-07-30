@@ -1282,9 +1282,13 @@ test_that("resolveOracleClientLocation only reports an ORACLE_HOME for the lib s
   file.create(file.path(zipLayout, "libclntsh.dylib.23.1"))
 
   # ROracle only ever looks at $ORACLE_HOME/lib, so home is the parent of the lib directory.
+  # resolveOracleClientLocation derives home with dirname(), which on Windows rewrites every
+  # separator to a forward slash, while tempfile() hands back backslashes -- so compare with the
+  # separators neutralized rather than against the raw homeLayout string. (no-op on Mac/Linux)
+  forwardSlashes <- function(p) gsub("\\\\", "/", p)
   resolved <- exploratory:::resolveOracleClientLocation(homeLayout)
   expect_equal(resolved$libDir, file.path(homeLayout, "lib"))
-  expect_equal(resolved$home, homeLayout)
+  expect_equal(forwardSlashes(resolved$home), forwardSlashes(homeLayout))
 
   # The zip layout cannot be expressed as an ORACLE_HOME, so home stays empty and the
   # caller falls back to loading the library directly.

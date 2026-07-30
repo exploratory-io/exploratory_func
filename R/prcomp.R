@@ -383,7 +383,12 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       }
 
       fit$parallel <- tryCatch(
-        compute_parallel_analysis(encoded_df, cor_type = resolved$type, cor_matrix = fit$correlation),
+        # method = "pca": keep PCA's own parallel analysis on plain (untouched-diagonal) correlation
+        # eigenvalues -- compute_parallel_analysis() now defaults to Factor Analysis's
+        # "factor_model" method (issue tam#37332), which do_prcomp must NOT silently pick up, since
+        # "Eigenvalue = x$sdev^2" below is only guaranteed to match the PCA-style eigenvalues.
+        compute_parallel_analysis(encoded_df, cor_type = resolved$type, cor_matrix = fit$correlation,
+                                  method = "pca"),
         error = function(e) NULL)
       fit$kaiser_components <- tryCatch(
         # A correlation matrix is standardized by construction, so under a categorical correlation
