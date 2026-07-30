@@ -377,9 +377,11 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   expect_false(any(judged$kaiser_status == "na"))
   # Selected = the factors this analysis actually extracted (nfactors), first rows only.
   expect_equal(judged$selected_status, ifelse(seq_len(n_var) <= 2, "adopted", "not_adopted"))
-  expect_equal(judged$Selected, ifelse(seq_len(n_var) <= 2, "Adopt", "Not Adopted"))
-  # Labels stay English-canonical; the client translates them.
-  expect_true(all(judged$`Parallel Analysis` %in% c("Adopt", "Not Adopted", "Not Available")))
+  expect_equal(judged$Selected, ifelse(seq_len(n_var) <= 2, "Adopted", "Not Adopted"))
+  # Labels stay English-canonical; the client translates them. "Adopted" (not PCA's "Adopt") so the
+  # English report reads as a judgment against "Not Adopted".
+  expect_true(all(judged$`Parallel Analysis` %in% c("Adopted", "Not Adopted", "Not Available")))
+  expect_true(all(judged$`Kaiser Criterion` %in% c("Adopted", "Not Adopted")))
   expect_true(all(judged$parallel_status %in% c("adopted", "not_adopted", "na")))
   # Parallel analysis unavailable (old saved model) degrades to Not Available / na, same shape.
   no_par <- fit

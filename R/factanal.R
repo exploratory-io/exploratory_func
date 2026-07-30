@@ -817,12 +817,14 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       actual[ptbl$factor_number[in_range]] <- ptbl$actual_eigenvalue[in_range]
       threshold[ptbl$factor_number[in_range]] <- ptbl$random_eigenvalue_threshold[in_range]
       adopted <- !is.na(actual) & !is.na(threshold) & actual > threshold
-      parallel_label <- ifelse(adopted, "Adopt", "Not Adopted")
+      parallel_label <- ifelse(adopted, "Adopted", "Not Adopted")
       parallel_status <- ifelse(adopted, "adopted", "not_adopted")
     }
     # Kaiser is always meaningful here: factor analysis always fits a correlation matrix, so the
     # eigenvalue >= 1 rule applies unconditionally (unlike PCA, where a covariance-scaled fit makes
     # it "na"). The comparison matches the factor_count branch's kaiser_n (eig > 1).
+    # "Adopted" / "Not Adopted", not PCA's "Adopt" / "Not Adopted": the pair reads as a judgment in
+    # the English report, and both map to the same 採用 / 非採用 in Japanese. (tam#37340)
     kaiser_adopted <- eig > 1
     # Adopted = the factors this analysis actually extracted (the nfactors setting).
     selected_adopted <- seq_len(n_row) <= n_factor
@@ -832,8 +834,8 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       `% Variance` = pct_variance,
       `Cummulated % Variance` = cumsum(pct_variance),
       `Parallel Analysis` = parallel_label,
-      `Kaiser Criterion` = ifelse(kaiser_adopted, "Adopt", "Not Adopted"),
-      Selected = ifelse(selected_adopted, "Adopt", "Not Adopted"),
+      `Kaiser Criterion` = ifelse(kaiser_adopted, "Adopted", "Not Adopted"),
+      Selected = ifelse(selected_adopted, "Adopted", "Not Adopted"),
       parallel_status = parallel_status,
       kaiser_status = ifelse(kaiser_adopted, "adopted", "not_adopted"),
       selected_status = ifelse(selected_adopted, "adopted", "not_adopted")
