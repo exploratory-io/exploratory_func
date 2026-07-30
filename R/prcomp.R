@@ -139,14 +139,15 @@ get_prcomp_scores <- function(fit, score_scale = c("preserve_variance", "unit_va
   if (identical(score_scale, "preserve_variance")) {
     return(fit$x)
   }
-  sdev <- fit$sdev[seq_len(ncol(fit$x))]
   # Dividing by a ~0 sdev turns rounding noise into a huge score, so refuse rather than emit
   # garbage. A degenerate component means a variable is (nearly) a linear combination of the
-  # others, or there are fewer rows than variables. EXP-ANA-36 carries no params.
-  if (any(!is.finite(sdev) | sdev <= sqrt(.Machine$double.eps))) {
+  # others, or there are fewer rows than variables. Guard the WHOLE sdev vector -- not just the
+  # columns being swept -- so a degenerate trailing component is reported even in the (currently
+  # impossible) case where sdev is longer than the score matrix. EXP-ANA-36 carries no params.
+  if (any(!is.finite(fit$sdev) | fit$sdev <= sqrt(.Machine$double.eps))) {
     stop("EXP-ANA-36 :: [] :: Some principal components have zero or near-zero standard deviation and cannot be standardized.")
   }
-  sweep(fit$x, MARGIN = 2, STATS = sdev, FUN = "/")
+  sweep(fit$x, MARGIN = 2, STATS = fit$sdev[seq_len(ncol(fit$x))], FUN = "/")
 }
 
 #' User-facing score matrix of a stored fit, with back-compat fallback. (issue #27224)
