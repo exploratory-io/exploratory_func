@@ -799,11 +799,17 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     kj <- judge_kmo(kmo)
     bj <- judge_bartlett(p)
     kmo_val <- if (is.na(kmo)) "N/A" else format(round(kmo, 2), nsmall = 2)
-    bart_val <- if (is.na(p)) "N/A" else if (p < 0.001) "p < 0.001" else paste0("p = ", format(round(p, 3), nsmall = 3))
+    # The Value cell holds the VALUE ONLY -- no "p < " / "p = " prefix, since the Metric name now
+    # says "(P Value)". Small p values are reported as "< 0.0001" (NOT the old 0.001 threshold), so
+    # this is the one place in the report that shows 4 decimals rather than the usual 3: 3 decimals
+    # cannot express the threshold itself. (issue tam#37340)
+    # formatC(format = "f") -- NOT format(nsmall = 4), which switches to scientific notation for a
+    # small-but-above-threshold p (0.0002 rendered as "2e-04").
+    bart_val <- if (is.na(p)) "N/A" else if (p < 0.0001) "< 0.0001" else formatC(p, format = "f", digits = 4)
     rows_used <- if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
     variables_used <- if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A"
     res <- tibble::tibble(
-      Metric = c("KMO", "Bartlett's Test of Sphericity", "Rows Used", "Variables Used"),
+      Metric = c("KMO", "Bartlett's Test of Sphericity (P Value)", "Rows Used", "Variables Used"),
       Value = c(kmo_val, bart_val, rows_used, variables_used),
       Judgement = c(kj$label, bj$label, "", ""),
       Description = c(kj$description, bj$description,
@@ -817,19 +823,26 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     cor_type <- if (is.null(x$correlation_type)) "pearson" else x$correlation_type
     rotation <- if (!is.null(x$rotation)) x$rotation else "none"
     res <- tibble::tibble(
-      # NOTE: "Target Variables" / "Data Rows" instead of the shorter "Variables" / "Rows":
-      # the client's shared translation map already binds those two keys to different wordings
-      # for other tables, and a direct-map key can only have one translation. (issue #26623)
-      Item = c("Correlation", "Factor Extraction Method", "Rotation", "Parallel Analysis Method", "Target Variables", "Data Rows"),
+      # The variable / row counts come FIRST (issue tam#37340): the section is now
+      # 「分析条件とデータの確認」, which leads with what data was analyzed. The method rows keep
+      # their own relative order after them, including the Parallel Analysis Method row (tam#37332).
+      # NOTE on the two count keys: they were "Target Variables" / "Data Rows" while the shorter
+      # "Variables" / "Rows" were already bound to other wordings in the client's shared
+      # translation map (#26623). They are now "Number of Variables" / "Row Count" -- keys the map
+      # ALREADY carries with exactly the wanted JA (変数の数 / 行数) from PCA's analysis_conditions
+      # table (#37268), so no new translation key is needed. Do NOT use "Number of Rows": that key
+      # is bound to 行の数 elsewhere in the same map.
+      Item = c("Number of Variables", "Row Count", "Correlation", "Factor Extraction Method",
+               "Rotation", "Parallel Analysis Method"),
       Value = c(
+        if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A",
+        if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A",
         factanal_correlation_label(cor_type),
         factanal_extraction_method_label(x$fm),
         factanal_rotation_label(rotation),
         # issue tam#37332: reported even when parallel analysis itself failed (x$parallel NULL),
         # since x$parallel_method is set independently of whether the computation succeeded.
-        factanal_parallel_method_label(x$parallel_method),
-        if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A",
-        if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
+        factanal_parallel_method_label(x$parallel_method)
       ),
       # Hidden columns. The client reads them to bind the report's explanation text; they are not
       # part of the rendered Item/Value table. The booleans are emitted as EXPLICIT "TRUE"/"FALSE"
@@ -886,6 +899,62 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
         parallel_description,
         "Look for the point where the eigenvalue drop levels off (the elbow)."
       )
+    )
+  }
+  else if (type == "variances_judged") {
+    # Per-factor eigenvalue table with the three retention judgments, for the report's
+    # 「因子数の判定」 section (issue tam#37340). Same shape as prcomp.R's "variances_judged" branch
+    # so the client can reuse the PCA table's viz configuration.
+    #
+    # One row per correlation-matrix eigenvalue (i.e. per VARIABLE, not per extracted factor): the
+    # judgments only mean something when every candidate factor is listed, exactly like PCA's
+    # PC1..PCn. Eigenvalue / % Variance / Cummulated % Variance therefore all come off the SAME
+    # eigen(x$correlation) basis the screeplot / parallel_screeplot / factor_count branches use --
+    # NOT psych's Vaccounted "Proportion Var", which only exists for the extracted factors and
+    # would leave the remaining rows empty. So the ratios here are eigenvalue shares and can
+    # legitimately differ from the 「各因子の寄与率」 chart, which is Vaccounted-based.
+    eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
+    n_row <- length(eig)
+    total_variance <- sum(eig)
+    pct_variance <- if (is.finite(total_variance) && total_variance != 0) eig / total_variance * 100 else rep(NA_real_, n_row)
+    par <- x$parallel
+    if (is.null(par)) {
+      parallel_label <- rep("Not Available", n_row)
+      parallel_status <- rep("na", n_row)
+    }
+    else {
+      ptbl <- par$table
+      in_range <- ptbl$factor_number <= n_row
+      actual <- rep(NA_real_, n_row)
+      threshold <- rep(NA_real_, n_row)
+      actual[ptbl$factor_number[in_range]] <- ptbl$actual_eigenvalue[in_range]
+      threshold[ptbl$factor_number[in_range]] <- ptbl$random_eigenvalue_threshold[in_range]
+      adopted <- !is.na(actual) & !is.na(threshold) & actual > threshold
+      parallel_label <- ifelse(adopted, "Adopted", "Not Adopted")
+      parallel_status <- ifelse(adopted, "adopted", "not_adopted")
+    }
+    # Kaiser is always meaningful here: factor analysis always fits a correlation matrix, so the
+    # eigenvalue >= 1 rule applies unconditionally (unlike PCA, where a covariance-scaled fit makes
+    # it "na"). The comparison matches the factor_count branch's kaiser_n (eig > 1).
+    # "Adopted" / "Not Adopted", not PCA's "Adopt" / "Not Adopted": the pair reads as a judgment in
+    # the English report, and both map to the same 採用 / 非採用 in Japanese. (tam#37340)
+    kaiser_adopted <- eig > 1
+    # Adopted = the factors this analysis actually extracted (the nfactors setting).
+    selected_adopted <- seq_len(n_row) <= n_factor
+    res <- tibble::tibble(
+      Factor = as.character(seq_len(n_row)),
+      Eigenvalue = eig,
+      `% Variance` = pct_variance,
+      `Cummulated % Variance` = cumsum(pct_variance),
+      `Parallel Analysis` = parallel_label,
+      `Kaiser Criterion` = ifelse(kaiser_adopted, "Adopted", "Not Adopted"),
+      # Column name "Adoption", not PCA's "Selected": the cells read "Adopted" / "Not Adopted", so a
+      # "Selected" header would not agree with its own values in the English report. Both map to
+      # 採否 / 採用 / 非採用 in Japanese. (tam#37340)
+      Adoption = ifelse(selected_adopted, "Adopted", "Not Adopted"),
+      parallel_status = parallel_status,
+      kaiser_status = ifelse(kaiser_adopted, "adopted", "not_adopted"),
+      selected_status = ifelse(selected_adopted, "adopted", "not_adopted")
     )
   }
   else if (type == "parallel_screeplot") {

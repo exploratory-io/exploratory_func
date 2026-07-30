@@ -51,7 +51,7 @@ test_that("exp_factanal with default orthogonal varimax rotation", {
     # New report tidy types (issue #37018).
     res <- model_df %>% tidy_rowwise(model, type="suitability")
     expect_equal(colnames(res), c("Metric", "Value", "Judgement", "Description", "status"))
-    expect_equal(res$Metric, c("KMO", "Bartlett's Test of Sphericity", "Rows Used", "Variables Used"))
+    expect_equal(res$Metric, c("KMO", "Bartlett's Test of Sphericity (P Value)", "Rows Used", "Variables Used")) # #37340
     res <- model_df %>% tidy_rowwise(model, type="factor_count")
     expect_equal(colnames(res), c("Method", "Recommended Number of Factors", "Description"))
     expect_equal(res$Method, c("Kaiser Criterion", "Parallel Analysis", "Scree Plot"))
@@ -422,12 +422,14 @@ test_that("parallel analysis method: factor_model vs smc (issue #37332)", {
   fc_smc <- smc_model_df %>% tidy_rowwise(model, type = "factor_count")
   expect_equal(fc_smc$Description[[2]], "Number of factors whose SMC-based factor eigenvalue exceeds the random-data threshold.")
 
-  # analysis_method table carries the new row.
+  # analysis_method table carries the new row. Read BY ITEM NAME: #37340 moved the two data counts
+  # to the top of the table, so the row's position is no longer 4.
+  am_value <- function(tbl, item) tbl$Value[[which(tbl$Item == item)]]
   am_factor_model <- model_df %>% tidy_rowwise(model, type = "analysis_method")
-  expect_equal(am_factor_model$Item[[4]], "Parallel Analysis Method")
-  expect_equal(am_factor_model$Value[[4]], "Factor Model")
+  expect_true("Parallel Analysis Method" %in% am_factor_model$Item)
+  expect_equal(am_value(am_factor_model, "Parallel Analysis Method"), "Factor Model")
   am_smc <- smc_model_df %>% tidy_rowwise(model, type = "analysis_method")
-  expect_equal(am_smc$Value[[4]], "Diagonal SMC")
+  expect_equal(am_value(am_smc, "Parallel Analysis Method"), "Diagonal SMC")
 
   # factanal_parallel_method_label: NULL degrades to the factor_model default; unknown -> Not Available.
   expect_equal(factanal_parallel_method_label(NULL), "Factor Model")
@@ -440,5 +442,89 @@ test_that("parallel analysis method: factor_model vs smc (issue #37332)", {
   legacy_fit <- fit
   legacy_fit$parallel_method <- NULL
   legacy_am <- tidy(legacy_fit, type = "analysis_method")
-  expect_equal(legacy_am$Value[[4]], "Factor Model")
+  # #37340 moved the two data counts to the top, so read the row BY NAME rather than by position.
+  expect_equal(legacy_am$Value[[which(legacy_am$Item == "Parallel Analysis Method")]], "Factor Model")
+})
+
+test_that("report part 3: variances_judged, suitability P value format, analysis_method order (issue tam#37340)", {
+  model_df <- mtcars %>%
+    exp_factanal(mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 2, fm = "minres",
+                 rotate = "varimax", cor_type = "pearson", parallel_n_iter = 5)
+  fit <- model_df$model[[1]]
+
+  # --- variances_judged: one row per correlation-matrix eigenvalue (per VARIABLE, like PCA's PCn),
+  # so every candidate factor is judged -- not just the extracted ones.
+  judged <- tidy(fit, type = "variances_judged")
+  expect_equal(colnames(judged),
+               c("Factor", "Eigenvalue", "% Variance", "Cummulated % Variance",
+                 "Parallel Analysis", "Kaiser Criterion", "Adoption",
+                 "parallel_status", "kaiser_status", "selected_status"))
+  n_var <- length(fit$communality)
+  expect_equal(nrow(judged), n_var)
+  expect_equal(judged$Factor, as.character(seq_len(n_var)))
+  # Eigenvalues come off eigen(x$correlation) -- the SAME basis as screeplot / parallel_screeplot,
+  # descending, and the ratios are eigenvalue shares summing to 100%.
+  expect_equal(judged$Eigenvalue, eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values)
+  expect_equal(sum(judged$`% Variance`), 100)
+  expect_equal(judged$`Cummulated % Variance`, cumsum(judged$`% Variance`))
+  expect_equal(judged$`Cummulated % Variance`[[n_var]], 100)
+  # Kaiser mirrors the factor_count branch's kaiser_n (eigenvalue > 1) and is ALWAYS judged for
+  # factor analysis (always a correlation matrix) -- never "na" the way covariance-scaled PCA is.
+  expect_equal(sum(judged$kaiser_status == "adopted"), sum(judged$Eigenvalue > 1))
+  expect_false(any(judged$kaiser_status == "na"))
+  # Selected = the factors this analysis actually extracted (nfactors), first rows only.
+  expect_equal(judged$selected_status, ifelse(seq_len(n_var) <= 2, "adopted", "not_adopted"))
+  expect_equal(judged$Adoption, ifelse(seq_len(n_var) <= 2, "Adopted", "Not Adopted"))
+  # Labels stay English-canonical; the client translates them. "Adopted" (not PCA's "Adopt") so the
+  # English report reads as a judgment against "Not Adopted".
+  expect_true(all(judged$`Parallel Analysis` %in% c("Adopted", "Not Adopted", "Not Available")))
+  expect_true(all(judged$`Kaiser Criterion` %in% c("Adopted", "Not Adopted")))
+  expect_true(all(judged$parallel_status %in% c("adopted", "not_adopted", "na")))
+  # Parallel analysis unavailable (old saved model) degrades to Not Available / na, same shape.
+  no_par <- fit
+  no_par$parallel <- NULL
+  judged_no_par <- tidy(no_par, type = "variances_judged")
+  expect_equal(unique(judged_no_par$`Parallel Analysis`), "Not Available")
+  expect_equal(unique(judged_no_par$parallel_status), "na")
+  expect_equal(nrow(judged_no_par), n_var)
+
+  # --- analysis_method: counts first, then the method rows (#37340).
+  method_tbl <- tidy(fit, type = "analysis_method")
+  expect_equal(method_tbl$Item, c("Number of Variables", "Row Count", "Correlation",
+                                  "Factor Extraction Method", "Rotation", "Parallel Analysis Method"))
+  expect_equal(method_tbl$Value[[1]], as.character(n_var))
+  expect_equal(method_tbl$Value[[2]], as.character(nrow(mtcars)))
+  expect_equal(method_tbl$Value[[3]], "Pearson Correlation")
+
+  # --- suitability: Metric names the P value, the Value cell holds the value ONLY, and the
+  # small-p threshold is 0.0001 (was 0.001).
+  suit <- tidy(fit, type = "suitability")
+  expect_equal(suit$Metric[[2]], "Bartlett's Test of Sphericity (P Value)")
+  expect_false(grepl("p", suit$Value[[2]], fixed = TRUE)) # no "p < " / "p = " prefix
+  expect_true(grepl("^(< 0\\.0001|[0-9]+\\.[0-9]{4}|N/A)$", suit$Value[[2]]))
+  fake <- fit
+  fake$bartlett <- list(p.value = 1e-9)
+  expect_equal(tidy(fake, type = "suitability")$Value[[2]], "< 0.0001")
+  fake$bartlett <- list(p.value = 0.00005)
+  expect_equal(tidy(fake, type = "suitability")$Value[[2]], "< 0.0001")
+  # Just ABOVE the threshold: 4 fixed decimals, never scientific notation ("2e-04").
+  fake$bartlett <- list(p.value = 0.0002)
+  expect_equal(tidy(fake, type = "suitability")$Value[[2]], "0.0002")
+  fake$bartlett <- list(p.value = 0.03)
+  expect_equal(tidy(fake, type = "suitability")$Value[[2]], "0.0300")
+  fake$bartlett <- NULL
+  expect_equal(tidy(fake, type = "suitability")$Value[[2]], "N/A")
+})
+
+test_that("report part 3: an over-parameterized fit legitimately has no fit test (issue tam#37340)", {
+  # 4 factors on 7 variables drives the model's degrees of freedom NEGATIVE, so psych::fa returns
+  # no chi-square P value, no RMSEA and no BIC. The report must present that as "not available"
+  # (and must NOT claim a hypothesis-test verdict) -- these blanks are the true output of an
+  # over-parameterized fit, not a serialization bug, so glance is intentionally left as-is.
+  model_df <- mtcars %>%
+    exp_factanal(mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 4, fm = "minres",
+                 rotate = "varimax", cor_type = "pearson", parallel_n_iter = 3)
+  g <- glance(model_df$model[[1]])
+  expect_true(g$DF <= 0)
+  expect_true(is.na(g$`P Value`))
 })
