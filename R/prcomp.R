@@ -120,13 +120,58 @@ prcomp_signed_loadings <- function(x) {
   cor(cleaned_df, x$x)
 }
 
+#' Principal component scores in the scale the user asked for. (issue #27224)
+#'
+#' `prcomp()` returns scores whose spread reflects each component's own variance (sdev), while
+#' SPSS (and `psych::principal()`) reports scores standardized to standard deviation 1. Both
+#' describe the SAME solution -- the components, loadings and explained variance are identical and
+#' only the scale of the score numbers differs -- so this is an output-scale choice, not a
+#' different analysis.
+#'
+#' MUST be called AFTER sign stabilization, so the chosen scale is applied to the signs the report
+#' actually shows.
+#'
+#' @param fit a prcomp-shaped fit (needs `$x` and `$sdev`)
+#' @param score_scale "preserve_variance" (prcomp's own scores) or "unit_variance" (SD = 1, SPSS-compatible)
+#' @return the score matrix, same dim/dimnames as `fit$x`
+get_prcomp_scores <- function(fit, score_scale = c("preserve_variance", "unit_variance")) {
+  score_scale <- match.arg(score_scale)
+  if (identical(score_scale, "preserve_variance")) {
+    return(fit$x)
+  }
+  # Dividing by a ~0 sdev turns rounding noise into a huge score, so refuse rather than emit
+  # garbage. A degenerate component means a variable is (nearly) a linear combination of the
+  # others, or there are fewer rows than variables. Guard the WHOLE sdev vector -- not just the
+  # columns being swept -- so a degenerate trailing component is reported even in the (currently
+  # impossible) case where sdev is longer than the score matrix. EXP-ANA-36 carries no params.
+  if (any(!is.finite(fit$sdev) | fit$sdev <= sqrt(.Machine$double.eps))) {
+    stop("EXP-ANA-36 :: [] :: Some principal components have zero or near-zero standard deviation and cannot be standardized.")
+  }
+  sweep(fit$x, MARGIN = 2, STATS = fit$sdev[seq_len(ncol(fit$x))], FUN = "/")
+}
+
+#' User-facing score matrix of a stored fit, with back-compat fallback. (issue #27224)
+#'
+#' `$scores` only exists on fits produced after #27224. Models saved before it (and k-means fits,
+#' which never carry report data) fall back to `$x`, i.e. the previous behavior exactly.
+get_stored_prcomp_scores <- function(x) {
+  if (!is.null(x$scores)) x$scores else x$x
+}
+
+#' The score scale a stored fit was built with, with back-compat fallback. (issue #27224)
+get_stored_prcomp_score_scale <- function(x) {
+  if (!is.null(x$score_scale)) x$score_scale else "preserve_variance"
+}
+
 #' do PCA
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
 #' retained_components - Number of principal components the report treats as retained. NULL = auto (use parallel analysis recommendation). Clamped to [1, number of components].
 #' with_report_data - Whether to compute and attach the redesigned PCA report data (parallel analysis, Kaiser, retained/diagnostics) AND apply sign stabilization. Pure-PCA only; exp_kmeans passes FALSE so k-means fits are neither given report data nor sign-flipped. (issue #37019)
 #' cor_type - Correlation the analysis runs on: "auto" (decide from the variable types and the shape of their distributions), "pearson", "polychoric", "tetrachoric" or "mixed". Anything other than Pearson eigen-decomposes that correlation matrix instead of calling prcomp() on the raw data, and the observation scores become APPROXIMATE (see prcomp_build_categorical_fit). Pure-PCA only -- honored when with_report_data is TRUE, so exp_kmeans is unaffected. (issue #37294)
+#' score_scale - Scale of the principal component scores that are OUTPUT (data columns, biplot, observation map): "preserve_variance" (default; prcomp's own scores, whose spread reflects each component's variance) or "unit_variance" (each component's scores standardized to SD 1, matching SPSS / psych::principal). Display scale only -- loadings, coefficients, contributions, explained variance and every judgment are computed from the canonical prcomp scores and are IDENTICAL either way. Pure-PCA only: exp_kmeans passes with_report_data = FALSE and is always kept at "preserve_variance" so clustering input never changes. (issue #27224)
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE, retained_components = NULL, with_report_data = TRUE, cor_type = "auto") {
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE, retained_components = NULL, with_report_data = TRUE, cor_type = "auto", score_scale = c("preserve_variance", "unit_variance")) {
+  score_scale <- match.arg(score_scale)
   all_cols <- colnames(df)
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -394,6 +439,17 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       }, error = function(e) NULL)
     }
 
+    # User-facing score matrix (issue #27224). fit$x stays the canonical prcomp score matrix that
+    # every loading / contribution / representation computation reads; fit$scores is what the
+    # OUTPUT (data columns, biplot, observation map) shows. Built here -- outside the
+    # with_report_data block, but AFTER the sign stabilization inside it -- so the scale is applied
+    # to the signs the report shows and so a fit built with with_report_data = FALSE still gets a
+    # $scores field. k-means is pinned to preserve_variance: rescaling its PCA scores would change
+    # the clustering input, and its dialog exposes no such option.
+    effective_score_scale <- if (with_report_data) score_scale else "preserve_variance"
+    fit$score_scale <- effective_score_scale
+    fit$scores <- get_prcomp_scores(fit, score_scale = effective_score_scale)
+
     class(fit) <- c("prcomp_exploratory", class(fit))
     fit
   }
@@ -429,8 +485,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     # prepare loadings matrix
     loadings_matrix <- x$rotation[,1:2] # keep only PC1 and PC2 for biplot
 
-    # prepare scores matrix
-    scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
+    # prepare scores matrix. Observation coordinates use the USER-FACING scores (issue #27224), so
+    # a "unit variance" (SPSS-compatible) analysis plots the same numbers the Data tab shows. The
+    # loading vectors are rescaled to the observations below (scale_ratio), so the biplot stays
+    # readable either way -- only the axis range differs.
+    scores_matrix <- get_stored_prcomp_scores(x)[, 1:2, drop = FALSE] # keep only PC1 and PC2 for biplot
 
     if (is.null(n_sample)) { # set default of 5000 for biplot case.
       n_sample = 5000
@@ -534,15 +593,26 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       scale_status <- if (!normalized && is.finite(scale_ratio) && scale_ratio >= cfg$scale_ratio_warning) "scale_warning" else "ok"
       # #37268: rename Rows Used / Variables Used; drop redundant Rows vs Variables row;
       # refresh Description copy (and English-canonical strings for the client translator).
+      # Score Scale (issue #27224). English-canonical value labels; the client translates.
+      # Old saved models have no $score_scale -- they were built with prcomp's own scores.
+      score_scale_display <- if (identical(get_stored_prcomp_score_scale(x), "unit_variance")) {
+        "Unit Variance"
+      } else {
+        "Preserve Component Variance"
+      }
       res <- tibble::tibble(
         Metric = c("Row Count", "Rows Excluded", "Number of Variables", "Excluded Variables",
-                   "Normalization", "SD Ratio (Max/Min)"),
+                   "Normalization", "Score Scale", "SD Ratio (Max/Min)"),
         Value = c(
           as.character(d$analyzed_row_count),
           paste0(d$excluded_row_count, " (", format(round(excluded_pct, 1), nsmall = 1), "%)"),
           as.character(variables_used),
           excluded_display,
-          if (normalized) "Yes" else "No",
+          # English-canonical boolean string, not "Yes"/"No" (issue #27224 follow-up): matches
+          # the plain TRUE/FALSE convention this file's own analysis_method hidden columns
+          # already use, and reads unambiguously as a raw boolean value in the report table.
+          if (normalized) "TRUE" else "FALSE",
+          score_scale_display,
           scale_display
         ),
         Description = c(
@@ -551,6 +621,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
           "Number of variables used in the analysis.",
           "Variables dropped before analysis because they were all missing or had only one unique value.",
           "Whether variables were standardized before analysis.",
+          "How principal-component scores are scaled.",
           "Ratio of the maximum to the minimum standard deviation across all variables."
         ),
         status = c(
@@ -558,6 +629,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
           if (d$excluded_row_rate >= cfg$na_exclusion_warning) "high_na_exclusion" else "ok",
           "ok",
           if (length(excluded_names) == 0) "na" else "ok",
+          "ok",
           "ok",
           scale_status
         )
@@ -830,11 +902,28 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     # on non-dominant variables. rotation is already sign-stabilized (A2) -- do NOT re-flip. Empty
     # typed tibble for k-means / old saved models.
     if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
-      res <- tibble::tibble(Variable = character(0), Component = character(0), Coefficient = numeric(0))
+      res <- tibble::tibble(Variable = character(0), Component = character(0),
+                            Coefficient = numeric(0), `Score Coefficient` = numeric(0))
     }
     else {
+      # `Score Coefficient` = the weights that actually produce the OUTPUT scores (issue #27224).
+      # With "preserve variance" that IS the rotation, so the two columns coincide; with
+      # "unit variance" (SPSS-compatible) the score is rotation / sdev -- SPSS's "Component Score
+      # Coefficient Matrix". The client only shows this column in the unit-variance case, where the
+      # two differ. sdev is guaranteed non-degenerate here: get_prcomp_scores() refuses to build
+      # unit-variance scores otherwise, so a stored "unit_variance" fit cannot divide by ~0.
+      score_scale <- get_stored_prcomp_score_scale(x)
+      score_coefficients <- if (identical(score_scale, "unit_variance")) {
+        sweep(x$rotation, MARGIN = 2, STATS = x$sdev[seq_len(ncol(x$rotation))], FUN = "/")
+      } else {
+        x$rotation
+      }
       res <- tibble::as_tibble(x$rotation, rownames = "Variable") %>%
-        tidyr::gather(Component, Coefficient, dplyr::starts_with("PC"), convert = TRUE) %>%
+        tidyr::gather(Component, Coefficient, dplyr::starts_with("PC"), convert = TRUE)
+      score_res <- tibble::as_tibble(score_coefficients, rownames = "Variable") %>%
+        tidyr::gather(Component, `Score Coefficient`, dplyr::starts_with("PC"), convert = TRUE)
+      res <- res %>%
+        dplyr::left_join(score_res, by = c("Variable", "Component")) %>%
         dplyr::mutate(Component = forcats::fct_inorder(Component)) # PC2 before PC10 on chart
     }
   }
@@ -931,8 +1020,12 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       # res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster)) # this caused error when input had column x.
       res$cluster <- factor(x$kmeans$cluster)
     }
-    res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
-    column_names <- attr(x$rotation, "dimname")[[1]] 
+    # PC score columns appended to the data use the USER-FACING scores (issue #27224):
+    # prcomp's own scores by default, or SD-1 standardized scores when the analysis was run with
+    # score_scale = "unit_variance". Falls back to x$x for models saved before #27224 and for
+    # k-means fits (which never set $scores through a UI option).
+    res <- res %>% dplyr::bind_cols(as.data.frame(get_stored_prcomp_scores(x)))
+    column_names <- attr(x$rotation, "dimname")[[1]]
     if (normalize_data) {
       res <- res %>% dplyr::mutate(dplyr::across(dplyr::all_of(column_names), exploratory::normalize))
     }
