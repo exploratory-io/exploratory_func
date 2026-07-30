@@ -1297,14 +1297,18 @@ test_that("resolveOracleClientLocation only reports an ORACLE_HOME for the lib s
   expect_equal(resolvedZip$home, "")
 })
 
-test_that("applyOracleClientEnv reports FALSE when no Oracle client can be found", {
-  # An unusable explicit directory falls through to the well known locations, so this can
-  # only assert the not-found path on a machine that has no Oracle client installed.
-  skip_if(exploratory:::resolveOracleClientLocation("")$libDir != "",
-          "an Oracle client is installed on this machine")
+test_that("applyOracleClientEnv reports whether an Oracle client can be found", {
+  # An unusable explicit directory falls through to the well known locations, so the
+  # outcome here depends on whether this machine has a client installed at all -- assert
+  # whichever outcome that implies instead of skipping when one happens to be present.
   emptyDir <- tempfile()
   dir.create(emptyDir)
-  expect_false(exploratory:::applyOracleClientEnv(emptyDir))
+  clientInstalled <- exploratory:::resolveOracleClientLocation("")$libDir != ""
+  if (clientInstalled) {
+    expect_true(exploratory:::applyOracleClientEnv(emptyDir))
+  } else {
+    expect_false(exploratory:::applyOracleClientEnv(emptyDir))
+  }
 })
 
 test_that("oracleOCINlsLang always forces the AL32UTF8 character set", {
