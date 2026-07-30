@@ -136,6 +136,78 @@ judge_loading <- function(loadings, cfg = factanal_report_config()) {
        primary_factor = primary_factor, secondary_factors = "", direction = direction)
 }
 
+# The factor-analysis eigenvalues used by parallel analysis (issue tam#37332). Both actual-data and
+# random-data eigenvalues in compute_parallel_analysis() are routed through this so the two sides
+# are always compared on the same basis.
+#
+# method = "factor_model":
+#   Estimate communalities from a one-factor model using the selected factor extraction method,
+#   following the factor-analysis approach used by psych::fa.parallel(). nfactors = 1 below is used
+#   ONLY to estimate communalities for these eigenvalues -- it has nothing to do with how many
+#   factors exp_factanal() itself ultimately extracts.
+#
+# method = "smc":
+#   Replace the diagonal of the correlation matrix with squared multiple correlations (SMC) and
+#   compute eigenvalues of the reduced matrix.
+#
+# method = "pca":
+#   Plain eigenvalues of the correlation matrix, diagonal untouched (the classic PCA-style parallel
+#   analysis). NOT exposed on the exp_factanal() "Parallel Analysis Method" property (issue
+#   tam#37332 only offers factor_model/smc there) -- this value exists so do_prcomp(), which shares
+#   this helper via compute_parallel_analysis(), keeps its own pre-existing PCA parallel analysis
+#   (issue #37019/#37294) unchanged. PCA eigenvalues must equal x$sdev^2 exactly when normalized, an
+#   invariant only the untouched-diagonal eigenvalues satisfy.
+compute_parallel_factor_eigenvalues <- function(cor_matrix, method = c("factor_model", "smc", "pca"),
+                                                 fm = "minres", n_obs = NULL) {
+  method <- match.arg(method)
+  cor_matrix <- as.matrix(cor_matrix)
+  if (nrow(cor_matrix) != ncol(cor_matrix)) {
+    stop("cor_matrix must be a square matrix")
+  }
+  if (any(!is.finite(cor_matrix))) {
+    stop("cor_matrix contains non-finite values")
+  }
+
+  if (identical(method, "pca")) {
+    return(eigen(cor_matrix, symmetric = TRUE, only.values = TRUE)$values)
+  }
+
+  if (identical(method, "smc")) {
+    reduced_cor <- cor_matrix
+    smc_values <- psych::smc(cor_matrix)
+    if (length(smc_values) != ncol(cor_matrix) || any(!is.finite(smc_values))) {
+      stop("SMC communalities could not be computed")
+    }
+    diag(reduced_cor) <- smc_values
+    return(eigen(reduced_cor, symmetric = TRUE, only.values = TRUE)$values)
+  }
+
+  # Factor-model method.
+  fa_args <- list(r = cor_matrix, nfactors = 1, fm = fm, rotate = "none", warnings = FALSE)
+  if (!is.null(n_obs)) {
+    fa_args$n.obs <- n_obs
+  }
+  factor_fit <- do.call(psych::fa, fa_args)
+  factor_eigenvalues <- factor_fit$values
+  if (is.null(factor_eigenvalues) || length(factor_eigenvalues) != ncol(cor_matrix) ||
+      any(!is.finite(factor_eigenvalues))) {
+    stop("Factor-model eigenvalues could not be computed")
+  }
+  as.numeric(factor_eigenvalues)
+}
+
+# The number of LEADING factors whose actual eigenvalue exceeds the random-data threshold, stopping
+# at the first factor that does not -- not a simple count of how many factors exceed it anywhere in
+# the sequence (issue tam#37332). e.g. TRUE, TRUE, FALSE, TRUE -> 2, not 3.
+compute_parallel_recommended_n <- function(actual_eigen, random_threshold) {
+  retained <- actual_eigen > random_threshold
+  first_not_retained <- which(!retained)[1]
+  if (is.na(first_not_retained)) {
+    return(length(retained))
+  }
+  first_not_retained - 1L
+}
+
 # Horn's parallel analysis: compares actual correlation-matrix eigenvalues against the
 # quantile of eigenvalues from random normal data of the same shape. (issue #37018 spec 3.4)
 #' @param cor_type Correlation type the whole analysis uses. For anything other than "pearson" both the
@@ -143,8 +215,16 @@ judge_loading <- function(loadings, cfg = factanal_report_config()) {
 #'        analysis never silently falls back to Pearson. (issue #26623)
 #' @param cor_matrix Correlation matrix already built for the analysis. Reused for the actual eigenvalues
 #'        so the scree/parallel chart matches the matrix `fa()` was fitted on.
+#' @param method How communalities are estimated for the parallel-analysis eigenvalues: "factor_model"
+#'        (one-factor model using `fm`), "smc" (diagonal replaced by squared multiple correlations),
+#'        or "pca" (plain eigenvalues, diagonal untouched -- do_prcomp's own PCA-style parallel
+#'        analysis; not exposed on exp_factanal()'s property). The SAME method is applied to the
+#'        actual data and to every random-data iteration. (issue tam#37332)
+#' @param fm Factor extraction method used by `method = "factor_model"`. Ignored otherwise.
 compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
-                                      cor_type = "pearson", cor_matrix = NULL) {
+                                      cor_type = "pearson", cor_matrix = NULL,
+                                      method = c("factor_model", "smc", "pca"), fm = "minres") {
+  method <- match.arg(method)
   if (length(n_iter) != 1L || is.na(n_iter) || n_iter < 1 || n_iter != as.integer(n_iter)) {
     stop("n_iter must be a positive integer")
   }
@@ -155,57 +235,30 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
   x <- as.data.frame(x)
   n <- nrow(x)
   p <- ncol(x)
-  if (!identical(cor_type, "pearson")) {
-    # Polychoric/tetrachoric/mixed: the null distribution is built by shuffling each column
-    # independently, which keeps every variable's category marginals but destroys the association,
-    # and the SAME correlation method is applied to it. Drawing normal deviates instead would
-    # compare a polychoric eigenvalue against a Pearson one.
-    actual_eigen <- if (!is.null(cor_matrix)) {
-      eigen(cor_matrix, symmetric = TRUE, only.values = TRUE)$values
-    } else {
-      eigen(build_factor_correlation(x, cor_type)$correlation, symmetric = TRUE, only.values = TRUE)$values
-    }
-    had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-    old_seed <- if (had_seed) get(".Random.seed", envir = .GlobalEnv) else NULL
-    set.seed(1234)
-    on.exit({
-      if (had_seed) {
-        assign(".Random.seed", old_seed, envir = .GlobalEnv)
-      } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
-        rm(".Random.seed", envir = .GlobalEnv)
-      }
-    }, add = TRUE)
-    random_eigen_list <- lapply(seq_len(n_iter), function(i) {
-      shuffled <- as.data.frame(lapply(x, function(col) col[sample.int(n)]))
-      res <- build_factor_correlation(shuffled, cor_type)
-      # build_factor_correlation degrades to Pearson when the estimation fails. Comparing a
-      # polychoric eigenvalue against a Pearson threshold is exactly the mix-up this whole change
-      # exists to prevent, so drop the iteration instead.
-      if (isTRUE(res$failed)) return(NULL)
-      eigen(res$correlation, symmetric = TRUE, only.values = TRUE)$values
-    })
-    random_eigen_list <- random_eigen_list[!vapply(random_eigen_list, is.null, logical(1))]
-    if (length(random_eigen_list) == 0) {
-      return(NULL) # no usable null distribution; the caller reports the parallel analysis as unavailable
-    }
-    random_eigen_mat <- do.call(cbind, random_eigen_list)
-    random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
-    return(list(
-      recommended_n = sum(actual_eigen > random_threshold),
-      table = tibble::tibble(
-        factor_number = seq_along(actual_eigen),
-        actual_eigenvalue = actual_eigen,
-        random_eigenvalue_threshold = random_threshold
-      )
-    ))
-  }
-  # Reuse the analysis's own matrix when it was handed one, so the scree/parallel chart and the
-  # fit can never be based on two separately-computed Pearson matrices. (issue #26623)
-  actual_eigen <- if (!is.null(cor_matrix)) {
-    eigen(cor_matrix, symmetric = TRUE, only.values = TRUE)$values
+
+  # Build or reuse the actual correlation matrix. Reusing the analysis's own matrix when it was
+  # handed one means the scree/parallel chart and the fit can never be based on two separately
+  # computed matrices. (issue #26623)
+  actual_cor <- if (!is.null(cor_matrix)) {
+    cor_matrix
+  } else if (identical(cor_type, "pearson")) {
+    stats::cor(x, use = "pairwise.complete.obs")
   } else {
-    eigen(cor(x, use = "pairwise.complete.obs"), symmetric = TRUE, only.values = TRUE)$values
+    actual_cor_result <- build_factor_correlation(x, cor_type)
+    if (isTRUE(actual_cor_result$failed)) {
+      return(NULL)
+    }
+    actual_cor_result$correlation
   }
+
+  actual_eigen <- tryCatch(
+    compute_parallel_factor_eigenvalues(actual_cor, method = method, fm = fm, n_obs = n),
+    error = function(e) NULL
+  )
+  if (is.null(actual_eigen)) {
+    return(NULL)
+  }
+
   # Snapshot the RNG so this null-distribution draw does not perturb the outer deterministic
   # stream that later groups' sampling relies on. Restore afterward.
   had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
@@ -218,17 +271,50 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
       rm(".Random.seed", envir = .GlobalEnv)
     }
   }, add = TRUE)
-  random_eigen_mat <- replicate(n_iter, {
-    rd <- matrix(stats::rnorm(n * p), nrow = n, ncol = p)
-    eigen(cor(rd), symmetric = TRUE, only.values = TRUE)$values
+
+  random_eigen_list <- lapply(seq_len(n_iter), function(i) {
+    random_cor <- if (identical(cor_type, "pearson")) {
+      rd <- matrix(stats::rnorm(n * p), nrow = n, ncol = p)
+      stats::cor(rd)
+    } else {
+      # Shuffling each column independently keeps every variable's category marginals but
+      # destroys the association, and the SAME correlation method is applied to it -- drawing
+      # normal deviates instead would compare a polychoric eigenvalue against a Pearson one.
+      shuffled <- as.data.frame(lapply(x, function(col) col[sample.int(n)]))
+      res <- build_factor_correlation(shuffled, cor_type)
+      # build_factor_correlation degrades to Pearson when the estimation fails. Comparing a
+      # polychoric eigenvalue against a Pearson threshold is exactly the mix-up this whole change
+      # exists to prevent, so drop the iteration instead.
+      if (isTRUE(res$failed)) return(NULL)
+      res$correlation
+    }
+    if (is.null(random_cor)) return(NULL)
+    tryCatch(
+      compute_parallel_factor_eigenvalues(random_cor, method = method, fm = fm, n_obs = n),
+      error = function(e) NULL
+    )
   })
-  random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob)
+  random_eigen_list <- random_eigen_list[!vapply(random_eigen_list, is.null, logical(1))]
+  if (length(random_eigen_list) == 0) {
+    return(NULL) # no usable null distribution; the caller reports the parallel analysis as unavailable
+  }
+  random_eigen_mat <- do.call(cbind, random_eigen_list)
+  random_threshold <- apply(random_eigen_mat, 1, stats::quantile, probs = quantile_prob, na.rm = TRUE)
+  recommended_n <- compute_parallel_recommended_n(actual_eigen, random_threshold)
+
   list(
-    recommended_n = sum(actual_eigen > random_threshold),
+    method = method,
+    factor_extraction_method = fm,
+    requested_n_iter = n_iter,
+    successful_n_iter = length(random_eigen_list),
+    failed_n_iter = n_iter - length(random_eigen_list),
+    quantile_prob = quantile_prob,
+    recommended_n = recommended_n,
     table = tibble::tibble(
       factor_number = seq_along(actual_eigen),
       actual_eigenvalue = actual_eigen,
-      random_eigenvalue_threshold = random_threshold
+      random_eigenvalue_threshold = random_threshold,
+      retained = seq_along(actual_eigen) <= recommended_n
     )
   )
 }
@@ -242,8 +328,14 @@ compute_parallel_analysis <- function(x, n_iter = 100, quantile_prob = 0.95,
 #' @param parallel_n_iter Iterations of the parallel analysis null distribution (default 100 for
 #'        every correlation type). Polychoric-family correlations re-estimate the correlation on
 #'        each iteration, so this is the dominant cost of a polychoric run.
+#' @param parallel_method How communalities are estimated for the parallel-analysis eigenvalues:
+#'        "factor_model" (default; a one-factor model using `fm`) or "smc" (diagonal replaced by
+#'        squared multiple correlations). Applied identically to the actual data and the random-data
+#'        null distribution. (issue tam#37332)
 exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1,
-                         cor_type = "auto", parallel_n_iter = NULL) {
+                         cor_type = "auto", parallel_n_iter = NULL,
+                         parallel_method = c("factor_model", "smc")) {
+  parallel_method <- match.arg(parallel_method)
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   if (length(selected_cols) < nfactors) {
@@ -423,8 +515,13 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     fit$bartlett <- tryCatch(psych::cortest.bartlett(cor_mat, n = nrow(encoded_df)), error = function(e) NULL)
     n_iter <- if (!is.null(parallel_n_iter)) parallel_n_iter else 100
     fit$parallel <- tryCatch(compute_parallel_analysis(encoded_df, n_iter = n_iter,
-                                                       cor_type = resolved$type, cor_matrix = cor_mat),
+                                                       cor_type = resolved$type, cor_matrix = cor_mat,
+                                                       method = parallel_method, fm = fm),
                              error = function(e) NULL)
+    # Kept even when fit$parallel itself is NULL (e.g. n_iter too small to yield a usable null
+    # distribution), so the report can still show which setting was selected. (issue tam#37332)
+    fit$parallel_method <- parallel_method
+    fit$parallel_factor_extraction_method <- fm
     # Keyed off the REQUESTED family, so a failed polychoric estimation still shows the table with
     # its "Estimation failed" row rather than hiding the only signal the user has.
     fit$cor_diagnostics <- if (identical(requested_family, "pearson")) NULL else {
@@ -723,11 +820,14 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # NOTE: "Target Variables" / "Data Rows" instead of the shorter "Variables" / "Rows":
       # the client's shared translation map already binds those two keys to different wordings
       # for other tables, and a direct-map key can only have one translation. (issue #26623)
-      Item = c("Correlation", "Factor Extraction Method", "Rotation", "Target Variables", "Data Rows"),
+      Item = c("Correlation", "Factor Extraction Method", "Rotation", "Parallel Analysis Method", "Target Variables", "Data Rows"),
       Value = c(
         factanal_correlation_label(cor_type),
         factanal_extraction_method_label(x$fm),
         factanal_rotation_label(rotation),
+        # issue tam#37332: reported even when parallel analysis itself failed (x$parallel NULL),
+        # since x$parallel_method is set independently of whether the computation succeeded.
+        factanal_parallel_method_label(x$parallel_method),
         if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A",
         if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
       ),
@@ -763,26 +863,45 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     }
   }
   else if (type == "factor_count") {
+    # Kaiser criterion always reads the plain correlation-matrix eigenvalues (issue tam#37332
+    # section 10): it is a separate, well-known rule of thumb that this change does not touch.
     eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
     kaiser_n <- sum(eig > 1)
     par <- x$parallel
     parallel_rec <- if (is.null(par)) "Not available" else as.character(par$recommended_n)
+    # The description names which eigenvalue the Parallel Analysis row actually compared, so it
+    # stays honest once the method is selectable (issue tam#37332).
+    parallel_description <- if (is.null(par)) {
+      "Parallel analysis could not be computed."
+    } else if (identical(par$method, "smc")) {
+      "Number of factors whose SMC-based factor eigenvalue exceeds the random-data threshold."
+    } else {
+      "Number of factors whose factor-model eigenvalue exceeds the random-data threshold."
+    }
     res <- tibble::tibble(
       Method = c("Kaiser Criterion", "Parallel Analysis", "Scree Plot"),
       `Recommended Number of Factors` = c(as.character(kaiser_n), parallel_rec, "Check the chart"),
       Description = c(
         "Number of factors with an eigenvalue greater than 1.",
-        "Number of factors whose eigenvalue exceeds the random-data eigenvalue.",
+        parallel_description,
         "Look for the point where the eigenvalue drop levels off (the elbow)."
       )
     )
   }
   else if (type == "parallel_screeplot") {
-    eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
     par <- x$parallel
-    threshold <- if (is.null(par)) rep(NA_real_, length(eig)) else par$table$random_eigenvalue_threshold
-    length(threshold) <- length(eig) # pad/truncate to align with eigenvalue count
-    res <- tibble::tibble(Factor = 1:length(eig), Eigenvalue = eig, `Random Data Eigenvalue` = threshold)
+    # The actual-data curve MUST be the same kind of eigenvalue the parallel analysis itself used
+    # (factor-model or SMC) -- not the plain correlation-matrix eigenvalues -- or the chart compares
+    # two different quantities against each other. (issue tam#37332 section 9)
+    if (is.null(par)) {
+      n_vars <- ncol(x$correlation)
+      eig <- rep(NA_real_, n_vars)
+      threshold <- rep(NA_real_, n_vars)
+    } else {
+      eig <- par$table$actual_eigenvalue
+      threshold <- par$table$random_eigenvalue_threshold
+    }
+    res <- tibble::tibble(Factor = seq_along(eig), Eigenvalue = eig, `Random Data Eigenvalue` = threshold)
   }
   else if (type == "score_coefficients") {
     # Factor score coefficients (因子得点係数 / SPSS's Factor Score Coefficient Matrix) -- the weights
