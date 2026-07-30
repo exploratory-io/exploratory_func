@@ -148,10 +148,16 @@ test_that("every downstream computation uses the polychoric matrix, not Pearson 
   expect_false(isTRUE(all.equal(poly$kmo, pearson$kmo)))
   expect_false(isTRUE(all.equal(poly$bartlett$chisq, pearson$bartlett$chisq)))
 
-  # The parallel analysis compares against the SAME matrix fa() was fitted on.
+  # The parallel analysis compares against the SAME matrix fa() was fitted on -- but via the
+  # selected parallel-analysis method (default "factor_model"), not a plain eigen() of that matrix
+  # (issue tam#37332): a plain correlation-matrix eigen would be PCA-style, not factor-analysis-style.
   expect_equal(poly$parallel$table$actual_eigenvalue,
-               eigen(poly$correlation, symmetric = TRUE, only.values = TRUE)$values)
-  # The scree plot / Kaiser criterion read the same matrix as well.
+               compute_parallel_factor_eigenvalues(poly$correlation, method = "factor_model",
+                                                   fm = poly$fm, n_obs = poly$n_rows_used))
+  expect_false(isTRUE(all.equal(poly$parallel$table$actual_eigenvalue,
+                                eigen(poly$correlation, symmetric = TRUE, only.values = TRUE)$values)))
+  # The scree plot / Kaiser criterion still read the plain matrix eigenvalues (issue #37332 section
+  # 10: the normal scree plot is intentionally unaffected by the parallel-analysis method).
   expect_equal(tidy(poly, type = "screeplot")$eigenvalue,
                eigen(poly$correlation, only.values = TRUE)$values)
 
@@ -169,14 +175,17 @@ test_that("analysis_method and cor_diagnostics tidy types (issue #26623)", {
 
   method_tbl <- tidy(poly, type = "analysis_method")
   # #37340: the data counts lead the table ("Number of Variables" / "Row Count" -- keys whose JA the
-  # client already carries), then the method rows. Values are asserted BY ITEM NAME so a future
-  # reorder does not silently pass with the wrong value.
+  # client already carries), then the method rows, which keep their own order including the
+  # Parallel Analysis Method row (tam#37332). Values are asserted BY ITEM NAME so a future reorder
+  # does not silently pass with the wrong value.
   expect_equal(method_tbl$Item, c("Number of Variables", "Row Count", "Correlation",
-                                  "Factor Extraction Method", "Rotation"))
+                                  "Factor Extraction Method", "Rotation", "Parallel Analysis Method"))
   method_value <- function(tbl, item) tbl$Value[[which(tbl$Item == item)]]
   expect_equal(method_value(method_tbl, "Correlation"), "Polychoric Correlation")
   expect_equal(method_value(method_tbl, "Factor Extraction Method"), "Minimum Residual")
   expect_equal(method_value(method_tbl, "Rotation"), "Varimax (Orthogonal)")
+  # exp_factanal() was not passed parallel_method, so the default (issue tam#37332) applies.
+  expect_equal(method_value(method_tbl, "Parallel Analysis Method"), "Factor Model")
   expect_equal(method_value(method_tbl, "Number of Variables"), "6")
   expect_equal(method_value(method_tbl, "Row Count"), as.character(nrow(df)))
   # Hidden columns the client binds the report explanation from.
@@ -353,12 +362,14 @@ test_that("verification pass 2 findings (issue #26623)", {
   expect_true("sparse_categories" %in% tokens)
   expect_equal(factanal_selection_warning_tokens(select_factor_correlation_type(mtcars[, 1:4])), character())
 
-  # The parallel analysis reuses the analysis's own matrix rather than recomputing a second one.
+  # The parallel analysis reuses the analysis's own matrix rather than recomputing a second one --
+  # verified by checking that the SAME matrix (not one recomputed from x) drives the method-aware
+  # eigenvalues (issue tam#37332: no longer a plain eigen() of the matrix).
+  cor_subset <- cor(mtcars[, c("mpg", "hp", "drat", "wt")])
   parallel_result <- compute_parallel_analysis(mtcars[, c("mpg", "hp", "drat", "wt")], n_iter = 3,
-                                               cor_type = "pearson",
-                                               cor_matrix = cor(mtcars[, c("mpg", "hp", "drat", "wt")]))
+                                               cor_type = "pearson", cor_matrix = cor_subset)
   expect_equal(parallel_result$table$actual_eigenvalue,
-               eigen(cor(mtcars[, c("mpg", "hp", "drat", "wt")]), only.values = TRUE)$values)
+               compute_parallel_factor_eigenvalues(cor_subset, method = "factor_model", fm = "minres", n_obs = 32))
 })
 
 test_that("positive definiteness reports the matrix BEFORE psych's smoothing (issue #26623)", {
@@ -473,8 +484,12 @@ test_that("the parallel analysis null distribution never mixes in Pearson eigenv
   on.exit(restore(), add = TRUE)
   result <- compute_parallel_analysis(df, n_iter = 4, cor_type = "polychoric",
                                       cor_matrix = diag(ncol(df)))
-  # Only the successful iterations (identity matrices) contribute, so every threshold is 1.
-  expect_true(all(abs(result$table$random_eigenvalue_threshold - 1) < 1e-8))
+  # Only the successful iterations (identity matrices) contribute -- an identity correlation
+  # matrix has zero factor-model / SMC eigenvalues (no shared variance among variables), unlike a
+  # plain eigen() of it (which would trivially be 1 for every dimension). (issue tam#37332)
+  expected <- compute_parallel_factor_eigenvalues(diag(ncol(df)), method = "factor_model",
+                                                   fm = "minres", n_obs = nrow(df))
+  expect_true(all(abs(result$table$random_eigenvalue_threshold - expected) < 1e-8))
 })
 
 test_that("verification pass 4 findings (issue #26623)", {
