@@ -652,7 +652,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       Item = c("Correlation", "Normalization", "Target Variables", "Data Rows"),
       Value = c(
         factanal_correlation_label(cor_type),
-        if (normalized) "Yes" else "No",
+        # Raw boolean string, not "Yes"/"No" (issue #27224 follow-up) -- matches the
+        # analysis_conditions table's Normalization row and this file's own hidden columns below.
+        if (normalized) "TRUE" else "FALSE",
         if (length(n_variables) == 1L && !is.na(n_variables)) as.character(n_variables) else "N/A",
         if (length(n_rows_used) == 1L && !is.na(n_rows_used)) as.character(n_rows_used) else "N/A"
       ),
