@@ -338,14 +338,16 @@ test_that("all 8 report tidy types return 0-row typed tibbles for an old saved m
 test_that("coefficients tidy type returns rotation weights (long, signed)", {
   model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
   res <- model_df %>% tidy_rowwise(model, type = "coefficients")
-  expect_equal(colnames(res), c("Variable", "Component", "Coefficient"))
+  expect_equal(colnames(res), c("Variable", "Component", "Coefficient", "Score Coefficient"))
   expect_true(any(res$Coefficient < 0))            # signed eigenvector weights
   expect_true(nrow(res) == 6 * length(unique(res$Component)))  # vars x components
+  # Default scale preserves component variance, so the score coefficient IS the rotation. (#27224)
+  expect_equal(res$`Score Coefficient`, res$Coefficient, tolerance = 1e-12)
   # kmeans fit -> empty
   km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
   r2 <- km %>% tidy_rowwise(model, type = "coefficients")
   expect_equal(nrow(r2), 0)
-  expect_equal(colnames(r2), c("Variable", "Component", "Coefficient"))
+  expect_equal(colnames(r2), c("Variable", "Component", "Coefficient", "Score Coefficient"))
 })
 
 # ---------------------------------------------------------------------------
@@ -501,4 +503,153 @@ test_that("exp_kmeans is unaffected by the PCA correlation-type support", {
   expect_null(fit$correlation_type)
   expect_null(fit$is_categorical_correlation)
   expect_null(fit$signed_loadings)
+})
+
+# ---------------------------------------------------------------------------
+# Principal component score scale (issue #27224)
+# ---------------------------------------------------------------------------
+
+test_that("do_prcomp defaults to preserve_variance and attaches the canonical scores", {
+  fit <- (mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt))$model[[1]]
+  expect_equal(fit$score_scale, "preserve_variance")
+  expect_equal(unname(fit$scores), unname(fit$x), tolerance = 1e-12)
+  # The default score SDs are the component SDs, not 1 -- that is the whole point of the option.
+  expect_equal(unname(apply(fit$scores, 2, sd)), unname(fit$sdev), tolerance = 1e-8)
+})
+
+test_that("unit_variance standardizes every component to SD 1 without changing the solution", {
+  ref <- (mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt))$model[[1]]
+  fit <- (mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, score_scale = "unit_variance"))$model[[1]]
+  expect_equal(fit$score_scale, "unit_variance")
+  expect_equal(unname(apply(fit$scores, 2, sd)), rep(1, length(fit$sdev)), tolerance = 1e-8)
+  # Only the scale of the OUTPUT scores changes: eigenvalues, coefficients and the canonical
+  # score matrix are identical to the default run.
+  expect_equal(fit$sdev, ref$sdev, tolerance = 1e-12)
+  expect_equal(fit$rotation, ref$rotation, tolerance = 1e-12)
+  expect_equal(fit$x, ref$x, tolerance = 1e-12)
+  # scores * sdev == x, i.e. the scaling is exactly the documented sweep.
+  expect_equal(unname(sweep(fit$scores, 2, fit$sdev, "*")), unname(fit$x), tolerance = 1e-10)
+})
+
+test_that("unit_variance scores are built AFTER sign stabilization (#27224)", {
+  fit <- (mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, score_scale = "unit_variance"))$model[[1]]
+  # Sign stabilization flips fit$x; scaling it afterwards keeps the same sign, so every score
+  # column must correlate POSITIVELY with the canonical (already flipped) score column.
+  correlations <- vapply(seq_len(ncol(fit$scores)), function(i) cor(fit$scores[, i], fit$x[, i]), numeric(1))
+  expect_true(all(correlations > 0))
+  # And the report's sign contract still holds: the strongest-loading variable loads positively.
+  loadings <- cor(mtcars[, c("mpg", "cyl", "disp", "hp", "drat", "wt")], fit$x)
+  strongest <- vapply(seq_len(ncol(loadings)), function(i) loadings[which.max(abs(loadings[, i])), i], numeric(1))
+  expect_true(all(strongest >= 0))
+})
+
+test_that("data / biplot tidy types output the selected score scale (#27224)", {
+  preserve <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
+  unitvar  <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, score_scale = "unit_variance")
+  d_preserve <- preserve %>% tidy_rowwise(model, type = "data")
+  d_unitvar  <- unitvar  %>% tidy_rowwise(model, type = "data")
+  expect_equal(sd(d_preserve$PC1), preserve$model[[1]]$sdev[1], tolerance = 1e-8)
+  expect_equal(sd(d_unitvar$PC1), 1, tolerance = 1e-8)
+  # Same solution, different score scale: the two PC1 columns are perfectly correlated.
+  expect_equal(cor(d_preserve$PC1, d_unitvar$PC1), 1, tolerance = 1e-10)
+
+  # Biplot observation rows carry the same scale (loading rows are appended after the scores).
+  b_preserve <- preserve %>% tidy_rowwise(model, type = "biplot")
+  b_unitvar  <- unitvar  %>% tidy_rowwise(model, type = "biplot")
+  obs_preserve <- b_preserve$PC1[is.na(b_preserve$measure_name)]
+  obs_unitvar  <- b_unitvar$PC1[is.na(b_unitvar$measure_name)]
+  expect_equal(sd(obs_preserve), preserve$model[[1]]$sdev[1], tolerance = 1e-8)
+  expect_equal(sd(obs_unitvar), 1, tolerance = 1e-8)
+})
+
+test_that("score-independent report outputs are identical under both score scales (#27224)", {
+  preserve <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
+  unitvar  <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, score_scale = "unit_variance")
+  for (ty in c("variances", "variances_judged", "loadings", "loadings_signed", "loadings_signed_wide",
+               "contributions", "component_profiles", "variable_map", "representation",
+               "screeplot", "parallel_screeplot")) {
+    expect_equal(preserve %>% tidy_rowwise(model, type = ty),
+                 unitvar %>% tidy_rowwise(model, type = ty), info = ty)
+  }
+})
+
+test_that("old saved models without $scores fall back to the canonical scores (#27224)", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp)
+  reference <- model_df %>% tidy_rowwise(model, type = "data")
+  model_df$model[[1]]$scores <- NULL      # model saved before #27224
+  model_df$model[[1]]$score_scale <- NULL
+  legacy <- model_df %>% tidy_rowwise(model, type = "data")
+  expect_equal(legacy, reference)
+  # The conditions table and the coefficients table degrade to the pre-#27224 meaning too.
+  conditions <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(conditions$Value[conditions$Metric == "Score Scale"], "Preserve Component Variance")
+  coefficients <- model_df %>% tidy_rowwise(model, type = "coefficients")
+  expect_equal(coefficients$`Score Coefficient`, coefficients$Coefficient, tolerance = 1e-12)
+})
+
+test_that("exp_kmeans is pinned to preserve_variance (#27224)", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  fit <- km$model[[1]]
+  expect_equal(fit$score_scale, "preserve_variance")
+  expect_equal(unname(fit$scores), unname(fit$x), tolerance = 1e-12)
+})
+
+test_that("unit_variance refuses to standardize a degenerate component (EXP-ANA-36, #27224)", {
+  set.seed(27224)
+  n <- 100
+  df <- data.frame(a = rnorm(n), b = rnorm(n))
+  df$c <- df$a + df$b # exactly collinear -> the last component has ~0 standard deviation
+  # The default scale still works; only unit variance is impossible.
+  expect_silent(df %>% do_prcomp(a, b, c))
+  expect_error(df %>% do_prcomp(a, b, c, score_scale = "unit_variance"), "EXP-ANA-36")
+})
+
+test_that("do_prcomp rejects an unknown score_scale value (#27224)", {
+  expect_error(mtcars %>% do_prcomp(mpg, cyl, disp, score_scale = "spss"))
+})
+
+test_that("analysis_conditions carries the Score Scale row (#27224)", {
+  preserve <- (mtcars %>% do_prcomp(mpg, cyl, disp, hp)) %>% tidy_rowwise(model, type = "analysis_conditions")
+  expect_true("Score Scale" %in% preserve$Metric)
+  expect_equal(preserve$Value[preserve$Metric == "Score Scale"], "Preserve Component Variance")
+  expect_equal(preserve$Description[preserve$Metric == "Score Scale"],
+               "How principal-component scores are scaled.")
+  expect_equal(preserve$status[preserve$Metric == "Score Scale"], "ok")
+  # Sits between Normalization and SD Ratio, per the spec's Metric ordering.
+  expect_equal(which(preserve$Metric == "Score Scale"), which(preserve$Metric == "Normalization") + 1L)
+  expect_equal(which(preserve$Metric == "SD Ratio (Max/Min)"), which(preserve$Metric == "Score Scale") + 1L)
+
+  unitvar <- (mtcars %>% do_prcomp(mpg, cyl, disp, hp, score_scale = "unit_variance")) %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(unitvar$Value[unitvar$Metric == "Score Scale"], "Unit Variance")
+})
+
+test_that("coefficients carry rotation / sdev as the score coefficient under unit_variance (#27224)", {
+  model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, score_scale = "unit_variance")
+  fit <- model_df$model[[1]]
+  res <- model_df %>% tidy_rowwise(model, type = "coefficients")
+  expect_equal(colnames(res), c("Variable", "Component", "Coefficient", "Score Coefficient"))
+  # Component coefficient stays the (sign-stabilized) rotation; score coefficient is rotation/sdev.
+  expected <- sweep(fit$rotation, 2, fit$sdev, "/")
+  got <- res %>%
+    dplyr::mutate(Component = as.character(Component)) %>%
+    dplyr::arrange(match(Variable, rownames(expected)), match(Component, colnames(expected)))
+  expect_equal(got$Coefficient, as.vector(t(fit$rotation)), tolerance = 1e-10)
+  expect_equal(got$`Score Coefficient`, as.vector(t(expected)), tolerance = 1e-10)
+  # Verifying the meaning: applying the score coefficients to the standardized data reproduces
+  # the SD-1 scores the Data tab shows -- this is SPSS's Component Score Coefficient Matrix.
+  standardized <- scale(as.matrix(mtcars[, rownames(expected)]))
+  expect_equal(unname(standardized %*% expected), unname(fit$scores), tolerance = 1e-8)
+})
+
+test_that("polychoric fits honor the score scale too (#27224)", {
+  df <- make_ordinal_survey()
+  fit <- (df %>% do_prcomp(q1, q2, q3, q4, q5, q6,
+                           cor_type = "polychoric", score_scale = "unit_variance"))$model[[1]]
+  expect_equal(fit$score_scale, "unit_variance")
+  expect_equal(unname(sweep(fit$scores, 2, fit$sdev, "*")), unname(fit$x), tolerance = 1e-10)
+  # Approximate scores: dividing by the eigenvalue-derived sdev lands close to, but not exactly at,
+  # SD 1 -- documented behavior (the report says so), so assert a bound rather than an exact 1.
+  # Measured on this fixture: 0.976 .. 1.124, i.e. a max deviation of 0.124.
+  expect_true(all(abs(apply(fit$scores, 2, sd) - 1) < 0.2))
 })
