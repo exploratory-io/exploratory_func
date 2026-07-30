@@ -9,6 +9,14 @@ context("test factor analysis correlation type, exp_factanal cor_type")
 
 # Builds ordinal survey-like data: q1-q3 load on one latent factor, q4-q6 on another.
 # `skew=TRUE` concentrates the responses so the 5-category rule picks Polychoric.
+#
+# Returns plain integer columns on purpose -- some callers (build_factor_correlation,
+# compute_parallel_analysis's stubbed correlation builder, etc.) call low-level functions
+# DIRECTLY with this data and expect a numeric matrix, bypassing exp_factanal()'s own
+# type-detection/encoding step entirely. Callers that need exp_factanal()'s AUTO correlation-type
+# selection to actually reach Polychoric must opt in explicitly via as_ordinal_fixture() below
+# (issue #37344 removed the numeric-rating-scale heuristic that used to do this from a plain
+# integer column's shape).
 factanal_ordinal_fixture <- function(n = 300, skew = TRUE, seed = 42) {
   set.seed(seed)
   lat1 <- stats::rnorm(n)
@@ -24,6 +32,14 @@ factanal_ordinal_fixture <- function(n = 300, skew = TRUE, seed = 42) {
   }
   data.frame(q1 = make_col(lat1), q2 = make_col(lat1), q3 = make_col(lat1),
              q4 = make_col(lat2), q5 = make_col(lat2), q6 = make_col(lat2))
+}
+
+# Declares every column of `df` as an EXPLICIT ordered category (ordered factor), so
+# exp_factanal()'s AUTO correlation-type selection reaches Polychoric for data that only LOOKS
+# like a rating scale (issue #37344: a numeric column never auto-promotes on shape alone).
+as_ordinal_fixture <- function(df) {
+  df[] <- lapply(df, function(col) factor(col, ordered = TRUE))
+  df
 }
 
 # Swaps build_factor_correlation for a stub and returns a restore function.
@@ -66,10 +82,13 @@ test_that("correlation type auto-selection rules (issue #26623)", {
   n <- 300
   set.seed(11)
   lat <- stats::rnorm(n)
+  # Ordered factor, not plain integer: an EXPLICIT ordinal type is required to reach
+  # auto-Polychoric (issue #37344 removed the numeric-rating-scale heuristic).
   ordinal_col <- function(k) {
     z <- 0.7 * lat + sqrt(1 - 0.7^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = stats::quantile(z, probs = seq(0, 1, length.out = k + 1)),
-                   include.lowest = TRUE, labels = FALSE))
+    codes <- as.integer(cut(z, breaks = stats::quantile(z, probs = seq(0, 1, length.out = k + 1)),
+                            include.lowest = TRUE, labels = FALSE))
+    factor(codes, ordered = TRUE)
   }
   method_of <- function(df) select_factor_correlation_type(df)$selected_method
 
@@ -85,8 +104,8 @@ test_that("correlation type auto-selection rules (issue #26623)", {
                                     b = factor(ordinal_col(4), ordered = TRUE),
                                     c = factor(ordinal_col(4), ordered = TRUE))), "polychoric")
   # 5 categories: skewed/concentrated -> Polychoric, balanced -> Pearson.
-  expect_equal(method_of(factanal_ordinal_fixture(skew = TRUE)), "polychoric")
-  expect_equal(method_of(factanal_ordinal_fixture(skew = FALSE)), "pearson")
+  expect_equal(method_of(as_ordinal_fixture(factanal_ordinal_fixture(skew = TRUE))), "polychoric")
+  expect_equal(method_of(as_ordinal_fixture(factanal_ordinal_fixture(skew = FALSE))), "pearson")
   # 6 or more ordered categories -> Pearson by default.
   expect_equal(method_of(data.frame(a = ordinal_col(7), b = ordinal_col(7), c = ordinal_col(7))), "pearson")
   # Numeric + ordinal mix -> Mixed correlation.
@@ -102,16 +121,29 @@ test_that("correlation type auto-selection rules (issue #26623)", {
   expect_true(grepl("Invalid variables", invalid$reason))
 })
 
-test_that("numeric rating-scale detection does not reclassify ordinary measurements (issue #26623)", {
-  # A 1-5 (or 0-4) consecutive integer scale is treated as ordinal...
-  expect_true(is_rating_scale_numeric(c(1, 2, 3, 4, 5)))
-  expect_true(is_rating_scale_numeric(c(0, 1, 2, 3)))
-  # ...but a measurement with gaps, non-integers, too many levels, or not starting at 0/1 is not.
-  expect_false(is_rating_scale_numeric(c(4, 6, 8)))          # mtcars$cyl
-  expect_false(is_rating_scale_numeric(c(1.5, 2.5, 3.5)))
-  expect_false(is_rating_scale_numeric(1:8))
-  expect_false(is_rating_scale_numeric(c(3, 4, 5)))
-  # So an all-numeric data frame like mtcars keeps using Pearson.
+test_that("numeric measurements are never auto-promoted to ordinal, even when they look like a rating scale (issue #37344)", {
+  # A 1-5 (or 0-4) consecutive integer scale used to be auto-treated as ordinal (issue #26623);
+  # that heuristic read as a type-mismatch bug to users who declared the column numeric, so it was
+  # reversed: only an EXPLICIT category declaration (an ordered factor, or a manual Correlation
+  # Type override) reaches Polychoric now. A plain numeric column always detects as "numeric".
+  expect_equal(inspect_factor_variable("q", c(1, 2, 3, 4, 5))$detected_type, "numeric")
+  expect_equal(inspect_factor_variable("q", c(0, 1, 2, 3))$detected_type, "numeric")
+  expect_equal(inspect_factor_variable("q", c(4, 6, 8))$detected_type, "numeric")   # mtcars$cyl
+
+  # So an all-numeric data frame that LOOKS like a 1-4 rating scale still uses Pearson...
+  # (4 categories, not 5, so the outcome doesn't depend on the 5-category skew rule.)
+  rating_like <- data.frame(a = rep(1:4, 25), b = rep(1:4, 25), c = rep(1:4, 25))
+  expect_equal(select_factor_correlation_type(rating_like)$selected_method, "pearson")
+  # ...unless the same data is explicitly declared ordinal via an ordered factor,
+  expect_equal(select_factor_correlation_type(
+    data.frame(a = factor(rating_like$a, ordered = TRUE), b = factor(rating_like$b, ordered = TRUE),
+              c = factor(rating_like$c, ordered = TRUE)))$selected_method, "polychoric")
+  # ...or a manual Correlation Type override.
+  manual <- resolve_factanal_correlation_type("polychoric", select_factor_correlation_type(rating_like))
+  expect_equal(manual$type, "polychoric")
+  expect_false(manual$auto)
+
+  # An all-numeric data frame like mtcars keeps using Pearson too.
   expect_equal(select_factor_correlation_type(mtcars[, c("cyl", "mpg", "hp", "drat")])$selected_method, "pearson")
 })
 
@@ -134,7 +166,7 @@ test_that("exp_factanal Pearson results are unchanged by the correlation-type su
 })
 
 test_that("every downstream computation uses the polychoric matrix, not Pearson (issue #26623)", {
-  df <- factanal_ordinal_fixture()
+  df <- as_ordinal_fixture(factanal_ordinal_fixture())
   poly <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
                        parallel_n_iter = 5)$model[[1]]
   pearson <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
@@ -169,7 +201,7 @@ test_that("every downstream computation uses the polychoric matrix, not Pearson 
 })
 
 test_that("analysis_method and cor_diagnostics tidy types (issue #26623)", {
-  df <- factanal_ordinal_fixture()
+  df <- as_ordinal_fixture(factanal_ordinal_fixture())
   poly <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, fm = "minres", rotate = "varimax",
                        parallel_n_iter = 5)$model[[1]]
 
@@ -219,9 +251,12 @@ test_that("tetrachoric, mixed and unsupported paths (issue #26623)", {
   n <- 250
   lat1 <- stats::rnorm(n); lat2 <- stats::rnorm(n)
   binary_col <- function(latent) as.integer(0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n) > 0.3)
+  # Ordered factor, not plain integer: an EXPLICIT ordinal type is required to reach
+  # auto-Polychoric (issue #37344 removed the numeric-rating-scale heuristic).
   ordinal_col <- function(latent) {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    codes <- as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    factor(codes, ordered = TRUE)
   }
   binary_df <- data.frame(b1 = binary_col(lat1), b2 = binary_col(lat1), b3 = binary_col(lat1),
                           b4 = binary_col(lat2), b5 = binary_col(lat2), b6 = binary_col(lat2))
@@ -314,9 +349,12 @@ test_that("mixed-correlation diagnostics only describe the categorical variables
   set.seed(21)
   n <- 300
   lat1 <- stats::rnorm(n); lat2 <- stats::rnorm(n)
+  # Ordered factor, not plain integer: an EXPLICIT ordinal type is required to reach
+  # auto-Polychoric (issue #37344 removed the numeric-rating-scale heuristic).
   ordinal_col <- function(latent) {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    codes <- as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    factor(codes, ordered = TRUE)
   }
   mixed_df <- data.frame(x1 = lat1 + stats::rnorm(n, 0, .5), x2 = lat1 + stats::rnorm(n, 0, .5),
                          q1 = ordinal_col(lat2), q2 = ordinal_col(lat2), q3 = ordinal_col(lat2))
@@ -332,7 +370,7 @@ test_that("mixed-correlation diagnostics only describe the categorical variables
 })
 
 test_that("verification pass 2 findings (issue #26623)", {
-  df <- factanal_ordinal_fixture()
+  df <- as_ordinal_fixture(factanal_ordinal_fixture())
   fit <- exp_factanal(df, q1, q2, q3, q4, q5, q6, nfactors = 2, rotate = "varimax",
                       parallel_n_iter = 3)$model[[1]]
   method_tbl <- tidy(fit, type = "analysis_method")
@@ -426,8 +464,11 @@ test_that("verification pass 3 findings (issue #26623)", {
   expect_true(any(grepl("Correlations estimated from categories", failed_diagnostics$Description)))
 
   # Counts are singular when there is exactly one hit. Balanced columns, then one rare category
-  # injected into a single variable.
-  balanced <- data.frame(q1 = rep(1:4, 50), q2 = rep(1:4, 50), q3 = rep(1:4, 50))
+  # injected into a single variable. Ordered factor, not plain integer: an EXPLICIT ordinal type
+  # is required to reach the categorical/sparse-detection code path (issue #37344).
+  balanced <- data.frame(q1 = factor(rep(1:4, 50), levels = 1:4, ordered = TRUE),
+                         q2 = factor(rep(1:4, 50), levels = 1:4, ordered = TRUE),
+                         q3 = factor(rep(1:4, 50), levels = 1:4, ordered = TRUE))
   balanced$q1[balanced$q1 == 4] <- 3
   balanced$q1[1] <- 4   # a single response in the top category (1 of 200 = below the 5% cutoff)
   balanced_selection <- select_factor_correlation_type(balanced)
@@ -600,6 +641,11 @@ test_that("Repeat By groups all use the same correlation (issue #26623)", {
   set.seed(31)
   n <- 200
   latent_a <- stats::rnorm(n)
+  # Plain integer, not ordered factor: correlation type is resolved ONCE from the POOLED data
+  # across both groups (group_a's ordinal-shaped values rbind'd with group_b's continuous
+  # values under the same column name) -- an ordered factor here would make rbind coerce the
+  # mismatched types to NA. Whether the pooled selection lands on Pearson or Polychoric is not
+  # what this test checks; it only asserts every group ends up using the SAME one.
   ordinal_col <- function(latent) {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
     as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))

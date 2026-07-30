@@ -450,7 +450,9 @@ test_that("do_prcomp cor_type='auto' picks polychoric for ordinal data and Pears
   set.seed(37294)
   n <- 300
   latent_a <- rnorm(n); latent_b <- rnorm(n)
-  to_four <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.6, 0, 0.6, Inf), labels = FALSE))
+  # Ordered factor, not plain integer: an EXPLICIT ordinal type is required to reach
+  # auto-Polychoric (issue #37344 removed the numeric-rating-scale heuristic).
+  to_four <- function(z) factor(as.integer(cut(z, breaks = c(-Inf, -0.6, 0, 0.6, Inf), labels = FALSE)), ordered = TRUE)
   ordinal <- data.frame(a = to_four(latent_a + rnorm(n, 0, 0.5)), b = to_four(latent_a + rnorm(n, 0, 0.5)),
                         c = to_four(latent_b + rnorm(n, 0, 0.5)), e = to_four(latent_b + rnorm(n, 0, 0.5)))
   ordinal_fit <- (ordinal %>% do_prcomp(a, b, c, e))$model[[1]]

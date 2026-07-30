@@ -58,30 +58,6 @@ get_factor_category_levels <- function(x, supplied_levels = NULL) {
 }
 
 # -----------------------------------------------------------------------------
-# Is a numeric column really a rating scale (1-5 survey answer) rather than a
-# continuous measurement?
-#
-# The spec's literal rule calls every numeric column with 3+ distinct values
-# "numeric", which would mean a 1-to-5 survey item imported as an integer -- the
-# exact data the polychoric request is about -- never reaches the ordinal branch.
-# So numeric columns are treated as ordinal only when they look like a rating
-# scale: consecutive integers, 3 to `max_categories` of them, starting at 0 or 1.
-# A measurement like cyl (4, 6, 8) or a count is not consecutive-from-0/1 and
-# stays numeric, so existing all-numeric analyses keep using Pearson.
-# -----------------------------------------------------------------------------
-is_rating_scale_numeric <- function(observed, max_categories = 7) {
-  observed <- observed[is.finite(observed)]
-  if (length(observed) == 0) return(FALSE)
-  if (any(observed != floor(observed))) return(FALSE)
-  values <- sort(unique(observed))
-  n_values <- length(values)
-  if (n_values < 3 || n_values > max_categories) return(FALSE)
-  if (!(min(values) %in% c(0, 1))) return(FALSE)
-  # Consecutive integers only: 1,2,3,4,5 yes; 1,2,5 no.
-  identical(as.numeric(max(values) - min(values) + 1), as.numeric(n_values))
-}
-
-# -----------------------------------------------------------------------------
 # Detect the type of one variable.
 # -----------------------------------------------------------------------------
 inspect_factor_variable <- function(variable_name, x, declared_type = "auto", supplied_levels = NULL) {
@@ -114,9 +90,13 @@ inspect_factor_variable <- function(variable_name, x, declared_type = "auto", su
   } else if (is.factor(x)) {
     detected_type <- if (nlevels(x) == 2) "binary" else "nominal"
   } else if (is.numeric(x)) {
-    detected_type <- if (n_observed_categories == 2) "binary"
-      else if (is_rating_scale_numeric(observed)) "ordinal"
-      else "numeric"
+    # A numeric column is NEVER auto-promoted to ordinal, even when it looks like a rating scale
+    # (e.g. consecutive 1-5 integers) -- issue #37344 reversed that heuristic (formerly
+    # is_rating_scale_numeric, issue #26623) because it read as a type-mismatch bug: the report
+    # would call a column "categorical" when the user had declared it numeric. Use an ordered
+    # factor, or a manual Correlation Type override, to explicitly opt a numeric-looking scale
+    # into ordinal/Polychoric treatment.
+    detected_type <- if (n_observed_categories == 2) "binary" else "numeric"
   } else if (is.character(x)) {
     detected_type <- if (n_observed_categories == 2) "binary" else "nominal"
   } else {
