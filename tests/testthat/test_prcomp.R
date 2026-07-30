@@ -649,6 +649,7 @@ test_that("polychoric fits honor the score scale too (#27224)", {
   expect_equal(fit$score_scale, "unit_variance")
   expect_equal(unname(sweep(fit$scores, 2, fit$sdev, "*")), unname(fit$x), tolerance = 1e-10)
   # Approximate scores: dividing by the eigenvalue-derived sdev lands close to, but not exactly at,
-  # SD 1 -- documented behavior, so assert the loose bound rather than an exact 1.
-  expect_true(all(abs(apply(fit$scores, 2, sd) - 1) < 0.35))
+  # SD 1 -- documented behavior (the report says so), so assert a bound rather than an exact 1.
+  # Measured on this fixture: 0.976 .. 1.124, i.e. a max deviation of 0.124.
+  expect_true(all(abs(apply(fit$scores, 2, sd) - 1) < 0.2))
 })
