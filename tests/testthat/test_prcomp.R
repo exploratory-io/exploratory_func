@@ -360,7 +360,10 @@ make_ordinal_survey <- function(n = 300, seed = 37294) {
   set.seed(seed)
   latent_a <- rnorm(n)
   latent_b <- rnorm(n)
-  to_five <- function(z) as.integer(cut(z, breaks = c(-Inf, -1, -0.3, 0.3, 1, Inf), labels = FALSE))
+  # Ordered factor, not bare integers: detection is TYPE based (issue #37344), so a
+  # numeric column is numeric no matter how rating-scale-shaped its values are.
+  to_five <- function(z) factor(as.integer(cut(z, breaks = c(-Inf, -1, -0.3, 0.3, 1, Inf), labels = FALSE)),
+                                levels = 1:5, ordered = TRUE)
   data.frame(
     q1 = to_five(latent_a + rnorm(n, 0, 0.6)), q2 = to_five(latent_a + rnorm(n, 0, 0.6)),
     q3 = to_five(latent_a + rnorm(n, 0, 0.6)), q4 = to_five(latent_b + rnorm(n, 0, 0.6)),
@@ -385,7 +388,7 @@ test_that("do_prcomp polychoric scores are scale(data) %*% eigenvectors (issue #
   fit <- (df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric"))$model[[1]]
   # The approximation the issue specifies. Sign stabilization sweeps rotation and x together,
   # so the identity survives it.
-  expected <- scale(as.matrix(df)) %*% fit$rotation
+  expected <- scale(as.matrix(as.data.frame(lapply(df, as.numeric)))) %*% fit$rotation
   expect_equal(unname(expected), unname(fit$x), tolerance = 1e-10)
 })
 
@@ -409,7 +412,7 @@ test_that("do_prcomp polychoric loadings come from the polychoric solution, not 
   expect_equal(unname(loadings),
                unname(fit$rotation %*% diag(fit$sdev, nrow = length(fit$sdev))), tolerance = 1e-10)
   # And it is NOT the Pearson cross-correlation the pre-#37294 branches recomputed.
-  pearson_loadings <- cor(as.matrix(df), fit$x)
+  pearson_loadings <- cor(as.matrix(as.data.frame(lapply(df, as.numeric))), fit$x)
   expect_false(isTRUE(all.equal(unname(loadings), unname(pearson_loadings), tolerance = 1e-6)))
 })
 
@@ -452,7 +455,9 @@ test_that("do_prcomp cor_type='auto' picks polychoric for ordinal data and Pears
   set.seed(37294)
   n <- 300
   latent_a <- rnorm(n); latent_b <- rnorm(n)
-  to_four <- function(z) as.integer(cut(z, breaks = c(-Inf, -0.6, 0, 0.6, Inf), labels = FALSE))
+  # Ordered factor, not bare integers -- see #37344 note above.
+  to_four <- function(z) factor(as.integer(cut(z, breaks = c(-Inf, -0.6, 0, 0.6, Inf), labels = FALSE)),
+                                levels = 1:4, ordered = TRUE)
   ordinal <- data.frame(a = to_four(latent_a + rnorm(n, 0, 0.5)), b = to_four(latent_a + rnorm(n, 0, 0.5)),
                         c = to_four(latent_b + rnorm(n, 0, 0.5)), e = to_four(latent_b + rnorm(n, 0, 0.5)))
   ordinal_fit <- (ordinal %>% do_prcomp(a, b, c, e))$model[[1]]

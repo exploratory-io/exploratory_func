@@ -58,45 +58,30 @@ get_factor_category_levels <- function(x, supplied_levels = NULL) {
 }
 
 # -----------------------------------------------------------------------------
-# Is a numeric column really a rating scale (1-5 survey answer) rather than a
-# continuous measurement?
-#
-# The spec's literal rule calls every numeric column with 3+ distinct values
-# "numeric", which would mean a 1-to-5 survey item imported as an integer -- the
-# exact data the polychoric request is about -- never reaches the ordinal branch.
-# So numeric columns are treated as ordinal only when they look like a rating
-# scale: consecutive integers, 3 to `max_categories` of them, starting close to
-# 0 or 1.
-#
-# "Starts close to" (0, 1, or 2), not "starts exactly at 0 or 1" (issue #37344):
-# a skewed-positive item (e.g. satisfaction) routinely draws zero responses at
-# its lowest category in a given sample even though the scale itself runs from
-# 1. Requiring the SAMPLE's observed minimum to be exactly 0/1 misreads that
-# sampling gap as evidence the column isn't a rating scale at all, silently
-# falling back to "numeric" -- which can flip an entire multi-item selection
-# from Polychoric to Mixed (or Pearson) because one sibling item happened not
-# to draw a floor response. Tolerating a one-category gap at the low end keeps
-# genuine measurements like cyl (4, 6, 8) or a count starting well above 2 out
-# (those fail the consecutive-integers check below, or fall outside this
-# tolerance), while accepting the sampling-gap case.
-#
-# A measurement like cyl (4, 6, 8) or a count is not consecutive-from-a-low-
-# floor and stays numeric, so existing all-numeric analyses keep using Pearson.
-# -----------------------------------------------------------------------------
-is_rating_scale_numeric <- function(observed, max_categories = 7) {
-  observed <- observed[is.finite(observed)]
-  if (length(observed) == 0) return(FALSE)
-  if (any(observed != floor(observed))) return(FALSE)
-  values <- sort(unique(observed))
-  n_values <- length(values)
-  if (n_values < 3 || n_values > max_categories) return(FALSE)
-  if (!(min(values) %in% c(0, 1, 2))) return(FALSE)
-  # Consecutive integers only: 1,2,3,4,5 yes; 1,2,5 no.
-  identical(as.numeric(max(values) - min(values) + 1), as.numeric(n_values))
-}
-
-# -----------------------------------------------------------------------------
 # Detect the type of one variable.
+#
+# Detection is driven by the column's DATA TYPE, never by the shape of the
+# values a numeric column happens to hold (issue #37344). An earlier revision
+# guessed that a numeric column "looked like" a 1-5 rating scale (consecutive
+# small integers) and promoted it to ordinal, so that survey items imported as
+# integers reached the polychoric branch. That guess was retired because it is
+# not knowable from the values alone:
+#   - it silently described a column the user declared numeric as categorical
+#     in the report, which reads as a type mismatch;
+#   - it was sample-dependent -- a skewed item that drew no response at its
+#     lowest category changed type, flipping the correlation chosen for the
+#     WHOLE analysis (Polychoric -> Mixed) because of sampling luck alone;
+#   - widening the shape rule to cover that only moved the boundary, since a
+#     genuine small-integer measurement (a count, a 1-7 code) is indistinguish-
+#     able from a rating scale by its values.
+#
+# A numeric column is therefore always "numeric" (Pearson), with one exception
+# that predates the heuristic and is the original request of issue #26623: a
+# numeric column holding exactly two distinct values is a 0/1 dummy, i.e.
+# binary, and belongs on the tetrachoric branch.
+#
+# To have ordinal (polychoric) treatment, a column must SAY it is ordered --
+# an ordered factor, supplied category levels, or an explicit declared type.
 # -----------------------------------------------------------------------------
 inspect_factor_variable <- function(variable_name, x, declared_type = "auto", supplied_levels = NULL) {
   declared_type <- normalize_factor_variable_type(declared_type)
@@ -128,9 +113,10 @@ inspect_factor_variable <- function(variable_name, x, declared_type = "auto", su
   } else if (is.factor(x)) {
     detected_type <- if (nlevels(x) == 2) "binary" else "nominal"
   } else if (is.numeric(x)) {
-    detected_type <- if (n_observed_categories == 2) "binary"
-      else if (is_rating_scale_numeric(observed)) "ordinal"
-      else "numeric"
+    # Type-based (issue #37344): a numeric column stays numeric no matter what its
+    # values look like. The only exception is a two-value 0/1 dummy, which is binary
+    # (tetrachoric) -- the original ask of issue #26623.
+    detected_type <- if (n_observed_categories == 2) "binary" else "numeric"
   } else if (is.character(x)) {
     detected_type <- if (n_observed_categories == 2) "binary" else "nominal"
   } else {

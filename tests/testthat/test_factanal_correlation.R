@@ -7,6 +7,19 @@ context("test factor analysis correlation type, exp_factanal cor_type")
 # Polychoric correlation support (issue #26623)
 # =============================================================================
 
+# Ordered-factor helpers. Detection is TYPE based (issue #37344): a numeric column is
+# always numeric, whatever its values look like, so a fixture that wants ordinal
+# treatment has to SAY it is ordered rather than rely on small consecutive integers.
+# Levels are fixed 1..k so a category nobody happened to answer is still a defined
+# category (which is also what real ordered survey data carries).
+ordered_k <- function(codes, k) factor(as.integer(codes), levels = seq_len(k), ordered = TRUE)
+ordered_five <- function(codes) ordered_k(codes, 5)
+
+# Ordered-factor columns carry their order as levels, so plain numeric maths (stats::cor,
+# scale) cannot be run on them directly. Stubs that stand in for build_factor_correlation
+# need the same numeric encoding the real builder applies internally.
+as_numeric_codes <- function(d) as.data.frame(lapply(as.data.frame(d), as.numeric))
+
 # Builds ordinal survey-like data: q1-q3 load on one latent factor, q4-q6 on another.
 # `skew=TRUE` concentrates the responses so the 5-category rule picks Polychoric.
 factanal_ordinal_fixture <- function(n = 300, skew = TRUE, seed = 42) {
@@ -16,10 +29,10 @@ factanal_ordinal_fixture <- function(n = 300, skew = TRUE, seed = 42) {
   make_col <- function(latent) {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
     if (skew) {
-      as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+      ordered_five(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
     } else {
-      as.integer(cut(z, breaks = stats::quantile(z, probs = seq(0, 1, length.out = 6)),
-                     include.lowest = TRUE, labels = FALSE))
+      ordered_five(cut(z, breaks = stats::quantile(z, probs = seq(0, 1, length.out = 6)),
+                       include.lowest = TRUE, labels = FALSE))
     }
   }
   data.frame(q1 = make_col(lat1), q2 = make_col(lat1), q3 = make_col(lat1),
@@ -68,8 +81,8 @@ test_that("correlation type auto-selection rules (issue #26623)", {
   lat <- stats::rnorm(n)
   ordinal_col <- function(k) {
     z <- 0.7 * lat + sqrt(1 - 0.7^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = stats::quantile(z, probs = seq(0, 1, length.out = k + 1)),
-                   include.lowest = TRUE, labels = FALSE))
+    ordered_k(cut(z, breaks = stats::quantile(z, probs = seq(0, 1, length.out = k + 1)),
+                  include.lowest = TRUE, labels = FALSE), k)
   }
   method_of <- function(df) select_factor_correlation_type(df)$selected_method
 
@@ -102,44 +115,46 @@ test_that("correlation type auto-selection rules (issue #26623)", {
   expect_true(grepl("Invalid variables", invalid$reason))
 })
 
-test_that("numeric rating-scale detection does not reclassify ordinary measurements (issue #26623)", {
-  # A 1-5 (or 0-4) consecutive integer scale is treated as ordinal...
-  expect_true(is_rating_scale_numeric(c(1, 2, 3, 4, 5)))
-  expect_true(is_rating_scale_numeric(c(0, 1, 2, 3)))
-  # ...but a measurement with gaps, non-integers, too many levels, or not starting at 0/1 is not.
-  expect_false(is_rating_scale_numeric(c(4, 6, 8)))          # mtcars$cyl
-  expect_false(is_rating_scale_numeric(c(1.5, 2.5, 3.5)))
-  expect_false(is_rating_scale_numeric(1:8))
-  expect_false(is_rating_scale_numeric(c(3, 4, 5)))
-  # So an all-numeric data frame like mtcars keeps using Pearson.
+test_that("a numeric column is detected from its TYPE, never from the shape of its values (issue #37344)", {
+  detect <- function(x) inspect_factor_variable("v", x)$detected_type
+
+  # Values that "look like" a 1-5 rating scale do NOT make a numeric column ordinal.
+  # This is the whole point of #37344: the report must not describe a column the user
+  # declared numeric as a category, and the type must not depend on which values the
+  # sample happened to draw.
+  expect_equal(detect(c(1, 2, 3, 4, 5)), "numeric")
+  expect_equal(detect(c(0, 1, 2, 3)), "numeric")
+  expect_equal(detect(c(2, 3, 4, 5)), "numeric")   # a sample that never drew the scale's "1"
+  # Ordinary measurements are unchanged.
+  expect_equal(detect(c(4, 6, 8)), "numeric")      # mtcars$cyl
+  expect_equal(detect(c(1.5, 2.5, 3.5)), "numeric")
+  expect_equal(detect(1:8), "numeric")
+
+  # A numeric 0/1 dummy stays BINARY -- the original request of #26623 (tetrachoric).
+  expect_equal(detect(c(0, 1)), "binary")
+  expect_equal(detect(c(1, 2)), "binary")
+
+  # Saying the column is ordered is what earns ordinal treatment.
+  expect_equal(detect(factor(c(1, 2, 3, 4, 5), levels = 1:5, ordered = TRUE)), "ordinal")
+  expect_equal(inspect_factor_variable("v", c(1, 2, 3, 4, 5), declared_type = "ordinal")$detected_type, "ordinal")
+  expect_equal(inspect_factor_variable("v", c(1, 2, 3, 4, 5), supplied_levels = 1:5)$detected_type, "ordinal")
+
+  # The heuristic is gone, not merely bypassed.
+  expect_false(exists("is_rating_scale_numeric", envir = asNamespace("exploratory"), inherits = FALSE))
+
+  # An all-numeric data frame still uses Pearson...
   expect_equal(select_factor_correlation_type(mtcars[, c("cyl", "mpg", "hp", "drat")])$selected_method, "pearson")
-})
-
-test_that("numeric rating-scale detection tolerates a sample that never observed the scale's low end (issue #37344)", {
-  # A skewed-positive 1-5 satisfaction item routinely gets zero "1" responses in a given
-  # sample even though the scale itself runs 1-5. The observed minimum (2) must not make
-  # this read as an ordinary numeric measurement.
-  expect_true(is_rating_scale_numeric(c(2, 3, 4, 5)))
-  expect_true(is_rating_scale_numeric(c(2, 3, 4)))
-  # A minimum this far from a plausible 0/1 floor still reads as an ordinary measurement,
-  # not a rating scale that simply missed its low end -- unchanged from the #26623 behavior.
-  expect_false(is_rating_scale_numeric(c(3, 4, 5)))
-  expect_false(is_rating_scale_numeric(c(4, 5, 6, 7)))
-
-  # Three sibling 1-5 satisfaction items where ONE never sampled a "1" response must all
-  # still classify as ordinal (not mixed): a per-column sampling gap must not change the
-  # correlation method chosen for the whole analysis.
+  # ...and so does a set of integer 1-5 survey items, because they are typed numeric.
   set.seed(37344)
-  n <- 500
-  df <- data.frame(
-    a = pmin(pmax(round(stats::rnorm(n, mean = 3.6)), 1), 5),
-    b = pmin(pmax(round(stats::rnorm(n, mean = 3.6)), 2), 5), # this sample never observes "1"
-    c = pmin(pmax(round(stats::rnorm(n, mean = 3.6)), 1), 5)
-  )
-  expect_equal(min(df$b), 2)
+  n <- 300
+  likert <- function(floor_at) pmin(pmax(round(stats::rnorm(n, mean = 3.6)), floor_at), 5)
+  df <- data.frame(a = likert(1), b = likert(2), c = likert(1))
   selection <- select_factor_correlation_type(df)
-  expect_equal(unname(selection$variable_summary$detected_type), c("ordinal", "ordinal", "ordinal"))
-  expect_true(selection$selected_method %in% c("polychoric", "pearson"))
+  expect_equal(unname(selection$variable_summary$detected_type), c("numeric", "numeric", "numeric"))
+  expect_equal(selection$selected_method, "pearson")
+  # Crucially it is not "mixed": one column drawing no "1" no longer changes the method
+  # chosen for the whole analysis, which was the reported #37344 symptom.
+  expect_false(selection$selected_method == "mixed")
 })
 
 test_that("exp_factanal Pearson results are unchanged by the correlation-type support (issue #26623)", {
@@ -248,7 +263,7 @@ test_that("tetrachoric, mixed and unsupported paths (issue #26623)", {
   binary_col <- function(latent) as.integer(0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n) > 0.3)
   ordinal_col <- function(latent) {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    ordered_five(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
   }
   binary_df <- data.frame(b1 = binary_col(lat1), b2 = binary_col(lat1), b3 = binary_col(lat1),
                           b4 = binary_col(lat2), b5 = binary_col(lat2), b6 = binary_col(lat2))
@@ -273,7 +288,11 @@ test_that("tetrachoric, mixed and unsupported paths (issue #26623)", {
 })
 
 test_that("build_factor_correlation returns one matrix for the whole analysis (issue #26623)", {
-  df <- factanal_ordinal_fixture(n = 200)
+  # build_factor_correlation works on the numeric-encoded frame: exp_factanal runs
+  # encode_factanal_data first, which turns ordered categories into their 1..k codes.
+  # (Before #37344 the fixture was already bare integers, so this step was invisible.)
+  df_raw <- factanal_ordinal_fixture(n = 200)
+  df <- encode_factanal_data(df_raw, select_factor_correlation_type(df_raw))
   pearson <- build_factor_correlation(df, "pearson")
   expect_equal(pearson$type, "pearson")
   expect_equal(pearson$correlation, stats::cor(df, use = "pairwise.complete.obs"))
@@ -343,7 +362,7 @@ test_that("mixed-correlation diagnostics only describe the categorical variables
   lat1 <- stats::rnorm(n); lat2 <- stats::rnorm(n)
   ordinal_col <- function(latent) {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    ordered_five(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
   }
   mixed_df <- data.frame(x1 = lat1 + stats::rnorm(n, 0, .5), x2 = lat1 + stats::rnorm(n, 0, .5),
                          q1 = ordinal_col(lat2), q2 = ordinal_col(lat2), q3 = ordinal_col(lat2))
@@ -454,9 +473,11 @@ test_that("verification pass 3 findings (issue #26623)", {
 
   # Counts are singular when there is exactly one hit. Balanced columns, then one rare category
   # injected into a single variable.
-  balanced <- data.frame(q1 = rep(1:4, 50), q2 = rep(1:4, 50), q3 = rep(1:4, 50))
-  balanced$q1[balanced$q1 == 4] <- 3
-  balanced$q1[1] <- 4   # a single response in the top category (1 of 200 = below the 5% cutoff)
+  balanced_codes <- data.frame(q1 = rep(1:4, 50), q2 = rep(1:4, 50), q3 = rep(1:4, 50))
+  balanced_codes$q1[balanced_codes$q1 == 4] <- 3
+  balanced_codes$q1[1] <- 4   # a single response in the top category (1 of 200 = below the 5% cutoff)
+  # Ordered factors, so these are categorical variables at all (#37344: bare integers are numeric).
+  balanced <- as.data.frame(lapply(balanced_codes, ordered_k, k = 4))
   balanced_selection <- select_factor_correlation_type(balanced)
   single <- compute_polychoric_diagnostics(balanced,
                                            list(correlation = diag(3), thresholds = NULL,
@@ -500,7 +521,7 @@ test_that("the parallel analysis null distribution never mixes in Pearson eigenv
   fake_build <- function(data, correlation_type, ...) {
     calls <<- calls + 1
     if (calls %% 2 == 0) {
-      list(correlation = stats::cor(data), thresholds = NULL, type = "pearson",
+      list(correlation = stats::cor(as_numeric_codes(data)), thresholds = NULL, type = "pearson",
            smoothed = FALSE, warnings = "failed", failed = TRUE)
     } else {
       list(correlation = diag(ncol(data)), thresholds = NULL, type = correlation_type,
@@ -592,7 +613,7 @@ test_that("a failed estimation degrades to Pearson end to end (issue #26623)", {
     if (identical(correlation_type, "pearson")) {
       return(original_build(data, correlation_type, use = use, correct = correct))
     }
-    list(correlation = stats::cor(data, use = use), thresholds = NULL, type = "pearson",
+    list(correlation = stats::cor(as_numeric_codes(data), use = use), thresholds = NULL, type = "pearson",
          smoothed = FALSE, warnings = "simulated polychoric failure", failed = TRUE)
   }
   restore <- stub_build_factor_correlation(failing_build)
@@ -621,22 +642,35 @@ test_that("a failed estimation degrades to Pearson end to end (issue #26623)", {
 })
 
 test_that("Repeat By groups all use the same correlation (issue #26623)", {
-  # Group A is ordinal (would pick Polychoric on its own), group B is continuous (Pearson). One
-  # report describes one correlation, and loadings must be comparable across facets, so the choice
-  # is made once from the whole data.
+  # Group A is skewed (would pick Polychoric on its own), group B is balanced (Pearson on its
+  # own). One report describes one correlation, and loadings must be comparable across facets,
+  # so the choice is made once from the whole data.
+  #
+  # Both groups are ordered factors of the SAME 5 levels: a column has one type, so the two
+  # groups can only differ in DISTRIBUTION, not in type. (Before #37344 this fixture rbind()ed
+  # an integer group onto a continuous group; ordered factors cannot be stacked onto doubles --
+  # rbind would coerce every value to NA.)
   set.seed(31)
   n <- 200
-  latent_a <- stats::rnorm(n)
-  ordinal_col <- function(latent) {
+  skewed_col <- function(latent) {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    ordered_five(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
   }
-  group_a <- data.frame(g = "A", q1 = ordinal_col(latent_a), q2 = ordinal_col(latent_a),
-                        q3 = ordinal_col(latent_a), stringsAsFactors = FALSE)
+  balanced_col <- function(latent) {
+    z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
+    ordered_five(cut(z, breaks = stats::quantile(z, probs = seq(0, 1, length.out = 6)),
+                     include.lowest = TRUE, labels = FALSE))
+  }
+  latent_a <- stats::rnorm(n)
+  group_a <- data.frame(g = "A", q1 = skewed_col(latent_a), q2 = skewed_col(latent_a),
+                        q3 = skewed_col(latent_a), stringsAsFactors = FALSE)
   latent_b <- stats::rnorm(n)
-  group_b <- data.frame(g = "B",
-                        q1 = latent_b + stats::rnorm(n), q2 = latent_b + stats::rnorm(n),
-                        q3 = latent_b + stats::rnorm(n), stringsAsFactors = FALSE)
+  group_b <- data.frame(g = "B", q1 = balanced_col(latent_b), q2 = balanced_col(latent_b),
+                        q3 = balanced_col(latent_b), stringsAsFactors = FALSE)
+  # Sanity: on their own the two groups really would disagree, which is what makes the
+  # single-choice assertion below meaningful.
+  expect_false(identical(select_factor_correlation_type(group_a[, c("q1","q2","q3")])$selected_method,
+                         select_factor_correlation_type(group_b[, c("q1","q2","q3")])$selected_method))
   grouped <- dplyr::group_by(rbind(group_a, group_b), g)
 
   model_df <- exp_factanal(grouped, q1, q2, q3, nfactors = 1, rotate = "none", parallel_n_iter = 3)
@@ -656,7 +690,7 @@ test_that("an unsupported facet is skipped, not fatal, under Repeat By (issue #2
   latent <- stats::rnorm(n)
   ordinal_col <- function() {
     z <- 0.75 * latent + sqrt(1 - 0.75^2) * stats::rnorm(n)
-    as.integer(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
+    ordered_five(cut(z, breaks = c(-Inf, stats::quantile(z, c(.55, .75, .88, .96)), Inf), labels = FALSE))
   }
   good <- data.frame(g = "good", q1 = sample(c("yes", "no"), n, TRUE),
                      q2 = ordinal_col(), q3 = ordinal_col(), stringsAsFactors = FALSE)
