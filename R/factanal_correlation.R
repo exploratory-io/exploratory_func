@@ -65,9 +65,23 @@ get_factor_category_levels <- function(x, supplied_levels = NULL) {
 # "numeric", which would mean a 1-to-5 survey item imported as an integer -- the
 # exact data the polychoric request is about -- never reaches the ordinal branch.
 # So numeric columns are treated as ordinal only when they look like a rating
-# scale: consecutive integers, 3 to `max_categories` of them, starting at 0 or 1.
-# A measurement like cyl (4, 6, 8) or a count is not consecutive-from-0/1 and
-# stays numeric, so existing all-numeric analyses keep using Pearson.
+# scale: consecutive integers, 3 to `max_categories` of them, starting close to
+# 0 or 1.
+#
+# "Starts close to" (0, 1, or 2), not "starts exactly at 0 or 1" (issue #37344):
+# a skewed-positive item (e.g. satisfaction) routinely draws zero responses at
+# its lowest category in a given sample even though the scale itself runs from
+# 1. Requiring the SAMPLE's observed minimum to be exactly 0/1 misreads that
+# sampling gap as evidence the column isn't a rating scale at all, silently
+# falling back to "numeric" -- which can flip an entire multi-item selection
+# from Polychoric to Mixed (or Pearson) because one sibling item happened not
+# to draw a floor response. Tolerating a one-category gap at the low end keeps
+# genuine measurements like cyl (4, 6, 8) or a count starting well above 2 out
+# (those fail the consecutive-integers check below, or fall outside this
+# tolerance), while accepting the sampling-gap case.
+#
+# A measurement like cyl (4, 6, 8) or a count is not consecutive-from-a-low-
+# floor and stays numeric, so existing all-numeric analyses keep using Pearson.
 # -----------------------------------------------------------------------------
 is_rating_scale_numeric <- function(observed, max_categories = 7) {
   observed <- observed[is.finite(observed)]
@@ -76,7 +90,7 @@ is_rating_scale_numeric <- function(observed, max_categories = 7) {
   values <- sort(unique(observed))
   n_values <- length(values)
   if (n_values < 3 || n_values > max_categories) return(FALSE)
-  if (!(min(values) %in% c(0, 1))) return(FALSE)
+  if (!(min(values) %in% c(0, 1, 2))) return(FALSE)
   # Consecutive integers only: 1,2,3,4,5 yes; 1,2,5 no.
   identical(as.numeric(max(values) - min(values) + 1), as.numeric(n_values))
 }

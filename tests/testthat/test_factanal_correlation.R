@@ -115,6 +115,33 @@ test_that("numeric rating-scale detection does not reclassify ordinary measureme
   expect_equal(select_factor_correlation_type(mtcars[, c("cyl", "mpg", "hp", "drat")])$selected_method, "pearson")
 })
 
+test_that("numeric rating-scale detection tolerates a sample that never observed the scale's low end (issue #37344)", {
+  # A skewed-positive 1-5 satisfaction item routinely gets zero "1" responses in a given
+  # sample even though the scale itself runs 1-5. The observed minimum (2) must not make
+  # this read as an ordinary numeric measurement.
+  expect_true(is_rating_scale_numeric(c(2, 3, 4, 5)))
+  expect_true(is_rating_scale_numeric(c(2, 3, 4)))
+  # A minimum this far from a plausible 0/1 floor still reads as an ordinary measurement,
+  # not a rating scale that simply missed its low end -- unchanged from the #26623 behavior.
+  expect_false(is_rating_scale_numeric(c(3, 4, 5)))
+  expect_false(is_rating_scale_numeric(c(4, 5, 6, 7)))
+
+  # Three sibling 1-5 satisfaction items where ONE never sampled a "1" response must all
+  # still classify as ordinal (not mixed): a per-column sampling gap must not change the
+  # correlation method chosen for the whole analysis.
+  set.seed(37344)
+  n <- 500
+  df <- data.frame(
+    a = pmin(pmax(round(stats::rnorm(n, mean = 3.6)), 1), 5),
+    b = pmin(pmax(round(stats::rnorm(n, mean = 3.6)), 2), 5), # this sample never observes "1"
+    c = pmin(pmax(round(stats::rnorm(n, mean = 3.6)), 1), 5)
+  )
+  expect_equal(min(df$b), 2)
+  selection <- select_factor_correlation_type(df)
+  expect_equal(unname(selection$variable_summary$detected_type), c("ordinal", "ordinal", "ordinal"))
+  expect_true(selection$selected_method %in% c("polychoric", "pearson"))
+})
+
 test_that("exp_factanal Pearson results are unchanged by the correlation-type support (issue #26623)", {
   set.seed(3)
   n <- 200
