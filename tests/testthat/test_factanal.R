@@ -51,7 +51,7 @@ test_that("exp_factanal with default orthogonal varimax rotation", {
     # New report tidy types (issue #37018).
     res <- model_df %>% tidy_rowwise(model, type="suitability")
     expect_equal(colnames(res), c("Metric", "Value", "Judgement", "Description", "status"))
-    expect_equal(res$Metric, c("KMO", "Bartlett's Test of Sphericity (P Value)", "Rows Used", "Variables Used")) # #37340
+    expect_equal(res$Metric, c("KMO", "Bartlett's Test of Sphericity (P Value)")) # #37340; Rows Used/Variables Used dropped in #37402
     res <- model_df %>% tidy_rowwise(model, type="factor_count")
     expect_equal(colnames(res), c("Method", "Recommended Number of Factors", "Description"))
     expect_equal(res$Method, c("Kaiser Criterion", "Parallel Analysis", "Scree Plot"))
@@ -452,8 +452,7 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
                  rotate = "varimax", cor_type = "pearson", parallel_n_iter = 5)
   fit <- model_df$model[[1]]
 
-  # --- variances_judged: one row per correlation-matrix eigenvalue (per VARIABLE, like PCA's PCn),
-  # so every candidate factor is judged -- not just the extracted ones.
+  # --- variances_judged: one row per variable (every candidate factor, like PCA's PCn).
   judged <- tidy(fit, type = "variances_judged")
   expect_equal(colnames(judged),
                c("Factor", "Eigenvalue", "% Variance", "Cummulated % Variance",
@@ -462,15 +461,16 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   n_var <- length(fit$communality)
   expect_equal(nrow(judged), n_var)
   expect_equal(judged$Factor, as.character(seq_len(n_var)))
-  # Eigenvalues come off eigen(x$correlation) -- the SAME basis as screeplot / parallel_screeplot,
-  # descending, and the ratios are eigenvalue shares summing to 100%.
-  expect_equal(judged$Eigenvalue, eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values)
+  # Displayed Eigenvalue matches parallel_screeplot (factor-model / SMC actuals), NOT the plain
+  # correlation-matrix eigenvalues -- otherwise the scree tooltip and this table disagree (tam#37402).
+  scree <- tidy(fit, type = "parallel_screeplot")
+  expect_equal(judged$Eigenvalue, scree$Eigenvalue)
   expect_equal(sum(judged$`% Variance`), 100)
   expect_equal(judged$`Cummulated % Variance`, cumsum(judged$`% Variance`))
   expect_equal(judged$`Cummulated % Variance`[[n_var]], 100)
-  # Kaiser mirrors the factor_count branch's kaiser_n (eigenvalue > 1) and is ALWAYS judged for
-  # factor analysis (always a correlation matrix) -- never "na" the way covariance-scaled PCA is.
-  expect_equal(sum(judged$kaiser_status == "adopted"), sum(judged$Eigenvalue > 1))
+  # Kaiser still uses correlation-matrix eigenvalues (> 1), matching factor_count's kaiser_n.
+  corr_eig <- eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values
+  expect_equal(sum(judged$kaiser_status == "adopted"), sum(corr_eig > 1))
   expect_false(any(judged$kaiser_status == "na"))
   # Selected = the factors this analysis actually extracted (nfactors), first rows only.
   expect_equal(judged$selected_status, ifelse(seq_len(n_var) <= 2, "adopted", "not_adopted"))
@@ -481,24 +481,29 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   expect_true(all(judged$`Kaiser Criterion` %in% c("Adopted", "Not Adopted")))
   expect_true(all(judged$parallel_status %in% c("adopted", "not_adopted", "na")))
   # Parallel analysis unavailable (old saved model) degrades to Not Available / na, same shape.
+  # Displayed Eigenvalue then falls back to correlation-matrix eigenvalues.
   no_par <- fit
   no_par$parallel <- NULL
   judged_no_par <- tidy(no_par, type = "variances_judged")
   expect_equal(unique(judged_no_par$`Parallel Analysis`), "Not Available")
+  expect_equal(judged_no_par$Eigenvalue, corr_eig)
   expect_equal(unique(judged_no_par$parallel_status), "na")
   expect_equal(nrow(judged_no_par), n_var)
 
   # --- analysis_method: counts first, then the method rows (#37340).
   method_tbl <- tidy(fit, type = "analysis_method")
-  expect_equal(method_tbl$Item, c("Number of Variables", "Row Count", "Correlation",
+  expect_equal(method_tbl$Item, c("Number of Variables", "Row Count", "Rows Removed", "Correlation",
                                   "Factor Extraction Method", "Rotation", "Parallel Analysis Method"))
   expect_equal(method_tbl$Value[[1]], as.character(n_var))
   expect_equal(method_tbl$Value[[2]], as.character(nrow(mtcars)))
-  expect_equal(method_tbl$Value[[3]], "Pearson Correlation")
+  # mtcars has no NAs on the selected columns, so nothing was removed. (tam#37402)
+  expect_equal(method_tbl$Value[[3]], "0 (0.0%)")
+  expect_equal(method_tbl$Value[[4]], "Pearson Correlation")
 
   # --- suitability: Metric names the P value, the Value cell holds the value ONLY, and the
   # small-p threshold is 0.0001 (was 0.001).
   suit <- tidy(fit, type = "suitability")
+  expect_equal(nrow(suit), 2) # Rows Used / Variables Used removed (tam#37402)
   expect_equal(suit$Metric[[2]], "Bartlett's Test of Sphericity (P Value)")
   expect_false(grepl("p", suit$Value[[2]], fixed = TRUE)) # no "p < " / "p = " prefix
   expect_true(grepl("^(< 0\\.0001|[0-9]+\\.[0-9]{4}|N/A)$", suit$Value[[2]]))
@@ -514,6 +519,28 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   expect_equal(tidy(fake, type = "suitability")$Value[[2]], "0.0300")
   fake$bartlett <- NULL
   expect_equal(tidy(fake, type = "suitability")$Value[[2]], "N/A")
+})
+
+test_that("analysis_method reports Rows Removed under Row Count (tam#37402)", {
+  # Inject missing values so preprocess_factanal_data_before_sample drops rows. Sampling is
+  # NOT counted as removed -- only the NA/Inf filter is.
+  df <- mtcars[, c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec")]
+  df$mpg[1:5] <- NA_real_
+  fit <- exp_factanal(df, mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 2, fm = "minres",
+                      rotate = "varimax", cor_type = "pearson", parallel_n_iter = 3)$model[[1]]
+  expect_equal(fit$n_rows_excluded, 5L)
+  expect_equal(fit$n_rows_used, nrow(df) - 5L)
+  method_tbl <- tidy(fit, type = "analysis_method")
+  expect_equal(method_tbl$Item[[2]], "Row Count")
+  expect_equal(method_tbl$Item[[3]], "Rows Removed")
+  expect_equal(method_tbl$Item[[4]], "Correlation")
+  expect_equal(method_tbl$Value[[2]], as.character(nrow(df) - 5L))
+  expect_equal(method_tbl$Value[[3]], paste0("5 (", format(round(5 / nrow(df) * 100, 1), nsmall = 1), "%)"))
+  # Old saved models without n_rows_excluded still emit the row as N/A so the table shape is stable.
+  legacy <- fit
+  legacy$n_rows_excluded <- NULL
+  legacy$n_rows_input <- NULL
+  expect_equal(tidy(legacy, type = "analysis_method")$Value[[3]], "N/A")
 })
 
 test_that("report part 3: an over-parameterized fit legitimately has no fit test (issue tam#37340)", {
