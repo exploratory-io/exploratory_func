@@ -461,15 +461,16 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   n_var <- length(fit$communality)
   expect_equal(nrow(judged), n_var)
   expect_equal(judged$Factor, as.character(seq_len(n_var)))
-  # Displayed Eigenvalue matches parallel_screeplot (factor-model / SMC actuals), NOT the plain
-  # correlation-matrix eigenvalues -- otherwise the scree tooltip and this table disagree (tam#37402).
-  scree <- tidy(fit, type = "parallel_screeplot")
-  expect_equal(judged$Eigenvalue, scree$Eigenvalue)
+  # Displayed Eigenvalue / % Variance use correlation-matrix eigenvalues (not parallel
+  # factor-model actuals). Parallel actuals can be negative and make % Variance exceed 100%
+  # or go negative when used as the share basis (tam#37402 follow-up).
+  corr_eig <- eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values
+  expect_equal(judged$Eigenvalue, corr_eig)
   expect_equal(sum(judged$`% Variance`), 100)
   expect_equal(judged$`Cummulated % Variance`, cumsum(judged$`% Variance`))
   expect_equal(judged$`Cummulated % Variance`[[n_var]], 100)
+  expect_true(all(judged$`% Variance` >= 0 | !is.finite(judged$`% Variance`)))
   # Kaiser still uses correlation-matrix eigenvalues (> 1), matching factor_count's kaiser_n.
-  corr_eig <- eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values
   expect_equal(sum(judged$kaiser_status == "adopted"), sum(corr_eig > 1))
   expect_false(any(judged$kaiser_status == "na"))
   # Selected = the factors this analysis actually extracted (nfactors), first rows only.
@@ -481,7 +482,6 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   expect_true(all(judged$`Kaiser Criterion` %in% c("Adopted", "Not Adopted")))
   expect_true(all(judged$parallel_status %in% c("adopted", "not_adopted", "na")))
   # Parallel analysis unavailable (old saved model) degrades to Not Available / na, same shape.
-  # Displayed Eigenvalue then falls back to correlation-matrix eigenvalues.
   no_par <- fit
   no_par$parallel <- NULL
   judged_no_par <- tidy(no_par, type = "variances_judged")

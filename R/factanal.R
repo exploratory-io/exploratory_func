@@ -935,21 +935,20 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # so the client can reuse the PCA table's viz configuration.
     #
     # One row per variable (every candidate factor), exactly like PCA's PC1..PCn.
-    # DISPLAYED Eigenvalue / % Variance MUST match parallel_screeplot (tam#37402): that chart
-    # uses the parallel-analysis actual eigenvalues (factor-model or SMC), NOT the plain
-    # correlation-matrix eigenvalues. Showing eigen(x$correlation) here made Factor 2 read
-    # 1.82 in the table while the scree tooltip showed 1.1 for the same factor.
-    # Kaiser Criterion still judges against the correlation-matrix eigenvalues (> 1) -- that is
-    # the traditional Kaiser rule and matches factor_count's kaiser_n. So the Kaiser column can
-    # disagree with a naive reading of the displayed (factor-model) Eigenvalue; that is
-    # intentional.
+    # DISPLAYED Eigenvalue / % Variance use the correlation-matrix eigenvalues
+    # (eigen(x$correlation)). Factor-model / SMC eigenvalues used by parallel analysis can be
+    # negative and their signed sum is far smaller than n_vars, so using them for % Variance
+    # produced values above 100% and negative contribution rates (tam#37402 follow-up).
+    # Parallel Analysis still judges against those parallel actuals vs the random threshold;
+    # Kaiser Criterion still uses corr_eig > 1. The parallel screeplot may therefore show a
+    # different Eigenvalue number than this table for the same factor -- that is intentional.
     # % Variance here remains an eigenvalue-share and can legitimately differ from the
     # 「各因子の寄与率」 chart, which is Vaccounted-based.
     corr_eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
     n_row <- length(corr_eig)
+    eig <- corr_eig
     par <- x$parallel
     if (is.null(par)) {
-      eig <- corr_eig
       parallel_label <- rep("Not Available", n_row)
       parallel_status <- rep("na", n_row)
     }
@@ -960,9 +959,6 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       threshold <- rep(NA_real_, n_row)
       actual[ptbl$factor_number[in_range]] <- ptbl$actual_eigenvalue[in_range]
       threshold[ptbl$factor_number[in_range]] <- ptbl$random_eigenvalue_threshold[in_range]
-      # Prefer parallel's actual eigenvalues for the displayed column (same curve as the scree).
-      # Fall back to correlation-matrix eigenvalues only where parallel did not return a value.
-      eig <- ifelse(!is.na(actual), actual, corr_eig)
       adopted <- !is.na(actual) & !is.na(threshold) & actual > threshold
       parallel_label <- ifelse(adopted, "Adopted", "Not Adopted")
       parallel_status <- ifelse(adopted, "adopted", "not_adopted")
