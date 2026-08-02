@@ -508,6 +508,11 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
     # guarded so a singular/degenerate correlation matrix degrades to NA instead of aborting.
     fit$n_rows_used <- nrow(cleaned_df)
     fit$n_variables <- ncol(cleaned_df)
+    # Rows dropped by NA/Inf filtering (tam#37402). Compared against the post-sample
+    # input so sampling itself is NOT counted as "removed". Kept separately from
+    # n_rows_used so analysis_method can report both 「行数」 and 「削除された行数」.
+    fit$n_rows_input <- nrow(df)
+    fit$n_rows_excluded <- max(0L, as.integer(nrow(df) - nrow(cleaned_df)))
     # KMO and Bartlett take the correlation MATRIX (never the raw data): passing raw data would
     # make psych recompute a Pearson correlation internally and silently contradict a polychoric
     # fit. cortest.bartlett also needs n explicitly, or it assumes n = 100. (issue #26623)
@@ -557,6 +562,36 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
     `BIC` = safe_num(x$BIC)
   )
   res
+}
+
+# Factor-count diagnostics shared by the normal scree plot, parallel-analysis
+# chart, and factor-count table. Keeping the alignment here prevents those three
+# report outputs from independently interpreting the parallel-analysis table.
+build_factor_count_diagnostics <- function(x) {
+  correlation_eigenvalues <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
+  n_factors <- length(correlation_eigenvalues)
+  parallel_eigenvalues <- rep(NA_real_, n_factors)
+  random_eigenvalues <- rep(NA_real_, n_factors)
+  parallel_adopted <- rep(NA, n_factors)
+
+  if (!is.null(x$parallel) && !is.null(x$parallel$table)) {
+    parallel_table <- x$parallel$table
+    valid <- parallel_table$factor_number >= 1 & parallel_table$factor_number <= n_factors
+    factor_index <- parallel_table$factor_number[valid]
+    parallel_eigenvalues[factor_index] <- parallel_table$actual_eigenvalue[valid]
+    random_eigenvalues[factor_index] <- parallel_table$random_eigenvalue_threshold[valid]
+    parallel_adopted[factor_index] <- parallel_eigenvalues[factor_index] > random_eigenvalues[factor_index]
+  }
+
+  tibble::tibble(
+    factor_number = seq_len(n_factors),
+    correlation_eigenvalue = correlation_eigenvalues,
+    parallel_eigenvalue = parallel_eigenvalues,
+    random_eigenvalue = random_eigenvalues,
+    kaiser_adopted = correlation_eigenvalues > 1,
+    parallel_adopted = parallel_adopted,
+    selected_adopted = seq_len(n_factors) <= x$factors
+  )
 }
 
 #' extracts results from psych::fa object as a dataframe
@@ -609,8 +644,11 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   n_factor <- x$factors # Number of factors.
 
   if (type == "screeplot") {
-    eigen_res <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
-    res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
+    diagnostics <- build_factor_count_diagnostics(x)
+    res <- diagnostics %>% dplyr::transmute(
+      factor = factor_number,
+      eigenvalue = correlation_eigenvalue
+    )
   }
   else if (type == "variances") {
     res <- tibble::as_tibble(t(x$Vaccounted))
@@ -806,22 +844,43 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # formatC(format = "f") -- NOT format(nsmall = 4), which switches to scientific notation for a
     # small-but-above-threshold p (0.0002 rendered as "2e-04").
     bart_val <- if (is.na(p)) "N/A" else if (p < 0.0001) "< 0.0001" else formatC(p, format = "f", digits = 4)
-    rows_used <- if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A"
-    variables_used <- if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A"
+    # tam#37402: Rows Used / Variables Used are already shown in analysis_method
+    # (Number of Variables / Row Count), so keep this table to KMO + Bartlett only.
     res <- tibble::tibble(
-      Metric = c("KMO", "Bartlett's Test of Sphericity (P Value)", "Rows Used", "Variables Used"),
-      Value = c(kmo_val, bart_val, rows_used, variables_used),
-      Judgement = c(kj$label, bj$label, "", ""),
-      Description = c(kj$description, bj$description,
-                      "Number of rows used after removing missing values.",
-                      "Number of variables used in the analysis."),
-      status = c(kj$status, bj$status, "", "")
+      Metric = c("KMO", "Bartlett's Test of Sphericity (P Value)"),
+      Value = c(kmo_val, bart_val),
+      Judgement = c(kj$label, bj$label),
+      Description = c(kj$description, bj$description),
+      status = c(kj$status, bj$status)
     )
   }
   else if (type == "analysis_method") {
     # Report header table: what the numbers below were actually computed with. (issue #26623)
     cor_type <- if (is.null(x$correlation_type)) "pearson" else x$correlation_type
     rotation <- if (!is.null(x$rotation)) x$rotation else "none"
+    # 「削除された行数」directly under 「行数」 (tam#37402). Do NOT reuse PCA's "Rows Excluded"
+    # key -- that already maps to 除外された行数 in the client's VizUtil; this report wants
+    # 削除された行数, so the English-canonical Item is the distinct "Rows Removed".
+    # Format matches PCA's analysis_conditions ("12 (4.0%)"); old saved models without
+    # n_rows_excluded degrade to "N/A" so the row still exists and the table shape stays stable.
+    rows_removed_value <- {
+      if (is.null(x$n_rows_excluded) || length(x$n_rows_excluded) != 1L || is.na(x$n_rows_excluded)) {
+        "N/A"
+      } else {
+        n_ex <- as.integer(x$n_rows_excluded)
+        n_in <- if (!is.null(x$n_rows_input) && length(x$n_rows_input) == 1L && !is.na(x$n_rows_input)) {
+          as.integer(x$n_rows_input)
+        } else {
+          NA_integer_
+        }
+        if (is.na(n_in) || n_in <= 0L) {
+          as.character(n_ex)
+        } else {
+          pct <- n_ex / n_in * 100
+          paste0(n_ex, " (", format(round(pct, 1), nsmall = 1), "%)")
+        }
+      }
+    }
     res <- tibble::tibble(
       # The variable / row counts come FIRST (issue tam#37340): the section is now
       # 「分析条件とデータの確認」, which leads with what data was analyzed. The method rows keep
@@ -832,11 +891,13 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # ALREADY carries with exactly the wanted JA (変数の数 / 行数) from PCA's analysis_conditions
       # table (#37268), so no new translation key is needed. Do NOT use "Number of Rows": that key
       # is bound to 行の数 elsewhere in the same map.
-      Item = c("Number of Variables", "Row Count", "Correlation", "Factor Extraction Method",
-               "Rotation", "Parallel Analysis Method"),
+      # tam#37402: "Rows Removed" sits directly under "Row Count", before Correlation.
+      Item = c("Number of Variables", "Row Count", "Rows Removed", "Correlation",
+               "Factor Extraction Method", "Rotation", "Parallel Analysis Method"),
       Value = c(
         if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A",
         if (length(x$n_rows_used) == 1L && !is.na(x$n_rows_used)) as.character(x$n_rows_used) else "N/A",
+        rows_removed_value,
         factanal_correlation_label(cor_type),
         factanal_extraction_method_label(x$fm),
         factanal_rotation_label(rotation),
@@ -902,75 +963,40 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     )
   }
   else if (type == "variances_judged") {
-    # Per-factor eigenvalue table with the three retention judgments, for the report's
-    # 「因子数の判定」 section (issue tam#37340). Same shape as prcomp.R's "variances_judged" branch
-    # so the client can reuse the PCA table's viz configuration.
-    #
-    # One row per correlation-matrix eigenvalue (i.e. per VARIABLE, not per extracted factor): the
-    # judgments only mean something when every candidate factor is listed, exactly like PCA's
-    # PC1..PCn. Eigenvalue / % Variance / Cummulated % Variance therefore all come off the SAME
-    # eigen(x$correlation) basis the screeplot / parallel_screeplot / factor_count branches use --
-    # NOT psych's Vaccounted "Proportion Var", which only exists for the extracted factors and
-    # would leave the remaining rows empty. So the ratios here are eigenvalue shares and can
-    # legitimately differ from the 「各因子の寄与率」 chart, which is Vaccounted-based.
-    eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
-    n_row <- length(eig)
-    total_variance <- sum(eig)
-    pct_variance <- if (is.finite(total_variance) && total_variance != 0) eig / total_variance * 100 else rep(NA_real_, n_row)
-    par <- x$parallel
-    if (is.null(par)) {
-      parallel_label <- rep("Not Available", n_row)
-      parallel_status <- rep("na", n_row)
-    }
-    else {
-      ptbl <- par$table
-      in_range <- ptbl$factor_number <= n_row
-      actual <- rep(NA_real_, n_row)
-      threshold <- rep(NA_real_, n_row)
-      actual[ptbl$factor_number[in_range]] <- ptbl$actual_eigenvalue[in_range]
-      threshold[ptbl$factor_number[in_range]] <- ptbl$random_eigenvalue_threshold[in_range]
-      adopted <- !is.na(actual) & !is.na(threshold) & actual > threshold
-      parallel_label <- ifelse(adopted, "Adopted", "Not Adopted")
-      parallel_status <- ifelse(adopted, "adopted", "not_adopted")
-    }
-    # Kaiser is always meaningful here: factor analysis always fits a correlation matrix, so the
-    # eigenvalue >= 1 rule applies unconditionally (unlike PCA, where a covariance-scaled fit makes
-    # it "na"). The comparison matches the factor_count branch's kaiser_n (eig > 1).
-    # "Adopted" / "Not Adopted", not PCA's "Adopt" / "Not Adopted": the pair reads as a judgment in
-    # the English report, and both map to the same 採用 / 非採用 in Japanese. (tam#37340)
-    kaiser_adopted <- eig > 1
-    # Adopted = the factors this analysis actually extracted (the nfactors setting).
-    selected_adopted <- seq_len(n_row) <= n_factor
-    res <- tibble::tibble(
-      Factor = as.character(seq_len(n_row)),
-      Eigenvalue = eig,
-      `% Variance` = pct_variance,
-      `Cummulated % Variance` = cumsum(pct_variance),
-      `Parallel Analysis` = parallel_label,
+    diagnostics <- build_factor_count_diagnostics(x)
+    parallel_label <- dplyr::case_when(
+      is.na(diagnostics$parallel_adopted) ~ "Not Available",
+      diagnostics$parallel_adopted ~ "Adopted",
+      TRUE ~ "Not Adopted"
+    )
+    parallel_status <- dplyr::case_when(
+      is.na(diagnostics$parallel_adopted) ~ "na",
+      diagnostics$parallel_adopted ~ "adopted",
+      TRUE ~ "not_adopted"
+    )
+    res <- diagnostics %>% dplyr::transmute(
+      Factor = as.character(factor_number),
+      `Correlation Matrix Eigenvalue` = correlation_eigenvalue,
+      `Parallel Analysis Eigenvalue` = parallel_eigenvalue,
+      `Random Data Eigenvalue` = random_eigenvalue,
       `Kaiser Criterion` = ifelse(kaiser_adopted, "Adopted", "Not Adopted"),
-      # Column name "Adoption", not PCA's "Selected": the cells read "Adopted" / "Not Adopted", so a
-      # "Selected" header would not agree with its own values in the English report. Both map to
-      # 採否 / 採用 / 非採用 in Japanese. (tam#37340)
-      Adoption = ifelse(selected_adopted, "Adopted", "Not Adopted"),
-      parallel_status = parallel_status,
+      `Parallel Analysis` = parallel_label,
+      `Adopted in Analysis` = ifelse(selected_adopted, "Adopted", "Not Adopted"),
       kaiser_status = ifelse(kaiser_adopted, "adopted", "not_adopted"),
+      parallel_status = parallel_status,
       selected_status = ifelse(selected_adopted, "adopted", "not_adopted")
     )
   }
   else if (type == "parallel_screeplot") {
-    par <- x$parallel
-    # The actual-data curve MUST be the same kind of eigenvalue the parallel analysis itself used
-    # (factor-model or SMC) -- not the plain correlation-matrix eigenvalues -- or the chart compares
-    # two different quantities against each other. (issue tam#37332 section 9)
-    if (is.null(par)) {
-      n_vars <- ncol(x$correlation)
-      eig <- rep(NA_real_, n_vars)
-      threshold <- rep(NA_real_, n_vars)
-    } else {
-      eig <- par$table$actual_eigenvalue
-      threshold <- par$table$random_eigenvalue_threshold
-    }
-    res <- tibble::tibble(Factor = seq_along(eig), Eigenvalue = eig, `Random Data Eigenvalue` = threshold)
+    diagnostics <- build_factor_count_diagnostics(x)
+    recommended_n <- if (is.null(x$parallel)) NA_integer_ else x$parallel$recommended_n
+    res <- diagnostics %>% dplyr::transmute(
+      Factor = factor_number,
+      `Actual Data Eigenvalue` = parallel_eigenvalue,
+      `Random Data Eigenvalue` = random_eigenvalue,
+      `Recommended Number of Factors` = recommended_n,
+      `Selected Number of Factors` = x$factors
+    )
   }
   else if (type == "score_coefficients") {
     # Factor score coefficients (因子得点係数 / SPSS's Factor Score Coefficient Matrix) -- the weights
