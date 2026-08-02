@@ -57,7 +57,8 @@ test_that("exp_factanal with default orthogonal varimax rotation", {
     expect_equal(res$Method, c("Kaiser Criterion", "Parallel Analysis", "Scree Plot"))
     expect_equal(res$`Recommended Number of Factors`[3], "Check the chart")
     res <- model_df %>% tidy_rowwise(model, type="parallel_screeplot")
-    expect_equal(colnames(res), c("Factor", "Eigenvalue", "Random Data Eigenvalue"))
+    expect_equal(colnames(res), c("Factor", "Actual Data Eigenvalue", "Random Data Eigenvalue",
+                                  "Recommended Number of Factors", "Selected Number of Factors"))
     res <- model_df %>% tidy_rowwise(model, type="loadings_wide")
     expect_equal(colnames(res), c("variable", "Factor 1", "Factor 2", "Factor 3", "Judgement", "judgement_status", "primary_factor", "secondary_factors", "direction"))
     # Every status token must be one of the known set (guards against a typo drifting from the client tooltip keys).
@@ -311,7 +312,7 @@ test_that("factor analysis report judgment helpers (issue #37018)", {
   expect_equal(judge_loading(c(`Factor 1` = NA_real_, `Factor 2` = NA_real_))$status, "na")
   old_fa <- structure(list(), class = "fa_exploratory")
   expect_equal(tidy.fa_exploratory(old_fa, type = "suitability")$Value,
-               c("N/A", "N/A", "N/A", "N/A"))
+               c("N/A", "N/A"))
 
   # Communality bar (#37018): a Heywood case (communality > 1) leaves communality UNCAPPED so the
   # numeric label shows the actual value (e.g. 105); the chart's 0-100 value-axis range clips the
@@ -411,8 +412,8 @@ test_that("parallel analysis method: factor_model vs smc (issue #37332)", {
   # factor-model/SMC eigenvalues differ from PCA-style correlation-matrix eigenvalues.
   screeplot_res <- model_df %>% tidy_rowwise(model, type = "screeplot")
   parallel_screeplot_res <- model_df %>% tidy_rowwise(model, type = "parallel_screeplot")
-  expect_equal(parallel_screeplot_res$Eigenvalue, fit$parallel$table$actual_eigenvalue)
-  expect_false(isTRUE(all.equal(parallel_screeplot_res$Eigenvalue, screeplot_res$eigenvalue)))
+  expect_equal(parallel_screeplot_res$`Actual Data Eigenvalue`, fit$parallel$table$actual_eigenvalue)
+  expect_false(isTRUE(all.equal(parallel_screeplot_res$`Actual Data Eigenvalue`, screeplot_res$eigenvalue)))
   # The normal (non-parallel) scree plot is untouched by the method selection (issue #37332 section 10).
   expect_equal(screeplot_res$eigenvalue, eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values)
 
@@ -452,30 +453,25 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
                  rotate = "varimax", cor_type = "pearson", parallel_n_iter = 5)
   fit <- model_df$model[[1]]
 
-  # --- variances_judged: one row per variable (every candidate factor, like PCA's PCn).
+  # --- variances_judged: one row per variable with all three eigenvalue series used by
+  # the factor-count diagnostics (tam#37440).
   judged <- tidy(fit, type = "variances_judged")
   expect_equal(colnames(judged),
-               c("Factor", "Eigenvalue", "% Variance", "Cummulated % Variance",
-                 "Parallel Analysis", "Kaiser Criterion", "Adoption",
-                 "parallel_status", "kaiser_status", "selected_status"))
+               c("Factor", "Correlation Matrix Eigenvalue", "Parallel Analysis Eigenvalue",
+                 "Random Data Eigenvalue", "Kaiser Criterion", "Parallel Analysis",
+                 "Adopted in Analysis", "kaiser_status", "parallel_status", "selected_status"))
   n_var <- length(fit$communality)
   expect_equal(nrow(judged), n_var)
   expect_equal(judged$Factor, as.character(seq_len(n_var)))
-  # Displayed Eigenvalue / % Variance use correlation-matrix eigenvalues (not parallel
-  # factor-model actuals). Parallel actuals can be negative and make % Variance exceed 100%
-  # or go negative when used as the share basis (tam#37402 follow-up).
   corr_eig <- eigen(fit$correlation, symmetric = TRUE, only.values = TRUE)$values
-  expect_equal(judged$Eigenvalue, corr_eig)
-  expect_equal(sum(judged$`% Variance`), 100)
-  expect_equal(judged$`Cummulated % Variance`, cumsum(judged$`% Variance`))
-  expect_equal(judged$`Cummulated % Variance`[[n_var]], 100)
-  expect_true(all(judged$`% Variance` >= 0 | !is.finite(judged$`% Variance`)))
+  expect_equal(judged$`Correlation Matrix Eigenvalue`, corr_eig)
+  expect_equal(judged$`Parallel Analysis Eigenvalue`, fit$parallel$table$actual_eigenvalue)
+  expect_equal(judged$`Random Data Eigenvalue`, fit$parallel$table$random_eigenvalue_threshold)
   # Kaiser still uses correlation-matrix eigenvalues (> 1), matching factor_count's kaiser_n.
   expect_equal(sum(judged$kaiser_status == "adopted"), sum(corr_eig > 1))
   expect_false(any(judged$kaiser_status == "na"))
-  # Selected = the factors this analysis actually extracted (nfactors), first rows only.
   expect_equal(judged$selected_status, ifelse(seq_len(n_var) <= 2, "adopted", "not_adopted"))
-  expect_equal(judged$Adoption, ifelse(seq_len(n_var) <= 2, "Adopted", "Not Adopted"))
+  expect_equal(judged$`Adopted in Analysis`, ifelse(seq_len(n_var) <= 2, "Adopted", "Not Adopted"))
   # Labels stay English-canonical; the client translates them. "Adopted" (not PCA's "Adopt") so the
   # English report reads as a judgment against "Not Adopted".
   expect_true(all(judged$`Parallel Analysis` %in% c("Adopted", "Not Adopted", "Not Available")))
@@ -486,7 +482,9 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   no_par$parallel <- NULL
   judged_no_par <- tidy(no_par, type = "variances_judged")
   expect_equal(unique(judged_no_par$`Parallel Analysis`), "Not Available")
-  expect_equal(judged_no_par$Eigenvalue, corr_eig)
+  expect_equal(judged_no_par$`Correlation Matrix Eigenvalue`, corr_eig)
+  expect_true(all(is.na(judged_no_par$`Parallel Analysis Eigenvalue`)))
+  expect_true(all(is.na(judged_no_par$`Random Data Eigenvalue`)))
   expect_equal(unique(judged_no_par$parallel_status), "na")
   expect_equal(nrow(judged_no_par), n_var)
 
