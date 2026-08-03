@@ -212,17 +212,7 @@ exp_mca_aggregated <- function(df, row_category, ...,
                                   ~ dplyr::if_else(is.na(.x), 0, as.numeric(.x))))
 
     count_values <- as.matrix(counts_df[, value_cols, drop = FALSE])
-    if (any(!is.finite(count_values))) {
-      stop("The aggregated counts must be finite numbers.")
-    }
-    if (any(count_values < 0)) {
-      stop("The aggregated counts must not be negative.")
-    }
-    # Chi-square residuals, the Fisher exact test and the Monte Carlo p-value all
-    # require whole counts. Weighted (fractional) counts are not supported.
-    if (any(abs(count_values - round(count_values)) > 1e-8)) {
-      stop("The aggregated counts must be whole numbers.")
-    }
+    .ca_validate_aggregated_counts(count_values)
 
     # Rows sharing a category label are summed rather than rejected.
     row_labels <- as.character(counts_df[[row_col]])
@@ -238,48 +228,170 @@ exp_mca_aggregated <- function(df, row_category, ...,
     names(dimnames(contingency_table)) <- c("", "")
     class(contingency_table) <- "table"
 
-    contingency_table <- contingency_table[
-      rowSums(contingency_table) > 0, colSums(contingency_table) > 0, drop = FALSE
-    ]
-    if (nrow(contingency_table) < 2 || ncol(contingency_table) < 2) {
-      if (length(grouped_cols) < 1) {
-        stop("There are not enough categories after removing rows and columns with no counts.")
-      } else {
-        return(NULL)
-      }
-    }
-
-    # A table with k rows and m columns supports at most min(k, m) - 1 dimensions.
-    effective_ncp <- min(ncp, min(dim(contingency_table)) - 1)
-
-    fit <- FactoMineR::CA(contingency_table, ncp = effective_ncp, graph = FALSE)
-    fit$analysis_type <- "CA"
-    fit$row_variable_name <- row_col
-    fit$column_variable_name <- column_variable_name
-    fit$contingency_table <- contingency_table
-    fit$section5 <- build_section5_from_factominer(
-      fit, analysis_type = "CA",
-      row_variable_name = row_col, column_variable_name = column_variable_name,
-      contingency_table = contingency_table, max_dimensions = effective_ncp
-    )
-    class(fit) <- c("ca_exploratory", "mca_exploratory", class(fit))
-
-    fit$association <- build_pairwise_association_results_from_counts(
+    .ca_fit_from_contingency_table(
       contingency_table = contingency_table,
       row_variable_name = row_col, column_variable_name = column_variable_name,
+      ncp = ncp, seed = seed,
       overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
-      alpha = alpha, simulation_count = simulation_count, seed = seed
+      alpha = alpha, simulation_count = simulation_count,
+      df = df, grouped_cols = grouped_cols
     )
+  }
 
-    fit$effective_vars <- c(row_col, column_variable_name)
-    fit$n_used <- sum(contingency_table)
-    fit$n_excluded <- 0
-    fit$category_total <- nrow(fit$section5$all_metrics %>% dplyr::distinct(variable, category))
-    fit$n_dims <- nrow(fit$eig)
-    fit$df <- df
-    fit$grouped_cols <- grouped_cols
-    fit$sampled_nrow <- NULL
-    fit
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
+# Shared assembly for both aggregated entry points (wide and long). Takes an
+# already-built contingency table and returns the ca_exploratory model object,
+# identical in shape to the 2-variable branch of exp_mca().
+# Returns NULL for a grouped input whose table collapses below 2x2, so that
+# Repeat By drops the group instead of aborting the whole analysis.
+.ca_fit_from_contingency_table <- function(contingency_table, row_variable_name,
+                                           column_variable_name, ncp, seed,
+                                           overall_adjust_method, cell_adjust_method,
+                                           alpha, simulation_count, df, grouped_cols) {
+  contingency_table <- contingency_table[
+    rowSums(contingency_table) > 0, colSums(contingency_table) > 0, drop = FALSE
+  ]
+  if (nrow(contingency_table) < 2 || ncol(contingency_table) < 2) {
+    if (length(grouped_cols) < 1) {
+      stop("There are not enough categories after removing rows and columns with no counts.")
+    } else {
+      return(NULL)
+    }
+  }
+
+  # A table with k rows and m columns supports at most min(k, m) - 1 dimensions.
+  effective_ncp <- min(ncp, min(dim(contingency_table)) - 1)
+
+  fit <- FactoMineR::CA(contingency_table, ncp = effective_ncp, graph = FALSE)
+  fit$analysis_type <- "CA"
+  fit$row_variable_name <- row_variable_name
+  fit$column_variable_name <- column_variable_name
+  fit$contingency_table <- contingency_table
+  fit$section5 <- build_section5_from_factominer(
+    fit, analysis_type = "CA",
+    row_variable_name = row_variable_name, column_variable_name = column_variable_name,
+    contingency_table = contingency_table, max_dimensions = effective_ncp
+  )
+  class(fit) <- c("ca_exploratory", "mca_exploratory", class(fit))
+
+  fit$association <- build_pairwise_association_results_from_counts(
+    contingency_table = contingency_table,
+    row_variable_name = row_variable_name, column_variable_name = column_variable_name,
+    overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
+    alpha = alpha, simulation_count = simulation_count, seed = seed
+  )
+
+  fit$effective_vars <- c(row_variable_name, column_variable_name)
+  fit$n_used <- sum(contingency_table)
+  fit$n_excluded <- 0
+  fit$category_total <- nrow(fit$section5$all_metrics %>% dplyr::distinct(variable, category))
+  fit$n_dims <- nrow(fit$eig)
+  fit$df <- df
+  fit$grouped_cols <- grouped_cols
+  fit$sampled_nrow <- NULL
+  fit
+}
+
+# Shared count validation for both aggregated entry points.
+.ca_validate_aggregated_counts <- function(count_values) {
+  if (any(!is.finite(count_values))) {
+    stop("The aggregated counts must be finite numbers.")
+  }
+  if (any(count_values < 0)) {
+    stop("The aggregated counts must not be negative.")
+  }
+  # Chi-square residuals, the Fisher exact test and the Monte Carlo p-value all
+  # require whole counts. Weighted (fractional) counts are not supported.
+  if (any(abs(count_values - round(count_values)) > 1e-8)) {
+    stop("The aggregated counts must be whole numbers.")
+  }
+  invisible(TRUE)
+}
+
+#' Correspondence Analysis for already-aggregated input in LONG format.
+#'
+#' Takes three columns - the row category, the column category, and the count for
+#' that combination - and builds the contingency table from them. The resulting
+#' model object is identical to the one exp_mca_aggregated() produces from the
+#' equivalent wide cross tab, so every tidy() type and the whole report pipeline
+#' work unchanged.
+#'
+#' Unlike the wide form there is no column_variable_name argument: the column
+#' variable's name IS the column category column's name.
+#'
+#' @param row_category Column holding the row categories.
+#' @param column_category Column holding the column categories.
+#' @param count Numeric column holding the count for each row/column combination.
+#' @export
+exp_mca_aggregated_long <- function(df, row_category, column_category, count,
+                                    ncp = 5, seed = 1,
+                                    overall_adjust_method = "holm", cell_adjust_method = "holm",
+                                    alpha = 0.05,
+                                    simulation_count = 20000) {
+  row_col <- col_name(substitute(row_category))
+  col_col <- col_name(substitute(column_category))
+  count_col <- col_name(substitute(count))
+  grouped_cols <- grouped_by(df)
+
+  for (nm in c(row_col, col_col, count_col)) {
+    if (!nm %in% colnames(df)) {
+      stop(paste0("The column is not found: ", nm))
+    }
+  }
+  if (length(unique(c(row_col, col_col, count_col))) < 3) {
+    stop("The row category, column category and count columns must be different columns.")
+  }
+  if (any(c(row_col, col_col, count_col) %in% grouped_cols)) {
+    stop("Repeat-By column cannot be used as the row category, column category or count column.")
+  }
+  if (!is.numeric(df[[count_col]])) {
+    stop("The aggregated count column must be numeric.")
+  }
+
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
+  each_func <- function(df) {
+    long_df <- df[, c(row_col, col_col, count_col), drop = FALSE]
+    # An absent cell means "no observations", which is a zero count.
+    counts <- as.numeric(long_df[[count_col]])
+    counts[is.na(counts)] <- 0
+    .ca_validate_aggregated_counts(counts)
+
+    row_labels <- as.character(long_df[[row_col]])
+    col_labels <- as.character(long_df[[col_col]])
+    row_labels[is.na(row_labels)] <- "NA"
+    col_labels[is.na(col_labels)] <- "NA"
+
+    # Keep the declared category order (factor levels, else first appearance),
+    # matching how the raw and wide paths order their categories.
+    row_levels <- unique(row_labels[order(match(row_labels,
+                                                ca_get_category_levels(long_df[[row_col]])))])
+    col_levels <- unique(col_labels[order(match(col_labels,
+                                                ca_get_category_levels(long_df[[col_col]])))])
+
+    # xtabs sums duplicated row/column combinations rather than rejecting them,
+    # mirroring how the wide path sums repeated row labels.
+    contingency_table <- xtabs(
+      counts ~ factor(row_labels, levels = row_levels) + factor(col_labels, levels = col_levels)
+    )
+    contingency_table <- round(contingency_table)
+    dimnames(contingency_table) <- list(row_levels, col_levels)
+    storage.mode(contingency_table) <- "integer"
+    names(dimnames(contingency_table)) <- c("", "")
+    class(contingency_table) <- "table"
+
+    .ca_fit_from_contingency_table(
+      contingency_table = contingency_table,
+      row_variable_name = row_col, column_variable_name = col_col,
+      ncp = ncp, seed = seed,
+      overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
+      alpha = alpha, simulation_count = simulation_count,
+      df = df, grouped_cols = grouped_cols
+    )
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
