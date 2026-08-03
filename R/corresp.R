@@ -151,6 +151,140 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
+#' Correspondence Analysis for already-aggregated (cross tab) input.
+#'
+#' Takes a wide cross tabulation: one row category column whose values are the row
+#' categories, plus two or more numeric columns whose NAMES are the column categories
+#' and whose values are the cell counts. The contingency table is handed to
+#' FactoMineR::CA directly instead of being counted from raw rows, and the resulting
+#' model object is assembled to be identical in shape to the 2-variable branch of
+#' exp_mca() - so every tidy() type and the whole report pipeline work unchanged.
+#'
+#' @param row_category Column holding the row categories.
+#' @param ... Numeric columns holding the aggregated counts. Their names become the
+#'   column categories.
+#' @param column_variable_name Display name of the variable the count columns represent.
+#'   The aggregated input has no column carrying it, so it is supplied as text.
+#' @export
+exp_mca_aggregated <- function(df, row_category, ...,
+                               column_variable_name = "Column",
+                               ncp = 5, seed = 1,
+                               overall_adjust_method = "holm", cell_adjust_method = "holm",
+                               alpha = 0.05,
+                               simulation_count = 20000) {
+  row_col <- col_name(substitute(row_category))
+  value_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  grouped_cols <- grouped_by(df)
+  value_cols <- setdiff(value_cols, c(grouped_cols, row_col))
+
+  if (!row_col %in% colnames(df)) {
+    stop(paste0("The row category column is not found: ", row_col))
+  }
+  if (row_col %in% grouped_cols) {
+    stop("Repeat-By column cannot be used as the row category column.")
+  }
+  if (length(value_cols) < 2) {
+    stop("Select two or more columns that hold the aggregated counts.")
+  }
+  non_numeric_cols <- value_cols[!purrr::map_lgl(value_cols, function(col) is.numeric(df[[col]]))]
+  if (length(non_numeric_cols) > 0) {
+    stop(paste0("The aggregated count columns must be numeric: ", paste(non_numeric_cols, collapse = ", ")))
+  }
+  if (is.null(column_variable_name) || is.na(column_variable_name) || column_variable_name == "") {
+    column_variable_name <- "Column"
+  }
+  # The row and column variable names label separate category sets in the report
+  # tables and the category map. Sharing one name would merge those sets.
+  if (column_variable_name == row_col) {
+    stop("The column variable name must be different from the row category column name.")
+  }
+
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
+  each_func <- function(df) {
+    counts_df <- df[, c(row_col, value_cols), drop = FALSE]
+
+    # An absent cell in a cross tab means "no observations", which is a zero count.
+    counts_df <- counts_df %>%
+      dplyr::mutate(dplyr::across(dplyr::all_of(value_cols),
+                                  ~ dplyr::if_else(is.na(.x), 0, as.numeric(.x))))
+
+    count_values <- as.matrix(counts_df[, value_cols, drop = FALSE])
+    if (any(!is.finite(count_values))) {
+      stop("The aggregated counts must be finite numbers.")
+    }
+    if (any(count_values < 0)) {
+      stop("The aggregated counts must not be negative.")
+    }
+    # Chi-square residuals, the Fisher exact test and the Monte Carlo p-value all
+    # require whole counts. Weighted (fractional) counts are not supported.
+    if (any(abs(count_values - round(count_values)) > 1e-8)) {
+      stop("The aggregated counts must be whole numbers.")
+    }
+
+    # Rows sharing a category label are summed rather than rejected.
+    row_labels <- as.character(counts_df[[row_col]])
+    row_labels[is.na(row_labels)] <- "NA"
+    row_levels <- unique(row_labels[order(match(row_labels,
+                                                ca_get_category_levels(counts_df[[row_col]])))])
+    contingency_table <- rowsum(round(count_values), group = factor(row_labels, levels = row_levels),
+                                reorder = FALSE)
+    dimnames(contingency_table) <- list(rownames(contingency_table), value_cols)
+    storage.mode(contingency_table) <- "integer"
+    # Match the object the raw 2-variable path hands to FactoMineR::CA exactly:
+    # a `table` with unnamed dimnames, not a bare matrix.
+    names(dimnames(contingency_table)) <- c("", "")
+    class(contingency_table) <- "table"
+
+    contingency_table <- contingency_table[
+      rowSums(contingency_table) > 0, colSums(contingency_table) > 0, drop = FALSE
+    ]
+    if (nrow(contingency_table) < 2 || ncol(contingency_table) < 2) {
+      if (length(grouped_cols) < 1) {
+        stop("There are not enough categories after removing rows and columns with no counts.")
+      } else {
+        return(NULL)
+      }
+    }
+
+    # A table with k rows and m columns supports at most min(k, m) - 1 dimensions.
+    effective_ncp <- min(ncp, min(dim(contingency_table)) - 1)
+
+    fit <- FactoMineR::CA(contingency_table, ncp = effective_ncp, graph = FALSE)
+    fit$analysis_type <- "CA"
+    fit$row_variable_name <- row_col
+    fit$column_variable_name <- column_variable_name
+    fit$contingency_table <- contingency_table
+    fit$section5 <- build_section5_from_factominer(
+      fit, analysis_type = "CA",
+      row_variable_name = row_col, column_variable_name = column_variable_name,
+      contingency_table = contingency_table, max_dimensions = effective_ncp
+    )
+    class(fit) <- c("ca_exploratory", "mca_exploratory", class(fit))
+
+    fit$association <- build_pairwise_association_results_from_counts(
+      contingency_table = contingency_table,
+      row_variable_name = row_col, column_variable_name = column_variable_name,
+      overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
+      alpha = alpha, simulation_count = simulation_count, seed = seed
+    )
+
+    fit$effective_vars <- c(row_col, column_variable_name)
+    fit$n_used <- sum(contingency_table)
+    fit$n_excluded <- 0
+    fit$category_total <- nrow(fit$section5$all_metrics %>% dplyr::distinct(variable, category))
+    fit$n_dims <- nrow(fit$eig)
+    fit$df <- df
+    fit$grouped_cols <- grouped_cols
+    fit$sampled_nrow <- NULL
+    fit
+  }
+
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
 # Build a category_id -> (variable, category, orders) lookup from MCA V<i>: ids.
 .mca_build_category_lookup <- function(category_ids, var_names_map, variables, source_data) {
   # category_id like "V2:Some Value" (value itself may contain ":").
