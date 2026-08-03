@@ -78,6 +78,24 @@ ca_create_significance_marker <- function(adjusted_p_value) {
 # ------------------------------------------------------------
 # Analyze one variable pair
 # ------------------------------------------------------------
+
+# Placeholder row used when a pair cannot be tested (no data, or the table
+# collapses below 2x2 after dropping all-zero rows and columns).
+ca_empty_pair_result <- function(pair_index, pair_id, variable_1, variable_2,
+                                 n, row_cat_count, column_cat_count) {
+  tibble::tibble(
+    pair_index = pair_index, pair_id = pair_id,
+    variable_1 = variable_1, variable_2 = variable_2,
+    n = n, row_category_count = row_cat_count, column_category_count = column_cat_count,
+    chi_square = NA_real_, df = NA_real_, p_value = NA_real_,
+    cramers_v = NA_real_, association_strength = "undeterminable",
+    test_method = "undeterminable", expected_count_warning = TRUE,
+    minimum_expected_count = NA_real_, expected_under_1_count = NA_integer_,
+    expected_under_5_count = NA_integer_, expected_under_5_rate = NA_real_
+  )
+}
+
+# Row-level entry point: count the rows into a contingency table, then delegate.
 ca_analyze_one_variable_pair <- function(
   data, variable_1, variable_2, pair_index,
   cell_adjust_method, alpha, simulation_count, seed
@@ -89,23 +107,12 @@ ca_analyze_one_variable_pair <- function(
     ) %>%
     tidyr::drop_na()
 
-  pair_id <- paste(variable_1, variable_2, sep = " × ")
-
-  empty_pair_result <- function(n, row_cat_count, column_cat_count) {
-    tibble::tibble(
-      pair_index = pair_index, pair_id = pair_id,
-      variable_1 = variable_1, variable_2 = variable_2,
-      n = n, row_category_count = row_cat_count, column_category_count = column_cat_count,
-      chi_square = NA_real_, df = NA_real_, p_value = NA_real_,
-      cramers_v = NA_real_, association_strength = "undeterminable",
-      test_method = "undeterminable", expected_count_warning = TRUE,
-      minimum_expected_count = NA_real_, expected_under_1_count = NA_integer_,
-      expected_under_5_count = NA_integer_, expected_under_5_rate = NA_real_
-    )
-  }
-
   if (nrow(pair_data) == 0) {
-    return(list(pair_result = empty_pair_result(0, 0, 0), cell_results = tibble::tibble()))
+    pair_id <- paste(variable_1, variable_2, sep = " × ")
+    return(list(
+      pair_result = ca_empty_pair_result(pair_index, pair_id, variable_1, variable_2, 0, 0, 0),
+      cell_results = tibble::tibble()
+    ))
   }
 
   row_levels <- ca_get_category_levels(pair_data$row_category)
@@ -117,7 +124,27 @@ ca_analyze_one_variable_pair <- function(
       column_category = factor(column_category, levels = column_levels)
     )
 
-  contingency_table <- table(pair_data$row_category, pair_data$column_category)
+  ca_analyze_one_variable_pair_from_counts(
+    contingency_table = table(pair_data$row_category, pair_data$column_category),
+    variable_1 = variable_1, variable_2 = variable_2, pair_index = pair_index,
+    cell_adjust_method = cell_adjust_method, alpha = alpha,
+    simulation_count = simulation_count, seed = seed
+  )
+}
+
+# Counts entry point: everything downstream of the contingency table is pure
+# matrix math (compute_chisq_from_counts / chisq.test / fisher.test all accept a
+# matrix), so an already-aggregated cross tab can be analyzed here directly.
+ca_analyze_one_variable_pair_from_counts <- function(
+  contingency_table, variable_1, variable_2, pair_index,
+  cell_adjust_method, alpha, simulation_count, seed
+) {
+  pair_id <- paste(variable_1, variable_2, sep = " × ")
+
+  empty_pair_result <- function(n, row_cat_count, column_cat_count) {
+    ca_empty_pair_result(pair_index, pair_id, variable_1, variable_2, n, row_cat_count, column_cat_count)
+  }
+
   contingency_table <- contingency_table[
     rowSums(contingency_table) > 0, colSums(contingency_table) > 0, drop = FALSE
   ]
@@ -266,6 +293,58 @@ build_pairwise_association_results <- function(
     }
   )
 
+  settings <- list(
+    variables = variables, analysis_n = nrow(analysis_data),
+    overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
+    alpha = alpha, missing_method = missing_method, simulation_count = simulation_count
+  )
+
+  ca_finalize_association_results(pair_analysis_results, overall_adjust_method, alpha, settings)
+}
+
+#' Correspondence Analysis pairwise associations from an already-aggregated cross tab.
+#'
+#' Counts-input counterpart of build_pairwise_association_results(). The aggregated
+#' input describes exactly one variable pair (the row category column against the
+#' column categories carried by the value column names), so there is a single pair
+#' and the overall p-value adjustment is applied to a length-1 vector.
+#' @export
+build_pairwise_association_results_from_counts <- function(
+  contingency_table,
+  row_variable_name, column_variable_name,
+  overall_adjust_method = "holm",
+  cell_adjust_method = "holm",
+  alpha = 0.05,
+  simulation_count = 20000,
+  seed = 123
+) {
+  supported_adjust_methods <- c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")
+  if (!overall_adjust_method %in% supported_adjust_methods) stop("overall_adjust_method is invalid.")
+  if (!cell_adjust_method %in% supported_adjust_methods) stop("cell_adjust_method is invalid.")
+
+  pair_analysis_results <- list(
+    ca_analyze_one_variable_pair_from_counts(
+      contingency_table = contingency_table,
+      variable_1 = row_variable_name, variable_2 = column_variable_name,
+      pair_index = 1, cell_adjust_method = cell_adjust_method, alpha = alpha,
+      simulation_count = simulation_count, seed = seed
+    )
+  )
+
+  settings <- list(
+    variables = c(row_variable_name, column_variable_name),
+    # The analysis N of an aggregated table is the total count, not the row count.
+    analysis_n = sum(contingency_table),
+    overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
+    alpha = alpha, missing_method = "aggregated", simulation_count = simulation_count
+  )
+
+  ca_finalize_association_results(pair_analysis_results, overall_adjust_method, alpha, settings)
+}
+
+# Shared tail of both builders: overall p-value adjustment, judgement enums,
+# residual heatmap data and featured combinations.
+ca_finalize_association_results <- function(pair_analysis_results, overall_adjust_method, alpha, settings) {
   variable_pair_results <- purrr::map_dfr(pair_analysis_results, "pair_result")
 
   valid_p_value <- !is.na(variable_pair_results$p_value) & is.finite(variable_pair_results$p_value)
@@ -291,12 +370,6 @@ build_pairwise_association_results <- function(
     dplyr::arrange(adjusted_p_value, dplyr::desc(cramers_v))
 
   residual_heatmap_data <- purrr::map_dfr(pair_analysis_results, "cell_results")
-
-  settings <- list(
-    variables = variables, analysis_n = nrow(analysis_data),
-    overall_adjust_method = overall_adjust_method, cell_adjust_method = cell_adjust_method,
-    alpha = alpha, missing_method = missing_method, simulation_count = simulation_count
-  )
 
   if (nrow(residual_heatmap_data) == 0) {
     return(list(
