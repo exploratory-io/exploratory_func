@@ -570,3 +570,108 @@ test_that("chaid_partial_dependence_vars prefers importance order", {
     c("a", "b")
   )
 })
+
+# tam#37466: importance_measure = "firm" reuses the model-agnostic
+# importance_firm() the other tree models already share. CHAID splits on
+# chi-square significance, not impurity, so there is no "impurity" option --
+# the choice is permutation (default) or FIRM.
+test_that("importance_measure = 'firm' returns the same schema as permutation", {
+  df <- make_binary_df()
+  perm <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                     min_split = 20, min_bucket = 5))
+  firm <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                     min_split = 20, min_bucket = 5,
+                                     importance_measure = "firm"))
+  perm_imp <- perm %>% tidy_rowwise(model, type = "importance")
+  firm_imp <- firm %>% tidy_rowwise(model, type = "importance")
+
+  # Identical column contract -- chaid_partial_dependence_vars() and the report
+  # tables read these columns, so a 2-column FIRM table would break them.
+  expect_equal(colnames(firm_imp), colnames(perm_imp))
+  expect_true(all(firm_imp$metric == "firm"))
+  expect_true(all(perm_imp$metric == "log_loss"))
+  # FIRM is derived from the PD curves, so it has no permutation repeats / SE.
+  expect_true(all(is.na(firm_imp$std_error)))
+  expect_true(all(is.na(firm_imp$repeats)))
+  expect_true(all(firm_imp$evaluation_data == "Training"))
+  # Ranks are dense and ordered.
+  expect_equal(firm_imp$rank[[1]], 1L)
+  expect_false(is.unsorted(firm_imp$rank))
+})
+
+test_that("importance_measure = 'firm' keeps display names and feeds partial dependence", {
+  df <- make_binary_df()
+  names(df)[names(df) == "tenure"] <- "tenure months"
+  firm <- suppressWarnings(exp_chaid(df, is_churn, plan, region, `tenure months`,
+                                     min_split = 20, min_bucket = 5,
+                                     importance_measure = "firm"))
+  imp <- firm %>% tidy_rowwise(model, type = "importance")
+  # Display (original) names in the table ...
+  expect_true("tenure months" %in% imp$variable)
+  # ... and the PD variable list is still resolvable back to clean names.
+  model <- firm$model[[1]]
+  expect_true(length(model$imp_vars) > 0)
+  expect_true(all(model$imp_vars %in% names(model$terms_mapping)))
+  expect_false(is.null(model$partial_dependence))
+})
+
+test_that("importance_measure = 'firm' honors max_pd_vars when trimming partial dependence", {
+  set.seed(11)
+  n <- 400
+  df <- data.frame(
+    is_churn = c(rep(TRUE, 150), rep(FALSE, 250)),
+    v1 = c(rnorm(150, 5), rnorm(250, 2)),
+    v2 = c(rnorm(150, 3), rnorm(250, 2)),
+    v3 = rnorm(n),
+    v4 = rnorm(n)
+  )
+  firm <- suppressWarnings(exp_chaid(df, is_churn, v1, v2, v3, v4,
+                                     min_split = 20, min_bucket = 5,
+                                     importance_measure = "firm", max_pd_vars = 2))
+  model <- firm$model[[1]]
+  # FIRM needs PD over every predictor to rank them, then trims back down.
+  expect_equal(length(model$imp_vars), 2)
+  expect_equal(sort(attr(model$partial_dependence, "vars")), sort(model$imp_vars))
+  # The importance table itself still lists every predictor.
+  expect_equal(nrow(firm %>% tidy_rowwise(model, type = "importance")), 4)
+})
+
+test_that("importance_measure falls back to permutation when FIRM cannot apply", {
+  df <- make_binary_df()
+  # A single predictor gives FIRM nothing to compare against.
+  single <- suppressWarnings(exp_chaid(df, is_churn, plan,
+                                       min_split = 20, min_bucket = 5,
+                                       importance_measure = "firm"))
+  expect_true(all((single %>% tidy_rowwise(model, type = "importance"))$metric == "log_loss"))
+
+  # An unrecognized value must not error out -- it takes the default path.
+  bogus <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
+                                      min_split = 20, min_bucket = 5,
+                                      importance_measure = "bogus"))
+  expect_true(all((bogus %>% tidy_rowwise(model, type = "importance"))$metric == "log_loss"))
+
+  # Optional UI settings can be absent or empty; both use the default path.
+  null_measure <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
+                                             min_split = 20, min_bucket = 5,
+                                             importance_measure = NULL))
+  expect_true(all((null_measure %>% tidy_rowwise(model, type = "importance"))$metric == "log_loss"))
+
+  empty_measure <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
+                                              min_split = 20, min_bucket = 5,
+                                              importance_measure = character()))
+  expect_true(all((empty_measure %>% tidy_rowwise(model, type = "importance"))$metric == "log_loss"))
+})
+
+test_that("importance_measure = 'firm' labels training PD data in test mode", {
+  df <- make_binary_df()
+  firm <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
+                                     min_split = 20, min_bucket = 5,
+                                     importance_measure = "firm", test_rate = 0.3))
+  imp <- firm %>% tidy_rowwise(model, type = "importance")
+  expect_true(all(imp$evaluation_data == "Training"))
+})
+
+test_that("chaid_firm_importance returns NULL when there is no partial dependence", {
+  expect_null(chaid_firm_importance(NULL, list(classification_type = "binary"), c("a", "b")))
+  expect_null(chaid_firm_importance(data.frame(a = 1), list(classification_type = "binary"), character()))
+})

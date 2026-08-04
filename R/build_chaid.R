@@ -27,6 +27,11 @@
 #' @param max_nrow Row cap; data is sampled down to this before fitting.
 #' @param target_n,predictor_n Category caps; excess categories are lumped into "Other".
 #' @param binary_classification_threshold Probability threshold for the positive class.
+#' @param importance_measure How variable importance is calculated. `permutation`
+#'   (default) uses model-independent permutation importance; `firm` derives it
+#'   from the flatness of each variable's partial-dependence curve. CHAID splits
+#'   on chi-square significance rather than impurity, so it exposes no
+#'   model-native impurity vector and therefore offers no `impurity` option.
 #' @param max_pd_vars Max number of predictors for partial dependence charts.
 #' @param pd_sample_size Row sample size used when computing partial dependence.
 #' @param pd_grid_resolution Grid resolution for numeric partial dependence.
@@ -58,6 +63,7 @@ exp_chaid <- function(df,
                       target_n = 20,
                       predictor_n = 12,
                       binary_classification_threshold = 0.5,
+                      importance_measure = "permutation",
                       max_pd_vars = 20,
                       pd_sample_size = 500,
                       pd_grid_resolution = 20,
@@ -190,30 +196,76 @@ exp_chaid <- function(df,
       } else {
         df
       }
-      model$importance <- chaid_permutation_importance(
-        model = model,
-        data = importance_data,
-        target = clean_target_col,
-        predictors = c_cols,
-        evaluation_data = if (length(test_index) > 0) "Test" else "Training",
-        seed = seed,
-        repeats = 10L
-      )
+      evaluation_data_label <- if (length(test_index) > 0) "Test" else "Training"
 
-      # Partial dependence for Analytics Report {{variable_effect}} /
-      # local_importance_binary (same contract as exp_rpart).
       if (is.null(max_pd_vars) || !is.finite(max_pd_vars) || max_pd_vars < 1) {
         max_pd_vars_eff <- 20
       } else {
         max_pd_vars_eff <- as.integer(max_pd_vars)
       }
-      imp_vars <- chaid_partial_dependence_vars(
-        model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
-      )
+
+      # tam#37466: `firm` derives importance from the partial-dependence curves,
+      # so unlike `permutation` it has to see the PD of EVERY predictor before it
+      # can rank them. That inverts the order of the two steps below, exactly the
+      # way exp_rpart does it: compute PD over all c_cols, run importance_firm(),
+      # then trim imp_vars and shrink the PD data back down to max_pd_vars.
+      # `identical()` keeps NULL and empty values on the permutation path, too.
+      # This matters for callers that forward an optional UI setting.
+      use_firm_importance <- identical(as.character(importance_measure), "firm") &&
+        length(c_cols) > 1
+
+      if (use_firm_importance) {
+        imp_vars <- c_cols
+      } else {
+        model$importance <- chaid_permutation_importance(
+          model = model,
+          data = importance_data,
+          target = clean_target_col,
+          predictors = c_cols,
+          evaluation_data = evaluation_data_label,
+          seed = seed,
+          repeats = 10L
+        )
+        imp_vars <- chaid_partial_dependence_vars(
+          model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
+        )
+      }
+
+      # Partial dependence for Analytics Report {{variable_effect}} /
+      # local_importance_binary (same contract as exp_rpart).
       model$partial_dependence <- partial_dependence.exploratory_chaid(
         model, clean_target_col, vars = imp_vars, data = df,
         n = c(pd_grid_resolution, min(nrow(df), pd_sample_size))
       )
+
+      if (use_firm_importance) {
+        model$importance <- chaid_firm_importance(
+          # PD is always calculated from the fitted model's training rows.
+          model$partial_dependence, model, imp_vars, "Training"
+        )
+        # Fall back to permutation when FIRM could not be computed (e.g. the
+        # optional `mmpf` package is missing, so partial_dependence is NULL).
+        if (is.null(model$importance)) {
+          model$importance <- chaid_permutation_importance(
+            model = model,
+            data = importance_data,
+            target = clean_target_col,
+            predictors = c_cols,
+            evaluation_data = evaluation_data_label,
+            seed = seed,
+            repeats = 10L
+          )
+        }
+        imp_vars <- chaid_partial_dependence_vars(
+          model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
+        )
+        if (!is.null(model$partial_dependence)) {
+          model$partial_dependence <- shrink_partial_dependence_data(
+            model$partial_dependence, imp_vars
+          )
+        }
+      }
+
       model$imp_vars <- imp_vars
       if (isTRUE(pd_with_bin_means) && isTRUE(is_target_logical)) {
         model$partial_binning <- calc_partial_binning_data(
@@ -351,6 +403,72 @@ chaid_as_probability_matrix <- function(prediction, class_levels = NULL) {
     mat <- mat[, class_levels, drop = FALSE]
   }
   mat
+}
+
+#' Calculate FIRM variable importance for an `exploratory_chaid` model.
+#'
+#' `importance_firm()` is model-agnostic -- it reads only the partial-dependence
+#' data frame and its `points` / `quantile_points` attributes -- so CHAID reuses
+#' it verbatim, the same way ranger / rpart / xgboost / lightgbm / catboost do.
+#' The only CHAID-specific work is conforming its 2-column output
+#' (`variable`, `importance`, clean names) to the 7-column display-name schema
+#' every other CHAID importance consumer expects (`chaid_partial_dependence_vars()`
+#' reverse-maps display -> clean, and the report tables read the extra columns).
+#'
+#' @param partial_dependence Partial-dependence object from
+#'   `partial_dependence.exploratory_chaid()`, covering every predictor.
+#' @param model The fitted `exploratory_chaid` model (for `terms_mapping` and
+#'   `classification_type`).
+#' @param predictors Clean predictor column names the PD was computed over.
+#' @param evaluation_data Source rows used for the partial-dependence curves.
+#'   FIRM is derived from training partial dependence rather than held-out
+#'   scoring, so callers should use `"Training"`.
+#' @return A data frame with the stable CHAID importance schema, or `NULL` when
+#'   FIRM cannot be calculated (no partial dependence available).
+chaid_firm_importance <- function(partial_dependence, model, predictors,
+                                  evaluation_data = 'Training') {
+  if (is.null(partial_dependence) || length(predictors) == 0L) {
+    return(NULL)
+  }
+  pdp_target_col <- if (identical(model$classification_type, "binary")) {
+    "TRUE"
+  } else {
+    attr(partial_dependence, "target")
+  }
+  firm_df <- tryCatch(
+    importance_firm(partial_dependence, pdp_target_col, predictors),
+    error = function(e) NULL
+  )
+  if (is.null(firm_df) || !is.data.frame(firm_df) || nrow(firm_df) == 0L) {
+    return(NULL)
+  }
+
+  # importance_firm() returns CLEAN names; the CHAID schema is display names.
+  mapped_variable <- vapply(as.character(firm_df$variable), function(clean_name) {
+    if (!is.null(model$terms_mapping) && clean_name %in% names(model$terms_mapping)) {
+      return(unname(model$terms_mapping[[clean_name]]))
+    }
+    clean_name
+  }, character(1), USE.NAMES = FALSE)
+
+  result <- data.frame(
+    variable = mapped_variable,
+    importance = as.numeric(firm_df$importance),
+    std_error = NA_real_,
+    metric = 'firm',
+    evaluation_data = evaluation_data,
+    repeats = NA_integer_,
+    stringsAsFactors = FALSE
+  )
+  result$rank <- ifelse(
+    is.finite(result$importance),
+    rank(-result$importance, ties.method = 'min'),
+    NA_integer_
+  )
+  result %>%
+    dplyr::arrange(is.na(rank), rank, variable) %>%
+    dplyr::select(variable, importance, std_error, rank, metric,
+                  evaluation_data, repeats)
 }
 
 #' Return an empty CHAID permutation-importance result.
