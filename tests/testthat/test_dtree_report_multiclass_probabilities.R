@@ -28,6 +28,19 @@ test_that("dtree_report_multiclass_probabilities returns train and test one-vs-r
   expect_equal(sum(!ret$is_test_data), (n - length(test_index)) * 3)
   expect_equal(levels(ret$`Actual Group`), c("This Category", "Other Categories"))
 
-  category_a <- ret[ret$Category == "A" & !ret$is_test_data, , drop = FALSE]
-  expect_equal(category_a$baseline_precision, rep(mean(category_a$`Actual Positive`), nrow(category_a)))
+  for (category in c("A", "B", "C")) {
+    for (is_test in c(FALSE, TRUE)) {
+      rows <- ret[ret$Category == category & ret$is_test_data == is_test, , drop = FALSE]
+      expected_positive <- rows$`Actual Category` == category
+      expected_group <- ifelse(expected_positive, "This Category", "Other Categories")
+
+      expect_equal(rows$`Actual Positive`, expected_positive, info = paste(category, is_test))
+      expect_equal(as.character(rows$`Actual Group`), expected_group, info = paste(category, is_test))
+      expect_equal(
+        rows$baseline_precision,
+        rep(mean(expected_positive, na.rm = TRUE), nrow(rows)),
+        info = paste(category, is_test)
+      )
+    }
+  }
 })
