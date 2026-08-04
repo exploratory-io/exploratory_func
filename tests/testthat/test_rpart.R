@@ -48,6 +48,48 @@ test_that("exp_rpart multiclass classification", {
   expect_true(is.data.frame(res))
 })
 
+test_that("exp_rpart multiclass prediction includes per-class probabilities", {
+  set.seed(1)
+  model_df <- iris %>%
+    exp_rpart(Species, Sepal.Length, Sepal.Width, test_rate = 0.2)
+
+  probability_columns <- paste0("predicted_probability_", levels(iris$Species))
+  training <- prediction(model_df, data = "training")
+  test <- prediction(model_df, data = "test")
+  combined <- prediction(model_df, data = "training_and_test")
+
+  for (result in list(training, test, combined)) {
+    expect_true(all(probability_columns %in% colnames(result)))
+    probabilities <- as.matrix(result[, probability_columns, drop = FALSE])
+    expect_equal(result$predicted_probability, apply(probabilities, 1, max), tolerance = 1e-12)
+    predicted_class <- as.character(result$predicted_label)
+    max_probability <- apply(probabilities, 1, max)
+    expect_true(all(mapply(function(label, row, maximum) {
+      label %in% levels(iris$Species)[which(row == maximum)]
+    }, predicted_class, split(probabilities, row(probabilities)), max_probability)))
+  }
+
+  expect_equal(nrow(combined), nrow(training) + nrow(test))
+
+  pretty <- prediction(model_df, data = "training_and_test", pretty.name = TRUE)
+  expect_true(all(paste0("Predicted Probability for ", levels(iris$Species)) %in% colnames(pretty)))
+
+  unknown_category_data <- tibble::tibble(
+    target = factor(c("A", "B", "C", "A", "B", "C", "A", "B", "C", "A"),
+                    levels = c("A", "B", "C")),
+    category = factor(c(rep("known", 8), rep("unseen", 2)),
+                      levels = c("known", "unseen")),
+    value = seq_len(10)
+  )
+  unknown_category_model <- unknown_category_data %>%
+    exp_rpart(target, category, value, test_rate = 0.2, test_split_type = "ordered")
+  unknown_category_test <- prediction(unknown_category_model, data = "test")
+  expect_equal(nrow(unknown_category_test), 3)
+  expect_equal(sum(is.na(unknown_category_test$predicted_probability)), 2)
+  unknown_probability_columns <- paste0("predicted_probability_", levels(unknown_category_data$target))
+  expect_true(all(unknown_probability_columns %in% colnames(unknown_category_test)))
+})
+
 test_that("exp_rpart regression", {
   model_df <- flight %>% exp_rpart(`DEP DELAY`, `delay ed`, `ARR DELAY`, test_rate = 0.3)
   train_ret <- prediction(model_df)

@@ -1126,8 +1126,12 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     y_value <- attributes(x)$ylevels[x$y]
     predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
+    predictions <- NULL
+    unknown_category_row_numbers <- NULL
+    na_row_numbers <- NULL
     switch(data_type,
       training = {
+        na_row_numbers <- x$na.action
         # If SMOTE was applied, use stored predictions on original training data
         if (!is.null(x$smote_applied) && x$smote_applied && !is.null(x$predicted_class_original)) {
           predicted_value_nona <- x$predicted_class_original
@@ -1153,30 +1157,54 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
               predicted_probability_nona <- probs[, positive_class_col]
             }
           } else {
-            predicted_probability_nona <- apply(x$predicted_prob_original, 1, max)
+            predictions <- x$predicted_prob_original
+            predicted_probability_nona <- apply(predictions, 1, max)
           }
           predicted_value <- restore_na(predicted_value_nona, x$na.action)
           predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
         } else {
           predicted_value_nona <- x$predicted_class
           predicted_value <- restore_na(predicted_value_nona, x$na.action)
-          # binary case and multiclass case are both handled inside this func.
-          predicted_probability_nona <- get_predicted_probability_rpart(x)
+          if (x$classification_type == "multi") {
+            predictions <- predict(x)
+            predicted_probability_nona <- apply(predictions, 1, max)
+          } else {
+            predicted_probability_nona <- get_predicted_probability_rpart(x)
+          }
           predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
         }
       },
       test = {
         predicted_value_nona <- x$predicted_class_test
-        predicted_value_nona <- restore_na(predicted_value_nona, x$unknown_category_rows_index_test)
-        predicted_value <- restore_na(predicted_value_nona, x$na_row_numbers_test)
-        # binary case and multiclass case are both handled inside this func.
-        predicted_probability_nona <- get_predicted_probability_rpart(x, data_type = "test")
-        predicted_probability_nona <- restore_na(predicted_probability_nona, x$unknown_category_rows_index_test)
-        predicted_probability <- restore_na(predicted_probability_nona, x$na_row_numbers_test)
+        unknown_category_row_numbers <- x$unknown_category_rows_index_test
+        na_row_numbers <- x$na_row_numbers_test
+        predicted_value_nona <- restore_na(predicted_value_nona, unknown_category_row_numbers)
+        predicted_value <- restore_na(predicted_value_nona, na_row_numbers)
+        if (x$classification_type == "multi") {
+          predictions <- x$prediction_test
+          predicted_probability_nona <- apply(predictions, 1, max)
+        } else {
+          predicted_probability_nona <- get_predicted_probability_rpart(x, data_type = "test")
+        }
+        predicted_probability_nona <- restore_na(predicted_probability_nona, unknown_category_row_numbers)
+        predicted_probability <- restore_na(predicted_probability_nona, na_row_numbers)
       })
 
-    data[[predicted_label_col]] <- predicted_value
-    data[[predicted_probability_col]] <- predicted_probability
+    if (x$classification_type == "multi") {
+      data <- ranger.set_multi_predicted_values(
+        data,
+        predictions,
+        predicted_value,
+        predicted_probability,
+        na_row_numbers,
+        unknown_category_row_numbers,
+        pred_prob_col = predicted_probability_col,
+        pred_value_col = predicted_label_col
+      )
+    } else {
+      data[[predicted_label_col]] <- predicted_value
+      data[[predicted_probability_col]] <- predicted_probability
+    }
     data
 
   } else {
