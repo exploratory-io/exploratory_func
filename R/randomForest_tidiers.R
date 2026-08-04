@@ -2788,6 +2788,67 @@ multiclass_auc_by_class <- function(actual, probability_matrix) {
   dplyr::bind_rows(rows)
 }
 
+# Return one-vs-rest probability rows for a multi-category rpart model. The
+# regular prediction() contract exposes only the winning probability, so the
+# report needs this model-aware data surface for category curves/density.
+dtree_report_multiclass_probabilities <- function(df) {
+  if (!is.data.frame(df) || !"model" %in% colnames(df)) return(data.frame())
+
+  model <- df$model[[1]]
+  if (is.null(model) || !inherits(model, "rpart") || !identical(model$classification_type, "multi")) {
+    return(data.frame())
+  }
+
+  source_data <- if ("source.data" %in% colnames(df)) df$source.data[[1]] else NULL
+  if (is.null(source_data) || !is.data.frame(source_data)) return(data.frame())
+
+  test_index <- if (".test_index" %in% colnames(df)) as.integer(df$.test_index[[1]]) else integer(0)
+  train_data <- if (length(test_index) > 0) source_data[-test_index, , drop = FALSE] else source_data
+  test_data <- if (length(test_index) > 0) source_data[test_index, , drop = FALSE] else source_data[0, , drop = FALSE]
+
+  target_col <- model$orig_target_col
+  if (is.null(target_col) || !target_col %in% colnames(source_data)) return(data.frame())
+
+  levels_target <- attr(model, "ylevels")
+  if (is.null(levels_target)) levels_target <- model$ylevels
+  if (is.null(levels_target)) levels_target <- levels(as.factor(source_data[[target_col]]))
+
+  make_rows <- function(data, is_test) {
+    if (nrow(data) == 0) return(data.frame())
+
+    probabilities <- tryCatch(
+      stats::predict(model, newdata = data, type = "prob"),
+      error = function(e) NULL
+    )
+    if (is.null(probabilities)) return(data.frame())
+
+    probabilities <- as.data.frame(probabilities, check.names = FALSE)
+    categories <- intersect(levels_target, colnames(probabilities))
+    if (length(categories) == 0) categories <- colnames(probabilities)
+
+    dplyr::bind_rows(lapply(categories, function(category) {
+      actual <- as.character(data[[target_col]])
+      is_positive <- actual == category
+      data.frame(
+        Category = category,
+        `Predicted Probability` = probabilities[[category]],
+        `Actual Positive` = is_positive,
+        `Actual Group` = factor(
+          ifelse(is_positive, "This Category", "Other Categories"),
+          levels = c("This Category", "Other Categories")
+        ),
+        `Actual Category` = actual,
+        is_test_data = is_test,
+        baseline_precision = mean(is_positive, na.rm = TRUE),
+        stringsAsFactors = FALSE,
+        check.names = FALSE
+      )
+    }))
+  }
+
+  dplyr::bind_rows(make_rows(train_data, FALSE), make_rows(test_data, TRUE))
+}
+
 # Extra per-category columns appended to the "Summary by Class" table for the
 # Decision Tree report (#37156): balanced accuracy, One-vs-Rest ROC AUC / PR AUC,
 # and the category's share of the evaluated rows (which is also the PR curve's
