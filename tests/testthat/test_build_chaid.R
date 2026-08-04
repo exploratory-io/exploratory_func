@@ -649,15 +649,26 @@ test_that("importance_measure falls back to permutation when FIRM cannot apply",
                                       min_split = 20, min_bucket = 5,
                                       importance_measure = "bogus"))
   expect_true(all((bogus %>% tidy_rowwise(model, type = "importance"))$metric == "log_loss"))
+
+  # Optional UI settings can be absent or empty; both use the default path.
+  null_measure <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
+                                             min_split = 20, min_bucket = 5,
+                                             importance_measure = NULL))
+  expect_true(all((null_measure %>% tidy_rowwise(model, type = "importance"))$metric == "log_loss"))
+
+  empty_measure <- suppressWarnings(exp_chaid(df, is_churn, plan, region,
+                                              min_split = 20, min_bucket = 5,
+                                              importance_measure = character()))
+  expect_true(all((empty_measure %>% tidy_rowwise(model, type = "importance"))$metric == "log_loss"))
 })
 
-test_that("importance_measure = 'firm' labels held-out evaluation data in test mode", {
+test_that("importance_measure = 'firm' labels training PD data in test mode", {
   df <- make_binary_df()
   firm <- suppressWarnings(exp_chaid(df, is_churn, plan, region, tenure,
                                      min_split = 20, min_bucket = 5,
                                      importance_measure = "firm", test_rate = 0.3))
   imp <- firm %>% tidy_rowwise(model, type = "importance")
-  expect_true(all(imp$evaluation_data == "Test"))
+  expect_true(all(imp$evaluation_data == "Training"))
 })
 
 test_that("chaid_firm_importance returns NULL when there is no partial dependence", {

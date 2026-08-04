@@ -209,7 +209,9 @@ exp_chaid <- function(df,
       # can rank them. That inverts the order of the two steps below, exactly the
       # way exp_rpart does it: compute PD over all c_cols, run importance_firm(),
       # then trim imp_vars and shrink the PD data back down to max_pd_vars.
-      use_firm_importance <- identical(as.character(importance_measure)[[1]], "firm") &&
+      # `identical()` keeps NULL and empty values on the permutation path, too.
+      # This matters for callers that forward an optional UI setting.
+      use_firm_importance <- identical(as.character(importance_measure), "firm") &&
         length(c_cols) > 1
 
       if (use_firm_importance) {
@@ -238,7 +240,8 @@ exp_chaid <- function(df,
 
       if (use_firm_importance) {
         model$importance <- chaid_firm_importance(
-          model$partial_dependence, model, imp_vars, evaluation_data_label
+          # PD is always calculated from the fitted model's training rows.
+          model$partial_dependence, model, imp_vars, "Training"
         )
         # Fall back to permutation when FIRM could not be computed (e.g. the
         # optional `mmpf` package is missing, so partial_dependence is NULL).
@@ -417,9 +420,9 @@ chaid_as_probability_matrix <- function(prediction, class_levels = NULL) {
 #' @param model The fitted `exploratory_chaid` model (for `terms_mapping` and
 #'   `classification_type`).
 #' @param predictors Clean predictor column names the PD was computed over.
-#' @param evaluation_data `"Training"` or `"Test"`, recorded for parity with the
-#'   permutation table (FIRM is derived from the PD curves, not from scoring a
-#'   held-out split, so this only labels which rows the model was evaluated on).
+#' @param evaluation_data Source rows used for the partial-dependence curves.
+#'   FIRM is derived from training partial dependence rather than held-out
+#'   scoring, so callers should use `"Training"`.
 #' @return A data frame with the stable CHAID importance schema, or `NULL` when
 #'   FIRM cannot be calculated (no partial dependence available).
 chaid_firm_importance <- function(partial_dependence, model, predictors,
