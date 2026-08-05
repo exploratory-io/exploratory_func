@@ -1484,11 +1484,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                                 r_squared = rsq,
                                 n = test_n
                                 )
-              # Mirror the training-side glance.rpart() extra column so the test row
-              # has the same columns (#37156). Without this the bound result would
-              # carry NA for MAE on the test row.
+              # Mirror the training-side glance.rpart() extra columns so the test row
+              # has the same columns (#37156, tam#37510). Without this the bound result
+              # would carry NA for MAE / Mean Error on the test row.
               if (report_metrics) {
-                ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+                ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted),
+                                             mean_error = exploratory::mean_error(actual, predicted))
               }
 
               if(pretty.name){
@@ -1499,7 +1500,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                            )
                 ret <- ret %>% dplyr::rename(!!!map)
                 if (report_metrics) {
-                  ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+                  ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error, `Mean Error` = mean_error)
                 }
               }
 
@@ -3211,9 +3212,10 @@ glance.ranger.regression <- function(x, pretty.name, report_metrics = FALSE, ...
     root_mean_square_error = root_mean_square_error,
     n = n
   )
-  # Opt-in MAE for Analytics Report parity with glance.rpart (#37256).
+  # Opt-in MAE / Mean Error for Analytics Report parity with glance.rpart (#37256, tam#37510).
   if (isTRUE(report_metrics)) {
-    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted),
+                                 mean_error = exploratory::mean_error(actual, predicted))
   }
 
   if(pretty.name){
@@ -3225,7 +3227,7 @@ glance.ranger.regression <- function(x, pretty.name, report_metrics = FALSE, ...
     ret <- ret %>%
       dplyr::rename(!!!map)
     if (isTRUE(report_metrics)) {
-      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error, `Mean Error` = mean_error)
     }
   }
   ret
@@ -3306,13 +3308,15 @@ glance.rpart <- function(x, pretty.name = FALSE, report_metrics = FALSE, ...) {
     root_mean_square_error = rmse_val,
     n = length(x$y)
   )
-  # Opt-in extra metric for the Decision Tree report (#37156). MAE is the typical
+  # Opt-in extra metrics for the Decision Tree report (#37156). MAE is the typical
   # absolute error, which is easier to read than RMSE because it is not inflated
-  # by a few large errors. The matching test-data branch in
-  # rf_evaluation_training_and_test() adds the same column, so training and test
-  # rows keep an identical column set.
+  # by a few large errors. Mean Error keeps the sign so the report can state whether
+  # the model under-predicts (positive) or over-predicts (negative) on average
+  # (tam#37510). The matching test-data branch in rf_evaluation_training_and_test()
+  # adds the same columns, so training and test rows keep an identical column set.
   if (report_metrics) {
-    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted),
+                                 mean_error = exploratory::mean_error(actual, predicted))
   }
 
   if(pretty.name){
@@ -3324,7 +3328,7 @@ glance.rpart <- function(x, pretty.name = FALSE, report_metrics = FALSE, ...) {
     ret <- ret %>%
       dplyr::rename(!!!map)
     if (report_metrics) {
-      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error, `Mean Error` = mean_error)
     }
   }
   ret
