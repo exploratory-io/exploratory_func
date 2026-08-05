@@ -1358,7 +1358,13 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   attr(f0,".Environment")<-environment() # Since we removed .Environment attribute for size reduction, add it back so that the following process works.
   lazyeval::f_rhs(f0) <- 1 # create null model formula.
   x0 <- glm(f0, x$model, family = x$family) # build null model. Use x$model rather than x$data since x$model seems to be the data after glm handled missingness.
-  pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
+  # Keep the intermediate LR-test Chi-Square/DF around (#37504) -- they were already being
+  # computed here just to feed pchisq(), then discarded. binomial/quasibinomial + report_metrics
+  # exposes them as their own columns below (Prediction Quality section split, tam#37504).
+  lr_anova <- anova(x0,x)
+  lr_chisq <- lr_anova$Deviance[2]
+  lr_df <- lr_anova$Df[2]
+  pvalue <- pchisq(lr_chisq, lr_df, lower.tail=FALSE)
   if(pretty.name) {
     ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue, `Rows`=!!length(x$y))
   }
@@ -1422,14 +1428,28 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       specificity <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
       sensitivity <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
       balanced_accuracy <- if (is.na(specificity) || is.na(sensitivity)) NA_real_ else (specificity + sensitivity) / 2
+      # McFadden's Pseudo R-Squared: 1 - LL(model)/LL(null), equivalently 1 - deviance/null.deviance
+      # since deviance = -2*logLik. Goodness-of-fit metric for the Prediction Quality /
+      # Goodness of Fit split (tam#37504).
+      mcfadden_r2 <- if (is.finite(x$null.deviance) && x$null.deviance != 0) {
+        1 - (x$deviance / x$null.deviance)
+      } else {
+        NA_real_
+      }
       if (pretty.name) {
         ret$`PR AUC` <- pr_auc
         ret$`Balanced Accuracy` <- balanced_accuracy
         ret$`Specificity` <- specificity
+        ret$`Likelihood Ratio Chi-Square` <- lr_chisq
+        ret$`DF` <- lr_df
+        ret$`McFadden R Squared` <- mcfadden_r2
       } else {
         ret$pr_auc <- pr_auc
         ret$balanced_accuracy <- balanced_accuracy
         ret$specificity <- specificity
+        ret$lr_chisq <- lr_chisq
+        ret$lr_df <- lr_df
+        ret$mcfadden_r2 <- mcfadden_r2
       }
     }
   }
@@ -1458,7 +1478,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
             "Misclass. Rate", "Precision", "Recall", "Specificity"),
           colnames(ret))
         stat_cols <- intersect(
-          c("P Value", "Rows", "positives", "negatives", "Log Likelihood", "AIC", "BIC",
+          c("Likelihood Ratio Chi-Square", "DF", "P Value", "McFadden R Squared", "Rows",
+            "positives", "negatives", "Log Likelihood", "AIC", "BIC",
             "Residual Deviance", "Residual DF", "Null Deviance", "Null Model DF"),
           colnames(ret))
         other_cols <- setdiff(colnames(ret), c(pred_cols, stat_cols))

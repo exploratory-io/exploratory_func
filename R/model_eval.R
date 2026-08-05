@@ -425,8 +425,8 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
     ret <- ret %>% dplyr::select(dplyr::any_of(c(
       "auc", "roc_auc", "pr_auc", "f_score", "balanced_accuracy", "accuracy_rate",
       "misclassification_rate", "precision", "recall", "specificity",
-      "p.value", "positives", "negatives", "n", "logLik", "AIC", "BIC",
-      "deviance", "null.deviance", "df.null", "df.residual")),
+      "lr_chisq", "lr_df", "p.value", "mcfadden_r2", "positives", "negatives", "n",
+      "logLik", "AIC", "BIC", "deviance", "null.deviance", "df.null", "df.residual")),
       everything())
   } else {
     ret <- ret %>% dplyr::select(auc, f_score, accuracy_rate, misclassification_rate, precision,
@@ -466,7 +466,10 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
     colnames(ret)[colnames(ret) == "n"] <- "Rows"
     colnames(ret)[colnames(ret) == "positives"] <- "Rows (TRUE)"
     colnames(ret)[colnames(ret) == "negatives"] <- "Rows (FALSE)"
+    colnames(ret)[colnames(ret) == "lr_chisq"] <- "Likelihood Ratio Chi-Square"
+    colnames(ret)[colnames(ret) == "lr_df"] <- "DF"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "mcfadden_r2"] <- "McFadden R Squared"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
     colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
