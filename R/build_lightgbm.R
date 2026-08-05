@@ -2069,14 +2069,16 @@ glance.lightgbm_exp.regression <- function(x, pretty.name, report_metrics = FALS
   rsq <- r_squared(actual, predicted)
   n <- length(actual)
   ret <- data.frame(r_squared = rsq, root_mean_square_error = root_mean_square_error, n = n)
+  # Opt-in MAE / Mean Error for Analytics Report parity with glance.rpart (#37256, tam#37510).
   if (isTRUE(report_metrics)) {
-    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted))
+    ret <- ret %>% dplyr::mutate(mean_absolute_error = mae(actual, predicted),
+                                 mean_error = exploratory::mean_error(actual, predicted))
   }
   if (pretty.name) {
     map <- list(`R Squared` = as.symbol("r_squared"), `RMSE` = as.symbol("root_mean_square_error"), `Rows` = as.symbol("n"))
     ret <- ret %>% dplyr::rename(!!!map)
     if (isTRUE(report_metrics)) {
-      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error)
+      ret <- ret %>% dplyr::rename(`MAE` = mean_absolute_error, `Mean Error` = mean_error)
     }
   }
   ret

@@ -1795,6 +1795,29 @@ mae <- function(actual, predicted, is_test_data=NULL) {
   ret
 }
 
+#' Calculate Mean Error (ME), a.k.a. mean bias error.
+#'
+#' Unlike MAE / RMSE, the errors are NOT made absolute, so the positive and the
+#' negative errors cancel each other out. That is exactly the point: it measures
+#' the model's average BIAS rather than its average magnitude of error.
+#'   mean(actual - predicted) > 0  =>  predictions are on average too low  (under-prediction)
+#'   mean(actual - predicted) < 0  =>  predictions are on average too high (over-prediction)
+#' Because of the sign, the argument order matters here (rmse()/mae() are symmetric,
+#' this one is not). Always pass actual first.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#'   NULL (default) evaluates the whole vector, mirroring rmse()/mae().
+#' @export
+mean_error <- function(actual, predicted, is_test_data=NULL) {
+  if (!is.null(is_test_data)) {
+    actual <- actual[is_test_data]
+    predicted <- predicted[is_test_data]
+  }
+  ret <- mean(actual-predicted, na.rm=TRUE)
+  ret
+}
+
 #' Calculate RMSE.
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.

@@ -523,7 +523,7 @@ test_that("exp_rpart report_metrics adds metrics without changing the default ou
   target_of <- list(regression = rlang::sym("ARR DELAY"),
                     binary = rlang::sym("is delayed"),
                     multiclass = rlang::sym("ORI GIN"))
-  expected_added <- list(regression = "MAE",
+  expected_added <- list(regression = c("MAE", "Mean Error"),
                          binary = c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity"),
                          multiclass = c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC"))
 
