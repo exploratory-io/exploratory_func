@@ -400,6 +400,40 @@ test_that("test build_xgboost with multi softprob", {
   expect_true(length(unique(prediction_ret$predicted_label)) > 1)
 })
 
+# tam#37510 follow-up: predict.xgb.Booster's return shape for multi:softprob
+# changed across xgboost R package versions -- older versions returned a
+# flat, row-major vector that predict_xgboost() reshaped via
+# matrix(nrow=num_class) %>% t(), but xgboost >= ~2.1 (installed: 3.2.1.1)
+# returns the nrow x num_class probability matrix DIRECTLY. Reshaping an
+# ALREADY-correct matrix with matrix(nrow=num_class) re-flattens it column-
+# major and regroups unrelated values from different original rows/columns
+# together -- every probability comes out wrong, but each individual value is
+# still a plausible-looking number > 0, so the existing "all(prob > 0)"
+# assertion above cannot catch it. The one property that must ALWAYS hold for
+# genuine softmax/softprob output -- each row's per-class probabilities sum
+# to 1 -- is exactly what a scrambled reshape breaks; verified directly on
+# real (non-test-fixture) data that this drifted to summing anywhere from
+# 0.007 to 2.67 pre-fix.
+test_that("test build_xgboost with multi softprob -- per-row class probabilities sum to 1 (tam#37510 follow-up)", {
+  set.seed(1)
+  n <- 60
+  test_data <- data.frame(
+    x1 = rnorm(n),
+    x2 = rnorm(n),
+    category = factor(sample(c("A", "B", "C"), n, replace = TRUE))
+  )
+  model_df <- test_data %>% exp_xgboost(category, x1, x2, test_rate = 0, nrounds = 5)
+  model <- model_df$model[[1]]
+
+  predict_xgboost <- get("predict_xgboost", envir = asNamespace("exploratory"))
+  predicted <- predict_xgboost(model, model$df)
+  expect_true(is.matrix(predicted))
+  expect_equal(ncol(predicted), length(model$y_levels))
+  expect_equal(colnames(predicted), as.character(model$y_levels))
+  row_sums <- rowSums(predicted)
+  expect_true(all(abs(row_sums[!is.na(row_sums)] - 1) < 1e-6))
+})
+
 test_that("test build_xgboost with linear booster", {
   test_data <- structure(
     list(
