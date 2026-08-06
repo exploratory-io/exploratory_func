@@ -43,7 +43,8 @@ Imports:
     V8,
     cluster,
     pwr,
-    readr
+    readr,
+    MASS
 Suggests:
     polycor,
     testthat,
