@@ -1096,7 +1096,25 @@ predict_lightgbm <- function(model, df, predraw = FALSE) {
   }
 
   if (!is.null(obj) && obj == "multiclass") {
-    probs <- matrix(pred, ncol = length(model$y_levels), byrow = TRUE)
+    # tam#37510 follow-up: predict.lgb.Booster's return shape for a multiclass
+    # objective changed across lightgbm R package versions, the same drift
+    # already found and fixed in xgboost (exploratory_func#1589). Older
+    # versions returned a flat, row-major vector that this code reshaped via
+    # matrix(ncol=num_class, byrow=TRUE). The installed lightgbm R package
+    # (4.6.0, confirmed live) instead returns the nrow x num_class probability
+    # matrix DIRECTLY (each row already sums to 1.0). Reshaping an already-
+    # correct matrix with matrix(byrow=TRUE) silently re-flattens it and
+    # regroups unrelated values from different original rows/columns together
+    # -- every probability came out wrong (row sums ranged 0.22-2.53 on real
+    # data, correlation with actual class dropped to ~0.04-0.09) but each
+    # individual value still looked plausible, so nothing errored. Detect
+    # which convention the installed package actually used instead of
+    # assuming either one.
+    probs <- if (is.matrix(pred) && ncol(pred) == length(model$y_levels)) {
+      pred
+    } else {
+      matrix(pred, ncol = length(model$y_levels), byrow = TRUE)
+    }
     probs <- fill_mat_NA(1:nrow(df), probs, nrow(df))
     colnames(probs) <- model$y_levels
     return(probs)

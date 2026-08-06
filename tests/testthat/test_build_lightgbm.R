@@ -186,6 +186,36 @@ test_that("test lightgbm_multi with numeric target", {
   expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
 })
 
+# tam#37510 follow-up: predict_lightgbm() reshaped predict()'s multiclass
+# output via matrix(pred, ncol=num_class, byrow=TRUE), assuming the OLD
+# lightgbm R package convention of a flat, row-major vector. The installed
+# lightgbm R package (4.6.0) instead returns the nrow x num_class probability
+# matrix DIRECTLY (confirmed live: each row already sums to 1.0). Reshaping
+# an ALREADY-correct matrix via matrix(byrow=TRUE) silently re-flattens and
+# regroups unrelated values together -- every probability comes out wrong,
+# but each individual value still looks like a plausible probability, so
+# nothing errors. Assert the one property that must ALWAYS hold for genuine
+# multiclass probability output: each row's per-class probabilities sum to 1.
+test_that("test lightgbm_multi -- per-row class probabilities sum to 1 (tam#37510 follow-up)", {
+  set.seed(1)
+  n <- 60
+  test_data <- data.frame(
+    x1 = rnorm(n),
+    x2 = rnorm(n),
+    category = factor(sample(c("A", "B", "C"), n, replace = TRUE))
+  )
+  model_df <- suppressWarnings(test_data %>% exp_lightgbm(category, x1, x2, test_rate = 0, nrounds = 5))
+  model <- model_df$model[[1]]
+
+  predict_lightgbm <- get("predict_lightgbm", envir = asNamespace("exploratory"))
+  predicted <- predict_lightgbm(model, model$df)
+  expect_true(is.matrix(predicted))
+  expect_equal(ncol(predicted), length(model$y_levels))
+  expect_equal(colnames(predicted), as.character(model$y_levels))
+  row_sums <- rowSums(predicted)
+  expect_true(all(abs(row_sums[!is.na(row_sums)] - 1) < 1e-6))
+})
+
 test_that("test lightgbm_multi with not clean names and NA", {
   test_data <- data.frame(
     label = rep(seq(3) * 5, 100),
