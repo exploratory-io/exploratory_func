@@ -812,8 +812,22 @@ predict_xgboost <- function(model, df) {
   obj <- model$params$objective
 
   if (obj == "multi:softprob") {
-    # predicted is a vector containing probabilities for each class
-    probs <- matrix(predicted, nrow = length(model$y_levels)) %>% t()
+    # tam#37510 follow-up: predict.xgb.Booster's return shape for multi:softprob
+    # changed across xgboost R package versions. Older versions returned a
+    # flat, row-major vector (row1_class1, row1_class2, ..., row2_class1, ...)
+    # that this code reshaped into a matrix via matrix(nrow=num_class) %>% t().
+    # xgboost >= ~2.1 (confirmed live on 3.2.1.1) instead returns the
+    # nrow(mat_data) x num_class probability matrix DIRECTLY -- reshaping that
+    # again with matrix(nrow=num_class) silently re-flattens it column-major
+    # and regroups UNRELATED values from different original rows/columns into
+    # each "row", corrupting every probability (row sums that must equal 1.0
+    # instead ranged 0.007-2.67 on real data). Detect which convention the
+    # installed package actually used instead of assuming either one.
+    probs <- if (is.matrix(predicted) && ncol(predicted) == length(model$y_levels)) {
+      predicted
+    } else {
+      matrix(predicted, nrow = length(model$y_levels)) %>% t()
+    }
     # probs <- fill_mat_NA(as.numeric(rownames(mat_data)), probs, nrow(df)) # code from xgboost step.
     probs <- fill_mat_NA(1:nrow(df), probs, nrow(df)) # Not sure if this is necessary. TODO: check.
     colnames(probs) <- model$y_levels
