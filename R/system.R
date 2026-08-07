@@ -3713,14 +3713,14 @@ download_data_file <- function(url, type){
 
 #'API that searches and imports multiple same structure Excel Sheets in the Excel Book and merge them to a single data frame
 #'@export
-searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern = "", col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+searchAndReadExcelFileMultiSheets <- function(file, forPreview = FALSE, pattern = "", col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, guess_max = min(1000, n_max), use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   sheets <- readxl::excel_sheets(file)
   sheets <- sheets[stringr::str_detect(sheets, pattern)]
   if (length(sheets) == 0) {
     stop(paste0('EXP-DATASRC-20 :: ', jsonlite::toJSON(file), ' :: There is no sheet in the file that matches with the specified condition.'))
   }
-  exploratory::read_excel_file_multi_sheets(file = file, forPreview = forPreview, sheets = sheets, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
+  exploratory::read_excel_file_multi_sheets(file = file, forPreview = forPreview, sheets = sheets, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, guess_max = guess_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
@@ -3744,7 +3744,7 @@ glob_to_regex <- function(pattern) {
 
 #'API that searches and imports multiple same structure Excel files and merge them to a single data frame
 #'@export
-searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, guess_max = min(1000, n_max), use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
     stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
@@ -3771,7 +3771,7 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
   if (length(files) == 0) {
     stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
-  exploratory::read_excel_files(files = as.character(files), forPreview = forPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
+  exploratory::read_excel_files(files = as.character(files), forPreview = forPreview, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, guess_max = guess_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
 
@@ -3782,7 +3782,7 @@ searchAndReadExcelFiles <- function(folder, forPreview = FALSE, pattern = "", sh
 #'From the Exploratory Desktop, this argument is set as c("Sheet1", "Sheet2", "Sheet3") style.
 #'NOTE: readxl package can handle either sheet name or sheet index for the "sheet" argument and the sheet index starts from 1.
 #'@export
-read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1), col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1), col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, guess_max = min(1000, n_max), use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
   sheets <- setNames(as.list(sheets), sheets)
   df <- purrr::map_dfr(sheets, .f = ~exploratory::read_excel_file(
@@ -3794,6 +3794,7 @@ read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1),
                        skip = skip,
                        trim_ws = trim_ws,
                        n_max = n_max,
+                       guess_max = guess_max,
                        use_readxl = use_readxl,
                        detectDates = detectDates,
                        skipEmptyRows = skipEmptyRows,
@@ -3816,7 +3817,7 @@ read_excel_file_multi_sheets <- function(file, forPrevew = FALSE, sheets = c(1),
 
 #'API that imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-read_excel_files <- function(files, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+read_excel_files <- function(files, forPreview = FALSE, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, guess_max = min(1000, n_max), use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
     # for preview mode, just use the first file.
     if (forPreview & length(files) > 0) {
       files <- files[1]
@@ -3830,6 +3831,7 @@ read_excel_files <- function(files, forPreview = FALSE, sheet = 1, col_names = T
            skip = skip,
            trim_ws = trim_ws,
            n_max = n_max,
+           guess_max = guess_max,
            use_readxl = use_readxl,
            detectDates = detecDates,
            skipEmptyRows = skipEmptyRows,
@@ -3851,7 +3853,7 @@ read_excel_files <- function(files, forPreview = FALSE, sheet = 1, col_names = T
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
 #'Use openxlsx::read.xlsx since it's memory footprint is less than that of readxl::read_excel and this creates benefit for users with less memory like Windows 32 bit users.
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...){
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, guess_max = min(1000, n_max), use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...){
   loadNamespace("openxlsx")
   loadNamespace('readxl')
   loadNamespace('stringr')
@@ -3908,18 +3910,18 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
           stringr::str_detect(path, "^ftp://")) {
         # need to download first since readxl::read_excel cannot work with URL.
         tmp <- download_data_file(path, "excel")
-        df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max)
       } else {
         # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
         if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
           new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
           fs::file_copy(path, new_path) # Using file_copy since file.copy fails with some paths with multibyte chars. #26852
-          df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+          df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max)
           file.remove(new_path)
         }
         else {
           # If it's local file without multibyte path, simply call readxl::read_excel
-          df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+          df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max)
         }
       }
       if(col_names == FALSE) {

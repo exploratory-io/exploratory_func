@@ -696,6 +696,49 @@ test_that("read_excel_files", {
   expect_equal(colnames(df), c("id", "放送...1", "放送...2", "個人...3", "個人...4"))
 })
 
+# tam issue #37277 - "Data Source: Excel: Determine column data types like CSV."
+# Regression coverage for the new guess_max parameter threaded through
+# read_excel_file(): readxl's own default (min(1000, n_max) == 1000 rows for a
+# real, non-preview import where n_max defaults to Inf) samples ONLY the first
+# guess_max rows sequentially from the top of the sheet, unlike CSV import. So a
+# column whose first 1000+ rows are blank is misdetected (typically as logical),
+# and any real value appearing later in the file is silently discarded/coerced to
+# NA on read. Passing a guess_max large enough to cover the whole sheet (which
+# tam's RTranslator.toImportExcelScriptParameters now does for every real
+# import/update/refresh) must fix this without needing any col_types override.
+test_that("read_excel_file: guess_max controls whether a column with many leading blank rows is typed correctly", {
+  skip_if_not_installed("openxlsx")
+
+  t_file <- tempfile(fileext = ".xlsx")
+  n_blank <- 1010 # just over readxl's default guess_max of 1000, keeps the test fast
+  id_col <- as.character(seq_len(n_blank + 3))
+  # A column that looks blank/NA for far more than 1000 rows, then contains
+  # genuine date-like text further down the sheet (e.g. imported/typed as text
+  # by the source system, matching the reported customer-ID/date scenario).
+  mystery_col <- c(rep(NA_character_, n_blank), "2024-01-01", "2024-01-02", "2024-01-03")
+  df_in <- data.frame(id = id_col, mystery_col = mystery_col, stringsAsFactors = FALSE)
+  openxlsx::write.xlsx(df_in, t_file)
+  on.exit(unlink(t_file), add = TRUE)
+
+  # With readxl's default guess_max (1000, driven off the default n_max = Inf),
+  # the long leading run of NAs makes the column guess as logical, and the real
+  # values that appear after row 1000 are dropped to NA.
+  df_default_guess <- exploratory::read_excel_file(t_file)
+  expect_true(is.logical(df_default_guess$mystery_col))
+  expect_true(all(is.na(df_default_guess$mystery_col)))
+
+  # With a guess_max that covers the whole sheet (what tam now generates for a
+  # real, non-preview import), the trailing real values are seen during type
+  # guessing and the column comes back as character with its data intact --
+  # matching CSV import's whole-file type detection.
+  df_full_guess <- exploratory::read_excel_file(t_file, guess_max = n_blank + 3)
+  expect_true(is.character(df_full_guess$mystery_col))
+  expect_equal(
+    df_full_guess$mystery_col[(n_blank + 1):(n_blank + 3)],
+    c("2024-01-01", "2024-01-02", "2024-01-03")
+  )
+})
+
 test_that("test setConnectionPoolMode", {
   # Save the original pool_connection value to restore later
   original_pool_connection <- exploratory::getConnectionPoolMode()
