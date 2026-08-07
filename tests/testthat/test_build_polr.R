@@ -327,3 +327,20 @@ test_that("default tidy() output is unchanged by the new type= argument", {
   expect_true(any(tidied$coefficient_type == "intercept"))
   expect_true(any(tidied$coefficient_type == "coefficient"))
 })
+
+test_that("tidy() joins the reference (base) level for each categorical predictor's dummy term", {
+  df <- make_ordinal_test_df(n = 150)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+  tidied <- tidy_rowwise(trial, model, pretty.name = TRUE)
+
+  expect_true("Base Level" %in% colnames(tidied))
+  dummy_rows <- tidied[tidied$Term %in% paste0("部署 名!#", c("Support", "Engineering")), ]
+  expect_true(nrow(dummy_rows) > 0)
+  # "Sales" is first in the factor's level order (make_ordinal_test_df), so it is
+  # the reference level dropped by treatment contrasts.
+  expect_true(all(dummy_rows$`Base Level` == "Sales"))
+
+  # A numeric predictor and the intercept (threshold) rows have no base level.
+  expect_true(is.na(tidied$`Base Level`[tidied$Term == "年齢"]))
+  expect_true(all(is.na(tidied$`Base Level`[tidied$Type == "intercept"])))
+})

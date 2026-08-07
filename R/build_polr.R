@@ -588,6 +588,16 @@ tidy.polr_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, c
     }
   }
 
+  # Reference (base) level for each categorical predictor's dummy term, e.g.
+  # `g` = "gB"/"gC" both get base.level = "A" (the level dropped by treatment
+  # contrasts, i.e. x$xlevels[[var]][1]) -- same helper and same semantics
+  # build_glm() uses (xlevels_to_base_level_table), joined by term string so the
+  # report's coefficient interpretation examples can say "compared to <base>".
+  if (length(x$xlevels) > 0) {
+    base_level_table <- xlevels_to_base_level_table(x$xlevels)
+    ret <- ret %>% dplyr::left_join(base_level_table, by = "term")
+  }
+
   if (pretty.name) {
     ret <- ret %>% dplyr::rename(
       Term = term,
@@ -605,6 +615,9 @@ tidy.polr_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, c
     }
     if ("odds.ratio.conf.low" %in% colnames(ret)) {
       ret <- ret %>% dplyr::rename(`Odds Ratio Conf. Low` = odds.ratio.conf.low, `Odds Ratio Conf. High` = odds.ratio.conf.high)
+    }
+    if ("base.level" %in% colnames(ret)) {
+      ret <- ret %>% dplyr::rename(`Base Level` = base.level)
     }
   }
 
