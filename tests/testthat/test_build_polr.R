@@ -204,3 +204,126 @@ test_that("build_polr works with Repeat By (group_cols) end to end through tidy/
   tidied <- tidy_rowwise(trial, model)
   expect_true(all(c("region", "term", "estimate") %in% colnames(tidied)))
 })
+
+# --- Report diagnostics: VIF / permutation importance / partial dependence ----
+# These feed the 多重共線性 / 説明変数の重要度 / 説明変数の影響度 sections of the
+# Analytics report, mirroring what Logistic Regression shows (tam#4453).
+
+test_that("tidy(type='vif') returns one row per predictor with the ORIGINAL column names", {
+  df <- make_ordinal_test_df(n = 120)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+
+  vif_df <- tidy_rowwise(trial, model, type = "vif")
+  # The `term` column comes back only because build_polr sets terms_mapping --
+  # vif_to_dataframe()'s trailing `x$terms_mapping[term]` silently DROPS the
+  # column when the map is missing. Assert the column AND its values.
+  expect_true("term" %in% colnames(vif_df))
+  expect_true("VIF" %in% colnames(vif_df))
+  expect_setequal(vif_df$term, c("年齢", "部署 名!#"))
+  expect_true(all(vif_df$VIF >= 0))
+  # Two near-independent predictors: VIF must be close to 1, never NA.
+  expect_false(any(is.na(vif_df$VIF)))
+})
+
+test_that("tidy(type='vif') reports a high VIF for a deliberately collinear predictor", {
+  df <- make_ordinal_test_df(n = 200)
+  set.seed(11)
+  df$`年齢 コピー` <- df$`年齢` * 0.95 + stats::rnorm(nrow(df), sd = 0.5)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `年齢 コピー`, `部署 名!#`)
+
+  vif_df <- tidy_rowwise(trial, model, type = "vif")
+  collinear <- vif_df$VIF[vif_df$term %in% c("年齢", "年齢 コピー")]
+  expect_true(all(collinear > 10))
+  expect_true(vif_df$VIF[vif_df$term == "部署 名!#"] < 10)
+})
+
+test_that("tidy(type='vif') returns an empty frame instead of failing with a single predictor", {
+  df <- make_ordinal_test_df(n = 80)
+  trial <- df %>% build_polr(`満足度`, `年齢`)
+  # VIF is undefined for one term; the group is skipped, not errored, so a
+  # Repeat By run with one bad group still renders the others.
+  expect_equal(nrow(tidy_rowwise(trial, model, type = "vif")), 0)
+})
+
+test_that("tidy(type='importance') ranks predictors and carries a P value per variable", {
+  df <- make_ordinal_test_df(n = 150)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+
+  imp <- tidy_rowwise(trial, model, type = "importance")
+  expect_true(all(c("variable", "importance", "p.value") %in% colnames(imp)))
+  expect_setequal(imp$variable, c("年齢", "部署 名!#"))
+  # Importance is clamped at 0 and sorted descending.
+  expect_true(all(imp$importance >= 0))
+  expect_equal(imp$importance, sort(imp$importance, decreasing = TRUE))
+  # P values are matched by PREFIX against the model terms; a categorical
+  # predictor contributes one term per level and takes the smallest.
+  expect_true(all(!is.na(imp$p.value)))
+  expect_true(all(imp$p.value >= 0 & imp$p.value <= 1))
+})
+
+test_that("tidy(type='importance') returns a structured empty frame for a single predictor", {
+  df <- make_ordinal_test_df(n = 80)
+  trial <- df %>% build_polr(`満足度`, `年齢`)
+  imp <- tidy_rowwise(trial, model, type = "importance")
+  expect_equal(nrow(imp), 0)
+  # Structured (not bare data.frame()) so a caller can arrange(desc(importance)).
+  expect_true(all(c("variable", "importance", "p.value") %in% colnames(imp)))
+})
+
+test_that("lm_partial_dependence() produces a faceted table keyed by the ORIGINAL column names", {
+  df <- make_ordinal_test_df(n = 150)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+
+  pd <- trial %>% lm_partial_dependence()
+  # x_name survives only because terms_mapping exists (handle_partial_dependence
+  # ends with `x$terms_mapping[x_name]`), and the chart facets on it.
+  expect_true(all(c("x_name", "x_value", "y_name", "y_value", "chart_type", "x_type") %in% colnames(pd)))
+  expect_true(nrow(pd) > 0)
+  expect_setequal(unique(pd$x_name), c("年齢", "部署 名!#"))
+  # Multiclass: one predicted-probability series per ordered target level.
+  expect_setequal(unique(as.character(pd$y_name)), c("Low", "Medium", "High"))
+  expect_true(all(pd$y_value >= 0 & pd$y_value <= 1))
+  # A numeric predictor draws a line, a categorical one draws points.
+  expect_equal(unique(pd$chart_type[pd$x_name == "年齢"]), "line")
+  expect_equal(unique(pd$chart_type[pd$x_name == "部署 名!#"]), "scatter")
+})
+
+test_that("partial dependence survives a column name full of regex/mmpf-hostile symbols", {
+  # mmpf::marginalPrediction cannot handle such names directly (a comma alone
+  # breaks it), which is why partial_dependence.polr_exploratory renames columns
+  # before handing the data over. Without that, this silently returns 0 rows.
+  set.seed(5)
+  n <- 150
+  stress <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  df <- data.frame(
+    `満足度` = factor(sample(c("Low", "Medium", "High"), n, TRUE),
+                      levels = c("Low", "Medium", "High"), ordered = TRUE),
+    v = stats::rnorm(n),
+    g = factor(sample(c("X", "Y", "Z"), n, TRUE)),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  names(df)[2] <- stress
+  trial <- df %>% build_polr(`満足度`, !!rlang::sym(stress), g)
+
+  pd <- trial %>% lm_partial_dependence()
+  expect_true(nrow(pd) > 0)
+  expect_setequal(unique(pd$x_name), c(stress, "g"))
+
+  vif_df <- tidy_rowwise(trial, model, type = "vif")
+  expect_setequal(vif_df$term, c(stress, "g"))
+
+  imp <- tidy_rowwise(trial, model, type = "importance")
+  expect_setequal(imp$variable, c(stress, "g"))
+})
+
+test_that("default tidy() output is unchanged by the new type= argument", {
+  df <- make_ordinal_test_df(n = 100)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+  tidied <- tidy_rowwise(trial, model)
+  # Same columns the coefficient table has always returned.
+  expect_true(all(c("term", "estimate", "std.error", "statistic", "p.value",
+                    "coefficient_type", "conf.low", "conf.high", "odds.ratio") %in% colnames(tidied)))
+  expect_true(any(tidied$coefficient_type == "intercept"))
+  expect_true(any(tidied$coefficient_type == "coefficient"))
+})

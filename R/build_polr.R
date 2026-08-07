@@ -42,6 +42,12 @@
 #'   build_lm.fast().
 #' @param keep.source Whether to retain the (pre-split) source data in the
 #'   source.data column.
+#' @param max_pd_vars Maximum number of predictors to compute partial dependence
+#'   for (the most important ones are kept), mirroring build_lm.fast().
+#' @param pd_grid_resolution Number of grid points per predictor for partial
+#'   dependence.
+#' @param pd_sample_size Maximum number of rows sampled when computing partial
+#'   dependence.
 #' @export
 build_polr <- function(df,
                         target,
@@ -54,6 +60,9 @@ build_polr <- function(df,
                         seed = 1,
                         test_rate = 0,
                         test_split_type = "random",
+                        max_pd_vars = 20,
+                        pd_grid_resolution = 20,
+                        pd_sample_size = 500,
                         keep.source = TRUE) {
   validate_empty_data(df)
 
@@ -213,6 +222,68 @@ build_polr <- function(df,
       stop(e$message)
     })
 
+    # Mark this as a multiclass model so the model-agnostic report helpers
+    # (ml_report_basic_info() on the tam side, handle_partial_dependence() here)
+    # take their multiclass branch, and record the target's ordered levels.
+    model$classification_type <- "multi"
+    model$orig_target_col <- target_col
+    attr(model, "ylevels") <- levels(train_data[[target_col]])
+
+    # The shared report helpers vif_to_dataframe() and handle_partial_dependence()
+    # BOTH end with `x$terms_mapping[<name column>]`. lm/glm fit on sanitized
+    # column names (c1_, c2_, ...) and use that map to restore the originals; we
+    # fit on the real names, so without a map the lookup returns NULL and dplyr
+    # SILENTLY DROPS the whole column -- the VIF chart loses its Variable column
+    # and the partial-dependence chart loses x_name (so it cannot facet).
+    # Provide an identity map covering both the bare name and the backtick-quoted
+    # form, since terms(model) labels a name needing quoting as `name`.
+    model$terms_mapping <- stats::setNames(
+      c(selected_cols, selected_cols),
+      c(selected_cols, paste0("`", selected_cols, "`"))
+    )
+
+    # --- Report diagnostics, mirroring build_lm.fast()/build_glm(). ---------
+    # These must run BEFORE the terms environment is stripped below, since
+    # model.matrix()/predict() on the fitted model still need it.
+
+    # Multicollinearity (VIF). Needs 2+ terms; a perfect-collinearity failure is
+    # captured as an error object so tidy(type='vif') can skip that group
+    # instead of failing the whole model, mirroring calc_vif() for lm/glm.
+    model$vif <- tryCatch(calc_vif_polr(model), error = function(e) e)
+
+    # Permutation importance. Skipped for a single predictor (nothing to rank).
+    model$imp_df <- if (length(selected_cols) > 1) {
+      tryCatch(
+        calc_permutation_importance_polr(model, target_col, selected_cols, train_data),
+        error = function(e) e
+      )
+    } else {
+      simpleError("Variable importance requires two or more variables.")
+    }
+
+    # Partial dependence, computed only for the most important predictors.
+    imp_vars <- if (!is.null(model$imp_df) && !inherits(model$imp_df, "error")) {
+      as.character((model$imp_df %>% dplyr::arrange(-importance))$variable)
+    } else {
+      as.character(selected_cols)
+    }
+    imp_vars <- imp_vars[seq_len(min(length(imp_vars), max_pd_vars))]
+    model$imp_vars <- imp_vars
+    model$partial_dependence <- if (length(imp_vars) > 0) {
+      tryCatch(
+        partial_dependence.polr_exploratory(
+          model,
+          target = target_col,
+          vars = imp_vars,
+          data = train_data,
+          n = c(pd_grid_resolution, min(nrow(train_data), pd_sample_size))
+        ),
+        error = function(e) NULL
+      )
+    } else {
+      NULL
+    }
+
     # Strip environments to save rds size when cached, mirroring build_lm.fast()/build_glm().
     if (!is.null(model$terms)) {
       attr(model$terms, ".Environment") <- NULL
@@ -252,14 +323,241 @@ build_polr <- function(df,
 #' @export
 build_ordinal_regression <- build_polr
 
+# Variance Inflation Factor for a MASS::polr() model.
+#
+# This is the same generalized-VIF computation as vif() in build_lm.R (itself
+# derived from car::vif), adapted for polr's two structural differences:
+#
+#   1. vcov(polr) is [slope coefficients ..., zeta (category thresholds) ...].
+#      The thresholds are polr's analogue of the intercept and must be dropped;
+#      lm/glm drop a single leading "(Intercept)" row instead.
+#   2. coef(polr) contains NO intercept, so build_lm's
+#      `names(coefficients(mod)[1]) == "(Intercept)"` test is FALSE and its
+#      "No intercept: vifs may not be sensible" branch would fire wrongly.
+#      model.matrix(polr) DOES include an intercept column (assign == 0), so
+#      the assign vector is filtered instead.
+#
+# Verified to agree with car::vif() on a polr fit to 4 decimal places.
+calc_vif_polr <- function(model) {
+  if (any(is.na(stats::coef(model)))) {
+    # Perfect collinearity: report the offending variables the same way
+    # calc_vif() does for lm/glm so the caller can surface a useful message.
+    coef_vec <- stats::coef(model)
+    na_coef_names <- names(coef_vec[is.na(coef_vec)])
+    stop(paste0("Variables causing perfect collinearity : ", paste(na_coef_names, collapse = ", ")))
+  }
+  v <- stats::vcov(model)
+  n_coef <- length(stats::coef(model))
+  # Drop the zeta (threshold) rows/columns; keep only the slope coefficients.
+  v <- v[seq_len(n_coef), seq_len(n_coef), drop = FALSE]
+
+  mm <- stats::model.matrix(model)
+  assign <- attr(mm, "assign")
+  assign <- assign[assign != 0] # drop the intercept column
+
+  terms_labels <- labels(stats::terms(model))
+  n_terms <- length(terms_labels)
+  if (n_terms < 2) {
+    stop("model contains fewer than 2 terms")
+  }
+
+  R <- stats::cov2cor(v)
+  detR <- det(R)
+  result <- matrix(0, n_terms, 3)
+  rownames(result) <- terms_labels
+  colnames(result) <- c("GVIF", "Df", "GVIF^(1/(2*Df))")
+  for (term in seq_len(n_terms)) {
+    subs <- which(assign == term)
+    result[term, 1] <- det(as.matrix(R[subs, subs])) * det(as.matrix(R[-subs, -subs])) / detR
+    result[term, 2] <- length(subs)
+  }
+  if (all(result[, 2] == 1)) {
+    result <- result[, 1]
+  } else {
+    result[, 3] <- result[, 1]^(1 / (2 * result[, 2]))
+  }
+  result
+}
+
+# Permutation importance for a MASS::polr() model.
+#
+# Mirrors calc_permutation_importance_rpart_multiclass(): predict() returns an
+# n x n_category probability matrix, and the loss is the probability-error of the
+# ground-truth category (a plain negative probability rather than a negative LOG
+# probability, so a zero probability for the observed class cannot contribute an
+# infinite penalty).
+calc_permutation_importance_polr <- function(fit, target, vars, data) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
+  }
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    tryCatch({
+      mmpf::permutationImportance(
+        data, var, target, fit,
+        nperm = 1, # 1 permutation for performance, matching the other models.
+        predict.fun = function(object, newdata) {
+          stats::predict(object, newdata = newdata, type = "probs")
+        },
+        loss.fun = function(x, y) {
+          sum(-(x[match(y[[1]][row(x)], colnames(x)) == col(x)]), na.rm = TRUE)
+        }
+      )
+    }, error = function(e) {
+      stop(paste0(e$message, " (while calculating permutation importance for variable '", var, "')"),
+           call. = FALSE)
+    })
+  })
+  importances <- purrr::flatten_dbl(importances)
+  # Negative importance can happen by chance with permutation importance; clamp to 0.
+  importances_df <- tibble::tibble(variable = vars, importance = pmax(importances, 0))
+  importances_df %>% dplyr::arrange(-importance)
+}
+
+# Partial dependence for a MASS::polr() model, in the same shape
+# (a data.frame with "pd" class and vars/target/points attributes) that
+# handle_partial_dependence() consumes.
+#
+# Mirrors partial_dependence.rpart(): the prediction is a per-category
+# probability matrix, so attr(,"target") is set to the ordered category levels
+# rather than the target column name -- handle_partial_dependence() uses that to
+# take its multiclass branch.
+partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(data),
+                                                n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+                                                interaction = FALSE, uniform = TRUE, data, ...) {
+  if (!requireNamespace("mmpf", quietly = TRUE)) {
+    return(NULL)
+  }
+
+  # mmpf::marginalPrediction cannot handle column names containing characters
+  # like a comma (see the same note in build_lm.R). lm/glm avoid this by fitting
+  # on sanitized names (c1_, c2_, ...); we fit on the real names, so instead
+  # hand mmpf a SAFE-NAMED COPY of the data and rename back inside predict.fun
+  # before the model sees it. Without this, a data frame with a column name like
+  # the repo's multibyte + symbol stress-test name silently yields a 0-row
+  # partial-dependence table and the chart renders empty.
+  orig_names <- colnames(data)
+  safe_names <- paste0(".pdcol", seq_along(orig_names))
+  safe_data <- data
+  colnames(safe_data) <- safe_names
+  safe_of <- stats::setNames(safe_names, orig_names)
+  safe_vars <- unname(safe_of[as.character(vars)])
+
+  predict.fun <- function(object, newdata) {
+    colnames(newdata) <- orig_names[match(colnames(newdata), safe_names)]
+    stats::predict(object, newdata = newdata, type = "probs")
+  }
+
+  # Grid points based on quantiles so an outlier does not dominate the grid,
+  # matching partial_dependence.lm_exploratory()/partial_dependence.rpart().
+  points <- list()
+  quantile_points <- list()
+  for (i in seq_along(vars)) {
+    cname <- as.character(vars)[[i]]
+    sname <- safe_vars[[i]]
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      minv <- min(coldata, na.rm = TRUE)
+      maxv <- max(coldata, na.rm = TRUE)
+      grid <- minv + (0:20) / 20 * (maxv - minv)
+      quantile_grid <- stats::quantile(coldata, probs = 1:24 / 25)
+      quantile_points[[cname]] <- quantile_grid
+      points[[sname]] <- sort(unique(c(grid, quantile_grid)))
+    } else {
+      points[[sname]] <- unique(data[[cname]])
+    }
+  }
+
+  args <- list(
+    "data" = safe_data,
+    "vars" = safe_vars,
+    "n" = n,
+    "model" = fit,
+    "points" = points,
+    "predict.fun" = predict.fun,
+    ...
+  )
+
+  if (length(safe_vars) > 1L && !interaction) {
+    pd <- data.table::rbindlist(sapply(safe_vars, function(x) {
+      args$vars <- x
+      if ("points" %in% names(args)) {
+        args$points <- args$points[x]
+      }
+      do.call(mmpf::marginalPrediction, args)
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(safe_vars, colnames(pd)[!colnames(pd) %in% safe_vars]))
+  } else {
+    args$vars <- as.character(safe_vars)
+    pd <- do.call(mmpf::marginalPrediction, args)
+  }
+
+  # Restore the original predictor column names before handing the frame on --
+  # every downstream consumer (handle_partial_dependence's `vars` attribute,
+  # the chart's x_name) works in terms of the user's column names.
+  pd <- as.data.frame(pd)
+  restored <- orig_names[match(colnames(pd), safe_names)]
+  colnames(pd) <- ifelse(is.na(restored), colnames(pd), restored)
+
+  attr(pd, "class") <- c("pd", "data.frame")
+  attr(pd, "interaction") <- interaction == TRUE
+  attr(pd, "target") <- attr(fit, "ylevels")
+  attr(pd, "vars") <- vars
+  attr(pd, "points") <- points
+  attr(pd, "quantile_points") <- quantile_points
+  pd
+}
+
 #' Coefficient / odds-ratio table for an Ordered Logistic Regression model.
 #' @param x A model built by build_polr(), with class polr_exploratory_0.
+#' @param type What to return: "coefficients" (default), "vif",
+#'   "importance", or "partial_dependence". Mirrors tidy.glm_exploratory().
 #' @param conf.int Whether to compute a (Wald, i.e. normal-approximation) confidence interval.
 #' @param conf.level Confidence level for conf.int.
 #' @param exponentiate Whether to add an odds.ratio column (exp(estimate)) for slope coefficients.
 #' @param pretty.name Whether to rename columns to display-friendly names.
 #' @export
-tidy.polr_exploratory_0 <- function(x, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, ...) {
+tidy.polr_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, ...) {
+  if (inherits(x, "error")) {
+    return(data.frame())
+  }
+  # Non-coefficient outputs mirror tidy.glm_exploratory()'s switch. They return
+  # an EMPTY data.frame (not an error) when unavailable so a single failing
+  # Repeat By group is skipped rather than failing the whole chart.
+  if (identical(type, "vif")) {
+    if (!is.null(x$vif) && !inherits(x$vif, "error")) {
+      return(vif_to_dataframe(x))
+    }
+    return(data.frame())
+  }
+  if (identical(type, "partial_dependence")) {
+    return(handle_partial_dependence(x))
+  }
+  if (identical(type, "importance") || identical(type, "permutation_importance")) {
+    if (is.null(x$imp_df) || inherits(x$imp_df, "error")) {
+      # Structured empty frame so callers can safely arrange(desc(importance)).
+      return(data.frame(variable = character(), importance = numeric(), p.value = numeric()))
+    }
+    ret <- x$imp_df
+    # Attach the smallest P value among the model terms belonging to each
+    # variable (a categorical predictor contributes one term per level), so the
+    # importance chart can color bars by significance the way glm's does.
+    coef_df <- tidy.polr_exploratory_0(x, type = "coefficients", conf.int = FALSE, exponentiate = FALSE)
+    slope_df <- coef_df %>% dplyr::filter(coefficient_type == "coefficient")
+    # Prefix match on the raw string rather than a regex: a column name can
+    # legitimately contain regex metacharacters (see the repo's multibyte +
+    # symbol stress-test name), which would silently mis-match under str_detect.
+    ret <- ret %>% dplyr::mutate(p.value = purrr::map_dbl(variable, function(var) {
+      bare_terms <- sub("^`", "", as.character(slope_df$term))
+      matched <- slope_df$p.value[startsWith(bare_terms, as.character(var))]
+      if (length(matched) == 0 || all(is.na(matched))) NA_real_ else min(matched, na.rm = TRUE)
+    }))
+    if (identical(type, "permutation_importance")) {
+      ret <- ret %>% dplyr::rename(term = variable)
+    }
+    return(ret)
+  }
+
   smry <- summary(x)$coefficients
   n_coef <- length(stats::coef(x))
   n_zeta <- length(x$zeta)
