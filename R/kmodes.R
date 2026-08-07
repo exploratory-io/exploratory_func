@@ -282,8 +282,11 @@ kmodes_silhouette_per_row <- function(cluster, mat, sample_idx = NULL) {
 #' @param iter_max Maximum iterations per fit.
 #' @param nstart Random starts per fit.
 #' @param sample_idx Rows used for the silhouette computation.
+#' @param selected_fit The fit the report itself shows, reused at its own cluster count.
+#' @param selected_k The cluster count of that fit.
 #' @return A tibble with one row per candidate cluster count.
-kmodes_iterate_silhouette <- function(mat, max_centers, iter_max, nstart, sample_idx) {
+kmodes_iterate_silhouette <- function(mat, max_centers, iter_max, nstart, sample_idx,
+                                      selected_fit = NULL, selected_k = NULL) {
   upper <- min(max_centers, nrow(unique(mat)) - 1)
   if (is.na(upper) || upper < 2) {
     return(tibble::tibble(center = integer(0), avg_silhouette = numeric(0),
@@ -292,7 +295,14 @@ kmodes_iterate_silhouette <- function(mat, max_centers, iter_max, nstart, sample
   sampled_mat <- mat[sample_idx, , drop = FALSE]
   d <- kmodes_matching_distance(sampled_mat)
   rows <- purrr::map(2:upper, function(k) {
-    fit <- kmodes_fit(mat, k, iter_max = iter_max, nstart = nstart)
+    # At the cluster count the report is actually showing, reuse that fit. Refitting would
+    # land on its own local optimum, and the table would then describe a different -- often
+    # worse -- clustering than every other section of the report.
+    fit <- if (!is.null(selected_fit) && identical(as.integer(k), as.integer(selected_k))) {
+      selected_fit
+    } else {
+      kmodes_fit(mat, k, iter_max = iter_max, nstart = nstart)
+    }
     sampled_cluster <- fit$cluster[sample_idx]
     if (dplyr::n_distinct(sampled_cluster) < 2) {
       return(tibble::tibble(center = k, avg_silhouette = NA_real_,
@@ -320,15 +330,24 @@ kmodes_iterate_silhouette <- function(mat, max_centers, iter_max, nstart, sample
 #' @param max_centers Largest number of clusters to try.
 #' @param iter_max Maximum iterations per fit.
 #' @param nstart Random starts per fit.
+#' @param selected_fit The fit the report itself shows, reused at its own cluster count.
+#' @param selected_k The cluster count of that fit.
 #' @return A tibble with one row per candidate cluster count.
-kmodes_iterate_elbow <- function(mat, max_centers, iter_max, nstart) {
+kmodes_iterate_elbow <- function(mat, max_centers, iter_max, nstart,
+                                 selected_fit = NULL, selected_k = NULL) {
   upper <- min(max_centers, nrow(unique(mat)))
   if (is.na(upper) || upper < 1) {
     return(tibble::tibble(center = integer(0), total_dissimilarity = numeric(0),
                           avg_dissimilarity = numeric(0), decrease_ratio = numeric(0)))
   }
   rows <- purrr::map(seq_len(upper), function(k) {
-    fit <- kmodes_fit(mat, k, iter_max = iter_max, nstart = nstart)
+    # Same reasoning as the silhouette table: the selected cluster count must report the
+    # clustering the rest of the report describes.
+    fit <- if (!is.null(selected_fit) && identical(as.integer(k), as.integer(selected_k))) {
+      selected_fit
+    } else {
+      kmodes_fit(mat, k, iter_max = iter_max, nstart = nstart)
+    }
     tibble::tibble(center = k,
                    total_dissimilarity = fit$total_dissimilarity,
                    avg_dissimilarity = fit$total_dissimilarity / nrow(mat))
@@ -674,12 +693,14 @@ exp_kmodes <- function(df, ...,
                                 map_category_top_n = map_category_top_n)
 
     silhouette_result <- if (optimal_method == "silhouette") {
-      kmodes_iterate_silhouette(mat, max_centers, iter.max, nstart, sil_idx)
+      kmodes_iterate_silhouette(mat, max_centers, iter.max, nstart, sil_idx,
+                                selected_fit = fit, selected_k = centers)
     } else {
       NULL
     }
     elbow_result <- if (optimal_method == "elbow") {
-      kmodes_iterate_elbow(mat, max_centers, iter.max, nstart)
+      kmodes_iterate_elbow(mat, max_centers, iter.max, nstart,
+                           selected_fit = fit, selected_k = centers)
     } else {
       NULL
     }

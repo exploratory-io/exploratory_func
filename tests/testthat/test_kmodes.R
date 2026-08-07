@@ -155,6 +155,37 @@ test_that("elbow mode reports the total mismatch count, never a sum of squares",
   expect_true(is.na(res$decrease_ratio[[1]]))
 })
 
+test_that("the cluster-count table agrees with the clustering the report shows", {
+  # The candidate loop used to refit at every k, including the selected one, and landed on
+  # its own local optimum -- so the k = centers row described a different, usually worse,
+  # clustering than the summary table right above it.
+  df <- kmodes_test_df()
+  model_df <- exp_kmodes(df, `利用目的`, `契約タイプ`, `導入経路`, flag, small_num, ord,
+                         centers = 3, seed = 1, elbow_method_mode = "silhouette",
+                         max_centers = 5)
+  summary_df <- model_df %>% tidy_rowwise(model, type = "summary")
+  selection <- model_df %>% tidy_rowwise(model, type = "silhouette") %>%
+    dplyr::filter(center == 3)
+
+  # The worst silhouette across the clusters IS the model's minimum.
+  expect_equal(selection$min_silhouette[[1]], min(summary_df$min_silhouette))
+  # And the reported average is the size-weighted average of the per-cluster averages.
+  expect_equal(selection$avg_silhouette[[1]],
+               sum(summary_df$size * summary_df$avg_silhouette) / sum(summary_df$size),
+               tolerance = 1e-8)
+
+  elbow_df <- exp_kmodes(df, `利用目的`, `契約タイプ`, `導入経路`, flag, small_num, ord,
+                         centers = 3, seed = 1, elbow_method_mode = "elbow", max_centers = 5)
+  elbow_summary <- elbow_df %>% tidy_rowwise(model, type = "summary")
+  elbow_selection <- elbow_df %>% tidy_rowwise(model, type = "elbow") %>%
+    dplyr::filter(center == 3)
+  # Total mismatches at the selected k = the mismatches the summary implies.
+  n_variables <- elbow_df$model[[1]]$n_variables
+  expect_equal(elbow_selection$total_dissimilarity[[1]],
+               sum(elbow_summary$size * n_variables * (1 - elbow_summary$avg_matching_rate_to_mode)),
+               tolerance = 1e-6)
+})
+
 test_that("the unselected cluster-count method returns an empty typed table", {
   df <- kmodes_test_df()
   model_df <- exp_kmodes(df, `利用目的`, `契約タイプ`, `導入経路`, centers = 3, seed = 1,
