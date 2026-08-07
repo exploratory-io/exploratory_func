@@ -344,3 +344,17 @@ test_that("tidy() joins the reference (base) level for each categorical predicto
   expect_true(is.na(tidied$`Base Level`[tidied$Term == "年齢"]))
   expect_true(all(is.na(tidied$`Base Level`[tidied$Type == "intercept"])))
 })
+
+test_that("evaluate_polr() carries a Max VIF column, matching build_lm.R's convention", {
+  df <- make_ordinal_test_df(n = 150)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+  ev <- evaluate_polr(trial, data = "training", pretty.name = TRUE)
+  expect_true("Max VIF" %in% colnames(ev))
+  expect_false(is.na(ev$`Max VIF`))
+  expect_true(ev$`Max VIF` >= 1)
+
+  # A single predictor: VIF is undefined, Max VIF must be NA (not an error).
+  trial_single <- df %>% build_polr(`満足度`, `年齢`)
+  ev_single <- evaluate_polr(trial_single, data = "training", pretty.name = TRUE)
+  expect_true(is.na(ev_single$`Max VIF`))
+})

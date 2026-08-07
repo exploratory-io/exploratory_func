@@ -792,11 +792,23 @@ evaluate_polr <- function(df, data = "training", pretty.name = FALSE) {
 #' @param data_types Character vector, any of "Training"/"Test", naming which rows to compute.
 #' @export
 evaluate_polr_one_model <- function(model, train_data, test_data, target_col, data_types = c("Training", "Test")) {
+  # Same convention as build_lm.R's lm/glm evaluators: fold the model's own VIF
+  # into every row of the summary table as a single `Max VIF` value, so the tam
+  # report can read multicollinearity off the SAME table it reads Accuracy /
+  # Misclass. Rate from, without a separate bar-chart-data parse. NA when VIF
+  # could not be computed at all (a single predictor); a perfect-collinearity
+  # error is surfaced by tidy(type='vif')'s own empty-frame branch, not here.
+  max_vif <- if (!is.null(model$vif) && !inherits(model$vif, "error")) {
+    max(vif_to_dataframe(model)$VIF, na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+
   data_sets <- list(Training = train_data, Test = test_data)
   purrr::map_dfr(data_types, function(dt) {
     eval_data <- data_sets[[dt]]
     if (is.null(eval_data) || nrow(eval_data) == 0) {
-      return(tibble::tibble(`Data Type` = dt, Rows = 0L, `Accuracy Rate` = NA_real_, `Misclass. Rate` = NA_real_))
+      return(tibble::tibble(`Data Type` = dt, Rows = 0L, `Accuracy Rate` = NA_real_, `Misclass. Rate` = NA_real_, `Max VIF` = max_vif))
     }
     augmented <- augment.polr_exploratory_0(model, newdata = eval_data)
     actual <- eval_data[[target_col]]
@@ -805,7 +817,8 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
       `Data Type` = dt,
       Rows = nrow(eval_data),
       `Accuracy Rate` = accuracy,
-      `Misclass. Rate` = 1 - accuracy
+      `Misclass. Rate` = 1 - accuracy,
+      `Max VIF` = max_vif
     )
   })
 }
