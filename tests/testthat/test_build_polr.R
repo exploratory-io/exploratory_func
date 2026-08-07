@@ -358,3 +358,49 @@ test_that("evaluate_polr() carries a Max VIF column, matching build_lm.R's conve
   ev_single <- evaluate_polr(trial_single, data = "training", pretty.name = TRUE)
   expect_true(is.na(ev_single$`Max VIF`))
 })
+
+test_that("tidy(type='vif') survives a term MASS::polr itself drops for rank-deficiency, per Repeat By group", {
+  # Distinct from the earlier "deliberately collinear predictor" test (VIF merely
+  # very large, ~87): here `年齢コピー` is an EXACT linear multiple of `年齢` for
+  # the "West" region, so MASS::polr's own rank-deficiency handling silently
+  # DROPS the redundant term from coef() rather than fitting a full design with
+  # an aliased column -- unlike lm/glm, whose coef() keeps a slot and fills it
+  # with NA (the case calc_vif_polr's original NA-coefficient guard was built
+  # for). Earlier this crashed with "subscript out of bounds": n_coef (survivors
+  # only, from vcov/coef) no longer matched the assign-vector length (still
+  # derived from the full 2-term formula), so a term index selected columns
+  # beyond the truncated 1x1 correlation matrix.
+  set.seed(11)
+  n <- 200
+  region <- rep(c("East", "West"), length.out = n)
+  age <- round(stats::runif(n, 20, 60))
+  age_copy <- ifelse(region == "West", age * 2, age + stats::rnorm(n))
+  score <- 0.08 * age + stats::rnorm(n)
+  satisfaction <- cut(score, breaks = stats::quantile(score, probs = c(0, 1 / 3, 2 / 3, 1)),
+                       labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+  df <- data.frame(
+    `満足度` = factor(as.character(satisfaction), levels = c("Low", "Medium", "High"), ordered = TRUE),
+    `年齢` = age,
+    `年齢コピー` = age_copy,
+    region = region,
+    check.names = FALSE, stringsAsFactors = FALSE
+  )
+  trial <- suppressWarnings(df %>% build_polr(`満足度`, `年齢`, `年齢コピー`, group_cols = "region"))
+
+  vif_df <- tidy_rowwise(trial, model, type = "vif")
+  # East (no aliasing) contributes 2 rows; West (aliased) contributes 0 --
+  # the whole group's VIF is skipped, not a partial/crashing result.
+  expect_equal(nrow(vif_df), 2)
+  expect_true(all(vif_df$region == "East"))
+
+  # The per-group error message names the DROPPED variable, mirroring lm/glm's
+  # NA-coefficient message text exactly (same downstream consumer: the report's
+  # Collinearity Error Message chart matches on the substring "perfect collinearity").
+  west_model <- trial$model[trial$region == "West"][[1]]
+  expect_true(inherits(west_model$vif, "error"))
+  expect_true(grepl("perfect collinearity", conditionMessage(west_model$vif), fixed = TRUE))
+  expect_true(grepl("年齢コピー", conditionMessage(west_model$vif), fixed = TRUE))
+
+  east_model <- trial$model[trial$region == "East"][[1]]
+  expect_true(is.numeric(east_model$vif))
+})

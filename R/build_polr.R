@@ -339,24 +339,43 @@ build_ordinal_regression <- build_polr
 #
 # Verified to agree with car::vif() on a polr fit to 4 decimal places.
 calc_vif_polr <- function(model) {
-  if (any(is.na(stats::coef(model)))) {
-    # Perfect collinearity: report the offending variables the same way
-    # calc_vif() does for lm/glm so the caller can surface a useful message.
-    coef_vec <- stats::coef(model)
-    na_coef_names <- names(coef_vec[is.na(coef_vec)])
-    stop(paste0("Variables causing perfect collinearity : ", paste(na_coef_names, collapse = ", ")))
+  coef_names <- names(stats::coef(model))
+  if (length(coef_names) == 0 || any(is.na(coef_names))) {
+    stop("model contains fewer than 2 terms")
   }
+
+  mm <- stats::model.matrix(model)
+  mm_assign <- attr(mm, "assign")
+  mm_colnames <- colnames(mm)
+  all_term_labels <- labels(stats::terms(model))
+
+  # Map each SURVIVING coefficient to its formula term index (assign's values,
+  # 1-based, 0 = intercept). Matched by NAME, not position: vcov()/coef() are
+  # already in coefficient order, which need not equal model.matrix's column
+  # order once a term has been dropped.
+  surv_term_idx <- mm_assign[match(coef_names, mm_colnames)]
+
+  # A rank-deficient design: unlike lm/glm, whose coef() keeps a slot per
+  # aliased term and fills it with NA (the case the block above used to
+  # handle), MASS::polr silently DROPS the aliased term from the fit --
+  # coef() simply has no entry for it at all. So a term is "aliased" here
+  # when NONE of its dummy columns survive into coef_names, not when a slot
+  # is NA. Detected by diffing the full formula's term set (all_term_labels)
+  # against the terms the surviving coefficients actually belong to.
+  # Surfaced with the SAME message calc_vif() uses for lm/glm so the caller
+  # (the report's Collinearity Error Message chart) handles both identically.
+  dropped_labels <- all_term_labels[!(seq_along(all_term_labels) %in% unique(surv_term_idx))]
+  if (length(dropped_labels) > 0) {
+    stop(paste0("Variables causing perfect collinearity : ", paste(dropped_labels, collapse = ", ")))
+  }
+
   v <- stats::vcov(model)
-  n_coef <- length(stats::coef(model))
+  n_coef <- length(coef_names)
   # Drop the zeta (threshold) rows/columns; keep only the slope coefficients.
   v <- v[seq_len(n_coef), seq_len(n_coef), drop = FALSE]
 
-  mm <- stats::model.matrix(model)
-  assign <- attr(mm, "assign")
-  assign <- assign[assign != 0] # drop the intercept column
-
-  terms_labels <- labels(stats::terms(model))
-  n_terms <- length(terms_labels)
+  term_ids <- sort(unique(surv_term_idx))
+  n_terms <- length(term_ids)
   if (n_terms < 2) {
     stop("model contains fewer than 2 terms")
   }
@@ -364,12 +383,12 @@ calc_vif_polr <- function(model) {
   R <- stats::cov2cor(v)
   detR <- det(R)
   result <- matrix(0, n_terms, 3)
-  rownames(result) <- terms_labels
+  rownames(result) <- all_term_labels[term_ids]
   colnames(result) <- c("GVIF", "Df", "GVIF^(1/(2*Df))")
-  for (term in seq_len(n_terms)) {
-    subs <- which(assign == term)
-    result[term, 1] <- det(as.matrix(R[subs, subs])) * det(as.matrix(R[-subs, -subs])) / detR
-    result[term, 2] <- length(subs)
+  for (i in seq_len(n_terms)) {
+    subs <- which(surv_term_idx == term_ids[i])
+    result[i, 1] <- det(as.matrix(R[subs, subs])) * det(as.matrix(R[-subs, -subs])) / detR
+    result[i, 2] <- length(subs)
   }
   if (all(result[, 2] == 1)) {
     result <- result[, 1]
