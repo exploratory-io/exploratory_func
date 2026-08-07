@@ -161,7 +161,10 @@ test_that("evaluate_polr reports training accuracy", {
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
   ev <- evaluate_polr(trial, data = "training")
 
-  expect_equal(colnames(ev), c("Data Type", "Rows", "Accuracy Rate", "Misclass. Rate"))
+  # Column set is pinned so a future metric addition is a deliberate, reviewed change.
+  expect_equal(colnames(ev), c("Data Type", "Rows", "Accuracy Rate", "Misclass. Rate",
+                               "Mean Category Error", "Ranked Probability Score",
+                               "Weighted Kappa", "Log Loss", "Max VIF"))
   expect_equal(ev$`Data Type`, "Training")
   expect_true(ev$Rows > 0)
   expect_true(ev$`Accuracy Rate` >= 0 && ev$`Accuracy Rate` <= 1)
@@ -334,11 +337,24 @@ test_that("tidy() joins the reference (base) level for each categorical predicto
   tidied <- tidy_rowwise(trial, model, pretty.name = TRUE)
 
   expect_true("Base Level" %in% colnames(tidied))
-  dummy_rows <- tidied[tidied$Term %in% paste0("部署 名!#", c("Support", "Engineering")), ]
+
+  # The model's term names carry backticks for a column whose name needs quoting,
+  # so match on the model's OWN dummy terms rather than a hand-built string.
+  model <- trial$model[[1]]
+  dept_levels <- model$xlevels[["部署 名!#"]]
+  expect_false(is.null(dept_levels))
+  dummy_terms <- names(stats::coef(model))
+  dummy_terms <- dummy_terms[grepl("部署", dummy_terms, fixed = TRUE)]
+  dummy_rows <- tidied[tidied$Term %in% dummy_terms, ]
   expect_true(nrow(dummy_rows) > 0)
-  # "Sales" is first in the factor's level order (make_ordinal_test_df), so it is
-  # the reference level dropped by treatment contrasts.
-  expect_true(all(dummy_rows$`Base Level` == "Sales"))
+
+  # The reference level is whichever level ends up FIRST after build_polr's
+  # forcats::fct_infreq() reordering of a character predictor -- not necessarily
+  # the order the values appear in the source data. Assert against the model's
+  # own xlevels so the test states the real contract.
+  expect_true(all(dummy_rows$`Base Level` == dept_levels[[1]]))
+  # Exactly one level is dropped as the reference; the rest get dummy terms.
+  expect_equal(nrow(dummy_rows), length(dept_levels) - 1)
 
   # A numeric predictor and the intercept (threshold) rows have no base level.
   expect_true(is.na(tidied$`Base Level`[tidied$Term == "年齢"]))
@@ -403,4 +419,85 @@ test_that("tidy(type='vif') survives a term MASS::polr itself drops for rank-def
 
   east_model <- trial$model[trial$region == "East"][[1]]
   expect_true(is.numeric(east_model$vif))
+})
+
+test_that("evaluate_polr() reports the ordinal-aware metrics the spec requires", {
+  df <- make_ordinal_test_df(n = 200)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+  ev <- evaluate_polr(trial, data = "training", pretty.name = TRUE)
+
+  expect_true(all(c("Accuracy Rate", "Mean Category Error", "Ranked Probability Score",
+                    "Weighted Kappa", "Log Loss") %in% colnames(ev)))
+  # Bounds implied by each definition.
+  expect_true(ev$`Mean Category Error` >= 0)
+  expect_true(ev$`Ranked Probability Score` >= 0 && ev$`Ranked Probability Score` <= 1)
+  expect_true(ev$`Weighted Kappa` <= 1)
+  expect_true(ev$`Log Loss` >= 0)
+  expect_false(any(is.na(ev[, c("Mean Category Error", "Ranked Probability Score",
+                                "Weighted Kappa", "Log Loss")])))
+})
+
+test_that("the ordinal metrics match independent hand computations", {
+  df <- make_ordinal_test_df(n = 200)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+  ev <- evaluate_polr(trial, data = "training", pretty.name = TRUE)
+
+  model <- trial$model[[1]]
+  train_data <- trial$.train_data[[1]]
+  aug <- augment.polr_exploratory_0(model, newdata = train_data)
+  lv <- levels(train_data$`満足度`)
+  K <- length(lv)
+  actual_rank <- match(as.character(train_data$`満足度`), lv)
+  pred_rank <- match(as.character(aug$.fitted), lv)
+  P <- as.matrix(aug[, paste0("predicted_probability_", lv)])
+
+  # Mean Category Error = mean(|predicted_rank - actual_rank|), per the spec.
+  expect_equal(ev$`Mean Category Error`, mean(abs(pred_rank - actual_rank)))
+  # Log Loss = -mean(log(probability assigned to the ACTUAL category)).
+  expect_equal(ev$`Log Loss`, -mean(log(P[cbind(seq_len(nrow(P)), actual_rank)])), tolerance = 1e-10)
+  # RPS = mean over rows of sum((cumulative predicted - cumulative actual)^2)/(K-1).
+  cum_p <- t(apply(P, 1, cumsum))
+  cum_a <- t(vapply(actual_rank, function(r) as.numeric(seq_len(K) >= r), numeric(K)))
+  expect_equal(ev$`Ranked Probability Score`,
+               mean(rowSums((cum_p[, seq_len(K - 1), drop = FALSE] -
+                               cum_a[, seq_len(K - 1), drop = FALSE])^2) / (K - 1)),
+               tolerance = 1e-10)
+})
+
+test_that("Ranked Probability Score matches the textbook definition on a known case", {
+  # Epstein/Murphy RPS: 3 categories, actual = category 2, forecast (0.2, 0.5, 0.3).
+  # cumulative predicted = (0.2, 0.7); cumulative actual = (0, 1)
+  # RPS = ((0.2-0)^2 + (0.7-1)^2) / (3-1) = (0.04 + 0.09) / 2 = 0.065
+  P <- matrix(c(0.2, 0.5, 0.3), nrow = 1)
+  K <- 3
+  actual_rank <- 2
+  cum_p <- t(apply(P, 1, cumsum))
+  cum_a <- t(vapply(actual_rank, function(r) as.numeric(seq_len(K) >= r), numeric(K)))
+  rps <- mean(rowSums((cum_p[, seq_len(K - 1), drop = FALSE] -
+                         cum_a[, seq_len(K - 1), drop = FALSE])^2) / (K - 1))
+  expect_equal(rps, 0.065)
+
+  # Bounds: a perfect forecast scores 0, a maximally wrong one scores 1.
+  perfect <- { p <- c(0, 1, 0); cp <- cumsum(p); ca <- as.numeric(1:3 >= 2); sum((cp[1:2] - ca[1:2])^2) / 2 }
+  worst <- { p <- c(0, 0, 1); cp <- cumsum(p); ca <- as.numeric(1:3 >= 1); sum((cp[1:2] - ca[1:2])^2) / 2 }
+  expect_equal(perfect, 0)
+  expect_equal(worst, 1)
+})
+
+test_that("Weighted Kappa uses quadratic weights and agrees with psych::cohen.kappa", {
+  skip_if_not_installed("psych")
+  df <- make_ordinal_test_df(n = 200)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+  ev <- evaluate_polr(trial, data = "training", pretty.name = TRUE)
+
+  model <- trial$model[[1]]
+  train_data <- trial$.train_data[[1]]
+  aug <- augment.polr_exploratory_0(model, newdata = train_data)
+  lv <- levels(train_data$`満足度`)
+  actual_rank <- match(as.character(train_data$`満足度`), lv)
+  pred_rank <- match(as.character(aug$.fitted), lv)
+
+  expect_equal(ev$`Weighted Kappa`,
+               psych::cohen.kappa(cbind(actual_rank, pred_rank))$weighted.kappa,
+               tolerance = 1e-8)
 })

@@ -827,16 +827,101 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
   purrr::map_dfr(data_types, function(dt) {
     eval_data <- data_sets[[dt]]
     if (is.null(eval_data) || nrow(eval_data) == 0) {
-      return(tibble::tibble(`Data Type` = dt, Rows = 0L, `Accuracy Rate` = NA_real_, `Misclass. Rate` = NA_real_, `Max VIF` = max_vif))
+      return(tibble::tibble(
+        `Data Type` = dt, Rows = 0L,
+        `Accuracy Rate` = NA_real_, `Misclass. Rate` = NA_real_,
+        `Mean Category Error` = NA_real_, `Ranked Probability Score` = NA_real_,
+        `Weighted Kappa` = NA_real_, `Log Loss` = NA_real_,
+        `Max VIF` = max_vif
+      ))
     }
     augmented <- augment.polr_exploratory_0(model, newdata = eval_data)
     actual <- eval_data[[target_col]]
     accuracy <- mean(as.character(augmented$.fitted) == as.character(actual), na.rm = TRUE)
+
+    # --- Ordinal-aware evaluation metrics (tam#4453 spec) ----------------------
+    # All four below treat the target as ORDERED: they use each category's RANK
+    # (position in the ordered factor's levels), not just equality, so predicting
+    # an ADJACENT category is penalized less than predicting a distant one.
+    # That is the whole reason an ordinal model is being used instead of a
+    # multiclass one, and plain Accuracy cannot express it.
+    lvls <- levels(model$model[[1]])
+    if (is.null(lvls)) {
+      lvls <- levels(factor(actual))
+    }
+    K <- length(lvls)
+    actual_rank <- match(as.character(actual), lvls)
+    predicted_rank <- match(as.character(augmented$.fitted), lvls)
+
+    prob_cols <- paste0("predicted_probability_", lvls)
+    prob_mat <- if (all(prob_cols %in% colnames(augmented))) {
+      as.matrix(augmented[, prob_cols, drop = FALSE])
+    } else {
+      NULL
+    }
+
+    # 平均カテゴリ誤差 -- mean(|predicted_rank - actual_rank|). 0 = perfect;
+    # 1 = off by one category on average. Directly interpretable in "categories".
+    mean_category_error <- mean(abs(predicted_rank - actual_rank), na.rm = TRUE)
+
+    # Ranked Probability Score -- the ordinal analogue of the Brier score. For
+    # each row, compare the CUMULATIVE predicted probability against the
+    # cumulative indicator of the actual category at every category boundary,
+    # square the difference, and normalize by K-1 so the value stays in 0..1
+    # regardless of how many categories there are. Lower is better. Unlike
+    # Accuracy it rewards a confident, ordinally-close probability distribution.
+    rps <- if (!is.null(prob_mat) && K > 1) {
+      cum_pred <- t(apply(prob_mat, 1, cumsum))
+      cum_actual <- t(vapply(actual_rank, function(r) as.numeric(seq_len(K) >= r), numeric(K)))
+      # Only the first K-1 boundaries carry information (the K-th cumulative is
+      # always 1 on both sides).
+      mean(rowSums((cum_pred[, seq_len(K - 1), drop = FALSE] -
+                      cum_actual[, seq_len(K - 1), drop = FALSE])^2) / (K - 1), na.rm = TRUE)
+    } else {
+      NA_real_
+    }
+
+    # Weighted Kappa (quadratic weights, per the spec's "v1 は quadratic weight
+    # を標準とする") -- agreement corrected for chance, with the penalty growing
+    # with the SQUARE of the rank distance. 1 = perfect, 0 = chance level,
+    # negative = worse than chance.
+    weighted_kappa <- {
+      ok <- !is.na(actual_rank) & !is.na(predicted_rank)
+      if (sum(ok) == 0) {
+        NA_real_
+      } else {
+        ar <- actual_rank[ok]
+        pr <- predicted_rank[ok]
+        obs <- matrix(0, K, K)
+        for (i in seq_along(ar)) obs[ar[i], pr[i]] <- obs[ar[i], pr[i]] + 1
+        obs <- obs / sum(obs)
+        # Expected agreement under independence of the two marginals.
+        expct <- outer(rowSums(obs), colSums(obs))
+        w <- outer(seq_len(K), seq_len(K), function(i, j) ((i - j)^2) / ((K - 1)^2))
+        denom <- sum(w * expct)
+        if (!is.finite(denom) || denom == 0) NA_real_ else 1 - sum(w * obs) / denom
+      }
+    }
+
+    # Log Loss -- negative mean log of the probability the model assigned to the
+    # category that actually occurred. Clamped away from 0 so a confidently wrong
+    # row contributes a large-but-finite penalty instead of Inf.
+    log_loss <- if (!is.null(prob_mat)) {
+      p_actual <- prob_mat[cbind(seq_len(nrow(prob_mat)), actual_rank)]
+      -mean(log(pmax(p_actual, .Machine$double.eps)), na.rm = TRUE)
+    } else {
+      NA_real_
+    }
+
     tibble::tibble(
       `Data Type` = dt,
       Rows = nrow(eval_data),
       `Accuracy Rate` = accuracy,
       `Misclass. Rate` = 1 - accuracy,
+      `Mean Category Error` = mean_category_error,
+      `Ranked Probability Score` = rps,
+      `Weighted Kappa` = weighted_kappa,
+      `Log Loss` = log_loss,
       `Max VIF` = max_vif
     )
   })
