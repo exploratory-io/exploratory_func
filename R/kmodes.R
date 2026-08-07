@@ -419,12 +419,15 @@ kmodes_adjusted_residual <- function(observed, expected, row_prop, col_prop) {
 #' Full category distribution of every variable within every cluster.
 #' @param prepared_df Prepared (all character) data frame of the rows used.
 #' @param cluster Integer cluster assignment.
-#' @param importance The variable importance table, used for the display order.
+#' @param importance The variable importance table, used for the default display order.
 #' @return A tibble of one row per variable, cluster and category.
 kmodes_category_composition <- function(prepared_df, cluster, importance) {
   order_lookup <- importance %>%
     dplyr::mutate(variable_order = dplyr::row_number()) %>%
     dplyr::select(variable, cramers_v, variable_order)
+  # The order the variables were selected in, so the report can switch back to it.
+  original_lookup <- tibble::tibble(variable = names(prepared_df),
+                                    original_order = seq_along(names(prepared_df)))
 
   rows <- purrr::map(names(prepared_df), function(col) {
     counts <- as.data.frame(table(cluster, prepared_df[[col]]), stringsAsFactors = FALSE)
@@ -440,6 +443,7 @@ kmodes_category_composition <- function(prepared_df, cluster, importance) {
   })
   dplyr::bind_rows(rows) %>%
     dplyr::left_join(order_lookup, by = "variable") %>%
+    dplyr::left_join(original_lookup, by = "variable") %>%
     dplyr::arrange(variable_order, cluster, category)
 }
 
@@ -521,7 +525,7 @@ kmodes_build_mca_map <- function(prepared_df, cluster, characteristic_categories
                        .groups = "drop") %>%
       dplyr::mutate(row_type = "cluster_representative", row_id = NA_integer_,
                     variable = NA_character_, category = NA_character_,
-                    label = as.character(cluster)) %>%
+                    label = paste0("Cluster ", cluster)) %>%
       dplyr::select(row_type, row_id, cluster, variable, category, Dim1, Dim2, label)
 
     top_categories <- characteristic_categories %>%

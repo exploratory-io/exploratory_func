@@ -217,7 +217,7 @@ test_that("category composition sums to 100% within each cluster and variable", 
                     elbow_method_mode = "none") %>%
     tidy_rowwise(model, type = "category_composition")
   expect_equal(colnames(res), c("variable", "cluster", "category", "n", "pct",
-                                "cramers_v", "variable_order"))
+                                "cramers_v", "variable_order", "original_order"))
   totals <- res %>%
     dplyr::group_by(variable, cluster) %>%
     dplyr::summarize(total = sum(pct, na.rm = TRUE), .groups = "drop")
@@ -226,6 +226,10 @@ test_that("category composition sums to 100% within each cluster and variable", 
   order_lookup <- res %>% dplyr::distinct(variable, cramers_v, variable_order) %>%
     dplyr::arrange(variable_order)
   expect_equal(order_lookup$cramers_v, sort(order_lookup$cramers_v, decreasing = TRUE))
+  # original_order is the order the variables were selected in, so the report can switch back.
+  original <- res %>% dplyr::distinct(variable, original_order) %>%
+    dplyr::arrange(original_order)
+  expect_equal(original$variable, c("利用目的", "契約タイプ", "導入経路", "flag"))
 })
 
 test_that("the MCA map returns observations, categories and cluster representatives", {
