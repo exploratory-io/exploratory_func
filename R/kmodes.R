@@ -101,8 +101,13 @@ kmodes_mode_value <- function(x) {
   }
   counts <- table(x)
   best <- names(counts)[counts == max(counts)]
-  winner <- sort(best)[[1]]
-  if (is.numeric(x)) as.numeric(winner) else winner
+  # table() names are always character, so a numeric input has to be sorted back as
+  # numbers -- otherwise code 10 would beat code 9 and the Mode chosen while fitting
+  # would disagree with the label-based Mode flag in the characteristic-category table.
+  if (is.numeric(x)) {
+    return(sort(as.numeric(best))[[1]])
+  }
+  sort(best)[[1]]
 }
 
 #' Mismatch count between every row of a code matrix and one Mode.

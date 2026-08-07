@@ -77,6 +77,11 @@ test_that("kmodes_mode_value breaks ties deterministically", {
   expect_equal(kmodes_mode_value(c("b", "a", "a", "b")), "a")
   expect_equal(kmodes_mode_value(c("c", "c", "a")), "c")
   expect_equal(kmodes_mode_value(c(NA, NA)), NA)
+  # A numeric tie must break on the number, not on its text. table() names are
+  # character, so a plain sort() would rank code 10 above code 9 and the Mode
+  # picked while fitting would stop matching the label-based Mode flag.
+  expect_equal(kmodes_mode_value(c(rep(9L, 3), rep(10L, 3))), 9)
+  expect_equal(kmodes_mode_value(c(rep(2L, 2), rep(11L, 2))), 2)
 })
 
 test_that("the distance is the simple matching mismatch count, not a numeric distance", {
