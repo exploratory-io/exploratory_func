@@ -188,11 +188,21 @@ build_polr <- function(df,
       stop("Fewer than 3 categories remain in the training data after sampling/splitting. Try lowering the test data rate.")
     }
 
+    # `fml`'s environment is build_polr()'s frame, not this each_func() call's frame.
+    # MASS::polr() -> stats::model.frame.default() resolves the `weights =` expression
+    # using `environment(formula)` (falling back to the calling frame only when the
+    # formula has none), so with a weight column it looks for `train_data`/`weight_col`
+    # in build_polr()'s frame and fails with "object 'train_data' not found" even though
+    # both are clearly in scope here. Rebind the formula's environment to this call's
+    # frame so `weights = train_data[[weight_col]]` resolves where it's actually defined.
+    local_fml <- fml
+    environment(local_fml) <- environment()
+
     model <- tryCatch({
       if (is.null(weight_col)) {
-        MASS::polr(fml, data = train_data, Hess = TRUE, method = "logistic")
+        MASS::polr(local_fml, data = train_data, Hess = TRUE, method = "logistic")
       } else {
-        MASS::polr(fml, data = train_data, weights = train_data[[weight_col]], Hess = TRUE, method = "logistic")
+        MASS::polr(local_fml, data = train_data, weights = train_data[[weight_col]], Hess = TRUE, method = "logistic")
       }
     }, error = function(e) {
       # Error message was changed across dplyr/MASS versions in ways that are hard to predict here,
