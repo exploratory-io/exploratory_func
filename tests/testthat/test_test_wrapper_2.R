@@ -128,6 +128,52 @@ test_that("test exp_wilcox paired results match direct wilcox.test", {
   expect_equal(ret$`W Value`[[1]] + direct_result$statistic[[1]], n * (n + 1) / 2)
 })
 
+test_that("exp_wilcox aligns shuffled rows by pairing key", {
+  set.seed(123)
+  n <- 10
+  subject_ids <- paste0("P", sprintf("%02d", 1:n))
+  before <- round(rnorm(n, mean = 50, sd = 5), 1)
+  after <- round(rnorm(n, mean = 45, sd = 5), 1)
+  shuffled_after <- c(3, 1, 10, 5, 8, 2, 9, 4, 7, 6)
+
+  data_shuffled <- tibble::tibble(
+    subject_id = c(subject_ids, subject_ids[shuffled_after]),
+    period = factor(rep(c("before", "after"), each = n), levels = c("before", "after")),
+    value = c(before, after[shuffled_after])
+  )
+  data_ordered <- tibble::tibble(
+    subject_id = rep(subject_ids, 2),
+    period = factor(rep(c("before", "after"), each = n), levels = c("before", "after")),
+    value = c(before, after)
+  )
+
+  keyed_model <- exp_wilcox(
+    data_shuffled,
+    value,
+    period,
+    paired = TRUE,
+    pairing_key = subject_id
+  ) %>% tidy_rowwise(model, type = "model")
+  ordered_model <- exp_wilcox(data_ordered, value, period, paired = TRUE) %>%
+    tidy_rowwise(model, type = "model")
+
+  expect_equal(keyed_model$`W Value`, ordered_model$`W Value`)
+  expect_equal(keyed_model$`P Value`, ordered_model$`P Value`)
+})
+
+test_that("exp_wilcox validates pairing keys", {
+  duplicate_keys <- tibble::tibble(
+    subject_id = c("A", "A", "B", "B"),
+    period = c("before", "before", "after", "after"),
+    value = c(1, 2, 3, 4)
+  )
+
+  expect_error(
+    exp_wilcox(duplicate_keys, value, period, paired = TRUE, pairing_key = subject_id),
+    "requires each pairing key to occur once in each group"
+  )
+})
+
 test_that("test exp_wilcox paired with conf.int results match direct wilcox.test", {
   set.seed(42)
   n <- 30
