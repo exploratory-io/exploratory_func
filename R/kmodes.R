@@ -607,11 +607,10 @@ exp_kmodes <- function(df, ...,
                        map_category_top_n = 30) {
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_cols <- grouped_by(df)
-  selected_cols <- setdiff(selected_cols, grouped_cols)
-
   if (any(selected_cols %in% grouped_cols)) {
     stop("Repeat-By column cannot be used as a variable column.")
   }
+  selected_cols <- setdiff(selected_cols, grouped_cols)
   if (length(selected_cols) < 2) {
     stop("K-Modes requires at least 2 variables. Select more variables.")
   }
@@ -632,10 +631,11 @@ exp_kmodes <- function(df, ...,
       set.seed(seed)
     }
     df <- df %>% dplyr::ungroup()
+    sampled_nrow <- NULL
     if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      sampled_nrow <- max_nrow
       df <- df %>% sample_rows(max_nrow)
     }
-    sampled_nrow <- if (!is.null(max_nrow)) max_nrow else NULL
 
     df_original <- df %>% dplyr::mutate(.kmodes_row_id = dplyr::row_number())
     prepared_all <- kmodes_prepare_data(df_original, selected_cols,
