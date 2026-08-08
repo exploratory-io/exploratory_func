@@ -187,7 +187,7 @@ build_polr <- function(df,
 
     # Drop unused predictor/target factor levels from the TRAINING data only. This mirrors
     # augment.glm_exploratory_0's newdata-side filtering: prediction on test_data later filters
-    # out rows whose predictor levels were never seen during training (see augment.polr_exploratory_0).
+    # out rows whose predictor levels were never seen during training (see augment.clm_exploratory_0).
     for (col in c(target_col, selected_cols)) {
       if (is.factor(train_data[[col]])) {
         train_data[[col]] <- forcats::fct_drop(train_data[[col]])
@@ -207,11 +207,18 @@ build_polr <- function(df,
     local_fml <- fml
     environment(local_fml) <- environment()
 
+    # ordinal::clm() rather than MASS::polr(): clm is the only one of the two that can
+    # test the proportional-odds assumption (ordinal::nominal_test()), which the report
+    # spec calls its most important section. The two share a parameterization -- on the
+    # same fit their coefficients AND thresholds agree to 4dp (pinned by a test) -- so
+    # this swap does not change any number the report already showed, and the spec's
+    # "always present the effect in the higher-category direction" requirement is
+    # satisfied by clm's own convention with no sign flipping.
     model <- tryCatch({
       if (is.null(weight_col)) {
-        MASS::polr(local_fml, data = train_data, Hess = TRUE, method = "logistic")
+        ordinal::clm(local_fml, data = train_data, link = "logit")
       } else {
-        MASS::polr(local_fml, data = train_data, weights = train_data[[weight_col]], Hess = TRUE, method = "logistic")
+        ordinal::clm(local_fml, data = train_data, weights = train_data[[weight_col]], link = "logit")
       }
     }, error = function(e) {
       # Error message was changed across dplyr/MASS versions in ways that are hard to predict here,
@@ -289,7 +296,7 @@ build_polr <- function(df,
       attr(model$terms, ".Environment") <- NULL
     }
 
-    class(model) <- c("polr_exploratory_0", class(model))
+    class(model) <- c("clm_exploratory_0", class(model))
 
     list(model = model, train_data = train_data, test_data = test_data)
   }
@@ -323,28 +330,58 @@ build_polr <- function(df,
 #' @export
 build_ordinal_regression <- build_polr
 
-# Variance Inflation Factor for a MASS::polr() model.
+
+# ordinal::clm()'s predict() returns a LIST with a `fit` element, where MASS::polr()
+# returned the matrix/vector directly. Every call site went through predict(), so this
+# unwraps once rather than repeating the check.
+clm_predict <- function(object, newdata = NULL, type = "prob") {
+  # If the RESPONSE column is present in newdata, clm's predict(type="prob") returns one
+  # probability per row -- the probability of the OBSERVED class -- instead of the full
+  # n x n_category matrix. Callers here always want the matrix, and mmpf hands us the raw
+  # training frame (target column included), so drop it first. Symptoms of not doing this:
+  # permutation importance died with "a matrix-like object is required as argument to
+  # 'row'", and partial dependence silently produced a SINGLE "preds" series rather than
+  # one per category.
+  if (!is.null(newdata) && !is.null(object$orig_target_col) &&
+      object$orig_target_col %in% colnames(newdata)) {
+    newdata <- newdata[, setdiff(colnames(newdata), object$orig_target_col), drop = FALSE]
+  }
+  res <- if (is.null(newdata)) {
+    stats::predict(object, type = type)
+  } else {
+    stats::predict(object, newdata = newdata, type = type)
+  }
+  if (is.list(res) && !is.data.frame(res) && "fit" %in% names(res)) res$fit else res
+}
+
+# Variance Inflation Factor for an ordinal::clm() model.
 #
 # This is the same generalized-VIF computation as vif() in build_lm.R (itself
-# derived from car::vif), adapted for polr's two structural differences:
+# derived from car::vif), adapted for clm's structural differences:
 #
-#   1. vcov(polr) is [slope coefficients ..., zeta (category thresholds) ...].
-#      The thresholds are polr's analogue of the intercept and must be dropped;
-#      lm/glm drop a single leading "(Intercept)" row instead.
-#   2. coef(polr) contains NO intercept, so build_lm's
-#      `names(coefficients(mod)[1]) == "(Intercept)"` test is FALSE and its
-#      "No intercept: vifs may not be sensible" branch would fire wrongly.
-#      model.matrix(polr) DOES include an intercept column (assign == 0), so
-#      the assign vector is filtered instead.
+#   1. vcov(clm) is [alpha (category thresholds) ..., beta (slopes) ...] --
+#      thresholds FIRST, the opposite of MASS::polr, which put them last. The
+#      thresholds are the ordinal analogue of the intercept and must be dropped.
+#      Selected BY NAME (x$beta) rather than by position so a future ordering
+#      change cannot silently compute VIF off the wrong submatrix.
+#   2. coef(clm) contains the thresholds too, so build_lm's
+#      `names(coefficients(mod)[1]) == "(Intercept)"` test would misfire.
+#      model.matrix(clm) returns a LIST whose $X carries the design matrix, and
+#      that matrix DOES include an intercept column (assign == 0).
 #
-# Verified to agree with car::vif() on a polr fit to 4 decimal places.
+# Verified to agree with car::vif() to 4 decimal places.
 calc_vif_polr <- function(model) {
-  coef_names <- names(stats::coef(model))
+  # Slopes only -- clm's coef() also contains the thresholds.
+  coef_names <- names(model$beta)
   if (length(coef_names) == 0 || any(is.na(coef_names))) {
     stop("model contains fewer than 2 terms")
   }
 
   mm <- stats::model.matrix(model)
+  # clm's model.matrix() returns list(X = <design matrix>, ...).
+  if (is.list(mm) && !is.matrix(mm) && "X" %in% names(mm)) {
+    mm <- mm$X
+  }
   mm_assign <- attr(mm, "assign")
   mm_colnames <- colnames(mm)
   all_term_labels <- labels(stats::terms(model))
@@ -357,7 +394,7 @@ calc_vif_polr <- function(model) {
 
   # A rank-deficient design: unlike lm/glm, whose coef() keeps a slot per
   # aliased term and fills it with NA (the case the block above used to
-  # handle), MASS::polr silently DROPS the aliased term from the fit --
+  # handle), ordinal::clm silently DROPS the aliased term from the fit --
   # coef() simply has no entry for it at all. So a term is "aliased" here
   # when NONE of its dummy columns survive into coef_names, not when a slot
   # is NA. Detected by diffing the full formula's term set (all_term_labels)
@@ -365,14 +402,27 @@ calc_vif_polr <- function(model) {
   # Surfaced with the SAME message calc_vif() uses for lm/glm so the caller
   # (the report's Collinearity Error Message chart) handles both identically.
   dropped_labels <- all_term_labels[!(seq_along(all_term_labels) %in% unique(surv_term_idx))]
+
+  # clm reports rank deficiency differently from polr: the aliased term STAYS in $beta
+  # (so the "missing from coef()" check above never fires) and is flagged in $aliased
+  # instead -- but vcov() omits it, so the slope submatrix selection below would fail with
+  # "subscript out of bounds". Translate the flag into the same user-facing message.
+  aliased_beta <- model$aliased$beta
+  if (!is.null(aliased_beta) && any(aliased_beta)) {
+    aliased_names <- names(aliased_beta)[aliased_beta]
+    if (is.null(aliased_names)) aliased_names <- coef_names[aliased_beta]
+    dropped_labels <- unique(c(dropped_labels, aliased_names))
+    coef_names <- setdiff(coef_names, aliased_names)
+  }
+
   if (length(dropped_labels) > 0) {
     stop(paste0("Variables causing perfect collinearity : ", paste(dropped_labels, collapse = ", ")))
   }
 
   v <- stats::vcov(model)
-  n_coef <- length(coef_names)
-  # Drop the zeta (threshold) rows/columns; keep only the slope coefficients.
-  v <- v[seq_len(n_coef), seq_len(n_coef), drop = FALSE]
+  # Keep ONLY the slope rows/columns, selected by name (clm puts the thresholds
+  # FIRST, so any positional slice written for polr would take the wrong block).
+  v <- v[coef_names, coef_names, drop = FALSE]
 
   term_ids <- sort(unique(surv_term_idx))
   n_terms <- length(term_ids)
@@ -416,7 +466,7 @@ calc_permutation_importance_polr <- function(fit, target, vars, data) {
         data, var, target, fit,
         nperm = 1, # 1 permutation for performance, matching the other models.
         predict.fun = function(object, newdata) {
-          stats::predict(object, newdata = newdata, type = "probs")
+          clm_predict(object, newdata = newdata, type = "prob")
         },
         loss.fun = function(x, y) {
           sum(-(x[match(y[[1]][row(x)], colnames(x)) == col(x)]), na.rm = TRUE)
@@ -464,7 +514,7 @@ partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(dat
 
   predict.fun <- function(object, newdata) {
     colnames(newdata) <- orig_names[match(colnames(newdata), safe_names)]
-    stats::predict(object, newdata = newdata, type = "probs")
+    clm_predict(object, newdata = newdata, type = "prob")
   }
 
   # Grid points based on quantiles so an outlier does not dominate the grid,
@@ -528,7 +578,7 @@ partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(dat
 }
 
 #' Coefficient / odds-ratio table for an Ordered Logistic Regression model.
-#' @param x A model built by build_polr(), with class polr_exploratory_0.
+#' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param type What to return: "coefficients" (default), "vif",
 #'   "importance", or "partial_dependence". Mirrors tidy.glm_exploratory().
 #' @param conf.int Whether to compute a (Wald, i.e. normal-approximation) confidence interval.
@@ -536,7 +586,7 @@ partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(dat
 #' @param exponentiate Whether to add an odds.ratio column (exp(estimate)) for slope coefficients.
 #' @param pretty.name Whether to rename columns to display-friendly names.
 #' @export
-tidy.polr_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, ...) {
+tidy.clm_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, ...) {
   if (inherits(x, "error")) {
     return(data.frame())
   }
@@ -561,7 +611,7 @@ tidy.polr_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, c
     # Attach the smallest P value among the model terms belonging to each
     # variable (a categorical predictor contributes one term per level), so the
     # importance chart can color bars by significance the way glm's does.
-    coef_df <- tidy.polr_exploratory_0(x, type = "coefficients", conf.int = FALSE, exponentiate = FALSE)
+    coef_df <- tidy.clm_exploratory_0(x, type = "coefficients", conf.int = FALSE, exponentiate = FALSE)
     slope_df <- coef_df %>% dplyr::filter(coefficient_type == "coefficient")
     # Prefix match on the raw string rather than a regex: a column name can
     # legitimately contain regex metacharacters (see the repo's multibyte +
@@ -577,19 +627,23 @@ tidy.polr_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, c
     return(ret)
   }
 
-  smry <- summary(x)$coefficients
-  n_coef <- length(stats::coef(x))
-  n_zeta <- length(x$zeta)
+  smry <- stats::coef(summary(x))
+  # ordinal::clm() orders coef(summary()) as [thresholds (alpha) ..., slopes (beta) ...] --
+  # the OPPOSITE of MASS::polr(), which put its zeta thresholds last. Classify by NAME
+  # against x$alpha / x$beta rather than by position so this cannot silently mislabel a
+  # row if the ordering ever changes again.
+  threshold_names <- names(x$alpha)
+  term_names <- rownames(smry)
 
   ret <- tibble::tibble(
-    term = rownames(smry),
+    term = term_names,
     estimate = as.numeric(smry[, 1]),
     std.error = as.numeric(smry[, 2]),
     statistic = as.numeric(smry[, 3]),
-    # polr() intentionally omits p-values (the Wald statistic is not exactly t-distributed);
-    # this is the normal-approximation p-value shown in MASS::polr's own help page example.
-    p.value = 2 * stats::pnorm(abs(as.numeric(smry[, 3])), lower.tail = FALSE),
-    coefficient_type = c(rep("coefficient", n_coef), rep("intercept", n_zeta))
+    # clm() reports a Wald p-value directly (column 4); polr() did not, so this used to be
+    # computed from the z statistic. Keep reading column 4 when it is there.
+    p.value = if (ncol(smry) >= 4) as.numeric(smry[, 4]) else 2 * stats::pnorm(abs(as.numeric(smry[, 3])), lower.tail = FALSE),
+    coefficient_type = ifelse(term_names %in% threshold_names, "intercept", "coefficient")
   )
 
   if (conf.int) {
@@ -644,51 +698,60 @@ tidy.polr_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, c
 }
 
 #' Model fit summary (glance) for an Ordered Logistic Regression model.
-#' @param x A model built by build_polr(), with class polr_exploratory_0.
+#' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param pretty.name Whether to rename columns to display-friendly names.
 #' @export
-glance.polr_exploratory_0 <- function(x, pretty.name = FALSE, ...) {
+glance.clm_exploratory_0 <- function(x, pretty.name = FALSE, ...) {
   ll <- stats::logLik(x)
   ll_val <- as.numeric(ll)
-  edf_val <- length(stats::coef(x)) + length(x$zeta)
-  nobs_val <- nrow(x$model)
+  # clm()'s own edf already counts thresholds + slopes (coef(x) includes BOTH for clm,
+  # unlike polr where coef() was slopes only and zeta held the thresholds -- adding them
+  # again here would double-count).
+  edf_val <- x$edf
+  nobs_val <- stats::nobs(x)
   aic_val <- -2 * ll_val + 2 * edf_val
   bic_val <- -2 * ll_val + log(nobs_val) * edf_val
   df_residual_val <- nobs_val - edf_val
 
-  # MASS::polr() does not compute a null (intercept-only) model on its own, unlike glm();
+  # ordinal::clm() does not expose a null (intercept-only) model on its own, unlike glm();
   # refit one here so that McFadden's Pseudo R-Squared can be reported, mirroring what the
   # existing Logistic Regression report computes from glm()'s built-in null.deviance/df.null.
   null_fit <- tryCatch({
     resp <- x$model[[1]]
     wts <- stats::model.weights(x$model)
+    null_df <- data.frame(.resp = resp)
     if (is.null(wts)) {
-      MASS::polr(resp ~ 1, Hess = FALSE)
+      ordinal::clm(.resp ~ 1, data = null_df, link = "logit")
     } else {
-      MASS::polr(resp ~ 1, weights = wts, Hess = FALSE)
+      null_df$.wts <- wts
+      ordinal::clm(.resp ~ 1, data = null_df, weights = .wts, link = "logit")
     }
   }, error = function(e) NULL)
 
   null_deviance_val <- NA_real_
   df_null_val <- NA_integer_
   mcfadden_r_squared_val <- NA_real_
+  # clm() exposes neither $deviance nor $zeta (polr did) -- derive deviance from the
+  # log-likelihood (-2*logLik, the same identity polr's own $deviance satisfies) and take
+  # the parameter count from clm's own $edf. Reading the absent fields returned NULL, which
+  # made the is.finite() guard below throw "missing value where TRUE/FALSE needed".
+  model_deviance_val <- -2 * ll_val
   if (!is.null(null_fit)) {
-    null_deviance_val <- null_fit$deviance
-    null_edf_val <- length(stats::coef(null_fit)) + length(null_fit$zeta)
-    df_null_val <- nobs_val - null_edf_val
+    null_deviance_val <- -2 * as.numeric(stats::logLik(null_fit))
+    df_null_val <- nobs_val - null_fit$edf
     if (is.finite(null_deviance_val) && null_deviance_val != 0) {
-      mcfadden_r_squared_val <- 1 - (x$deviance / null_deviance_val)
+      mcfadden_r_squared_val <- 1 - (model_deviance_val / null_deviance_val)
     }
   }
 
   ret <- tibble::tibble(
-    n_classes = length(x$lev),
+    n_classes = length(x$y.levels),
     nobs = nobs_val,
     edf = edf_val,
     logLik = ll_val,
     AIC = aic_val,
     BIC = bic_val,
-    deviance = x$deviance,
+    deviance = model_deviance_val,
     df.residual = df_residual_val,
     null.deviance = null_deviance_val,
     df.null = df_null_val,
@@ -714,13 +777,13 @@ glance.polr_exploratory_0 <- function(x, pretty.name = FALSE, ...) {
 
 #' Row-level predictions (predicted class + per-class probability) for an
 #' Ordered Logistic Regression model.
-#' @param x A model built by build_polr(), with class polr_exploratory_0.
+#' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param data Original data (used when newdata is not given).
 #' @param newdata New data to predict on. Rows whose predictor factor levels
 #'   were not seen during training are dropped, mirroring
 #'   augment.glm_exploratory_0().
 #' @export
-augment.polr_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
+augment.clm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
   target_data <- newdata
   if (is.null(target_data)) {
     target_data <- data
@@ -739,13 +802,16 @@ augment.polr_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
     }
   }
 
+  # clm()'s predict(type="prob") returns the probability of the OBSERVED class when the
+  # response column is present in newdata; dropping it yields the full per-category matrix,
+  # which is what this augment contract has always returned.
   probs <- tryCatch(
-    stats::predict(x, newdata = target_data, type = "probs"),
-    error = function(e) stats::predict(x, type = "probs")
+    clm_predict(x, newdata = target_data, type = "prob"),
+    error = function(e) clm_predict(x, type = "prob")
   )
   predicted_class <- tryCatch(
-    stats::predict(x, newdata = target_data, type = "class"),
-    error = function(e) stats::predict(x, type = "class")
+    clm_predict(x, newdata = target_data, type = "class"),
+    error = function(e) clm_predict(x, type = "class")
   )
 
   if (is.null(dim(probs))) {
@@ -804,7 +870,7 @@ evaluate_polr <- function(df, data = "training", pretty.name = FALSE) {
 #' Compute the training/test accuracy rows for a single fitted polr model.
 #' Kept as a standalone, pure function (rather than a closure inside
 #' evaluate_polr()) so it is directly unit-testable.
-#' @param model A polr_exploratory_0 model object.
+#' @param model A clm_exploratory_0 model object.
 #' @param train_data The data frame the model was trained on.
 #' @param test_data The held-out test data frame, or NULL if there is none.
 #' @param target_col Name of the target/objective column in train_data/test_data.
@@ -835,7 +901,7 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
         `Max VIF` = max_vif
       ))
     }
-    augmented <- augment.polr_exploratory_0(model, newdata = eval_data)
+    augmented <- augment.clm_exploratory_0(model, newdata = eval_data)
     actual <- eval_data[[target_col]]
     accuracy <- mean(as.character(augmented$.fitted) == as.character(actual), na.rm = TRUE)
 

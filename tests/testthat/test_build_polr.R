@@ -28,15 +28,33 @@ test_that("build_polr fits and returns a model column", {
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
 
   expect_true("model" %in% colnames(trial))
-  expect_true(inherits(trial$model[[1]], "polr_exploratory_0"))
-  expect_true(inherits(trial$model[[1]], "polr"))
-  expect_equal(length(trial$model[[1]]$lev), 3)
+  expect_true(inherits(trial$model[[1]], "clm_exploratory_0"))
+  expect_true(inherits(trial$model[[1]], "clm"))
+  expect_equal(length(trial$model[[1]]$y.levels), 3)
+})
+
+test_that("clm and polr agree on the sign convention, so no flipping is needed", {
+  # The report spec requires effects to ALWAYS be presented in the "higher category"
+  # direction, and warns that ordinal software differs on the sign of the linear
+  # predictor. This pins the fact the migration relied on: for the SAME fit, clm's
+  # coefficients AND thresholds match MASS::polr's exactly -- so switching engines
+  # changed no number the report shows, and no sign flip is required anywhere.
+  skip_if_not_installed("MASS")
+  df <- make_ordinal_test_df(n = 200)
+  fml <- stats::as.formula("`満足度` ~ `年齢` + `部署 名!#`")
+
+  m_clm <- ordinal::clm(fml, data = df, link = "logit")
+  m_polr <- MASS::polr(fml, data = df, Hess = TRUE, method = "logistic")
+
+  expect_equal(unname(m_clm$beta[names(stats::coef(m_polr))]),
+               unname(stats::coef(m_polr)), tolerance = 1e-4)
+  expect_equal(unname(m_clm$alpha), unname(m_polr$zeta), tolerance = 1e-4)
 })
 
 test_that("build_ordinal_regression is an alias for build_polr", {
   df <- make_ordinal_test_df()
   trial <- df %>% build_ordinal_regression(`満足度`, `年齢`, `部署 名!#`)
-  expect_true(inherits(trial$model[[1]], "polr_exploratory_0"))
+  expect_true(inherits(trial$model[[1]], "clm_exploratory_0"))
 })
 
 test_that("build_polr requires 3 or more target categories", {
@@ -80,7 +98,7 @@ test_that("build_polr supports group_cols (Repeat By)", {
 test_that("build_polr supports a weight column", {
   df <- make_ordinal_test_df()
   trial <- df %>% build_polr(`満足度`, `年齢`, weight = weight)
-  expect_true(inherits(trial$model[[1]], "polr_exploratory_0"))
+  expect_true(inherits(trial$model[[1]], "clm_exploratory_0"))
 })
 
 test_that("build_polr rejects a non-positive weight column", {
@@ -97,7 +115,7 @@ test_that("build_polr splits training/test data when test_rate > 0", {
   expect_true(nrow(trial$.train_data[[1]]) + nrow(trial$.test_data[[1]]) <= nrow(df))
 })
 
-test_that("tidy.polr_exploratory_0 returns coefficient and intercept rows", {
+test_that("tidy.clm_exploratory_0 returns coefficient and intercept rows", {
   df <- make_ordinal_test_df()
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
   tidied <- tidy_rowwise(trial, model)
@@ -113,14 +131,14 @@ test_that("tidy.polr_exploratory_0 returns coefficient and intercept rows", {
   expect_equal(sum(tidied$coefficient_type == "intercept"), 2)
 })
 
-test_that("tidy.polr_exploratory_0 pretty.name renames columns", {
+test_that("tidy.clm_exploratory_0 pretty.name renames columns", {
   df <- make_ordinal_test_df()
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
   tidied <- tidy_rowwise(trial, model, pretty.name = TRUE)
   expect_true(all(c("Term", "Coefficient", "Std. Error", "z value", "P Value", "Odds Ratio", "Type") %in% colnames(tidied)))
 })
 
-test_that("glance.polr_exploratory_0 returns fit statistics", {
+test_that("glance.clm_exploratory_0 returns fit statistics", {
   df <- make_ordinal_test_df()
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
   glanced <- glance_rowwise(trial, model)
@@ -135,14 +153,14 @@ test_that("glance.polr_exploratory_0 returns fit statistics", {
   expect_true(glanced$mcfadden.r.squared >= 0 && glanced$mcfadden.r.squared < 1)
 })
 
-test_that("glance.polr_exploratory_0 pretty.name renames columns", {
+test_that("glance.clm_exploratory_0 pretty.name renames columns", {
   df <- make_ordinal_test_df()
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
   glanced <- glance_rowwise(trial, model, pretty.name = TRUE)
   expect_true(all(c("Number of Categories", "Rows", "Log Likelihood", "McFadden R-Squared") %in% colnames(glanced)))
 })
 
-test_that("augment.polr_exploratory_0 returns predicted class and per-class probabilities", {
+test_that("augment.clm_exploratory_0 returns predicted class and per-class probabilities", {
   df <- make_ordinal_test_df()
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
   augmented <- augment_rowwise(trial, model)
@@ -444,7 +462,7 @@ test_that("the ordinal metrics match independent hand computations", {
 
   model <- trial$model[[1]]
   train_data <- trial$.train_data[[1]]
-  aug <- augment.polr_exploratory_0(model, newdata = train_data)
+  aug <- augment.clm_exploratory_0(model, newdata = train_data)
   lv <- levels(train_data$`満足度`)
   K <- length(lv)
   actual_rank <- match(as.character(train_data$`満足度`), lv)
@@ -492,7 +510,7 @@ test_that("Weighted Kappa uses quadratic weights and agrees with psych::cohen.ka
 
   model <- trial$model[[1]]
   train_data <- trial$.train_data[[1]]
-  aug <- augment.polr_exploratory_0(model, newdata = train_data)
+  aug <- augment.clm_exploratory_0(model, newdata = train_data)
   lv <- levels(train_data$`満足度`)
   actual_rank <- match(as.character(train_data$`満足度`), lv)
   pred_rank <- match(as.character(aug$.fitted), lv)
