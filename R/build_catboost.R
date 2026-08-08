@@ -1544,7 +1544,7 @@ tidy.catboost_exp <- function(x, type = "importance", pretty.name = FALSE, binar
       }
       actual <- extract_actual(x)
       predicted_probability <- extract_predicted(x)
-      do_roc_(data.frame(actual = actual, predicted_probability = predicted_probability), "actual", "predicted_probability")
+      do_roc_(data.frame(actual = actual, predicted_probability = predicted_probability), "predicted_probability", "actual")
     },
     summary_table = {
       tidy.catboost_exp(x, type = "evaluation", pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...)

@@ -282,6 +282,30 @@ test_that("direct catboost_binary supports classification evaluation and augment
   expect_true("predicted_probability" %in% colnames(augmented))
 })
 
+test_that("catboost binary ROC uses predicted probabilities as ROC scores", {
+  actual <- factor(c("yes", "no", "yes", "no", "no", "yes"))
+  predicted_probability <- c(0.95, 0.82, 0.71, 0.36, 0.19, 0.04)
+  model <- structure(
+    list(
+      df = data.frame(y = actual, x = seq_along(actual)),
+      terms = stats::terms(y ~ x),
+      prediction_training = predicted_probability,
+      classification_type = "binary"
+    ),
+    class = c("catboost_binary", "catboost_exp")
+  )
+
+  ret <- tidy(model, type = "roc")
+  expected <- do_roc_(
+    data.frame(actual = actual, predicted_probability = predicted_probability),
+    "predicted_probability",
+    "actual"
+  )
+
+  expect_equal(ret, expected)
+  expect_equal(nrow(ret), length(predicted_probability) + 1)
+})
+
 test_that("direct catboost_multi returns empty ROC data instead of failing", {
   testthat::skip_if_not_installed("catboost")
 
