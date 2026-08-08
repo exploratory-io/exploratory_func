@@ -955,6 +955,48 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
   do_on_each_group(df, ttest_each, name = "model", with_unnest = FALSE)
 }
 
+#' Align the two category vectors for a paired test.
+#'
+#' When a pairing key is supplied, observations are matched by key instead of
+#' by their current row order. The first category's order is retained so the
+#' existing direction/base-level behavior is unchanged.
+paired_test_vectors <- function(df, var1_col, var2_col, pairing_key_col = NULL, test_name) {
+  category_levels <- levels(df[[var2_col]])
+  before_index <- df[[var2_col]] == category_levels[1]
+  after_index <- df[[var2_col]] == category_levels[2]
+  var1_before <- df[[var1_col]][before_index]
+  var1_after <- df[[var1_col]][after_index]
+
+  if (is.null(pairing_key_col)) {
+    if (length(var1_before) != length(var1_after)) {
+      stop(paste0("Paired ", test_name, " requires equal number of observations in both groups"))
+    }
+    return(list(before = var1_before, after = var1_after))
+  }
+
+  if (!pairing_key_col %in% colnames(df)) {
+    stop(paste0("Pairing key column `", pairing_key_col, "` was not found"))
+  }
+
+  pairing_values <- df[[pairing_key_col]]
+  if (anyNA(pairing_values)) {
+    stop(paste0("Paired ", test_name, " requires non-missing pairing keys"))
+  }
+
+  key_before <- pairing_values[before_index]
+  key_after <- pairing_values[after_index]
+  if (anyDuplicated(key_before) || anyDuplicated(key_after)) {
+    stop(paste0("Paired ", test_name, " requires each pairing key to occur once in each group"))
+  }
+
+  after_match <- match(key_before, key_after)
+  if (length(var1_before) != length(var1_after) || anyNA(after_match)) {
+    stop(paste0("Paired ", test_name, " requires each pairing key to occur in both groups"))
+  }
+
+  list(before = var1_before, after = var1_after[after_match])
+}
+
 #' t-test wrapper for Analytics View
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
@@ -963,10 +1005,11 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
 #' @param d - Cohen's d to detect in power analysis.
 #' @param common_sd - Used for calculation of Cohen's d.
 #' @param diff_to_detect - Used for calculation of Cohen's d.
+#' @param pairing_key - Optional column used to align paired observations.
 exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL, paired = FALSE,
-                      ...) {
+                      ..., pairing_key = NULL) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Type 2 Error, or they must add up to 1.0.")
   }
@@ -975,6 +1018,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   }
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
+  pairing_key_col <- col_name(substitute(pairing_key))
   grouped_cols <- grouped_by(df)
 
   # Apply func2 to var2.
@@ -1101,15 +1145,15 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
           stop("The explanatory variable needs to have 2 unique values.")
         }
 
-        # Split the target value column (var1_col) into two vectores 
-        # by the category of the explanatory variable (var2_col).
-        var1_before <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[1]]
-        var1_after <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[2]]
-
-        # Check that the number of observations in both groups are the same.
-        if (length(var1_before) != length(var1_after)) {
-          stop("Paired t-test requires equal number of observations in both groups")
-        }
+        paired_vectors <- paired_test_vectors(
+          df_test,
+          var1_col,
+          var2_col,
+          pairing_key_col,
+          "t-test"
+        )
+        var1_before <- paired_vectors$before
+        var1_after <- paired_vectors$after
 
         # Call t.test with the two vectors.
         model <- t.test(var1_before, var1_after, paired = TRUE, ...)
@@ -1401,9 +1445,11 @@ wilcox_norm_dist_sd <- function(alternative, paired, statistic, n1, n2, tie_coun
 #' @export
 #' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
 #' @param conf.level - Level of confidence for confidence interval. Passed to wilcox.test as part of ...
-exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, paired = FALSE, ...) {
+#' @param pairing_key - Optional column used to align paired observations.
+exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, paired = FALSE, ..., pairing_key = NULL) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
+  pairing_key_col <- col_name(substitute(pairing_key))
   grouped_cols <- grouped_by(df)
 
   if (!is.null(func2)) {
@@ -1473,15 +1519,15 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
       }
       base.level <- levels(df_test[[var2_col]])[2]
       if (paired) {
-        # Split the target value column (var1_col) into two vectors
-        # by the category of the explanatory variable (var2_col).
-        var1_before <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[1]]
-        var1_after <- df_test[[var1_col]][df_test[[var2_col]] == levels(df_test[[var2_col]])[2]]
-
-        # Check that the number of observations in both groups are the same.
-        if (length(var1_before) != length(var1_after)) {
-          stop("Paired Wilcoxon test requires equal number of observations in both groups")
-        }
+        paired_vectors <- paired_test_vectors(
+          df_test,
+          var1_col,
+          var2_col,
+          pairing_key_col,
+          "Wilcoxon test"
+        )
+        var1_before <- paired_vectors$before
+        var1_after <- paired_vectors$after
 
         # Call wilcox.test with the two vectors.
         model <- wilcox.test(var1_before, var1_after, paired = TRUE, ...)
