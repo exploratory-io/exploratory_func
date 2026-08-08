@@ -235,6 +235,13 @@ build_polr <- function(df,
     model$classification_type <- "multi"
     model$orig_target_col <- target_col
     attr(model, "ylevels") <- levels(train_data[[target_col]])
+    if (!is.null(predictor_funs)) {
+      # train_data/test_data already contain these derived columns, but callers
+      # of augment() may provide the original columns. Keep the recipe on each
+      # per-group model so newdata can be prepared exactly like the fit data.
+      model$orig_predictor_cols <- orig_selected_cols
+      model$predictor_funs <- predictor_funs
+    }
 
     # The shared report helpers vif_to_dataframe() and handle_partial_dependence()
     # BOTH end with `x$terms_mapping[<name column>]`. lm/glm fit on sanitized
@@ -387,19 +394,31 @@ clm_nominal_test <- function(x) {
   safe_labels <- paste0(".ntv", seq_along(bare_labels))
   safe_mf <- mf[, c(resp, bare_labels), drop = FALSE]
   colnames(safe_mf) <- c(".ntresp", safe_labels)
+  model_weights <- stats::model.weights(mf)
 
   quoted <- paste(safe_labels, collapse = " + ")
   base_fml <- stats::as.formula(paste0(".ntresp ~ ", quoted), env = environment())
-  base <- tryCatch(ordinal::clm(base_fml, data = safe_mf, link = x$link), error = function(e) NULL)
+  fit_nominal_model <- function(formula, nominal = NULL) {
+    args <- list(formula = formula, data = safe_mf, link = x$link)
+    if (!is.null(model_weights)) {
+      args$weights <- model_weights
+    }
+    if (!is.null(nominal)) {
+      args$nominal <- nominal
+    }
+    do.call(ordinal::clm, args)
+  }
+  base <- tryCatch(fit_nominal_model(base_fml), error = function(e) NULL)
   if (is.null(base)) return(NULL)
   base_ll <- as.numeric(stats::logLik(base))
 
   rows <- lapply(seq_along(safe_labels), function(i) {
     # Refit letting ONLY this predictor have its own effect per category boundary.
     alt <- tryCatch(
-      ordinal::clm(base_fml,
-                   nominal = stats::as.formula(paste0("~ ", safe_labels[[i]]), env = environment()),
-                   data = safe_mf, link = x$link),
+      fit_nominal_model(
+        base_fml,
+        nominal = stats::as.formula(paste0("~ ", safe_labels[[i]]), env = environment())
+      ),
       error = function(e) NULL
     )
     if (is.null(alt)) return(NULL)
@@ -487,6 +506,8 @@ polr_report_multiclass_probabilities <- function(df) {
   make_rows <- function(data, is_test) {
     if (is.null(data) || !is.data.frame(data) || nrow(data) == 0) return(data.frame())
     if (!target_col %in% colnames(data)) return(data.frame())
+    data <- filter_clm_newdata(model, data)
+    if (nrow(data) == 0) return(data.frame())
 
     probabilities <- tryCatch(
       clm_predict(model, newdata = data, type = "prob"),
@@ -941,7 +962,9 @@ glance.clm_exploratory_0 <- function(x, pretty.name = FALSE, ...) {
   # unlike polr where coef() was slopes only and zeta held the thresholds -- adding them
   # again here would double-count).
   edf_val <- x$edf
-  nobs_val <- stats::nobs(x)
+  # clm stores the sum of case weights in nobs for weighted fits. The glance
+  # contract calls this field Rows, so use the number of fitted rows instead.
+  nobs_val <- if (is.data.frame(x$model)) nrow(x$model) else stats::nobs(x)
   aic_val <- -2 * ll_val + 2 * edf_val
   bic_val <- -2 * ll_val + log(nobs_val) * edf_val
   df_residual_val <- nobs_val - edf_val
@@ -1016,7 +1039,24 @@ glance.clm_exploratory_0 <- function(x, pretty.name = FALSE, ...) {
 #'   were not seen during training are dropped, mirroring
 #'   augment.glm_exploratory_0().
 #' @export
-augment.clm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
+filter_clm_newdata <- function(x, newdata) {
+  if (is.null(newdata) || nrow(newdata) == 0 || is.null(x$xlevels) || length(x$xlevels) == 0) {
+    return(newdata)
+  }
+
+  keep <- rep(TRUE, nrow(newdata))
+  for (i in seq_along(x$xlevels)) {
+    col <- names(x$xlevels)[[i]]
+    if (col %in% colnames(newdata)) {
+      keep <- keep & !is.na(match(as.character(newdata[[col]]), as.character(x$xlevels[[i]])))
+    }
+  }
+  newdata[keep, , drop = FALSE]
+}
+
+augment.clm_exploratory_0 <- function(x, data = NULL, newdata = NULL,
+                                      apply_predictor_funs = TRUE, ...) {
+  has_explicit_data <- !is.null(newdata) || !is.null(data)
   target_data <- newdata
   if (is.null(target_data)) {
     target_data <- data
@@ -1025,31 +1065,35 @@ augment.clm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
     target_data <- x$model
   }
 
-  if (!is.null(x$xlevels) && length(x$xlevels) > 0) {
-    for (i in seq_along(x$xlevels)) {
-      col <- names(x$xlevels)[[i]]
-      if (col %in% colnames(target_data)) {
-        target_data <- target_data %>%
-          dplyr::filter(!!rlang::sym(col) %in% !!x$xlevels[[i]])
-      }
-    }
+  if (has_explicit_data && isTRUE(apply_predictor_funs) &&
+      !is.null(x$predictor_funs) && !is.null(x$orig_predictor_cols)) {
+    target_data <- target_data %>%
+      mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+  }
+  if (has_explicit_data) {
+    target_data <- filter_clm_newdata(x, target_data)
   }
 
-  # clm()'s predict(type="prob") returns the probability of the OBSERVED class when the
-  # response column is present in newdata; dropping it yields the full per-category matrix,
-  # which is what this augment contract has always returned.
-  probs <- tryCatch(
-    clm_predict(x, newdata = target_data, type = "prob"),
-    error = function(e) clm_predict(x, type = "prob")
-  )
-  predicted_class <- tryCatch(
-    clm_predict(x, newdata = target_data, type = "class"),
-    error = function(e) clm_predict(x, type = "class")
-  )
+  if (nrow(target_data) == 0) {
+    target_levels <- x$y.levels
+    probs <- matrix(
+      numeric(0),
+      nrow = 0,
+      ncol = length(target_levels),
+      dimnames = list(NULL, target_levels)
+    )
+    predicted_class <- factor(character(0), levels = target_levels, ordered = TRUE)
+  } else {
+    # clm()'s predict(type="prob") returns the probability of the OBSERVED class when the
+    # response column is present in newdata; dropping it yields the full per-category matrix,
+    # which is what this augment contract has always returned.
+    probs <- clm_predict(x, newdata = target_data, type = "prob")
+    predicted_class <- clm_predict(x, newdata = target_data, type = "class")
 
-  if (is.null(dim(probs))) {
-    # A 1-row newdata collapses predict()'s result to a plain named vector; restore the matrix shape.
-    probs <- matrix(probs, nrow = 1, dimnames = list(NULL, names(probs)))
+    if (is.null(dim(probs))) {
+      # A 1-row newdata collapses predict()'s result to a plain named vector; restore the matrix shape.
+      probs <- matrix(probs, nrow = 1, dimnames = list(NULL, names(probs)))
+    }
   }
 
   prob_df <- as.data.frame(probs, stringsAsFactors = FALSE)
@@ -1125,6 +1169,12 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
   data_sets <- list(Training = train_data, Test = test_data)
   purrr::map_dfr(data_types, function(dt) {
     eval_data <- data_sets[[dt]]
+    if (!is.null(eval_data)) {
+      # build_polr() stores prepared train/test frames. Filter the same rows as
+      # augment() before extracting actual labels so unknown factor levels cannot
+      # misalign predictions and metrics.
+      eval_data <- filter_clm_newdata(model, eval_data)
+    }
     if (is.null(eval_data) || nrow(eval_data) == 0) {
       return(tibble::tibble(
         `Data Type` = dt, Rows = 0L,
@@ -1137,7 +1187,11 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
         `Max VIF` = max_vif
       ))
     }
-    augmented <- augment.clm_exploratory_0(model, newdata = eval_data)
+    augmented <- augment.clm_exploratory_0(
+      model,
+      newdata = eval_data,
+      apply_predictor_funs = FALSE
+    )
     actual <- eval_data[[target_col]]
     accuracy <- mean(as.character(augmented$.fitted) == as.character(actual), na.rm = TRUE)
 

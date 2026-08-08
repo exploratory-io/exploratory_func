@@ -272,6 +272,7 @@ test_that("tidy(type='vif') returns an empty frame instead of failing with a sin
 })
 
 test_that("tidy(type='importance') ranks predictors and carries a P value per variable", {
+  skip_if_not_installed("mmpf")
   df <- make_ordinal_test_df(n = 150)
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
 
@@ -297,6 +298,7 @@ test_that("tidy(type='importance') returns a structured empty frame for a single
 })
 
 test_that("lm_partial_dependence() produces a faceted table keyed by the ORIGINAL column names", {
+  skip_if_not_installed("mmpf")
   df <- make_ordinal_test_df(n = 150)
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
 
@@ -315,6 +317,7 @@ test_that("lm_partial_dependence() produces a faceted table keyed by the ORIGINA
 })
 
 test_that("partial dependence survives a column name full of regex/mmpf-hostile symbols", {
+  skip_if_not_installed("mmpf")
   # mmpf::marginalPrediction cannot handle such names directly (a comma alone
   # breaks it), which is why partial_dependence.polr_exploratory renames columns
   # before handing the data over. Without that, this silently returns 0 rows.
@@ -679,6 +682,7 @@ test_that("polr_report_basic_info() reports Target/Categories/Category Order/Pre
 })
 
 test_that("partial dependence for a build_polr() model flags numeric predictors as 'line' and categorical as 'scatter'", {
+  skip_if_not_installed("mmpf")
   # tam#4453 S17: the report renders one line per category for a numeric predictor, and a
   # different layout for a categorical one -- handle_partial_dependence()'s generic
   # chart_type/x_type columns are what the tam preprocessor branches on.
@@ -691,4 +695,80 @@ test_that("partial dependence for a build_polr() model flags numeric predictors 
   expect_true(all(pd$chart_type[pd$x_name == "部署 名!#"] == "scatter"))
   expect_true(all(pd$x_type[pd$x_name == "部署 名!#"] == "character"))
   expect_setequal(unique(pd$y_name), c("Low", "Medium", "High"))
+})
+
+test_that("augment applies predictor_funs to raw newdata without double-transforming fitted data", {
+  df <- make_ordinal_test_df(n = 120)
+  trial <- df %>% build_polr(`満足度`, `年齢`, predictor_funs = list(`年齢` = "log"))
+  model <- trial$model[[1]]
+
+  expect_equal(unname(model$orig_predictor_cols), "年齢")
+  expect_true(!is.null(model$predictor_funs))
+
+  augmented <- augment.clm_exploratory_0(model, newdata = df[1:5, ])
+  expect_equal(augmented$`年齢`, log(df$`年齢`[1:5]))
+
+  # The frames retained by build_polr() are already prepared. Evaluation must
+  # therefore opt out of applying the recipe a second time.
+  expect_no_error(evaluate_polr(trial, data = "training"))
+})
+
+test_that("augment and evaluation align rows when newdata has unseen predictor levels", {
+  set.seed(2)
+  n <- 90
+  df <- data.frame(
+    y = ordered(rep(c("L", "M", "H"), length.out = n), levels = c("L", "M", "H")),
+    x = factor(c(rep(c("a", "b"), each = 30), rep("c", 30)), levels = c("a", "b", "c")),
+    z = stats::rnorm(n)
+  )
+  trial <- suppressWarnings(df %>% build_polr(y, z, x, test_rate = 1 / 3, test_split_type = "ordered"))
+  model <- trial$model[[1]]
+
+  # All held-out rows have an unseen x level. The result is an empty prediction
+  # frame with the documented probability columns, not training predictions or
+  # a bind_cols() size error.
+  augmented_test <- augment.clm_exploratory_0(model, newdata = trial$.test_data[[1]])
+  expect_equal(nrow(augmented_test), 0)
+  expect_true(all(paste0("predicted_probability_", c("L", "M", "H")) %in% colnames(augmented_test)))
+
+  evaluated_test <- evaluate_polr(trial, data = "test")
+  expect_equal(evaluated_test$Rows, 0)
+  expect_true(is.na(evaluated_test$`Accuracy Rate`))
+
+  # With a mixture of known and unknown rows, only the known row contributes
+  # and the actual labels remain aligned with the predictions.
+  mixed <- rbind(trial$.train_data[[1]][1, ], trial$.test_data[[1]][1, ])
+  evaluated_mixed <- evaluate_polr_one_model(model, trial$.train_data[[1]], mixed, "y", data_types = "Test")
+  expect_equal(evaluated_mixed$Rows, 1)
+  expect_true(is.finite(evaluated_mixed$`Accuracy Rate`))
+})
+
+test_that("weighted nominal tests retain the model weights", {
+  set.seed(17)
+  n <- 180
+  x <- stats::rnorm(n)
+  y <- ordered(cut(1.2 * x + stats::rnorm(n), breaks = 3, labels = c("L", "M", "H")),
+               levels = c("L", "M", "H"))
+  w <- ifelse(x > 0, 12, 1)
+  df <- data.frame(y = y, x = x, w = w)
+  trial <- df %>% build_polr(y, x, weight = w)
+  model <- trial$model[[1]]
+  actual_weights <- stats::model.weights(model$model)
+
+  nominal <- tidy_rowwise(trial, model, type = "nominal_test")
+  weighted_base <- ordinal::clm(y ~ x, data = model$model, weights = actual_weights, link = "logit")
+  weighted_alt <- ordinal::clm(y ~ x, nominal = ~ x, data = model$model, weights = actual_weights, link = "logit")
+  expected_lrt <- 2 * (as.numeric(stats::logLik(weighted_alt)) - as.numeric(stats::logLik(weighted_base)))
+
+  expect_equal(nominal$statistic[nominal$term == "x"], expected_lrt, tolerance = 1e-6)
+})
+
+test_that("glance reports fitted row count for weighted models", {
+  df <- make_ordinal_test_df(n = 100)
+  trial <- df %>% build_polr(`満足度`, `年齢`, weight = weight)
+  model <- trial$model[[1]]
+  glanced <- glance_rowwise(trial, model)
+
+  expect_equal(glanced$nobs, nrow(model$model))
+  expect_equal(glanced$df.residual, nrow(model$model) - model$edf)
 })
