@@ -45,6 +45,40 @@ test_that("exp_kmodes is deterministic for a given seed", {
   expect_identical(first$model[[1]]$cluster, second$model[[1]]$cluster)
 })
 
+test_that("exp_kmodes rejects a Repeat-By column selected as a variable", {
+  df <- tibble::tibble(
+    repeat_by = rep(c("A", "B"), 20),
+    a = rep(c("x", "y"), 20),
+    b = rep(c("u", "v"), 20)
+  ) %>% dplyr::group_by(repeat_by)
+
+  expect_error(
+    exp_kmodes(df, repeat_by, a, b, centers = 2, elbow_method_mode = "none"),
+    "Repeat-By column cannot be used"
+  )
+})
+
+test_that("sampled_nrow is set only when max_nrow actually samples", {
+  df <- tibble::tibble(
+    a = rep(c("x", "y"), 20),
+    b = rep(c("u", "v"), 20)
+  )
+
+  not_sampled <- exp_kmodes(
+    df, a, b, centers = 2, max_nrow = 100,
+    elbow_method_mode = "none", map_sample_size = 2
+  )$model[[1]]
+  expect_null(not_sampled$sampled_nrow)
+  expect_equal(nrow(not_sampled$df_original), nrow(df))
+
+  sampled <- exp_kmodes(
+    df, a, b, centers = 2, max_nrow = 10,
+    elbow_method_mode = "none", map_sample_size = 2
+  )$model[[1]]
+  expect_equal(sampled$sampled_nrow, 10)
+  expect_equal(nrow(sampled$df_original), 10)
+})
+
 test_that("ordered factors are clustered as unordered categories", {
   # An ordered factor must contribute match/mismatch only. If the order leaked
   # into the distance, "low" would be closer to "mid" than to "high"; here every
