@@ -354,6 +354,66 @@ clm_predict <- function(object, newdata = NULL, type = "prob") {
   if (is.list(res) && !is.data.frame(res) && "fit" %in% names(res)) res$fit else res
 }
 
+
+# Proportional-odds assumption test, per predictor.
+#
+# ordinal::nominal_test() is the obvious call, but it refits via update(), which
+# re-evaluates the ORIGINAL `data =` argument by name in the formula's environment. Our
+# fits are built inside each_func() on a local `train_data` and then have their terms
+# environment stripped (to keep cached models small), so update() cannot find the data and
+# every LRT silently comes back NA -- no error, just an empty-looking table.
+#
+# Refit explicitly from the model frame clm itself stored ($model) instead, which is
+# self-contained. Verified to reproduce ordinal::nominal_test()'s LRT / Df / p-value
+# exactly on a fit where update() DOES work.
+clm_nominal_test <- function(x) {
+  mf <- x$model
+  if (is.null(mf) || !is.data.frame(mf) || ncol(mf) < 2) return(NULL)
+  resp <- colnames(mf)[[1]]
+  term_labels <- labels(stats::terms(x))
+  if (length(term_labels) == 0) return(NULL)
+  # terms() ALREADY backtick-quotes a label that needs quoting and leaves plain ones bare,
+  # so the set is mixed. Strip first and re-quote uniformly -- double-quoting produced
+  # ``name`` , which R parses as an empty identifier ("attempt to use zero-length variable
+  # name"). Same trap as the empty-backtick R-codegen hang recorded in the repo's lessons.
+  bare_labels <- gsub("^`|`$", "", term_labels)
+
+  # Fit on SANITIZED column names. clm() builds its nominal-effects formula by pasting
+  # strings together WITHOUT re-quoting, so a predictor whose name contains a space or
+  # symbol produces unparseable code ("unexpected symbol") the moment it is passed as
+  # `nominal =`. Backticking our own formula is not enough -- the breakage happens inside
+  # clm. Renaming to .ntv1, .ntv2, ... sidesteps it entirely, and the caller-facing term
+  # names are restored from bare_labels below.
+  safe_labels <- paste0(".ntv", seq_along(bare_labels))
+  safe_mf <- mf[, c(resp, bare_labels), drop = FALSE]
+  colnames(safe_mf) <- c(".ntresp", safe_labels)
+
+  quoted <- paste(safe_labels, collapse = " + ")
+  base_fml <- stats::as.formula(paste0(".ntresp ~ ", quoted), env = environment())
+  base <- tryCatch(ordinal::clm(base_fml, data = safe_mf, link = x$link), error = function(e) NULL)
+  if (is.null(base)) return(NULL)
+  base_ll <- as.numeric(stats::logLik(base))
+
+  rows <- lapply(seq_along(safe_labels), function(i) {
+    # Refit letting ONLY this predictor have its own effect per category boundary.
+    alt <- tryCatch(
+      ordinal::clm(base_fml,
+                   nominal = stats::as.formula(paste0("~ ", safe_labels[[i]]), env = environment()),
+                   data = safe_mf, link = x$link),
+      error = function(e) NULL
+    )
+    if (is.null(alt)) return(NULL)
+    lrt <- 2 * (as.numeric(stats::logLik(alt)) - base_ll)
+    dfd <- alt$edf - base$edf
+    if (!is.finite(lrt) || !is.finite(dfd) || dfd <= 0) return(NULL)
+    tibble::tibble(term = bare_labels[[i]], statistic = lrt, df = dfd,
+                   p.value = stats::pchisq(lrt, dfd, lower.tail = FALSE))
+  })
+  rows <- rows[!vapply(rows, is.null, logical(1))]
+  if (length(rows) == 0) return(NULL)
+  dplyr::bind_rows(rows)
+}
+
 # Variance Inflation Factor for an ordinal::clm() model.
 #
 # This is the same generalized-VIF computation as vif() in build_lm.R (itself
@@ -579,8 +639,9 @@ partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(dat
 
 #' Coefficient / odds-ratio table for an Ordered Logistic Regression model.
 #' @param x A model built by build_polr(), with class clm_exploratory_0.
-#' @param type What to return: "coefficients" (default), "vif",
-#'   "importance", or "partial_dependence". Mirrors tidy.glm_exploratory().
+#' @param type What to return: "coefficients" (default), "vif", "importance",
+#'   "partial_dependence", or "nominal_test" (the proportional-odds assumption
+#'   test, which is specific to an ordinal model). Mirrors tidy.glm_exploratory().
 #' @param conf.int Whether to compute a (Wald, i.e. normal-approximation) confidence interval.
 #' @param conf.level Confidence level for conf.int.
 #' @param exponentiate Whether to add an odds.ratio column (exp(estimate)) for slope coefficients.
@@ -602,6 +663,33 @@ tidy.clm_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, co
   if (identical(type, "partial_dependence")) {
     return(handle_partial_dependence(x))
   }
+  if (identical(type, "nominal_test")) {
+    # Proportional-odds (parallel lines) assumption test -- the report spec's most
+    # important ordinal-specific section. ordinal::nominal_test() refits the model
+    # allowing each predictor in turn to have its OWN effect per category boundary,
+    # and likelihood-ratio-tests that against the proportional-odds fit. A small
+    # p-value means that predictor's effect plausibly differs across boundaries, i.e.
+    # the assumption is doubtful FOR THAT VARIABLE.
+    ret <- clm_nominal_test(x)
+    if (is.null(ret) || nrow(ret) == 0) {
+      return(data.frame(term = character(), statistic = numeric(), df = numeric(), p.value = numeric()))
+    }
+    # Map internal term labels back to the user's column names, same as the other types.
+    if (!is.null(x$terms_mapping)) {
+      mapped <- x$terms_mapping[ret$term]
+      ret$term <- ifelse(is.na(mapped), ret$term, mapped)
+    }
+    if (pretty.name) {
+      ret <- ret %>% dplyr::rename(
+        Variable = term,
+        `Likelihood Ratio Statistic` = statistic,
+        `Degree of Freedom` = df,
+        `P Value` = p.value
+      )
+    }
+    return(ret)
+  }
+
   if (identical(type, "importance") || identical(type, "permutation_importance")) {
     if (is.null(x$imp_df) || inherits(x$imp_df, "error")) {
       # Structured empty frame so callers can safely arrange(desc(importance)).

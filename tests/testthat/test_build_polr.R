@@ -519,3 +519,81 @@ test_that("Weighted Kappa uses quadratic weights and agrees with psych::cohen.ka
                psych::cohen.kappa(cbind(actual_rank, pred_rank))$weighted.kappa,
                tolerance = 1e-8)
 })
+
+# --- Proportional-odds assumption test (比例オッズ仮定) --------------------------
+# The report spec's most important ordinal-specific section (tam#4453).
+
+test_that("tidy(type='nominal_test') matches ordinal::nominal_test on a simple fit", {
+  # Reference values produced by ordinal::nominal_test() on this exact fixture.
+  #
+  # They are hardcoded rather than computed here ON PURPOSE: nominal_test() refits via
+  # update(), which re-evaluates `data =` BY NAME, and that lookup only succeeds when the
+  # data lives in the GLOBAL environment. Inside a testthat block (or any function) it
+  # silently returns all-NA -- verified for the plain call, for a formula carrying the
+  # local environment, and for eval() in a purpose-built env. A computed reference would
+  # therefore be NA and the comparison would pass vacuously.
+  #
+  # Regenerate with (at top level, not inside a function):
+  #   set.seed(3); n <- 250
+  #   d <- data.frame(a = rnorm(n) * 2, g = factor(sample(c("X","Y"), n, TRUE)))
+  #   d$y <- factor(cut(.9*d$a + rnorm(n), breaks = 3, labels = c("lo","mid","hi")),
+  #                 levels = c("lo","mid","hi"), ordered = TRUE)
+  #   ordinal::nominal_test(ordinal::clm(y ~ a + g, data = d, link = "logit"))
+  reference <- data.frame(
+    term = c("a", "g"),
+    statistic = c(1.7253364503, 0.1835107250),
+    df = c(1, 1),
+    p.value = c(0.1890075734, 0.6683733783),
+    stringsAsFactors = FALSE
+  )
+
+  set.seed(3)
+  n <- 250
+  d <- data.frame(a = stats::rnorm(n) * 2, g = factor(sample(c("X", "Y"), n, TRUE)))
+  d$y <- factor(cut(0.9 * d$a + stats::rnorm(n), breaks = 3, labels = c("lo", "mid", "hi")),
+                levels = c("lo", "mid", "hi"), ordered = TRUE)
+
+  trial <- d %>% build_polr(y, a, g)
+  ours <- tidy_rowwise(trial, model, type = "nominal_test")
+
+  expect_setequal(ours$term, reference$term)
+  ours <- ours[match(reference$term, ours$term), ]
+  expect_equal(ours$statistic, reference$statistic, tolerance = 1e-6)
+  expect_equal(ours$df, reference$df, tolerance = 1e-8)
+  expect_equal(ours$p.value, reference$p.value, tolerance = 1e-6)
+})
+
+test_that("tidy(type='nominal_test') works for column names ordinal::nominal_test cannot handle", {
+  # ordinal::nominal_test() returns all-NA here: its update()-based refit cannot see our
+  # local training data, and clm() itself pastes the nominal formula together without
+  # re-quoting, so a name with a space/symbol is unparseable. Our implementation refits
+  # from the stored model frame under sanitized names, so it produces real statistics.
+  df <- make_ordinal_test_df(n = 300)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+
+  nt <- tidy_rowwise(trial, model, type = "nominal_test")
+  expect_setequal(nt$term, c("年齢", "部署 名!#"))
+  expect_true(all(is.finite(nt$statistic)))
+  expect_true(all(nt$df > 0))
+  expect_true(all(nt$p.value >= 0 & nt$p.value <= 1))
+  # A 3-level categorical predictor gets one extra threshold-specific effect per
+  # non-reference level per extra boundary.
+  expect_true(nt$df[nt$term == "部署 名!#"] > nt$df[nt$term == "年齢"])
+})
+
+test_that("tidy(type='nominal_test') renames for display with pretty.name", {
+  df <- make_ordinal_test_df(n = 200)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
+  nt <- tidy_rowwise(trial, model, type = "nominal_test", pretty.name = TRUE)
+  expect_true(all(c("Variable", "Likelihood Ratio Statistic", "Degree of Freedom", "P Value")
+                  %in% colnames(nt)))
+})
+
+test_that("tidy(type='nominal_test') degrades to an empty frame, not an error", {
+  df <- make_ordinal_test_df(n = 80)
+  trial <- df %>% build_polr(`満足度`, `年齢`)
+  nt <- tidy_rowwise(trial, model, type = "nominal_test")
+  # One predictor still has a testable nominal effect; the contract is only that it
+  # never errors and always returns the documented columns.
+  expect_true(all(c("term", "statistic", "df", "p.value") %in% colnames(nt)))
+})
