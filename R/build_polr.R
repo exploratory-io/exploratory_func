@@ -415,6 +415,151 @@ clm_nominal_test <- function(x) {
 }
 
 # Variance Inflation Factor for an ordinal::clm() model.
+# Report-top "分析対象" summary for a build_polr() model (tam#4453 spec, report
+# structure follow-up, S14). Deliberately a DEDICATED function rather than an
+# extension of the shared ml_report_basic_info() in tam's library.r -- that
+# helper explicitly documents itself as "only the columns every model can
+# supply" (it infers Categories from model$classification_type, a field
+# clm_exploratory_0 objects don't set), and Category Order has no equivalent in
+# any other model family. Mirrors dtree_report_basic_info()'s per-model-family
+# pattern instead. Not exported (same convention as the other _report_ helpers
+# in this file) -- tam preprocessors call it bare.
+polr_report_basic_info <- function(df, test_mode = FALSE) {
+  if (!is.data.frame(df) || !"model" %in% colnames(df)) return(data.frame())
+  model <- df$model[[1]]
+  if (is.null(model) || inherits(model, "error")) return(data.frame())
+
+  target_col <- model$orig_target_col
+  lvls <- levels(model$model[[1]])
+  if (is.null(lvls)) lvls <- character(0)
+
+  source_data <- if ("source.data" %in% colnames(df)) df$source.data[[1]] else NULL
+  rows <- if (!is.null(source_data) && is.data.frame(source_data)) {
+    nrow(source_data)
+  } else if (!is.null(model$model)) {
+    nrow(model$model)
+  } else {
+    NA_integer_
+  }
+
+  predictors <- tryCatch(labels(stats::terms(model)), error = function(e) character(0))
+  bare_predictors <- gsub("^`|`$", "", predictors)
+  bare_predictors <- bare_predictors[!is.na(bare_predictors) & nzchar(bare_predictors)]
+
+  data.frame(
+    `Target` = if (is.null(target_col)) NA_character_ else target_col,
+    `Categories` = length(lvls),
+    `Category Order` = if (length(lvls) == 0) NA_character_ else paste(lvls, collapse = " < "),
+    `Predictors` = length(unique(bare_predictors)),
+    `Rows` = rows,
+    `Model` = "Ordered Logistic Regression",
+    # Mirrors ml_report_basic_info()'s wording (#37513): the report already shows
+    # Training AND Test rows throughout, so this answers "was data held out for
+    # testing", not "what is being evaluated right now".
+    `Evaluation` = if (isTRUE(test_mode)) "Test Data" else "Training",
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+}
+
+# One-vs-rest probability rows for a build_polr() model, mirroring
+# dtree_report_multiclass_probabilities() (tam#37499) so the report's predicted
+# probability distribution chart can use the same One-vs-Rest layout: one line per
+# category, split This Category / Other Categories (tam#4453 spec, report
+# structure follow-up, §5-4). Unlike the rpart version this is not gated to a
+# specific tree class -- any build_polr() model qualifies. Not exported (mirrors
+# dtree_report_multiclass_probabilities()) -- tam preprocessors call it bare, the
+# same way every other _report_ internal helper is called.
+polr_report_multiclass_probabilities <- function(df) {
+  if (!is.data.frame(df) || !"model" %in% colnames(df)) return(data.frame())
+
+  model <- df$model[[1]]
+  if (is.null(model) || !inherits(model, "clm_exploratory_0")) return(data.frame())
+
+  train_data <- if (".train_data" %in% colnames(df)) df$.train_data[[1]] else NULL
+  test_data <- if (".test_data" %in% colnames(df)) df$.test_data[[1]] else NULL
+  target_col <- if (".target_col" %in% colnames(df)) df$.target_col[[1]] else model$orig_target_col
+  if (is.null(target_col)) return(data.frame())
+
+  levels_target <- levels(model$model[[1]])
+  if (is.null(levels_target)) return(data.frame())
+
+  make_rows <- function(data, is_test) {
+    if (is.null(data) || !is.data.frame(data) || nrow(data) == 0) return(data.frame())
+    if (!target_col %in% colnames(data)) return(data.frame())
+
+    probabilities <- tryCatch(
+      clm_predict(model, newdata = data, type = "prob"),
+      error = function(e) NULL
+    )
+    if (is.null(probabilities)) return(data.frame())
+
+    probabilities <- as.data.frame(probabilities, check.names = FALSE)
+    categories <- intersect(levels_target, colnames(probabilities))
+    if (length(categories) == 0) categories <- colnames(probabilities)
+
+    dplyr::bind_rows(lapply(categories, function(category) {
+      actual <- as.character(data[[target_col]])
+      is_positive <- actual == category
+      data.frame(
+        Category = category,
+        `Predicted Probability` = probabilities[[category]],
+        `Actual Positive` = is_positive,
+        `Actual Group` = factor(
+          ifelse(is_positive, "This Category", "Other Categories"),
+          levels = c("This Category", "Other Categories")
+        ),
+        `Actual Category` = actual,
+        is_test_data = is_test,
+        baseline_precision = mean(is_positive, na.rm = TRUE),
+        stringsAsFactors = FALSE,
+        check.names = FALSE
+      )
+    }))
+  }
+
+  dplyr::bind_rows(make_rows(train_data, FALSE), make_rows(test_data, TRUE))
+}
+
+# Macro (unweighted per-category mean) Precision / Recall / Specificity / F1 for a
+# multiclass label pair, using one-vs-rest confusion-matrix arithmetic per category.
+# `recall` here is numerically identical to multiclass_balanced_accuracy() (both are
+# macro recall by definition) -- kept as its own self-contained helper, rather than
+# reusing evaluate_multi_()'s internals, so the Prediction Accuracy table (tam#4453
+# spec, report structure follow-up) can report Precision/Recall/Specificity/F1
+# together without depending on another function's private locals.
+polr_macro_precision_recall_specificity <- function(actual, predicted) {
+  actual <- as.character(actual)
+  predicted <- as.character(predicted)
+  valid <- !is.na(actual) & !is.na(predicted)
+  actual <- actual[valid]
+  predicted <- predicted[valid]
+  if (length(actual) == 0) {
+    return(list(precision = NA_real_, recall = NA_real_, specificity = NA_real_, f1 = NA_real_))
+  }
+  classes <- sort(unique(actual))
+  per_class <- lapply(classes, function(k) {
+    tp <- sum(actual == k & predicted == k)
+    fn <- sum(actual == k & predicted != k)
+    fp <- sum(actual != k & predicted == k)
+    tn <- sum(actual != k & predicted != k)
+    precision <- if ((tp + fp) > 0) tp / (tp + fp) else NA_real_
+    recall <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
+    specificity <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
+    f1 <- if (!is.na(precision) && !is.na(recall) && (precision + recall) > 0) {
+      2 * precision * recall / (precision + recall)
+    } else {
+      0
+    }
+    c(precision = precision, recall = recall, specificity = specificity, f1 = f1)
+  })
+  m <- do.call(rbind, per_class)
+  list(precision = mean(m[, "precision"], na.rm = TRUE),
+       recall = mean(m[, "recall"], na.rm = TRUE),
+       specificity = mean(m[, "specificity"], na.rm = TRUE),
+       f1 = mean(m[, "f1"], na.rm = TRUE))
+}
+
 #
 # This is the same generalized-VIF computation as vif() in build_lm.R (itself
 # derived from car::vif), adapted for clm's structural differences:
@@ -984,6 +1129,9 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
       return(tibble::tibble(
         `Data Type` = dt, Rows = 0L,
         `Accuracy Rate` = NA_real_, `Misclass. Rate` = NA_real_,
+        `ROC AUC` = NA_real_, `PR AUC` = NA_real_, `Balanced Accuracy` = NA_real_,
+        `F1 Score` = NA_real_, `Precision` = NA_real_, `Recall` = NA_real_,
+        `Specificity` = NA_real_,
         `Mean Category Error` = NA_real_, `Ranked Probability Score` = NA_real_,
         `Weighted Kappa` = NA_real_, `Log Loss` = NA_real_,
         `Max VIF` = max_vif
@@ -1009,10 +1157,33 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
 
     prob_cols <- paste0("predicted_probability_", lvls)
     prob_mat <- if (all(prob_cols %in% colnames(augmented))) {
-      as.matrix(augmented[, prob_cols, drop = FALSE])
+      m <- as.matrix(augmented[, prob_cols, drop = FALSE])
+      colnames(m) <- lvls # so multiclass_auc_by_class() can match columns to actual's category labels.
+      m
     } else {
       NULL
     }
+
+    # --- One-vs-rest classification metrics (tam#4453 spec, report structure
+    # follow-up) -----------------------------------------------------------
+    # The report's "予測精度" (Prediction Accuracy) table mirrors the same
+    # ROC AUC / PR AUC / Balanced Accuracy / Accuracy / F1 / Precision / Recall /
+    # Specificity shape used elsewhere for multiclass models, computed one-vs-rest
+    # per category and macro-averaged (unweighted mean across categories) so a
+    # small category counts the same as a large one. These are in ADDITION to the
+    # ordinal-aware metrics above -- both sets answer different questions (is the
+    # category right at all vs. how far off is a miss).
+    predicted_label <- as.character(augmented$.fitted)
+    actual_label <- as.character(actual)
+    balanced_accuracy <- multiclass_balanced_accuracy(actual_label, predicted_label)
+    auc_by_class <- if (!is.null(prob_mat)) {
+      multiclass_auc_by_class(actual_label, prob_mat)
+    } else {
+      data.frame(class = character(), roc_auc = numeric(), pr_auc = numeric())
+    }
+    macro_roc_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$roc_auc, na.rm = TRUE) else NA_real_
+    macro_pr_auc <- if (nrow(auc_by_class) > 0) mean(auc_by_class$pr_auc, na.rm = TRUE) else NA_real_
+    prs <- polr_macro_precision_recall_specificity(actual_label, predicted_label)
 
     # 平均カテゴリ誤差 -- mean(|predicted_rank - actual_rank|). 0 = perfect;
     # 1 = off by one category on average. Directly interpretable in "categories".
@@ -1072,6 +1243,13 @@ evaluate_polr_one_model <- function(model, train_data, test_data, target_col, da
       Rows = nrow(eval_data),
       `Accuracy Rate` = accuracy,
       `Misclass. Rate` = 1 - accuracy,
+      `ROC AUC` = macro_roc_auc,
+      `PR AUC` = macro_pr_auc,
+      `Balanced Accuracy` = balanced_accuracy,
+      `F1 Score` = prs$f1,
+      `Precision` = prs$precision,
+      `Recall` = prs$recall,
+      `Specificity` = prs$specificity,
       `Mean Category Error` = mean_category_error,
       `Ranked Probability Score` = rps,
       `Weighted Kappa` = weighted_kappa,

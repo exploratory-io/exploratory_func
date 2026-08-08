@@ -180,7 +180,12 @@ test_that("evaluate_polr reports training accuracy", {
   ev <- evaluate_polr(trial, data = "training")
 
   # Column set is pinned so a future metric addition is a deliberate, reviewed change.
+  # tam#4453 report structure follow-up (S20) added the macro one-vs-rest classification
+  # metrics (ROC AUC/PR AUC/Balanced Accuracy/F1/Precision/Recall/Specificity) alongside
+  # the original ordinal-aware ones -- they answer different questions and both are kept.
   expect_equal(colnames(ev), c("Data Type", "Rows", "Accuracy Rate", "Misclass. Rate",
+                               "ROC AUC", "PR AUC", "Balanced Accuracy", "F1 Score",
+                               "Precision", "Recall", "Specificity",
                                "Mean Category Error", "Ranked Probability Score",
                                "Weighted Kappa", "Log Loss", "Max VIF"))
   expect_equal(ev$`Data Type`, "Training")
@@ -596,4 +601,94 @@ test_that("tidy(type='nominal_test') degrades to an empty frame, not an error", 
   # One predictor still has a testable nominal effect; the contract is only that it
   # never errors and always returns the documented columns.
   expect_true(all(c("term", "statistic", "df", "p.value") %in% colnames(nt)))
+})
+
+# --- tam#4453 report structure follow-up (S14/S17/S20/S22) -------------------
+
+test_that("evaluate_polr() reports macro one-vs-rest classification metrics with a multibyte-column model", {
+  df <- make_ordinal_test_df(n = 200)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`, test_rate = 0.25, seed = 1)
+  ev <- evaluate_polr(trial, data = "training_and_test")
+
+  expect_true(all(c("ROC AUC", "PR AUC", "Balanced Accuracy", "Precision", "Recall", "Specificity",
+                     "F1 Score") %in% colnames(ev)))
+  # Macro recall and Balanced Accuracy are the SAME statistic by definition (unweighted mean
+  # of per-category recall) -- pin the identity so a future refactor of either helper can't
+  # silently diverge them.
+  expect_equal(ev$Recall, ev$`Balanced Accuracy`)
+  numeric_cols <- c("ROC AUC", "PR AUC", "Balanced Accuracy", "Precision", "Recall", "Specificity", "F1 Score")
+  for (col in numeric_cols) {
+    expect_true(all(ev[[col]] >= 0 & ev[[col]] <= 1), info = col)
+  }
+})
+
+test_that("polr_macro_precision_recall_specificity() matches a hand-computed 3-class confusion matrix", {
+  # actual: A A A B B C C C C ; predicted: A B A B B C A C C
+  actual <- c("A", "A", "A", "B", "B", "C", "C", "C", "C")
+  predicted <- c("A", "B", "A", "B", "B", "C", "A", "C", "C")
+  # Per class: A: TP=2,FN=1,FP=1,TN=5 -> precision 2/3, recall 2/3, specificity 5/6
+  #            B: TP=2,FN=0,FP=1,TN=6 -> precision 2/3, recall 1,   specificity 6/7
+  #            C: TP=3,FN=1,FP=0,TN=5 -> precision 1,   recall 3/4, specificity 1
+  r <- polr_macro_precision_recall_specificity(actual, predicted)
+  expect_equal(r$precision, mean(c(2 / 3, 2 / 3, 1)), tolerance = 1e-9)
+  expect_equal(r$recall, mean(c(2 / 3, 1, 3 / 4)), tolerance = 1e-9)
+  expect_equal(r$specificity, mean(c(5 / 6, 6 / 7, 1)), tolerance = 1e-9)
+})
+
+test_that("polr_report_multiclass_probabilities() returns one One-vs-Rest row per (observation, category)", {
+  df <- make_ordinal_test_df(n = 150)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`, test_rate = 0.2, seed = 1)
+  rows <- polr_report_multiclass_probabilities(trial)
+
+  n_train <- nrow(trial$.train_data[[1]])
+  n_test <- nrow(trial$.test_data[[1]])
+  expect_equal(nrow(rows), (n_train + n_test) * 3) # 3 satisfaction categories
+  expect_true(all(rows$`Predicted Probability` >= 0 & rows$`Predicted Probability` <= 1))
+  expect_setequal(unique(rows$Category), c("Low", "Medium", "High"))
+  expect_setequal(levels(rows$`Actual Group`), c("This Category", "Other Categories"))
+  # baseline_precision for a (Category, is_test_data) group must equal that group's own
+  # actual positive share -- catches an accidental global (not per-group) average.
+  for (dt in c(FALSE, TRUE)) {
+    for (cat in c("Low", "Medium", "High")) {
+      sub <- rows[rows$Category == cat & rows$is_test_data == dt, ]
+      if (nrow(sub) > 0) {
+        expect_equal(unique(sub$baseline_precision), mean(sub$`Actual Positive`), tolerance = 1e-9)
+      }
+    }
+  }
+})
+
+test_that("polr_report_multiclass_probabilities() returns an empty frame for a non-clm model or missing columns", {
+  expect_equal(nrow(polr_report_multiclass_probabilities(data.frame())), 0)
+  expect_equal(nrow(polr_report_multiclass_probabilities(data.frame(model = I(list(1L))))), 0)
+})
+
+test_that("polr_report_basic_info() reports Target/Categories/Category Order/Predictors/Rows/Model", {
+  df <- make_ordinal_test_df(n = 90)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`, seed = 1)
+  info <- polr_report_basic_info(trial, test_mode = FALSE)
+
+  expect_equal(info$Target, "満足度")
+  expect_equal(info$Categories, 3L)
+  expect_equal(info$`Category Order`, "Low < Medium < High")
+  expect_equal(info$Predictors, 2L)
+  expect_equal(info$Rows, 90L)
+  expect_equal(info$Model, "Ordered Logistic Regression")
+  expect_equal(info$Evaluation, "Training")
+  expect_equal(polr_report_basic_info(trial, test_mode = TRUE)$Evaluation, "Test Data")
+})
+
+test_that("partial dependence for a build_polr() model flags numeric predictors as 'line' and categorical as 'scatter'", {
+  # tam#4453 S17: the report renders one line per category for a numeric predictor, and a
+  # different layout for a categorical one -- handle_partial_dependence()'s generic
+  # chart_type/x_type columns are what the tam preprocessor branches on.
+  df <- make_ordinal_test_df(n = 120)
+  trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`, seed = 1)
+  pd <- tidy_rowwise(trial, model, type = "partial_dependence")
+
+  expect_true(all(pd$chart_type[pd$x_name == "年齢"] == "line"))
+  expect_true(all(pd$x_type[pd$x_name == "年齢"] == "numeric"))
+  expect_true(all(pd$chart_type[pd$x_name == "部署 名!#"] == "scatter"))
+  expect_true(all(pd$x_type[pd$x_name == "部署 名!#"] == "character"))
+  expect_setequal(unique(pd$y_name), c("Low", "Medium", "High"))
 })
