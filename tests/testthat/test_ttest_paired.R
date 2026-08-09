@@ -134,6 +134,52 @@ test_that("test paired ttest", {
                "The explanatory variable needs to have 2 unique values.")
 })
 
+test_that("paired ttest aligns shuffled rows by pairing key", {
+  data_shuffled <- tibble::tibble(
+    subject_id = c("A", "B", "C", "D", "C", "A", "D", "B"),
+    period = c(rep("before", 4), rep("after", 4)),
+    value = c(1, 100, 3, 200, 30, 10, 20, 2)
+  )
+  data_ordered <- data_shuffled %>%
+    dplyr::arrange(period, subject_id)
+
+  keyed_model <- exp_ttest(
+    data_shuffled,
+    value,
+    period,
+    paired = TRUE,
+    pairing_key = subject_id
+  )$model[[1]]
+  ordered_model <- exp_ttest(data_ordered, value, period, paired = TRUE)$model[[1]]
+
+  expect_equal(keyed_model$p.value, ordered_model$p.value)
+  expect_equal(keyed_model$statistic, ordered_model$statistic)
+  expect_equal(keyed_model$estimate, ordered_model$estimate)
+  expect_equal(keyed_model$conf.int, ordered_model$conf.int)
+})
+
+test_that("paired ttest validates pairing keys", {
+  duplicate_keys <- tibble::tibble(
+    subject_id = c("A", "A", "B", "B"),
+    period = c("before", "before", "after", "after"),
+    value = c(1, 2, 3, 4)
+  )
+  missing_key <- tibble::tibble(
+    subject_id = c("A", NA, "A", "B"),
+    period = c("before", "before", "after", "after"),
+    value = c(1, 2, 3, 4)
+  )
+
+  expect_error(
+    exp_ttest(duplicate_keys, value, period, paired = TRUE, pairing_key = subject_id),
+    "requires each pairing key to occur once in each group"
+  )
+  expect_error(
+    exp_ttest(missing_key, value, period, paired = TRUE, pairing_key = subject_id),
+    "requires non-missing pairing keys"
+  )
+})
+
 test_that("test paired ttest with grouped data", {
   # Base data for the paired sample t-test.
   wide.data <- data.frame(
@@ -162,9 +208,15 @@ test_that("test paired ttest with grouped data", {
   # Run the exploratory t-test.
   model_df <- long.data %>% group_by(Category) %>% exp_ttest(Value, Group, paired = TRUE)
 
+  keyed_model_df <- long.data %>%
+    group_by(Category) %>%
+    exp_ttest(Value, Group, paired = TRUE, pairing_key = Subject)
+
   # Compare the base model and the exploratory model. 
   expect_equal(base.model.cat1$p.value, model_df$model[[1]]$p.value)
   expect_equal(base.model.cat1$estimate, model_df$model[[1]]$estimate)
+  expect_equal(model_df$model[[1]]$p.value, keyed_model_df$model[[1]]$p.value)
+  expect_equal(model_df$model[[1]]$estimate, keyed_model_df$model[[1]]$estimate)
 
   # Test different combinations of arguments with grouped data
   # Test case 1: Change significance level

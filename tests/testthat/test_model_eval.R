@@ -71,6 +71,166 @@ test_that("test do_roc with 2 numeric values", {
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
 })
 
+# Verbatim copy of the pre-fix do_roc_ point calculation (one ROC point per data row,
+# no tie handling). Used to pin the guarantee that the tie-collapsing fix does not change
+# the output at all when every predicted probability is distinct, which is the case for
+# every continuous-score model (logistic regression, xgboost, lightgbm, ...).
+roc_points_before_tie_fix <- function(df, pred_prob_col, actual_val_col) {
+  df <- df[!is.na(df[[pred_prob_col]]) & !is.na(df[[actual_val_col]]), ]
+  df[[actual_val_col]] <- exploratory:::binary_label(df[[actual_val_col]])
+  arranged <- df[order(-df[[pred_prob_col]]), ]
+  val <- arranged[[actual_val_col]]
+  act_sum <- sum(val)
+  fpr <- if (all(val)) {
+    c(rep(0, length(val)), 1)
+  } else {
+    c(0, cumsum(!val) / (length(val) - act_sum))
+  }
+  tpr <- if (all(!val)) {
+    c(rep(0, length(val)), 1)
+  } else {
+    c(0, cumsum(val) / act_sum)
+  }
+  list(tpr = tpr, fpr = fpr)
+}
+
+test_that("test do_roc collapses tied predicted probabilities into one point each", {
+  # A decision tree assigns one probability per leaf, so many rows share the exact same
+  # predicted probability. Those rows are indistinguishable to the model, so the curve
+  # must have one vertex per distinct probability, not one per row.
+  leaf_prob <- c(0.05, 0.20, 0.45, 0.70, 0.90)
+  leaf_positives <- c(2, 8, 18, 28, 36) # out of 40 rows in each leaf
+  prob <- rep(leaf_prob, each = 40)
+  actual <- unlist(lapply(leaf_positives, function(x) rep(c(1, 0), c(x, 40 - x))))
+  test_data <- data.frame(prob = prob, actual = actual)
+
+  ret <- do_roc_(test_data, "prob", "actual")
+  # (0,0) origin plus one vertex per distinct probability.
+  expect_equal(nrow(ret), length(leaf_prob) + 1)
+  expect_equal(length(ret[["true_positive_rate"]]), length(ret[["false_positive_rate"]]))
+  # The curve must still start at (0,0) and end at (1,1).
+  expect_equal(ret[["true_positive_rate"]][[1]], 0)
+  expect_equal(ret[["false_positive_rate"]][[1]], 0)
+  expect_equal(ret[["true_positive_rate"]][[nrow(ret)]], 1)
+  expect_equal(ret[["false_positive_rate"]][[nrow(ret)]], 1)
+  # Monotone non-decreasing on both axes.
+  expect_true(all(diff(ret[["true_positive_rate"]]) >= 0))
+  expect_true(all(diff(ret[["false_positive_rate"]]) >= 0))
+})
+
+test_that("test do_roc is independent of the input row order when probabilities are tied", {
+  set.seed(20260805)
+  n <- 600
+  prob <- rep(c(0.1, 0.3, 0.55, 0.8), length.out = n)
+  actual <- rbinom(n, 1, prob)
+  test_data <- data.frame(prob = prob, actual = actual)
+
+  ret <- do_roc_(test_data, "prob", "actual", with_auc = TRUE)
+
+  # Shuffling the rows changes nothing the model can see, so the curve must not move.
+  for (i in 1:5) {
+    shuffled <- test_data[sample(nrow(test_data)), ]
+    shuffled_ret <- do_roc_(shuffled, "prob", "actual", with_auc = TRUE)
+    expect_equal(nrow(shuffled_ret), nrow(ret))
+    expect_true(all.equal(shuffled_ret[["true_positive_rate"]], ret[["true_positive_rate"]]))
+    expect_true(all.equal(shuffled_ret[["false_positive_rate"]], ret[["false_positive_rate"]]))
+    # AUC was already tie-aware and row-order-independent before the fix. Keep it that way.
+    expect_true(all.equal(shuffled_ret[["auc"]], ret[["auc"]]))
+  }
+})
+
+test_that("test do_roc output is unchanged when there are no tied probabilities", {
+  # Every continuous-score model (logistic regression, xgboost, lightgbm, ...) produces
+  # distinct probabilities, and for those the tie-collapsing fix must be a no-op.
+  set.seed(20260805)
+  for (i in 1:20) {
+    n <- sample(5:200, 1)
+    prob <- runif(n) # continuous, so no ties
+    actual <- rbinom(n, 1, prob)
+    if (length(unique(actual)) < 2) {
+      next # degenerate cases are covered by their own test
+    }
+    test_data <- data.frame(prob = prob, actual = actual)
+
+    expected <- roc_points_before_tie_fix(test_data, "prob", "actual")
+    ret <- do_roc_(test_data, "prob", "actual")
+
+    expect_identical(ret[["true_positive_rate"]], expected$tpr)
+    expect_identical(ret[["false_positive_rate"]], expected$fpr)
+  }
+})
+
+test_that("test do_roc degenerate cases", {
+  degenerate_cases <- list(
+    all_positive = data.frame(prob = c(0.9, 0.5, 0.1), actual = c(1, 1, 1)),
+    all_negative = data.frame(prob = c(0.9, 0.5, 0.1), actual = c(0, 0, 0)),
+    all_positive_tied = data.frame(prob = c(0.5, 0.5, 0.5), actual = c(1, 1, 1)),
+    all_negative_tied = data.frame(prob = c(0.5, 0.5, 0.5), actual = c(0, 0, 0)),
+    single_positive_row = data.frame(prob = 0.7, actual = 1),
+    single_negative_row = data.frame(prob = 0.7, actual = 0),
+    every_probability_tied = data.frame(prob = rep(0.4, 10), actual = rep(c(1, 0), 5))
+  )
+
+  for (case_name in names(degenerate_cases)) {
+    ret <- do_roc_(degenerate_cases[[case_name]], "prob", "actual")
+    # fpr and tpr must always have the same length, or the data.frame() call would error.
+    expect_equal(length(ret[["true_positive_rate"]]), length(ret[["false_positive_rate"]]),
+                 info = case_name)
+    expect_true(all(!is.na(ret[["true_positive_rate"]])), info = case_name)
+    expect_true(all(!is.na(ret[["false_positive_rate"]])), info = case_name)
+  }
+
+  # A group that becomes empty after NA filtering must not error either.
+  empty_group_data <- data.frame(
+    group = c("a", "a", "b", "b"),
+    prob = c(0.9, 0.1, NA, NA),
+    actual = c(1, 0, 1, 0)
+  )
+  ret <- empty_group_data %>% dplyr::group_by(group) %>% do_roc_("prob", "actual")
+  expect_equal(length(ret[["true_positive_rate"]]), length(ret[["false_positive_rate"]]))
+  expect_true(all(!is.na(ret[["true_positive_rate"]])))
+})
+
+test_that("test do_roc with grouped input and tied probabilities", {
+  set.seed(20260805)
+  n <- 400
+  test_data <- data.frame(
+    group = rep(c("x", "y"), each = n / 2),
+    prob = rep(c(0.2, 0.5, 0.8), length.out = n),
+    actual = rbinom(n, 1, 0.4)
+  )
+
+  ret <- test_data %>% dplyr::group_by(group) %>% do_roc_("prob", "actual", with_auc = TRUE)
+  expect_equal(colnames(ret), c("group", "true_positive_rate", "false_positive_rate", "auc"))
+  # 3 distinct probabilities per group, plus the (0,0) origin, in each of 2 groups.
+  expect_equal(nrow(ret), 2 * (3 + 1))
+  expect_equal(sort(unique(ret[["group"]])), c("x", "y"))
+
+  # Each group's curve must match the curve of that group computed on its own.
+  for (group_name in c("x", "y")) {
+    one_group <- test_data[test_data$group == group_name, ]
+    expected <- do_roc_(one_group, "prob", "actual", with_auc = TRUE)
+    actual_ret <- ret[ret$group == group_name, ]
+    expect_true(all.equal(actual_ret[["true_positive_rate"]], expected[["true_positive_rate"]]))
+    expect_true(all.equal(actual_ret[["false_positive_rate"]], expected[["false_positive_rate"]]))
+    expect_true(all.equal(actual_ret[["auc"]], expected[["auc"]]))
+  }
+})
+
+test_that("test do_roc auc is unchanged by the tie handling fix", {
+  set.seed(20260805)
+  n <- 500
+  prob <- rep(c(0.15, 0.35, 0.55, 0.75, 0.95), length.out = n)
+  actual <- rbinom(n, 1, prob)
+  test_data <- data.frame(prob = prob, actual = actual)
+
+  ret <- do_roc_(test_data, "prob", "actual", with_auc = TRUE)
+  # auroc() is already tie-aware, so the reported AUC must equal it exactly.
+  expected_auc <- exploratory:::auroc(test_data$prob, exploratory:::binary_label(test_data$actual))
+  expect_equal(ret[["auc"]][[1]], expected_auc)
+  expect_equal(length(unique(ret[["auc"]])), 1)
+})
+
 test_that("test evaluate_binary with 2 numeric values", {
   test_data <- structure(
     list(

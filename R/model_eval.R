@@ -38,23 +38,37 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
 
     # and get actual values
     val <- arranged[[actual_val_col]]
+    prob <- arranged[[pred_prob_col]]
 
+    n <- length(val)
     act_sum <- sum(val)
+
+    # Collapse tied predicted probabilities into a single ROC vertex.
+    # A model that assigns the same probability to many rows (e.g. a decision tree,
+    # where every row that falls in the same leaf shares one probability) cannot
+    # distinguish those rows, so their order within the tied block is arbitrary and
+    # must not affect the curve. Keep only the LAST cumulative point of each run of
+    # identical probabilities, which turns the arbitrary staircase inside a tied block
+    # into the single straight chord it should be.
+    # When every probability is distinct (e.g. a logistic regression score), last_index
+    # is simply every index and the output is identical to keeping one point per row.
+    last_index <- if (n == 0) integer(0) else c(which(diff(prob) != 0), n)
+    m <- length(last_index)
 
     fpr <- if (all(val)){
       # should be all zero but put 1 to draw a curve
-      c(rep(0, length(val)), 1)
+      c(rep(0, m), 1)
     } else {
       # cumulative rate of false case
-      c(0, cumsum(!val) / (length(val) - act_sum))
+      c(0, (cumsum(!val) / (n - act_sum))[last_index])
     }
 
     tpr <- if (all(!val)) {
       # should be all zero but put 1 to draw a curve
-      c(rep(0, length(val)), 1)
+      c(rep(0, m), 1)
     } else {
       # cumulative rate of true case
-      c(0, cumsum(val) / act_sum)
+      c(0, (cumsum(val) / act_sum)[last_index])
     }
 
     ret <- data.frame(
