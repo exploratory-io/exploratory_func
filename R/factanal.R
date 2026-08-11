@@ -881,6 +881,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
         }
       }
     }
+    # tam#37638: FA is the role model for this issue, and this table's row set is already
+    # correct -- the 変数名（数値型）/変数名（順序付きカテゴリ型）/因子数 rows are injected
+    # CLIENT-SIDE by FactanalReportBindUtil.injectSummaryRowsIntoAnalysisMethod (tam#37402 /
+    # tam#37620 / tam#37633), not emitted by R. An earlier version of this change duplicated that
+    # work here in R; reverted -- adding them from both sides would either double-inject rows
+    # (whenever this R Item label doesn't exactly match the client's INJECTED_ITEMS set, e.g. the
+    # mixed-correlation case) or silently rely on the client's idempotent strip-and-reinject to
+    # paper over it. Only tam#37638's own additions belong here: 項目 header rename (tam-side
+    # tableColumnHeaderTemplate) and the Rows Removed format below.
     res <- tibble::tibble(
       # The variable / row counts come FIRST (issue tam#37340): the section is now
       # 「分析条件とデータの確認」, which leads with what data was analyzed. The method rows keep

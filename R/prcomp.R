@@ -574,8 +574,14 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     # the client translates. Empty typed tibble for k-means / old saved models (no report data).
     cfg <- prcomp_report_config()
     if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+      # Same column shape as the populated branch below (tam#37638), so a consumer that reads the
+      # hidden method columns never sees a table that is missing them entirely.
       res <- tibble::tibble(Metric = character(0), Value = character(0),
-                            Description = character(0), status = character(0))
+                            Description = character(0), status = character(0),
+                            correlation_type = character(0), correlation_is_auto = character(0),
+                            degraded_from = character(0), polychoric_available = character(0),
+                            warning_tokens = character(0), has_diagnostics = character(0),
+                            reason = character(0))
     }
     else {
       d <- x$input_diagnostics
@@ -600,39 +606,69 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       } else {
         "Preserve Component Variance"
       }
+      # tam#37638: this is now the report's ONE 「分析条件とデータの確認」 table -- the separate
+      # 「分析方法」 table was folded in, so Correlation and Variable Names live here too and the
+      # row order follows the spec (variables -> rows -> method). The old "Rows Excluded" key is
+      # now "Rows Removed" to match the wanted 削除された行数 (the Factor Analysis role-model
+      # table already uses that key); the client keeps a fallback for saved analytics.
+      variable_names_display <- {
+        nms <- names(d$variable_sd)
+        if (is.null(nms) || length(nms) == 0) "N/A" else paste(nms, collapse = ", ")
+      }
+      cor_type_for_table <- if (is.null(x$correlation_type)) "pearson" else x$correlation_type
       res <- tibble::tibble(
-        Metric = c("Row Count", "Rows Excluded", "Number of Variables", "Excluded Variables",
-                   "Normalization", "Score Scale", "SD Ratio (Max/Min)"),
+        Metric = c("Number of Variables", "Variable Names", "Excluded Variables",
+                   "Row Count", "Rows Removed", "Normalization",
+                   "SD Ratio (Max/Min)", "Correlation", "Score Scale"),
         Value = c(
+          as.character(variables_used),
+          variable_names_display,
+          excluded_display,
           as.character(d$analyzed_row_count),
           paste0(d$excluded_row_count, " (", format(round(excluded_pct, 1), nsmall = 1), "%)"),
-          as.character(variables_used),
-          excluded_display,
           # English-canonical boolean string, not "Yes"/"No" (issue #27224 follow-up): matches
           # the plain TRUE/FALSE convention this file's own analysis_method hidden columns
           # already use, and reads unambiguously as a raw boolean value in the report table.
           if (normalized) "TRUE" else "FALSE",
-          score_scale_display,
-          scale_display
+          scale_display,
+          factanal_correlation_label(cor_type_for_table),
+          score_scale_display
         ),
         Description = c(
+          "Number of variables used in the analysis.",
+          "Names of the variables used in the analysis.",
+          "Variables dropped before analysis because they were all missing or had only one unique value.",
           "Number of rows used in the analysis.",
           "Number and rate of rows removed because of missing values.",
-          "Number of variables used in the analysis.",
-          "Variables dropped before analysis because they were all missing or had only one unique value.",
           "Whether variables were standardized before analysis.",
-          "How principal-component scores are scaled.",
-          "Ratio of the maximum to the minimum standard deviation across all variables."
+          "Ratio of the maximum to the minimum standard deviation across all variables.",
+          "Which correlation the principal components were computed from.",
+          "How principal-component scores are scaled."
         ),
         status = c(
+          "ok",
+          "ok",
+          if (length(excluded_names) == 0) "na" else "ok",
           if (d$analyzed_row_count <= variables_used) "few_rows" else "ok",
           if (d$excluded_row_rate >= cfg$na_exclusion_warning) "high_na_exclusion" else "ok",
           "ok",
-          if (length(excluded_names) == 0) "na" else "ok",
+          scale_status,
           "ok",
-          "ok",
-          scale_status
+          "ok"
         )
+      )
+      # Hidden columns, identical in meaning to the ones analysis_method emits. They ride along
+      # here so ONE viz can feed both the rendered table and the report's explanation text now
+      # that the two tables were merged (tam#37638). Booleans are explicit "TRUE"/"FALSE"
+      # STRINGS -- see the analysis_method block below for why.
+      res <- res %>% dplyr::mutate(
+        correlation_type = cor_type_for_table,
+        correlation_is_auto = if (isTRUE(x$correlation_is_auto)) "TRUE" else "FALSE",
+        degraded_from = if (is.null(x$correlation_degraded_from)) "" else x$correlation_degraded_from,
+        polychoric_available = if (isTRUE(x$correlation_polychoric_available)) "TRUE" else "FALSE",
+        warning_tokens = paste(factanal_selection_warning_tokens(x$correlation_selection), collapse = ","),
+        has_diagnostics = if (!is.null(x$cor_diagnostics) && nrow(x$cor_diagnostics) > 0) "TRUE" else "FALSE",
+        reason = if (is.null(x$correlation_reason)) "" else x$correlation_reason
       )
     }
   }

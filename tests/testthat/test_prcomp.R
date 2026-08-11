@@ -92,8 +92,23 @@ test_that("do_prcomp attaches report data, sign stabilization, retained resoluti
 test_that("new report tidy types return expected columns and tokens", {
   model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
   res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
-  expect_equal(colnames(res), c("Metric", "Value", "Description", "status"))
+  # tam#37638: the separate analysis_method table was folded in here, so the hidden method
+  # columns ride along and the report can bind its explanation text from this one viz.
+  expect_equal(colnames(res), c("Metric", "Value", "Description", "status",
+                              "correlation_type", "correlation_is_auto", "degraded_from",
+                              "polychoric_available", "warning_tokens", "has_diagnostics",
+                              "reason"))
   expect_true(all(c("Row Count","Number of Variables","Normalization","SD Ratio (Max/Min)") %in% res$Metric))
+  # tam#37638: the exact row set and ORDER the report's 分析条件とデータの確認 table renders.
+  expect_equal(res$Metric,
+               c("Number of Variables", "Variable Names", "Excluded Variables", "Row Count",
+                 "Rows Removed", "Normalization", "SD Ratio (Max/Min)", "Correlation",
+                 "Score Scale"))
+  # Renamed from "Rows Excluded" so the report can say 削除された行数, like Factor Analysis.
+  expect_false("Rows Excluded" %in% res$Metric)
+  expect_equal(res$Value[[which(res$Metric == "Variable Names")]], "mpg, cyl, disp, hp, drat, wt")
+  expect_equal(res$Value[[which(res$Metric == "Correlation")]], "Pearson Correlation")
+  expect_equal(res$correlation_type[[1]], "pearson")
   expect_false("Rows vs Variables" %in% res$Metric)
   expect_false("Rows Used" %in% res$Metric)
   expect_false("Variables Used" %in% res$Metric)
@@ -119,7 +134,12 @@ test_that("new report tidy types return expected columns and tokens", {
 test_that("new report tidy types return empty typed tibbles for kmeans fits", {
   km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
   ac <- km %>% tidy_rowwise(model, type = "analysis_conditions")
-  expect_equal(colnames(ac), c("Metric", "Value", "Description", "status"))
+  # tam#37638: same column shape as the populated branch, so a consumer reading the hidden
+  # method columns never sees a table that lacks them entirely.
+  expect_equal(colnames(ac), c("Metric", "Value", "Description", "status",
+                              "correlation_type", "correlation_is_auto", "degraded_from",
+                              "polychoric_available", "warning_tokens", "has_diagnostics",
+                              "reason"))
   expect_equal(nrow(ac), 0)
   ps <- km %>% tidy_rowwise(model, type = "parallel_screeplot")
   expect_equal(colnames(ps), c("Component", "Eigenvalue", "Random Data Eigenvalue"))
@@ -227,7 +247,9 @@ PRCOMP_STRESS_NAME <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
 
 # The eight report tidy types + their required columns (empty case = 0 rows, same cols).
 PRCOMP_REPORT_TYPE_COLS <- list(
-  analysis_conditions = c("Metric", "Value", "Description", "status"),
+  analysis_conditions = c("Metric", "Value", "Description", "status",
+                          "correlation_type", "correlation_is_auto", "degraded_from",
+                          "polychoric_available", "warning_tokens", "has_diagnostics", "reason"),
   parallel_screeplot  = c("Component", "Eigenvalue", "Random Data Eigenvalue"),
   variances_judged    = c("Component", "Eigenvalue", "% Variance", "Cummulated % Variance",
                           "Parallel Analysis", "Kaiser Criterion", "Selected",
@@ -620,9 +642,11 @@ test_that("analysis_conditions carries the Score Scale row (#27224)", {
   expect_equal(preserve$Description[preserve$Metric == "Score Scale"],
                "How principal-component scores are scaled.")
   expect_equal(preserve$status[preserve$Metric == "Score Scale"], "ok")
-  # Sits between Normalization and SD Ratio, per the spec's Metric ordering.
-  expect_equal(which(preserve$Metric == "Score Scale"), which(preserve$Metric == "Normalization") + 1L)
-  expect_equal(which(preserve$Metric == "SD Ratio (Max/Min)"), which(preserve$Metric == "Score Scale") + 1L)
+  # tam#37638 reordered this table to the standardized 分析条件とデータの確認 layout: the method
+  # rows (Correlation, Score Scale) now come AFTER the data rows, so Score Scale is last.
+  expect_equal(which(preserve$Metric == "SD Ratio (Max/Min)"), which(preserve$Metric == "Normalization") + 1L)
+  expect_equal(which(preserve$Metric == "Score Scale"), which(preserve$Metric == "Correlation") + 1L)
+  expect_equal(which(preserve$Metric == "Score Scale"), length(preserve$Metric))
 
   unitvar <- (mtcars %>% do_prcomp(mpg, cyl, disp, hp, score_scale = "unit_variance")) %>%
     tidy_rowwise(model, type = "analysis_conditions")

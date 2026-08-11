@@ -726,3 +726,51 @@ test_that("do_cmdscale all 0 distances error", {
     do_cmdscale(data, var1, var2, val)
   }, "All distances are 0. Multidimensional scaling cannot be calculated.")
 })
+
+test_that("do_cor model carries the report's analysis_conditions (issue tam#37638)", {
+  set.seed(13)
+  df <- data.frame(a = rnorm(40), b = rnorm(40), c = rnorm(40))
+  df$b[1:4] <- NA
+  df$flat <- 1
+
+  model_df <- df %>% do_cor(a, b, c, flat, method = "auto", return_type = "model")
+  cond <- model_df$model[[1]] %>% tidy(type = "analysis_conditions")
+
+  expect_equal(cond$Metric,
+               c("Number of Variables", "Variable Names", "Excluded Variables",
+                 "Row Count", "Rows Removed", "Correlation"))
+  expect_equal(cond$Value[[1]], "4")
+  expect_equal(cond$Value[[2]], "a, b, c, flat")
+  # A constant column cannot correlate with anything, so it is reported as excluded -- the same
+  # predicate PCA uses for what it drops before analysis.
+  expect_equal(cond$Value[[3]], "flat")
+  expect_equal(cond$Value[[6]], "Pearson Correlation")
+  # Hidden columns the report binds its explanation text from. Explicit "TRUE"/"FALSE" strings.
+  expect_equal(cond$correlation_type[[1]], "pearson")
+  expect_equal(cond$correlation_is_auto[[1]], "TRUE")
+  expect_equal(cond$reason[[1]], "All variables are Numeric.")
+
+  # With pairwise.complete.obs (the default) only an all-missing row is unused, so no row is
+  # removed here; complete.obs drops any row with a missing value.
+  expect_equal(cond$Value[[4]], "40")
+  expect_match(cond$Value[[5]], "^0 \\(0.0%\\)$")
+  complete_cond <- df %>% do_cor(a, b, c, use = "complete.obs", return_type = "model") %>%
+    (function(x) tidy(x$model[[1]], type = "analysis_conditions"))
+  expect_equal(complete_cond$Value[[4]], "36")
+  expect_match(complete_cond$Value[[5]], "^4 \\(10.0%\\)$")
+
+  # An explicit method is not "auto", and the reason says so instead of inventing a rationale.
+  spearman <- df %>% do_cor(a, b, c, method = "spearman", return_type = "model")
+  sc <- spearman$model[[1]] %>% tidy(type = "analysis_conditions")
+  expect_equal(sc$correlation_is_auto[[1]], "FALSE")
+  expect_equal(sc$Value[[6]], "Spearman Correlation")
+
+  # A model saved before this existed has no $analysis_conditions: return the empty table with
+  # the same shape rather than erroring, so the report renders empty and the client falls back.
+  legacy <- model_df$model[[1]]
+  legacy$analysis_conditions <- NULL
+  legacy_cond <- tidy(legacy, type = "analysis_conditions")
+  expect_equal(nrow(legacy_cond), 0)
+  expect_equal(colnames(legacy_cond),
+               c("Metric", "Value", "Description", "correlation_type", "correlation_is_auto", "reason"))
+})

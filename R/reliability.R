@@ -675,16 +675,35 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
              round(confidence_interval$upper[[1]], 3))
     } else NA_character_
 
+    # tam#37638. The report renders this ONE table as TWO sections -- 分析条件とデータの確認
+    # (the data/method rows) and 信頼性の指標 (the coefficient rows) -- by filtering on Metric,
+    # so the rows are grouped in the order each section wants them.
+    #   * "Complete Responses" / "Responses with Missing" became "Row Count" / "Rows Removed":
+    #     keys the client's translation map ALREADY carries as 行数 / 削除された行数 from the
+    #     Factor Analysis and PCA tables, which is exactly the wanted wording.
+    #   * "Variable Names", "Correlation" and "Reliability Metric" are new. Correlation's reason
+    #     used to live in the separate correlation_method table, which the report drops.
     summary_table <- tibble::tibble(
-      Metric = c(coefficient_name, "Standardized Alpha", "95% CI", "Number of Variables",
-                 "Complete Responses", "Responses with Missing", "Total Missing Cells",
-                 "Average Inter-item Correlation", "Flagged Item"),
+      Metric = c(coefficient_name, "Standardized Alpha", "95% CI",
+                 "Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+                 "Correlation", "Reliability Metric",
+                 "Total Missing Cells", "Average Inter-item Correlation", "Flagged Item"),
       Value = c(as.character(round(display_alpha, 3)),
                 as.character(round(standardized_alpha, 3)),
                 ci_text,
                 as.character(ncol(cleaned_df)),
+                paste(colnames(cleaned_df), collapse = ", "),
                 as.character(complete_n),
-                as.character(rows_with_missing_n),
+                # "N (P%)", matching the Factor Analysis / PCA 削除された行数 rows this report is
+                # being standardized against (tam#37638). total_n is the pre-filter row count.
+                if (is.null(total_n) || length(total_n) != 1L || is.na(total_n) || total_n <= 0) {
+                  as.character(rows_with_missing_n)
+                } else {
+                  paste0(rows_with_missing_n, " (",
+                         format(round(rows_with_missing_n / total_n * 100, 1), nsmall = 1), "%)")
+                },
+                reliability_correlation_label(selected_method),
+                coefficient_name,
                 as.character(total_missing_n),
                 as.character(round(average_r, 3)),
                 flagged_item),
@@ -692,9 +711,15 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
         reliability_classify_alpha(display_alpha),
         "Standardized consistency",
         if (nrow(confidence_interval) > 0) "Feldt/Duhachek interval" else NA_character_,
-        paste0(ncol(cleaned_df), " items used"),
+        # tam#37638: a FIXED sentence, not the old composed "N items used". This cell is rendered
+        # in the 説明 column of 分析条件とデータの確認 and the client translates report cells by
+        # EXACT string match, so a runtime-composed string can never be localized.
+        "Number of variables used in the analysis",
+        "Variables used in the analysis",
         "Rows with no missing values",
         "Rows with 1+ missing value",
+        reliability_correlation_reason(correlation_method, item_types),
+        reliability_metric_reason(selected_method),
         "Missing cells across all items",
         dplyr::case_when(
           average_r >= 0.50 ~ "High relatedness",
@@ -753,6 +778,50 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
 }
 
 # ------------------------------------------------------------
+# Correlation / coefficient labels and their selection reasons (tam#37638).
+# Extracted so the 分析条件とデータの確認 table and the legacy correlation_method table cannot
+# drift apart. Every returned sentence is a FIXED English string, never composed at runtime: the
+# client translates report table cells by exact string match, so a runtime-composed sentence would
+# render untranslated in Japanese.
+# ------------------------------------------------------------
+
+reliability_correlation_label <- function(selected_method) {
+  switch(selected_method,
+    pearson = "Pearson Correlation",
+    polychoric = "Polychoric Correlation",
+    mixed = "Mixed Correlation",
+    selected_method)
+}
+
+reliability_correlation_reason <- function(requested_method, item_types) {
+  requested <- if (is.null(requested_method)) "auto" else requested_method
+  if (requested != "auto") {
+    return(switch(requested,
+      pearson = "Pearson was specified in the settings.",
+      polychoric = "Polychoric was specified in the settings.",
+      mixed = "Mixed Correlation was specified in the settings.",
+      "Specified in the settings."))
+  }
+  unique_types <- unique(unname(item_types))
+  if (all(unique_types == "continuous")) {
+    "All variables are Numeric."
+  } else if (all(unique_types %in% c("ordinal", "dichotomous"))) {
+    "All variables are Factor or Logical."
+  } else {
+    "Numeric and Factor/Logical variables are mixed."
+  }
+}
+
+# Why THIS reliability coefficient: it follows directly from the correlation that was selected.
+reliability_metric_reason <- function(selected_method) {
+  switch(selected_method,
+    pearson = "Cronbach's Alpha was selected because the correlation is Pearson.",
+    polychoric = "Ordinal Alpha was selected because the correlation is Polychoric.",
+    mixed = "Mixed-Correlation Alpha was selected because the correlation is Mixed.",
+    "Selected based on the correlation used.")
+}
+
+# ------------------------------------------------------------
 # glance / tidy
 # ------------------------------------------------------------
 
@@ -807,28 +876,10 @@ tidy.cronbach_alpha_exploratory <- function(x, type = "summary", pretty.name = F
   } else if (type == "correlation_method") {
     # The "which correlation was used and why" table. English labels only -- the
     # Analytics report localizes them through the usual translation path.
-    method_label <- switch(x$selected_method,
-      pearson = "Pearson Correlation",
-      polychoric = "Polychoric Correlation",
-      mixed = "Mixed Correlation",
-      x$selected_method)
-    requested <- if (is.null(x$requested_method)) "auto" else x$requested_method
-    reason <- if (requested != "auto") {
-      switch(requested,
-        pearson = "Pearson was specified in the settings.",
-        polychoric = "Polychoric was specified in the settings.",
-        mixed = "Mixed Correlation was specified in the settings.",
-        "Specified in the settings.")
-    } else {
-      unique_types <- unique(unname(x$item_types))
-      if (all(unique_types == "continuous")) {
-        "All variables are Numeric."
-      } else if (all(unique_types %in% c("ordinal", "dichotomous"))) {
-        "All variables are Factor or Logical."
-      } else {
-        "Numeric and Factor/Logical variables are mixed."
-      }
-    }
+    # tam#37638: the label / reason logic is shared with the summary table's Correlation row, so
+    # the two can never disagree about which correlation was used or why.
+    method_label <- reliability_correlation_label(x$selected_method)
+    reason <- reliability_correlation_reason(x$requested_method, x$item_types)
     res <- tibble::tibble(
       `Item` = c("Correlation Type", "Primary Metric", "Selection Reason"),
       `Value` = c(method_label, x$coefficient_name, reason))

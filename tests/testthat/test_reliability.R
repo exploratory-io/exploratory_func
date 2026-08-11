@@ -291,3 +291,50 @@ test_that("exp_cronbach_alpha works with group_by (per group model)", {
   res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
   expect_equal(nrow(res), 2)
 })
+
+test_that("summary table carries the analysis-condition rows and their reasons (issue tam#37638)", {
+  set.seed(11)
+  n <- 120
+  latent <- rnorm(n)
+  df <- data.frame(
+    q1 = round(latent + rnorm(n, 0, 0.6)),
+    q2 = round(latent + rnorm(n, 0, 0.6)),
+    q3 = round(latent + rnorm(n, 0, 0.7)),
+    q4 = round(latent + rnorm(n, 0, 0.8))
+  )
+  df$q2[1:12] <- NA
+  model_df <- df %>% exp_cronbach_alpha(q1, q2, q3, q4)
+  s <- model_df %>% tidy_rowwise(model, type = "summary")
+
+  # The report splits THIS one output into two tables by filtering Metric, so both groups have
+  # to be present and contiguous in the order each table wants to render them.
+  expect_true(all(c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+                    "Correlation", "Reliability Metric") %in% s$Metric))
+  cond <- s$Metric[s$Metric %in% c("Number of Variables", "Variable Names", "Row Count",
+                                   "Rows Removed", "Correlation", "Reliability Metric")]
+  expect_equal(cond, c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+                       "Correlation", "Reliability Metric"))
+  # Renamed so the client's existing 行数 / 削除された行数 keys apply (they used to be
+  # 回答数 / 欠損を含む回答数).
+  expect_false("Complete Responses" %in% s$Metric)
+  expect_false("Responses with Missing" %in% s$Metric)
+
+  val <- function(metric) s$Value[[which(s$Metric == metric)]]
+  interp <- function(metric) s$Interpretation[[which(s$Metric == metric)]]
+  expect_equal(val("Variable Names"), "q1, q2, q3, q4")
+  expect_equal(val("Correlation"), "Pearson Correlation")
+  expect_equal(val("Reliability Metric"), "Cronbach's Alpha")
+  # 「削除された行数」 is "N (P%)", matching the Factor Analysis / PCA tables.
+  expect_match(val("Rows Removed"), "^[0-9]+ \\([0-9.]+%\\)$")
+
+  # The selection REASONS moved here from the standalone correlation_method table, which the
+  # report no longer renders. Both are fixed English strings so the client can translate them.
+  expect_equal(interp("Correlation"), "All variables are Numeric.")
+  expect_equal(interp("Reliability Metric"),
+               "Cronbach's Alpha was selected because the correlation is Pearson.")
+
+  # The legacy tidy type still agrees with the summary rows -- they share one helper now.
+  cm <- model_df %>% tidy_rowwise(model, type = "correlation_method")
+  expect_equal(cm$Value[[which(cm$Item == "Correlation Type")]], val("Correlation"))
+  expect_equal(cm$Value[[which(cm$Item == "Selection Reason")]], interp("Correlation"))
+})
