@@ -774,3 +774,22 @@ test_that("do_cor model carries the report's analysis_conditions (issue tam#3763
   expect_equal(colnames(legacy_cond),
                c("Metric", "Value", "Description", "correlation_type", "correlation_is_auto", "reason"))
 })
+
+test_that("do_cor analysis_conditions counts rows according to use", {
+  df <- data.frame(
+    a = c(1, 4, NA, 7),
+    b = c(2, NA, 5, 8),
+    c = c(3, NA, 6, 9)
+  )
+
+  pairwise <- df %>% do_cor(a, b, c, use = "pairwise.complete.obs", return_type = "model") %>%
+    (function(x) tidy(x$model[[1]], type = "analysis_conditions"))
+  # The second row has only one observed variable and contributes to no pairwise correlation.
+  expect_equal(pairwise$Value[[4]], "3")
+  expect_equal(pairwise$Value[[5]], "1 (25.0%)")
+
+  na_or_complete <- df %>% do_cor(a, b, c, use = "na.or.complete", return_type = "model") %>%
+    (function(x) tidy(x$model[[1]], type = "analysis_conditions"))
+  expect_equal(na_or_complete$Value[[4]], "2")
+  expect_equal(na_or_complete$Value[[5]], "2 (50.0%)")
+})

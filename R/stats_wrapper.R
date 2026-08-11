@@ -301,13 +301,18 @@ cor_analysis_conditions <- function(mat, requested_method, use) {
   }, logical(1))
   excluded_names <- variable_names[is_unusable]
   total_rows <- nrow(mat)
-  # With the default pairwise.complete.obs a row still contributes to every pair it has both
-  # values for, so only an ALL-missing row is truly unused. Under complete.obs any missing value
-  # drops the whole row. Report whichever the analysis actually did.
-  rows_used <- if (identical(use, "complete.obs")) {
+  resolved_method <- resolve_correlation_method(mat, requested_method)
+  # Pairwise correlations use a row only when at least two selected variables are observed; a row
+  # with one value cannot contribute to any off-diagonal pair. Polychoric and mixed correlations
+  # map every use mode other than complete.obs to pairwise.complete.obs in do_cor_internal().
+  uses_pairwise <- identical(use, "pairwise.complete.obs") ||
+    (resolved_method %in% c("polychoric", "mixed") && !identical(use, "complete.obs"))
+  rows_used <- if (uses_pairwise) {
+    sum(rowSums(!is.na(mat)) >= 2L)
+  } else if (use %in% c("complete.obs", "na.or.complete")) {
     sum(stats::complete.cases(mat))
   } else {
-    sum(rowSums(!is.na(mat)) > 0)
+    total_rows
   }
   rows_removed <- max(0L, as.integer(total_rows - rows_used))
   removed_pct <- if (total_rows > 0) rows_removed / total_rows * 100 else 0
@@ -320,7 +325,7 @@ cor_analysis_conditions <- function(mat, requested_method, use) {
       if (length(excluded_names) == 0) "None" else paste(excluded_names, collapse = ", "),
       as.character(rows_used),
       paste0(rows_removed, " (", format(round(removed_pct, 1), nsmall = 1), "%)"),
-      cor_correlation_label(resolve_correlation_method(mat, requested_method))
+      cor_correlation_label(resolved_method)
     ),
     Description = c(
       "Number of variables used in the analysis.",
@@ -333,7 +338,7 @@ cor_analysis_conditions <- function(mat, requested_method, use) {
     # Hidden columns: the report reads them to decide whether to explain the automatic choice.
     # Explicit "TRUE"/"FALSE" STRINGS, not R logicals -- a logical can reach the client as "1"/"0"
     # depending on the pivot pipeline, and the client's isTrue() only accepts "TRUE"/"true"/true.
-    correlation_type = resolve_correlation_method(mat, requested_method),
+    correlation_type = resolved_method,
     correlation_is_auto = if (identical(requested_method, "auto")) "TRUE" else "FALSE",
     reason = cor_correlation_reason(mat, requested_method)
   )
