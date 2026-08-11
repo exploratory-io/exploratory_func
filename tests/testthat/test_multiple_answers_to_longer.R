@@ -66,6 +66,50 @@ test_that("exclude_empty = FALSE keeps blank answers", {
   expect_true("" %in% result$Answer)
 })
 
+test_that("count_na = FALSE (default) drops a genuinely-missing cell", {
+  df <- data.frame(id = c(1, 2), store = c(NA_character_, "Yamada"), stringsAsFactors = FALSE)
+  result <- df %>% exp_multiple_answers_to_longer(store, sep = ",")
+  expect_equal(nrow(result), 1)
+  expect_equal(result$Answer, "Yamada")
+})
+
+test_that("count_na = TRUE keeps a genuinely-missing cell as its own answer row", {
+  df <- data.frame(id = c(1, 2), store = c(NA_character_, "Yamada"), stringsAsFactors = FALSE)
+  result <- df %>% exp_multiple_answers_to_longer(store, sep = ",", count_na = TRUE)
+  expect_equal(nrow(result), 2)
+  expect_true(any(is.na(result$Answer)))
+  expect_true("Yamada" %in% result$Answer)
+})
+
+test_that("count_na = TRUE + exclude_empty = TRUE keeps NA but still drops empty strings", {
+  df <- data.frame(id = c(1, 2), store = c(NA_character_, "Yamada,,Edion"), stringsAsFactors = FALSE)
+  result <- df %>% exp_multiple_answers_to_longer(store, sep = ",", count_na = TRUE)
+  expect_equal(sum(is.na(result$Answer)), 1)
+  expect_false("" %in% result$Answer)
+  expect_equal(sort(result$Answer[!is.na(result$Answer)]), c("Edion", "Yamada"))
+})
+
+test_that("count_na = FALSE + exclude_empty = FALSE drops NA but keeps empty strings", {
+  df <- data.frame(id = c(1, 2), store = c(NA_character_, "Yamada,,Edion"), stringsAsFactors = FALSE)
+  result <- df %>% exp_multiple_answers_to_longer(store, sep = ",", exclude_empty = FALSE)
+  expect_equal(nrow(result), 3)
+  expect_false(any(is.na(result$Answer)))
+  expect_equal(sort(result$Answer), c("", "Edion", "Yamada"))
+})
+
+test_that("count_na = TRUE keeps NA rows independently per target column", {
+  df <- data.frame(
+    id = c(1),
+    store = c(NA_character_),
+    category = c(NA_character_),
+    stringsAsFactors = FALSE
+  )
+  result <- df %>% exp_multiple_answers_to_longer(store, category, sep = ",", count_na = TRUE)
+  expect_equal(nrow(result), 2)
+  expect_true(all(is.na(result$Answer)))
+  expect_equal(sort(result$Question), c("category", "store"))
+})
+
 test_that("dedupe_within_row = TRUE (default) collapses a repeated answer in one cell to one row", {
   df <- data.frame(id = c(1), store = c("Yamada,Yamada,Edion"), stringsAsFactors = FALSE)
   result <- df %>% exp_multiple_answers_to_longer(store, sep = ",")

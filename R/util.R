@@ -3845,6 +3845,10 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
 #'   blank cell) instead of emitting an empty-string row. Default TRUE.
 #' @param dedupe_within_row Collapse a choice repeated within the same
 #'   original cell (e.g. "A,A,B") down to one row. Default TRUE.
+#' @param count_na Include a genuinely-missing (NA) target-cell value as its
+#'   own answer row instead of dropping it. Independent of `exclude_empty`,
+#'   which only drops explicit empty-string ("") choices once this is FALSE.
+#'   Default FALSE.
 #' @param add_row_id Add a column identifying which original row each output
 #'   row came from. Default TRUE.
 #' @param row_id_col Name of the row-id column when `add_row_id` is TRUE.
@@ -3874,6 +3878,7 @@ exp_multiple_answers_to_longer <- function(df, ...,
                                             trim_ws = TRUE,
                                             exclude_empty = TRUE,
                                             dedupe_within_row = TRUE,
+                                            count_na = FALSE,
                                             add_row_id = TRUE,
                                             row_id_col = "Original Row ID",
                                             keep_other_columns = TRUE) {
@@ -3930,8 +3935,13 @@ exp_multiple_answers_to_longer <- function(df, ...,
     if (trim_ws) {
       piece$value <- trimws(piece$value)
     }
+    if (!count_na) {
+      piece <- piece[!is.na(piece$value), , drop = FALSE]
+    }
     if (exclude_empty) {
-      piece <- piece[!is.na(piece$value) & piece$value != "", , drop = FALSE]
+      # NA retention is count_na's job (handled above); this only drops
+      # explicit empty-string choices, never re-drops a kept NA.
+      piece <- piece[is.na(piece$value) | piece$value != "", , drop = FALSE]
     }
     if (dedupe_within_row) {
       piece <- piece[!duplicated(piece[c(row_id_col_internal, "value")]), , drop = FALSE]
