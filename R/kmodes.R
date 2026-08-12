@@ -767,6 +767,28 @@ kmodes_summary_table <- function(x, with_excluded_rows = FALSE) {
   summary_df
 }
 
+#' "Analysis Conditions and Data" table of a K-Modes model (issue #37682, the K-Modes
+#' follow-up to the FA/PCA/Cronbach/Correlation summary-section standardization done in
+#' tam#37638). One row per condition, Metric/Value, matching that role model's shape --
+#' every value is already a plain string (a count or a comma-joined name list), so no
+#' further per-column number formatting is needed on the viz side.
+#' @param x A kmodes_exploratory model.
+#' @return A tibble with `Metric` and `Value` columns.
+kmodes_analysis_conditions_table <- function(x) {
+  variable_names_display <- paste(x$selected_cols, collapse = ", ")
+  tibble::tibble(
+    Metric = c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+               "Number of Clusters"),
+    Value = c(
+      as.character(x$n_variables),
+      variable_names_display,
+      as.character(x$n_used),
+      as.character(x$excluded_nrow),
+      as.character(x$centers)
+    )
+  )
+}
+
 #' Row-level output of a K-Modes model.
 #' @param x A kmodes_exploratory model.
 #' @return The original rows with the cluster assignment and diagnostics attached.
@@ -792,6 +814,9 @@ kmodes_data_table <- function(x) {
 tidy.kmodes_exploratory <- function(x, type = "summary", with_excluded_rows = FALSE, ...) {
   if (type == "summary") {
     return(kmodes_summary_table(x, with_excluded_rows = with_excluded_rows))
+  }
+  if (type == "analysis_conditions") {
+    return(kmodes_analysis_conditions_table(x))
   }
   if (type == "modes") {
     return(x$modes)
