@@ -138,6 +138,40 @@ test_that("new report tidy types return empty typed tibbles for kmeans fits (exc
   expect_equal(nrow(vj), 0)
 })
 
+test_that("kmeans analysis conditions use per-group row metadata", {
+  df <- tibble::tibble(
+    segment = rep(c("a", "b"), each = 5),
+    x = c(1, 2, NA, 4, 5, 10, 11, NA, 13, 14),
+    y = c(2, 3, 4, 5, 6, 11, 12, 13, 14, 15)
+  )
+  km <- df %>%
+    dplyr::group_by(segment) %>%
+    exploratory:::exp_kmeans(x, y, centers = 2)
+
+  conditions <- km %>% tidy_rowwise(model, type = "analysis_conditions")
+  values_by_group <- split(conditions$Value, conditions$segment)
+
+  expect_equal(values_by_group$a[conditions$Metric[conditions$segment == "a"] == "Row Count"], "4")
+  expect_equal(values_by_group$b[conditions$Metric[conditions$segment == "b"] == "Row Count"], "4")
+  expect_equal(values_by_group$a[conditions$Metric[conditions$segment == "a"] == "Rows Removed"], "1")
+  expect_equal(values_by_group$b[conditions$Metric[conditions$segment == "b"] == "Rows Removed"], "1")
+})
+
+test_that("analysis conditions remain empty for legacy kmeans models without report fields", {
+  km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  legacy_fit <- km$model[[1]]
+  legacy_fit$n_rows_used <- NULL
+  legacy_fit$selected_cols <- NULL
+
+  conditions <- exploratory:::tidy.prcomp_exploratory(
+    legacy_fit,
+    type = "analysis_conditions"
+  )
+
+  expect_equal(nrow(conditions), 0)
+  expect_equal(colnames(conditions), c("Metric", "Value", "Description", "status"))
+})
+
 test_that("component_profiles / loadings_signed / contributions", {
   model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt, retained_components = 3)
   res <- model_df %>% tidy_rowwise(model, type = "component_profiles")
