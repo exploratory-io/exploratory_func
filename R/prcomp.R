@@ -573,7 +573,38 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     # (issue #37019). English-canonical Description sentences + language-neutral status tokens;
     # the client translates. Empty typed tibble for k-means / old saved models (no report data).
     cfg <- prcomp_report_config()
-    if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
+    if (!is.null(x$kmeans) &&
+        !is.null(x$selected_cols) && length(x$selected_cols) > 0 &&
+        length(x$n_rows_used) == 1L && !is.na(x$n_rows_used) &&
+        length(x$excluded_nrow) == 1L && !is.na(x$excluded_nrow)) {
+      # K-Means: 5-row 分析条件とデータの確認 table (tam#37681). 変数の数/変数名/クラス
+      # ターの数 are also available as pure client bind vars (AnalysisExplanationAPI.js
+      # kmeans case), but 行数/削除された行数 need the model's post-NA-filter counts,
+      # which only R has -- the whole table is built here so it has one source of truth,
+      # matching the PCA precedent above instead of re-deriving the same numbers in JS.
+      n_variables <- length(x$selected_cols)
+      variable_names_display <- if (n_variables == 0) "N/A" else paste(x$selected_cols, collapse = ", ")
+      n_rows_used <- if (!is.null(x$n_rows_used)) x$n_rows_used else NA_integer_
+      n_excluded <- if (!is.null(x$excluded_nrow)) x$excluded_nrow else NA_integer_
+      n_clusters <- length(unique(x$kmeans$cluster))
+      res <- tibble::tibble(
+        Metric = c("Number of Variables", "Variable Names", "Row Count", "Rows Removed", "Number of Clusters"),
+        Value = c(
+          as.character(n_variables),
+          variable_names_display,
+          if (is.na(n_rows_used)) "N/A" else as.character(n_rows_used),
+          if (is.na(n_excluded)) "N/A" else as.character(n_excluded),
+          as.character(n_clusters)
+        )
+      )
+    }
+    else if (!is.null(x$kmeans)) {
+      # K-Means models saved before tam#37681 have no report metadata. Returning a
+      # partially populated table would turn missing values into misleading analytics.
+      res <- tibble::tibble(Metric = character(0), Value = character(0),
+                            Description = character(0), status = character(0))
+    }
+    else if (is.null(x$input_diagnostics) && is.null(x$parallel)) {
       res <- tibble::tibble(Metric = character(0), Value = character(0),
                             Description = character(0), status = character(0))
     }

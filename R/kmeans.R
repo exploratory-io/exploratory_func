@@ -200,9 +200,9 @@ exp_kmeans <- function(df, ...,
   # As the name suggests, this preprocessing function was originally designed to be done
   # before sampling, but we found that for this k-means function, that makes the
   # process as a whole slower in the cases we tried. So, we are doing this after sampling.
-  nrow_before_filter <- nrow(df)
+  df_before_filter <- df
+  nrow_before_filter <- nrow(df_before_filter)
   filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
-  excluded_nrow <- nrow_before_filter - nrow(filtered_df)
   selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
   df <- filtered_df
 
@@ -300,7 +300,31 @@ exp_kmeans <- function(df, ...,
                                                    sample_idx = g_sample_idx)
       }
       x$sampled_nrow <- sampled_nrow
-      x$excluded_nrow <- excluded_nrow
+      # These values must be calculated from the model's own data. For a grouped input,
+      # `excluded_nrow` and `nrow(filtered_df)` above describe all groups combined, while
+      # `x$df` contains only this group's rows.
+      n_rows_used <- nrow(x$df)
+      if (length(grouped_cols) > 0) {
+        same_group <- rep(TRUE, nrow(df_before_filter))
+        for (group_col in grouped_cols) {
+          group_value <- x$df[[group_col]][[1]]
+          source_values <- df_before_filter[[group_col]]
+          same_group <- same_group & if (is.na(group_value)) {
+            is.na(source_values)
+          } else {
+            !is.na(source_values) & source_values == group_value
+          }
+        }
+        nrow_before_model <- sum(same_group)
+      } else {
+        nrow_before_model <- nrow_before_filter
+      }
+      x$excluded_nrow <- nrow_before_model - n_rows_used
+      # 分析条件とデータの確認 table inputs (tam#37681): row count actually used and the
+      # final (post-drop) variable list, read by tidy.prcomp_exploratory's
+      # analysis_conditions branch in prcomp.R.
+      x$n_rows_used <- n_rows_used
+      x$selected_cols <- colnames(y$centers)
       if (!is.null(elbow_result)) {
         x$elbow_result <- elbow_result
       }
