@@ -148,6 +148,23 @@ test_that("tidy summary carries the size, matching rate, silhouette and one Mode
   expect_equal(with_excluded$size[[4]], 3)
 })
 
+test_that("analysis_conditions reports variable count, names, row count, rows removed and cluster count (issue #37682)", {
+  df <- kmodes_test_df()
+  model_df <- exp_kmodes(df, `利用目的`, `契約タイプ`, `導入経路`, centers = 3, seed = 1,
+                         elbow_method_mode = "none")
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(colnames(res), c("Metric", "Value"))
+  expect_equal(res$Metric, c("Number of Variables", "Variable Names", "Row Count",
+                            "Rows Removed", "Number of Clusters"))
+  expect_equal(res$Value[[1]], "3")
+  expect_true(grepl("利用目的", res$Value[[2]], fixed = TRUE))
+  expect_true(grepl("契約タイプ", res$Value[[2]], fixed = TRUE))
+  expect_true(grepl("導入経路", res$Value[[2]], fixed = TRUE))
+  expect_equal(res$Value[[3]], as.character(nrow(df) - 3))
+  expect_equal(res$Value[[4]], "3")
+  expect_equal(res$Value[[5]], "3")
+})
+
 test_that("the matching rate is the complement of the dissimilarity rate", {
   df <- kmodes_test_df()
   model_df <- exp_kmodes(df, `利用目的`, `契約タイプ`, `導入経路`, centers = 3, seed = 1,
