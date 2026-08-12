@@ -33,7 +33,9 @@
     ),
     profile = tibble::tibble(
       variable = character(), cluster = integer(), standardized_mean = numeric(),
-      effect_size = numeric(), rank = integer()
+      effect_size = numeric(), rank = integer(), medoid = numeric(),
+      cluster_median = numeric(), cluster_mean = numeric(), overall_median = numeric(),
+      overall_mean = numeric()
     ),
     silhouette = tibble::tibble(
       center = integer(), avg_silhouette = numeric(), min_silhouette = numeric(),
@@ -60,9 +62,26 @@
       Dim1 = numeric(), Dim2 = numeric(), cluster = integer(), row_type = character(),
       label = character()
     ),
+    medoid_details = tibble::tibble(cluster = integer(), row_id = character()),
+    counts = tibble::tibble(
+      original_nrow = integer(), analysis_nrow = integer(), excluded_nrow = integer(),
+      exclusion_ratio = numeric()
+    ),
     data = tibble::tibble(),
     tibble::tibble()
   )
+}
+
+.kmedoids_valid_indices <- function(x) {
+  valid <- complete.cases(x$source_data)
+  if (ncol(x$source_data) > 0) {
+    valid <- valid & apply(x$source_data, 1, function(row) all(is.finite(row)))
+  }
+  which(valid)
+}
+
+.kmedoids_original_fit_mat <- function(x) {
+  x$source_data[.kmedoids_valid_indices(x), , drop = FALSE] %>% as.matrix()
 }
 
 .kmedoids_summary <- function(x, with_excluded_rows = FALSE) {
@@ -80,7 +99,7 @@
     tibble::tibble(
       cluster = as.integer(cluster_id),
       size = length(index),
-      pct_size = length(index) / x$sampled_nrow,
+      pct_size = length(index) / x$valid_nrow,
       avg_distance_to_medoid = mean(distances[index], na.rm = TRUE),
       max_distance_to_medoid = max(distances[index], na.rm = TRUE),
       avg_silhouette = mean(cluster_silhouette, na.rm = TRUE),
@@ -89,6 +108,13 @@
       medoid_row_id = x$row_ids[fit$id.med[[cluster_id]]]
     )
   })
+  original_mat <- .kmedoids_original_fit_mat(x)
+  medoid_values <- original_mat[fit$id.med, , drop = FALSE] %>%
+    as.data.frame(check.names = FALSE) %>%
+    tibble::as_tibble()
+  medoid_values$cluster <- seq_len(nrow(medoid_values))
+  medoid_values <- medoid_values %>% dplyr::select(cluster, dplyr::everything())
+  result <- result %>% dplyr::left_join(medoid_values, by = 'cluster')
   result <- result %>% dplyr::mutate(dplyr::across(
     c(avg_distance_to_medoid, max_distance_to_medoid, avg_silhouette,
       min_silhouette, pct_negative),
@@ -112,12 +138,17 @@
 
 .kmedoids_profile <- function(x) {
   mat <- x$mat
+  original_mat <- .kmedoids_original_fit_mat(x)
   ids <- x$pam$clustering
   overall_mean <- colMeans(mat, na.rm = TRUE)
   overall_sd <- apply(mat, 2, stats::sd, na.rm = TRUE)
   rows <- purrr::map_dfr(sort(unique(ids)), function(cluster_id) {
     index <- which(ids == cluster_id)
     cluster_mean <- colMeans(mat[index, , drop = FALSE], na.rm = TRUE)
+    original_cluster <- original_mat[index, , drop = FALSE]
+    original_cluster_mean <- colMeans(original_cluster, na.rm = TRUE)
+    original_cluster_median <- apply(original_cluster, 2, stats::median, na.rm = TRUE)
+    medoid_index <- x$pam$id.med[[cluster_id]]
     standardized <- ifelse(overall_sd > 0,
       (cluster_mean - overall_mean) / overall_sd,
       0
@@ -126,7 +157,12 @@
       variable = colnames(mat),
       cluster = as.integer(cluster_id),
       standardized_mean = as.numeric(standardized),
-      effect_size = abs(as.numeric(standardized))
+      effect_size = abs(as.numeric(standardized)),
+      medoid = as.numeric(original_mat[medoid_index, ]),
+      cluster_median = as.numeric(original_cluster_median),
+      cluster_mean = as.numeric(original_cluster_mean),
+      overall_median = as.numeric(apply(original_mat, 2, stats::median, na.rm = TRUE)),
+      overall_mean = as.numeric(colMeans(original_mat, na.rm = TRUE))
     )
   })
   rows %>%
@@ -221,17 +257,18 @@
 
 .kmedoids_representative_values <- function(x) {
   ids <- x$pam$clustering
+  original_mat <- .kmedoids_original_fit_mat(x)
   purrr::map_dfr(sort(unique(ids)), function(cluster_id) {
     index <- which(ids == cluster_id)
     medoid_index <- x$pam$id.med[[cluster_id]]
     tibble::tibble(
       cluster = as.integer(cluster_id),
-      variable = colnames(x$mat),
-      medoid = as.numeric(x$mat[medoid_index, ]),
-      cluster_median = apply(x$mat[index, , drop = FALSE], 2, stats::median, na.rm = TRUE),
-      cluster_mean = colMeans(x$mat[index, , drop = FALSE], na.rm = TRUE),
-      overall_median = apply(x$mat, 2, stats::median, na.rm = TRUE),
-      overall_mean = colMeans(x$mat, na.rm = TRUE)
+      variable = colnames(original_mat),
+      medoid = as.numeric(original_mat[medoid_index, ]),
+      cluster_median = apply(original_mat[index, , drop = FALSE], 2, stats::median, na.rm = TRUE),
+      cluster_mean = colMeans(original_mat[index, , drop = FALSE], na.rm = TRUE),
+      overall_median = apply(original_mat, 2, stats::median, na.rm = TRUE),
+      overall_mean = colMeans(original_mat, na.rm = TRUE)
     )
   })
 }
@@ -239,11 +276,12 @@
 .kmedoids_distribution <- function(x) {
   ids <- x$pam$clustering
   medoid_indices <- x$pam$id.med
-  purrr::map_dfr(seq_len(nrow(x$mat)), function(index) {
+  original_mat <- .kmedoids_original_fit_mat(x)
+  purrr::map_dfr(seq_len(nrow(original_mat)), function(index) {
     tibble::tibble(
       cluster = as.integer(ids[[index]]),
-      variable = colnames(x$mat),
-      value = as.numeric(x$mat[index, ]),
+      variable = colnames(original_mat),
+      value = as.numeric(original_mat[index, ]),
       is_medoid = index %in% medoid_indices
     )
   })
@@ -279,6 +317,27 @@
     cluster = seq_len(nrow(medoid_points)), row_type = 'medoid',
     label = row_ids[x$pam$id.med]
   ))
+  vector_scale <- max(abs(points), na.rm = TRUE)
+  if (!is.finite(vector_scale) || vector_scale == 0) vector_scale <- 1
+  loadings <- vapply(seq_len(ncol(x$mat)), function(index) {
+    c(
+      suppressWarnings(stats::cor(x$mat[, index], points[, 'Dim1'], use = 'complete.obs')),
+      if (n_dimension >= 2) {
+        suppressWarnings(stats::cor(x$mat[, index], points[, 'Dim2'], use = 'complete.obs'))
+      } else 0
+    )
+  }, numeric(2))
+  loadings[!is.finite(loadings)] <- 0
+  vector_points <- t(loadings) * (vector_scale * 0.8)
+  vectors <- purrr::map_dfr(seq_len(nrow(vector_points)), function(index) {
+    tibble::tibble(
+      Dim1 = c(0, vector_points[index, 1]),
+      Dim2 = c(0, vector_points[index, 2]),
+      cluster = NA_integer_, row_type = 'vector',
+      label = rep(colnames(x$mat)[[index]], 2)
+    )
+  })
+  result <- dplyr::bind_rows(result, vectors)
   eigenvalues <- coordinates$eig[coordinates$eig > 0]
   representation_rate <- if (length(eigenvalues) == 0) c(0, 0) else {
     cumsum(eigenvalues)[seq_len(min(2, length(eigenvalues)))] / sum(eigenvalues)
@@ -286,6 +345,28 @@
   x$representation_rate <- c(representation_rate, rep(0, 2 - length(representation_rate)))
   attr(result, 'representation_rate') <- x$representation_rate
   result
+}
+
+.kmedoids_medoid_details <- function(x) {
+  original_mat <- .kmedoids_original_fit_mat(x)
+  tibble::tibble(
+    cluster = seq_len(nrow(x$pam$medoids)),
+    row_id = x$row_ids[x$pam$id.med]
+  ) %>% dplyr::bind_cols(
+    original_mat[x$pam$id.med, , drop = FALSE] %>%
+      as.data.frame(check.names = FALSE) %>% tibble::as_tibble()
+  )
+}
+
+.kmedoids_counts <- function(x) {
+  tibble::tibble(
+    original_nrow = nrow(x$original_data),
+    analysis_nrow = x$valid_nrow,
+    excluded_nrow = x$excluded_nrow,
+    exclusion_ratio = if (nrow(x$original_data) > 0) {
+      x$excluded_nrow / nrow(x$original_data)
+    } else 0
+  )
 }
 
 #' K-Medoids clustering analytics.
@@ -356,7 +437,8 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   fit <- .kmedoids_fit(mat, centers, distance, seed)
   model <- list(
     pam = fit, mat = mat, source_data = source_data, original_data = original_data,
-    row_ids = row_ids, selected_cols = selected_cols, valid_nrow = nrow(fit_data),
+    row_ids = row_ids, source_row_ids = original_row_ids, selected_cols = selected_cols,
+    valid_nrow = nrow(fit_data),
     sampled_nrow = nrow(source_data), excluded_nrow = excluded_nrow,
     distance = distance, centers = centers, iterMax = iterMax, seed = seed,
     normalize_data = normalize_data, max_centers = max_centers,
@@ -390,14 +472,32 @@ tidy.pam_exploratory <- function(x, type = 'summary', with_excluded_rows = FALSE
     distribution = .kmedoids_distribution(x),
     cohesion = .kmedoids_cohesion(x),
     map = .kmedoids_map(x),
-    data = dplyr::bind_cols(
-      x$source_data,
-      tibble::tibble(cluster = {
-        values <- rep(NA_integer_, nrow(x$source_data))
-        values[seq_len(nrow(x$source_data)) %in% which(complete.cases(x$source_data))] <- x$pam$clustering
-        values
-      })
-    ),
+    medoid_details = .kmedoids_medoid_details(x),
+    counts = .kmedoids_counts(x),
+    data = {
+      valid_indices <- .kmedoids_valid_indices(x)
+      cluster <- rep(NA_integer_, nrow(x$source_data))
+      distance <- rep(NA_real_, nrow(x$source_data))
+      silhouette <- rep(NA_real_, nrow(x$source_data))
+      is_medoid <- rep(FALSE, nrow(x$source_data))
+      cluster[valid_indices] <- x$pam$clustering
+      distance[valid_indices] <- x$distance_to_medoid
+      if (!is.null(x$pam$silinfo$widths)) {
+        silhouette[valid_indices] <- x$pam$silinfo$widths[, 'sil_width']
+      }
+      is_medoid[valid_indices[x$pam$id.med]] <- TRUE
+      dplyr::bind_cols(
+        x$source_data,
+        tibble::tibble(
+          row_id = x$source_row_ids,
+          cluster = cluster,
+          is_medoid = is_medoid,
+          distance_to_medoid = distance,
+          silhouette_score = silhouette,
+          is_excluded = is.na(cluster)
+        )
+      )
+    },
     .kmedoids_empty(type)
   )
 }

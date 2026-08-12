@@ -11,6 +11,7 @@ test_that('exp_kmedoids returns a pam model and summary data', {
   expect_equal(sum(summary_data$size), nrow(mtcars))
   expect_true(all(c('avg_distance_to_medoid', 'avg_silhouette', 'medoid_row_id') %in%
     colnames(summary_data)))
+  expect_true(all(c('mpg', 'disp', 'hp') %in% colnames(summary_data)))
 })
 
 test_that('exp_kmedoids supports both distance metrics and standardization', {
@@ -46,7 +47,8 @@ test_that('report tidy types are available', {
   result <- mtcars %>% exploratory:::exp_kmedoids(mpg, disp, hp, centers = 3, seed = 1)
   model <- result$model[[1]]
   types <- c('profile', 'silhouette', 'elbow', 'variable_importance',
-    'representative_values', 'distribution', 'cohesion', 'map', 'data')
+    'representative_values', 'distribution', 'cohesion', 'map',
+    'medoid_details', 'counts', 'data')
 
   output <- lapply(types, function(type) broom::tidy(model, type = type))
   names(output) <- types
@@ -55,7 +57,14 @@ test_that('report tidy types are available', {
   expect_true(nrow(output$profile) > 0)
   expect_true(nrow(output$variable_importance) > 0)
   expect_true(nrow(output$map) > 0)
+  expect_true(any(output$map$row_type == 'vector'))
   expect_true(all(c('cluster', 'variable', 'value') %in% colnames(output$distribution)))
+  expect_true(all(c('cluster', 'row_id', 'mpg', 'disp', 'hp') %in%
+    colnames(broom::tidy(model, type = 'medoid_details'))))
+  expect_equal(nrow(output$counts), 1)
+  expect_equal(output$counts$original_nrow, nrow(mtcars))
+  expect_true(all(c('row_id', 'cluster', 'is_medoid', 'distance_to_medoid',
+    'silhouette_score', 'is_excluded') %in% colnames(output$data)))
 })
 
 test_that('non-numeric variables are rejected clearly', {
