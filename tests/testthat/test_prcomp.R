@@ -116,11 +116,18 @@ test_that("new report tidy types return expected columns and tokens", {
   expect_true(all(r2$kaiser_status == "na"))
 })
 
-test_that("new report tidy types return empty typed tibbles for kmeans fits", {
+test_that("new report tidy types return empty typed tibbles for kmeans fits (except analysis_conditions, tam#37681)", {
   km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, centers = 2)
+  # analysis_conditions is POPULATED for kmeans (tam#37681's 分析条件とデータの確認
+  # table) -- unlike the other PCA-only report types below, which stay empty.
   ac <- km %>% tidy_rowwise(model, type = "analysis_conditions")
-  expect_equal(colnames(ac), c("Metric", "Value", "Description", "status"))
-  expect_equal(nrow(ac), 0)
+  expect_equal(colnames(ac), c("Metric", "Value"))
+  expect_equal(nrow(ac), 5)
+  expect_equal(ac$Metric, c("Number of Variables", "Variable Names", "Row Count",
+                            "Rows Removed", "Number of Clusters"))
+  expect_true(all(c("mpg", "cyl", "disp") %in% strsplit(ac$Value[ac$Metric == "Variable Names"], ", ")[[1]]))
+  expect_equal(ac$Value[ac$Metric == "Number of Variables"], "3")
+  expect_equal(ac$Value[ac$Metric == "Number of Clusters"], "2")
   ps <- km %>% tidy_rowwise(model, type = "parallel_screeplot")
   expect_equal(colnames(ps), c("Component", "Eigenvalue", "Random Data Eigenvalue"))
   expect_equal(nrow(ps), 0)
@@ -308,12 +315,17 @@ test_that("report tidy types handle 2-variable input", {
   expect_true(all(apply(m, 1, function(r) all(diff(r) >= -1e-9))))
 })
 
-test_that("all 8 report tidy types return 0-row typed tibbles for a kmeans fit", {
+test_that("all 8 report tidy types return 0-row typed tibbles for a kmeans fit, except analysis_conditions (tam#37681)", {
   km <- mtcars %>% exploratory:::exp_kmeans(mpg, cyl, disp, hp, centers = 2)
   for (ty in names(PRCOMP_REPORT_TYPE_COLS)) {
     res <- km %>% tidy_rowwise(model, type = ty)
-    expect_equal(nrow(res), 0, info = ty)
-    expect_true(all(PRCOMP_REPORT_TYPE_COLS[[ty]] %in% colnames(res)), info = ty)
+    if (ty == "analysis_conditions") {
+      expect_gt(nrow(res), 0, label = ty)
+      expect_equal(colnames(res), c("Metric", "Value"), info = ty)
+    } else {
+      expect_equal(nrow(res), 0, info = ty)
+      expect_true(all(PRCOMP_REPORT_TYPE_COLS[[ty]] %in% colnames(res)), info = ty)
+    }
   }
 })
 

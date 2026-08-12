@@ -205,6 +205,9 @@ exp_kmeans <- function(df, ...,
   excluded_nrow <- nrow_before_filter - nrow(filtered_df)
   selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
   df <- filtered_df
+  # Rows actually analyzed (post NA-filter, post sampling), for the report's
+  # 分析条件とデータの確認 table (tam#37681, x$n_rows_used below).
+  n_rows_used <- nrow(df)
 
   # Always compute the normal (elbow_method_mode = FALSE) results
   kmeans_model_df <- df %>% build_kmeans.cols(!!!rlang::syms(selected_cols),
@@ -301,6 +304,11 @@ exp_kmeans <- function(df, ...,
       }
       x$sampled_nrow <- sampled_nrow
       x$excluded_nrow <- excluded_nrow
+      # 分析条件とデータの確認 table inputs (tam#37681): row count actually used and the
+      # final (post-drop) variable list, read by tidy.prcomp_exploratory's
+      # analysis_conditions branch in prcomp.R.
+      x$n_rows_used <- n_rows_used
+      x$selected_cols <- selected_cols
       if (!is.null(elbow_result)) {
         x$elbow_result <- elbow_result
       }
