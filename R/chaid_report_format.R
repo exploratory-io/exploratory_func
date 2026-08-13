@@ -12,6 +12,12 @@
 # shapes: "<= b1", "(b1, b2]", "> bk". Anything else (a category name, the
 # "Missing" level) is passed through untouched and acts as a barrier that
 # collapsing never crosses.
+#
+# tam #37691: the DISPLAY form of the unbounded-above shape is "bk <" (symbol
+# after the number); chaid_parse_interval() accepts both "> bk" (the raw bin
+# label shape) and "bk <" (chaid_format_interval()'s own output) so that
+# chaid_readable_one_condition()'s re-parse of an already-collapsed interval
+# still round-trips.
 
 CHAID_GROUP_SEPARATOR <- ' + '
 CHAID_CONDITION_SEPARATOR <- ' & '
@@ -51,6 +57,24 @@ chaid_parse_interval <- function(label) {
     return(list(lower = lower, upper = NA_character_,
                 lower_value = lower.value, upper_value = Inf))
   }
+  # tam #37691: chaid_format_interval() now renders the unbounded-above shape
+  # as "N <" (symbol after the number) instead of "> N". chaid_readable_one_
+  # condition() re-parses chaid_collapse_intervals()'s already-formatted
+  # output (see its `interval <- chaid_parse_interval(collapsed)` call), so
+  # this function must recognize its OWN sibling function's output, or a
+  # 3+-member contiguous run collapsing to one interval inside an
+  # "in {...}" condition falls through to the non-interval equality branch
+  # instead of the intended "<variable> > N" phrasing.
+  m <- regmatches(label, regexec('^(.+?)[[:space:]]*<$', label))[[1]]
+  if (length(m) == 2) {
+    lower <- trimws(m[2])
+    lower.value <- suppressWarnings(as.numeric(lower))
+    if (is.na(lower.value)) {
+      return(NULL)
+    }
+    return(list(lower = lower, upper = NA_character_,
+                lower_value = lower.value, upper_value = Inf))
+  }
   m <- regmatches(label, regexec('^\\([[:space:]]*([^,]+),[[:space:]]*(.+)\\]$', label))[[1]]
   if (length(m) == 3) {
     lower <- trimws(m[2])
@@ -78,7 +102,16 @@ chaid_format_interval <- function(interval) {
     return(paste0('<= ', interval$upper))
   }
   if (is.na(interval$upper)) {
-    return(paste0('> ', interval$lower))
+    # tam #37691: an unbounded-above interval reads "N <" (symbol after the
+    # number) instead of "> N" -- the display-only mirror of the inequality,
+    # matching the collapsed-Condition column's own "N < X" phrasing style.
+    # This function is reached only from chaid_collapse_intervals()'s flush(),
+    # which chaid_normalize_group_label() only calls with collapse = TRUE --
+    # i.e. only for `Merged Category` and `Final Intervals`. `Original
+    # Categories` (collapse = FALSE) and the Condition column (its own
+    # paste0() in chaid_readable_one_condition()) never reach this function,
+    # so they are unaffected by design.
+    return(paste0(interval$lower, ' <'))
   }
   paste0('(', interval$lower, ', ', interval$upper, ']')
 }

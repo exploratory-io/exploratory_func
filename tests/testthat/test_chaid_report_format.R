@@ -13,18 +13,38 @@ test_that('chaid_parse_interval recognizes the three bin label shapes', {
   expect_null(chaid_parse_interval('<= abc'))
 })
 
+test_that('chaid_format_interval puts the > symbol after the number (tam #37691)', {
+  expect_equal(chaid_format_interval(chaid_parse_interval('> 8')), '8 <')
+  expect_equal(chaid_format_interval(chaid_parse_interval('> 23')), '23 <')
+  # <= and the bounded (a, b] shape are unaffected.
+  expect_equal(chaid_format_interval(chaid_parse_interval('<= 23')), '<= 23')
+  expect_equal(chaid_format_interval(chaid_parse_interval('(3, 8]')), '(3, 8]')
+})
+
+test_that('chaid_parse_interval also recognizes its own "N <" output (tam #37691)', {
+  i <- chaid_parse_interval('8 <')
+  expect_equal(i$lower, '8')
+  expect_equal(i$lower_value, 8)
+  expect_true(is.na(i$upper))
+  expect_equal(i$upper_value, Inf)
+  # Round-trips through chaid_format_interval unchanged.
+  expect_equal(chaid_format_interval(chaid_parse_interval('8 <')), '8 <')
+})
+
 test_that('chaid_collapse_intervals collapses contiguous runs only', {
   # Spec examples (#37177).
   expect_equal(chaid_collapse_intervals(c('(3, 5]', '(5, 6.7]', '(6.7, 8]')), '(3, 8]')
+  # tam #37691: an unbounded-above collapsed interval reads "N <" (symbol
+  # after the number), not "> N".
   expect_equal(
     chaid_collapse_intervals(c('(8, 10]', '(10, 13]', '(13, 17]', '(17, 23]', '> 23')),
-    '> 8')
+    '8 <')
   expect_equal(
     chaid_collapse_intervals(c('<= 26', '(26, 29]', '(29, 31]', '(31, 34]')),
     '<= 34')
   expect_equal(
     chaid_collapse_intervals(c('(38, 41]', '(41, 45]', '(45, 50]', '> 50')),
-    '> 38')
+    '38 <')
 })
 
 test_that('a gap keeps the pieces enumerated', {
