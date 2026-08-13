@@ -48,7 +48,7 @@ test_that('report tidy types are available', {
   model <- result$model[[1]]
   types <- c('profile', 'silhouette', 'elbow', 'variable_importance',
     'representative_values', 'distribution', 'cohesion', 'map',
-    'medoid_details', 'counts', 'data')
+    'medoid_details', 'counts', 'analysis_conditions', 'data')
 
   output <- lapply(types, function(type) broom::tidy(model, type = type))
   names(output) <- types
@@ -66,6 +66,31 @@ test_that('report tidy types are available', {
   expect_equal(output$counts$original_nrow, nrow(mtcars))
   expect_true(all(c('row_id', 'cluster', 'is_medoid', 'distance_to_medoid',
     'silhouette_score', 'is_excluded') %in% colnames(output$data)))
+})
+
+test_that('analysis_conditions returns the shared Metric/Value shape', {
+  data <- tibble::tibble(
+    x = c(1, 2, 3, 4, 5, 6, NA),
+    y = c(1, 2, 4, 5, 7, 8, 9),
+    z = c(2, 3, 1, 6, 4, 9, 5)
+  )
+  result <- data %>% exploratory:::exp_kmedoids(x, y, z, centers = 2, seed = 1)
+  conditions <- broom::tidy(result$model[[1]], type = 'analysis_conditions')
+
+  # Same five rows, in the same order, as kmodes_analysis_conditions_table() and
+  # tidy.prcomp_exploratory()'s K-Means branch -- the report translates these cells by
+  # exact string match, so the wording is part of the contract.
+  expect_equal(colnames(conditions), c('Metric', 'Value'))
+  expect_equal(conditions$Metric,
+    c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed',
+      'Number of Clusters'))
+  expect_true(is.character(conditions$Value))
+  expect_equal(conditions$Value[[1]], '3')
+  expect_equal(conditions$Value[[2]], 'x, y, z')
+  # Row Count is the rows actually clustered, Rows Removed the ones dropped for the NA.
+  expect_equal(conditions$Value[[3]], '6')
+  expect_equal(conditions$Value[[4]], '1')
+  expect_equal(conditions$Value[[5]], '2')
 })
 
 test_that('non-numeric variables are rejected clearly', {
