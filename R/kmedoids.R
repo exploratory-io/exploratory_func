@@ -114,6 +114,7 @@
       avg_silhouette = numeric(), min_silhouette = numeric(),
       pct_negative = numeric(), medoid_row_id = character()
     ),
+    analysis_conditions = tibble::tibble(Metric = character(), Value = character()),
     profile = tibble::tibble(
       variable = character(), cluster = integer(), standardized_mean = numeric(),
       effect_size = numeric(), rank = integer(), medoid = numeric(),
@@ -505,6 +506,34 @@
   )
 }
 
+#' "Analysis Conditions and Data" table of a K-Medoids model (tam#30961). One row per
+#' condition, Metric/Value, matching the shape K-Modes (kmodes_analysis_conditions_table)
+#' and K-Means (tidy.prcomp_exploratory's analysis_conditions branch) already return, so the
+#' report's 分析条件とデータの確認 section looks the same across every clustering type.
+#' Every value is a plain string -- a count or a comma-joined name list -- so the viz side
+#' needs no per-column number formatting.
+#'
+#' Row Count is the number of rows actually clustered and Rows Removed the number dropped
+#' for missing/non-finite values, matching the sibling implementations. Both come from the
+#' model rather than being re-derived client-side so the table has one source of truth.
+#' @param x A pam_exploratory model.
+#' @return A tibble with `Metric` and `Value` columns.
+.kmedoids_analysis_conditions <- function(x) {
+  variable_names <- as.character(x$selected_cols)
+  n_variables <- length(variable_names)
+  tibble::tibble(
+    Metric = c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+               "Number of Clusters"),
+    Value = c(
+      as.character(n_variables),
+      if (n_variables == 0) "N/A" else paste(variable_names, collapse = ", "),
+      as.character(x$valid_nrow),
+      as.character(x$excluded_nrow),
+      as.character(x$centers)
+    )
+  )
+}
+
 .kmedoids_counts <- function(x) {
   tibble::tibble(
     original_nrow = nrow(x$original_data),
@@ -703,6 +732,7 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
 tidy.pam_exploratory <- function(x, type = 'summary', with_excluded_rows = FALSE, ...) {
   switch(type,
     summary = .kmedoids_summary(x, with_excluded_rows),
+    analysis_conditions = .kmedoids_analysis_conditions(x),
     profile = .kmedoids_profile(x),
     silhouette = x$silhouette_result %||% .kmedoids_empty('silhouette'),
     elbow = x$elbow_result %||% .kmedoids_empty('elbow'),
