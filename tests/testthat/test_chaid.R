@@ -186,6 +186,28 @@ test_that('CHAID report helpers return stable schemas', {
                   names(tree$edges)))
 })
 
+test_that('CHAID merge report keeps interval-looking categorical labels unchanged', {
+  model <- structure(list(
+    nodes = data.frame(node_id = 1L),
+    class_levels = 'yes',
+    category_merge_map = data.frame(
+      node_id = 1L,
+      variable = 'response_band',
+      merged_group = '> 8',
+      original_categories = '> 8',
+      merge_p_value = 0.01,
+      action = 'merge',
+      stringsAsFactors = FALSE
+    ),
+    numeric_binning_map = list(),
+    predictor_info = list(response_band = list(ordered = FALSE, levels = '> 8')),
+    original_factor_levels = list()
+  ), class = c('exploratory_chaid', 'list'))
+
+  merges <- chaid_category_merge_table(model)
+  expect_equal(merges[['Merged Category']], '> 8')
+})
+
 test_that('CHAID public functions are exported', {
   expect_true('chaid_fit' %in% getNamespaceExports('exploratory'))
   expect_true('chaid_predict' %in% getNamespaceExports('exploratory'))

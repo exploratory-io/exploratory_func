@@ -1421,11 +1421,21 @@ chaid_category_merge_table <- function(model) {
     level.order <- lapply(merge.data$variable, function(variable) {
       chaid_group_level_order(model, variable)
     })
+    is.binned.numeric <- vapply(merge.data$variable, function(variable) {
+      binning <- model$numeric_binning_map[[variable]]
+      !is.null(binning) && !isTRUE(binning$excluded) &&
+        !identical(binning$method, 'none')
+    }, logical(1))
     merge.data$merged_group <- vapply(seq_len(nrow(merge.data)), function(i) {
-      # tam #37691: report-display only -- "> N" -> "N <". Original Categories
-      # (below) intentionally does NOT get this treatment (unrequested by spec).
-      chaid_display_symbol_after_number(chaid_normalize_group_label(
-        merge.data$merged_group[i], level.order[[i]], collapse = TRUE))
+      label <- chaid_normalize_group_label(
+        merge.data$merged_group[i], level.order[[i]], collapse = TRUE)
+      # tam #37691: only numeric bin labels use the report-display "> N" ->
+      # "N <" form. A categorical value may legitimately be named "> N".
+      if (is.binned.numeric[i]) {
+        chaid_display_symbol_after_number(label)
+      } else {
+        label
+      }
     }, character(1))
     merge.data$original_categories <- vapply(seq_len(nrow(merge.data)), function(i) {
       chaid_normalize_group_label(merge.data$original_categories[i], level.order[[i]],
