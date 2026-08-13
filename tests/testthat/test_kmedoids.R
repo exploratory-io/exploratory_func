@@ -180,6 +180,17 @@ test_that('the PCoA map is computed once at fit time and cached, not recomputed 
   expect_true(is.numeric(attr(first_call, 'representation_rate')))
 })
 
+test_that('models created before map caching still produce their map', {
+  result <- mtcars %>% exploratory:::exp_kmedoids(mpg, disp, hp, centers = 3, seed = 1)
+  model <- result$model[[1]]
+  model$map_result <- NULL
+
+  map <- broom::tidy(model, type = 'map')
+
+  expect_true(nrow(map) > 0)
+  expect_true(any(map$row_type == 'vector'))
+})
+
 test_that('a minimal (all-tied) fit still produces a usable cached map', {
   data <- tibble::tibble(x = c(1, 1, 1), y = c(1, 1, 1))
   result <- data %>% exploratory:::exp_kmedoids(x, y, centers = 2, seed = 1)

@@ -710,7 +710,7 @@ tidy.pam_exploratory <- function(x, type = 'summary', with_excluded_rows = FALSE
     representative_values = .kmedoids_representative_values(x),
     distribution = .kmedoids_distribution(x),
     cohesion = .kmedoids_cohesion(x),
-    map = x$map_result %||% .kmedoids_empty('map'),
+    map = x$map_result %||% .kmedoids_map(x),
     medoid_details = .kmedoids_medoid_details(x),
     counts = .kmedoids_counts(x),
     data = {
