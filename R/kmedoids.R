@@ -326,7 +326,7 @@
       .kmedoids_fit(
         diagnostic_mat, center, x$distance,
         if (is.null(x$seed)) NULL else x$seed + center,
-        algorithm = 'pam'
+        algorithm = 'pam', nstart = x$nstart
       ),
       error = function(e) NULL
     )
@@ -358,7 +358,7 @@
       .kmedoids_fit(
         diagnostic_mat, center, x$distance,
         if (is.null(x$seed)) NULL else x$seed + center,
-        algorithm = 'pam'
+        algorithm = 'pam', nstart = x$nstart
       ),
       error = function(e) NULL
     )

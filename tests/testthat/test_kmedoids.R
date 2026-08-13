@@ -321,3 +321,33 @@ test_that('exp_kmedoids validates nstart and forwards it through to the fit', {
   model <- result$model[[1]]
   expect_identical(model$nstart, 5L)
 })
+
+test_that('nstart is forwarded to PAM diagnostic fits', {
+  calls <- list()
+  original_fit <- exploratory:::.kmedoids_fit
+  testthat::local_mocked_bindings(
+    .kmedoids_fit = function(...) {
+      call <- list(...)
+      calls[[length(calls) + 1L]] <<- call
+      original_fit(...)
+    },
+    .package = 'exploratory'
+  )
+
+  set.seed(12)
+  data <- as.data.frame(matrix(rnorm(120), ncol = 3))
+  names(data) <- c('v1', 'v2', 'v3')
+  data %>% exploratory:::exp_kmedoids(
+    v1, v2, v3, centers = 3, nstart = 5, max_centers = 4,
+    elbow_method_mode = 'silhouette', silhouette_sample_size = 40,
+    map_sample_size = 20, seed = 1
+  )
+  data %>% exploratory:::exp_kmedoids(
+    v1, v2, v3, centers = 3, nstart = 5, max_centers = 4,
+    elbow_method_mode = 'elbow', silhouette_sample_size = 40,
+    map_sample_size = 20, seed = 1
+  )
+
+  expect_gt(length(calls), 2L)
+  expect_true(all(vapply(calls, function(call) identical(call$nstart, 5L), logical(1))))
+})
