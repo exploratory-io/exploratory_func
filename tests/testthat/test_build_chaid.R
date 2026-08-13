@@ -277,6 +277,34 @@ test_that("numeric_intervals is empty when no numeric predictor is binned", {
                c("Node", "Variable", "Binning Method", "Initial Bins", "Final Intervals"))
 })
 
+test_that("Final Intervals shows 'N <' for display while cond_value keeps '> N' (tam #37691)", {
+  # Same fixture as "tree_nodes edge labels collapse contiguous numeric bins"
+  # below -- guarantees an unbounded-above final bin (salary > ~5045).
+  set.seed(11); n <- 700
+  df <- data.frame(
+    salary = round(runif(n, 1000, 15000)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$churn <- df$salary < 4000 | runif(n) < 0.1
+  model_df <- suppressWarnings(exp_chaid(df, churn, salary, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  expect_true(any(grepl("[0-9] <($| /)", ni[["Final Intervals"]])),
+              "the report-display column must show the flipped 'N <' shape")
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  salary_edges <- nodes[!is.na(nodes$cond_value) & nodes$cond_column == "salary", ]
+  expect_true(nrow(salary_edges) > 0)
+  values <- unlist(lapply(salary_edges$cond_value, jsonlite::fromJSON))
+  # cond_value feeds DTreeGenerator.parseNumericBinLabel (tam) for Show Detail
+  # drill-down -- it must stay the RAW "> N" shape, never the display "N <".
+  expect_true(any(grepl("^>", values)),
+              "cond_value must keep the raw '> N' shape unbounded-above bins use")
+  expect_false(any(grepl("<$", values)),
+               "cond_value must never carry the report-display 'N <' shape")
+})
+
 test_that("category_error_distribution is empty for a non-ordered target", {
   df <- make_ordered_df()
   df$grade <- as.character(df$grade) # drop the ordered attribute

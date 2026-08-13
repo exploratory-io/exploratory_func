@@ -12,6 +12,18 @@
 # shapes: "<= b1", "(b1, b2]", "> bk". Anything else (a category name, the
 # "Missing" level) is passed through untouched and acts as a barrier that
 # collapsing never crosses.
+#
+# tam #37691: the CHAID report table columns (Merged Category, Final Intervals)
+# display the unbounded-above shape as "bk <" (symbol after the number) instead
+# of "> bk". This is DISPLAY-ONLY, applied by chaid_display_symbol_after_number()
+# strictly AFTER chaid_collapse_intervals()/chaid_format_interval() -- those stay
+# on the original "> bk" shape, because chaid_collapse_intervals() ALSO produces
+# the machine-readable `cond_value` build_chaid.R stores for the interactive
+# tree's Show Detail drill-down (DTreeGenerator.parseNumericBinLabel on the tam
+# side parses exactly "<=" / ">" / "(a, b]", not "N <"). Do not fold the display
+# flip into chaid_format_interval() itself -- it silently breaks Show Detail for
+# any unbounded-above branch (caught live via the exploratory_func CI suite,
+# test_build_chaid.R's "tree_nodes edge labels collapse contiguous numeric bins").
 
 CHAID_GROUP_SEPARATOR <- ' + '
 CHAID_CONDITION_SEPARATOR <- ' & '
@@ -81,6 +93,39 @@ chaid_format_interval <- function(interval) {
     return(paste0('> ', interval$lower))
   }
   paste0('(', interval$lower, ', ', interval$upper, ']')
+}
+
+#' Rewrite a collapsed bin-label string for REPORT TABLE display (tam #37691).
+#'
+#' The Merged Category and Final Intervals report columns show an
+#' unbounded-above bin as `"N <"` (symbol after the number) instead of the
+#' engine's own `"> N"`. This is applied AFTER collapsing/formatting, as a
+#' separate, later step -- never inside [chaid_format_interval()] itself,
+#' because that function's output also becomes `cond_value`
+#' (`build_chaid.R`'s `tree_nodes` tidy type), the machine-readable label the
+#' interactive tree's Show Detail drill-down parses
+#' (`DTreeGenerator.parseNumericBinLabel` on the tam side expects exactly
+#' `"<="` / `">"` / `"(a, b]"`). Folding the flip into `chaid_format_interval()`
+#' silently breaks Show Detail for any unbounded-above branch.
+#'
+#' @param label A `" + "`-joined collapsed label string (as returned by
+#'   [chaid_normalize_group_label()]), or `NA`.
+#' @return The same string with every `"> N"` part rewritten to `"N <"`;
+#'   non-interval parts (category names, `"Missing"`, `"All"`) pass through
+#'   unchanged.
+chaid_display_symbol_after_number <- function(label) {
+  if (length(label) != 1 || is.na(label)) {
+    return(label)
+  }
+  parts <- strsplit(label, CHAID_GROUP_SEPARATOR, fixed = TRUE)[[1]]
+  parts <- vapply(parts, function(part) {
+    interval <- chaid_parse_interval(part)
+    if (!is.null(interval) && is.na(interval$upper)) {
+      return(paste0(interval$lower, ' <'))
+    }
+    part
+  }, character(1), USE.NAMES = FALSE)
+  paste(parts, collapse = CHAID_GROUP_SEPARATOR)
 }
 
 #' Collapse a run of adjacent numeric bin labels into single ranges.

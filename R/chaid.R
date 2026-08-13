@@ -1421,9 +1421,21 @@ chaid_category_merge_table <- function(model) {
     level.order <- lapply(merge.data$variable, function(variable) {
       chaid_group_level_order(model, variable)
     })
+    is.binned.numeric <- vapply(merge.data$variable, function(variable) {
+      binning <- model$numeric_binning_map[[variable]]
+      !is.null(binning) && !isTRUE(binning$excluded) &&
+        !identical(binning$method, 'none')
+    }, logical(1))
     merge.data$merged_group <- vapply(seq_len(nrow(merge.data)), function(i) {
-      chaid_normalize_group_label(merge.data$merged_group[i], level.order[[i]],
-                                  collapse = TRUE)
+      label <- chaid_normalize_group_label(
+        merge.data$merged_group[i], level.order[[i]], collapse = TRUE)
+      # tam #37691: only numeric bin labels use the report-display "> N" ->
+      # "N <" form. A categorical value may legitimately be named "> N".
+      if (is.binned.numeric[i]) {
+        chaid_display_symbol_after_number(label)
+      } else {
+        label
+      }
     }, character(1))
     merge.data$original_categories <- vapply(seq_len(nrow(merge.data)), function(i) {
       chaid_normalize_group_label(merge.data$original_categories[i], level.order[[i]],
@@ -1511,9 +1523,10 @@ chaid_numeric_intervals <- function(model) {
     child_labels <- edges$label[edges$parent_id == node_id]
     # tam #37177: each child edge's label is a " + "-joined run of bins; show the
     # range it actually covers. Binning method and bin count are separate columns.
+    # tam #37691: report-display only -- "> N" -> "N <" (chaid_display_symbol_after_number).
     child_labels <- vapply(child_labels, function(label) {
-      chaid_normalize_group_label(label, chaid_group_level_order(model, variable),
-                                  collapse = TRUE)
+      chaid_display_symbol_after_number(chaid_normalize_group_label(
+        label, chaid_group_level_order(model, variable), collapse = TRUE))
     }, character(1), USE.NAMES = FALSE)
     data.frame(
       Node = node_id,

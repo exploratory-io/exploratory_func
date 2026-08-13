@@ -13,8 +13,36 @@ test_that('chaid_parse_interval recognizes the three bin label shapes', {
   expect_null(chaid_parse_interval('<= abc'))
 })
 
+test_that('chaid_format_interval keeps the raw "> N" shape (machine format, tam #37691)', {
+  # chaid_format_interval()'s output also becomes `cond_value` in build_chaid.R
+  # (the interactive tree's Show Detail drill-down), which the tam-side
+  # DTreeGenerator.parseNumericBinLabel parses as exactly "<=" / ">" / "(a, b]".
+  # The report-display "N <" flip is a SEPARATE, later step -- see
+  # chaid_display_symbol_after_number() below -- never folded in here.
+  expect_equal(chaid_format_interval(chaid_parse_interval('> 8')), '> 8')
+  expect_equal(chaid_format_interval(chaid_parse_interval('> 23')), '> 23')
+  expect_equal(chaid_format_interval(chaid_parse_interval('<= 23')), '<= 23')
+  expect_equal(chaid_format_interval(chaid_parse_interval('(3, 8]')), '(3, 8]')
+})
+
+test_that('chaid_display_symbol_after_number rewrites > N to N < for report display (tam #37691)', {
+  expect_equal(chaid_display_symbol_after_number('> 8'), '8 <')
+  expect_equal(chaid_display_symbol_after_number('> 23'), '23 <')
+  # <= and the bounded (a, b] shape are unaffected.
+  expect_equal(chaid_display_symbol_after_number('<= 23'), '<= 23')
+  expect_equal(chaid_display_symbol_after_number('(3, 8]'), '(3, 8]')
+  # Spec example: multiple "+"-joined tokens, only the unbounded one flips.
+  expect_equal(chaid_display_symbol_after_number('<= 3 + (3, 8] + > 8'), '<= 3 + (3, 8] + 8 <')
+  # Non-interval / passthrough values are untouched.
+  expect_equal(chaid_display_symbol_after_number('Missing'), 'Missing')
+  expect_equal(chaid_display_symbol_after_number('All'), 'All')
+  expect_true(is.na(chaid_display_symbol_after_number(NA_character_)))
+})
+
 test_that('chaid_collapse_intervals collapses contiguous runs only', {
-  # Spec examples (#37177).
+  # Spec examples (#37177). Stays on the raw "> N" shape -- see the
+  # chaid_format_interval test above for why the display flip is a later,
+  # separate step (chaid_display_symbol_after_number), not baked in here.
   expect_equal(chaid_collapse_intervals(c('(3, 5]', '(5, 6.7]', '(6.7, 8]')), '(3, 8]')
   expect_equal(
     chaid_collapse_intervals(c('(8, 10]', '(10, 13]', '(13, 17]', '(17, 23]', '> 23')),
