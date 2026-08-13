@@ -256,3 +256,68 @@ test_that('CLARA candidate samples are capped before fitting', {
   )
   expect_identical(fit$clara_sample_size, 20L)
 })
+
+test_that('PAM with the default nstart matches calling cluster::pam() with no nstart at all', {
+  set.seed(11)
+  mat <- matrix(rnorm(150), ncol = 3)
+
+  set.seed(5)
+  fit_default <- exploratory:::.kmedoids_fit(mat, centers = 3, distance = 'euclidean', algorithm = 'pam')
+  set.seed(5)
+  raw <- cluster::pam(mat, k = 3, metric = 'euclidean', stand = FALSE, keep.diss = FALSE, keep.data = FALSE, pamonce = 5)
+
+  expect_identical(as.integer(fit_default$clustering), as.integer(raw$clustering))
+  expect_identical(fit_default$medoid_indices, as.integer(raw$id.med))
+
+  set.seed(5)
+  fit_explicit_one <- exploratory:::.kmedoids_fit(mat, centers = 3, distance = 'euclidean', algorithm = 'pam', nstart = 1)
+  expect_identical(as.integer(fit_explicit_one$clustering), as.integer(raw$clustering))
+})
+
+test_that('PAM nstart > 1 switches to random-start search and returns a valid clustering', {
+  set.seed(11)
+  mat <- matrix(rnorm(150), ncol = 3)
+
+  set.seed(5)
+  fit_nstart <- exploratory:::.kmedoids_fit(mat, centers = 3, distance = 'euclidean', algorithm = 'pam', nstart = 10)
+
+  expect_length(fit_nstart$medoid_indices, 3)
+  expect_length(unique(fit_nstart$medoid_indices), 3)
+  expect_setequal(unique(fit_nstart$clustering), 1:3)
+
+  # cluster::pam(medoids = 'random', nstart = N) is a distinct algorithm from
+  # the default deterministic "build" -- confirm the underlying raw fit
+  # actually used random medoid initialization for nstart > 1.
+  expect_identical(as.character(fit_nstart$raw$call$medoids), 'random')
+  expect_false(is.null(fit_nstart$raw$call$nstart))
+})
+
+test_that('CLARA ignores nstart entirely', {
+  set.seed(3)
+  mat <- matrix(rnorm(200), ncol = 2)
+
+  set.seed(7)
+  fit_a <- exploratory:::.kmedoids_fit(
+    mat, centers = 3, distance = 'euclidean', algorithm = 'clara', clara_samples = 5
+  )
+  set.seed(7)
+  fit_b <- exploratory:::.kmedoids_fit(
+    mat, centers = 3, distance = 'euclidean', algorithm = 'clara', clara_samples = 5, nstart = 25
+  )
+  expect_identical(as.integer(fit_a$clustering), as.integer(fit_b$clustering))
+})
+
+test_that('exp_kmedoids validates nstart and forwards it through to the fit', {
+  set.seed(4)
+  df <- as.data.frame(matrix(rnorm(90), ncol = 3))
+  names(df) <- c('v1', 'v2', 'v3')
+
+  expect_error(
+    df %>% exploratory:::exp_kmedoids(v1, v2, v3, centers = 3, algorithm = 'pam', nstart = 0),
+    'nstart must be a positive number'
+  )
+
+  result <- df %>% exploratory:::exp_kmedoids(v1, v2, v3, centers = 3, algorithm = 'pam', nstart = 5, seed = 1)
+  model <- result$model[[1]]
+  expect_identical(model$nstart, 5L)
+})
