@@ -13,11 +13,17 @@
 # "Missing" level) is passed through untouched and acts as a barrier that
 # collapsing never crosses.
 #
-# tam #37691: the DISPLAY form of the unbounded-above shape is "bk <" (symbol
-# after the number); chaid_parse_interval() accepts both "> bk" (the raw bin
-# label shape) and "bk <" (chaid_format_interval()'s own output) so that
-# chaid_readable_one_condition()'s re-parse of an already-collapsed interval
-# still round-trips.
+# tam #37691: the CHAID report table columns (Merged Category, Final Intervals)
+# display the unbounded-above shape as "bk <" (symbol after the number) instead
+# of "> bk". This is DISPLAY-ONLY, applied by chaid_display_symbol_after_number()
+# strictly AFTER chaid_collapse_intervals()/chaid_format_interval() -- those stay
+# on the original "> bk" shape, because chaid_collapse_intervals() ALSO produces
+# the machine-readable `cond_value` build_chaid.R stores for the interactive
+# tree's Show Detail drill-down (DTreeGenerator.parseNumericBinLabel on the tam
+# side parses exactly "<=" / ">" / "(a, b]", not "N <"). Do not fold the display
+# flip into chaid_format_interval() itself -- it silently breaks Show Detail for
+# any unbounded-above branch (caught live via the exploratory_func CI suite,
+# test_build_chaid.R's "tree_nodes edge labels collapse contiguous numeric bins").
 
 CHAID_GROUP_SEPARATOR <- ' + '
 CHAID_CONDITION_SEPARATOR <- ' & '
@@ -57,24 +63,6 @@ chaid_parse_interval <- function(label) {
     return(list(lower = lower, upper = NA_character_,
                 lower_value = lower.value, upper_value = Inf))
   }
-  # tam #37691: chaid_format_interval() now renders the unbounded-above shape
-  # as "N <" (symbol after the number) instead of "> N". chaid_readable_one_
-  # condition() re-parses chaid_collapse_intervals()'s already-formatted
-  # output (see its `interval <- chaid_parse_interval(collapsed)` call), so
-  # this function must recognize its OWN sibling function's output, or a
-  # 3+-member contiguous run collapsing to one interval inside an
-  # "in {...}" condition falls through to the non-interval equality branch
-  # instead of the intended "<variable> > N" phrasing.
-  m <- regmatches(label, regexec('^(.+?)[[:space:]]*<$', label))[[1]]
-  if (length(m) == 2) {
-    lower <- trimws(m[2])
-    lower.value <- suppressWarnings(as.numeric(lower))
-    if (is.na(lower.value)) {
-      return(NULL)
-    }
-    return(list(lower = lower, upper = NA_character_,
-                lower_value = lower.value, upper_value = Inf))
-  }
   m <- regmatches(label, regexec('^\\([[:space:]]*([^,]+),[[:space:]]*(.+)\\]$', label))[[1]]
   if (length(m) == 3) {
     lower <- trimws(m[2])
@@ -102,18 +90,42 @@ chaid_format_interval <- function(interval) {
     return(paste0('<= ', interval$upper))
   }
   if (is.na(interval$upper)) {
-    # tam #37691: an unbounded-above interval reads "N <" (symbol after the
-    # number) instead of "> N" -- the display-only mirror of the inequality,
-    # matching the collapsed-Condition column's own "N < X" phrasing style.
-    # This function is reached only from chaid_collapse_intervals()'s flush(),
-    # which chaid_normalize_group_label() only calls with collapse = TRUE --
-    # i.e. only for `Merged Category` and `Final Intervals`. `Original
-    # Categories` (collapse = FALSE) and the Condition column (its own
-    # paste0() in chaid_readable_one_condition()) never reach this function,
-    # so they are unaffected by design.
-    return(paste0(interval$lower, ' <'))
+    return(paste0('> ', interval$lower))
   }
   paste0('(', interval$lower, ', ', interval$upper, ']')
+}
+
+#' Rewrite a collapsed bin-label string for REPORT TABLE display (tam #37691).
+#'
+#' The Merged Category and Final Intervals report columns show an
+#' unbounded-above bin as `"N <"` (symbol after the number) instead of the
+#' engine's own `"> N"`. This is applied AFTER collapsing/formatting, as a
+#' separate, later step -- never inside [chaid_format_interval()] itself,
+#' because that function's output also becomes `cond_value`
+#' (`build_chaid.R`'s `tree_nodes` tidy type), the machine-readable label the
+#' interactive tree's Show Detail drill-down parses
+#' (`DTreeGenerator.parseNumericBinLabel` on the tam side expects exactly
+#' `"<="` / `">"` / `"(a, b]"`). Folding the flip into `chaid_format_interval()`
+#' silently breaks Show Detail for any unbounded-above branch.
+#'
+#' @param label A `" + "`-joined collapsed label string (as returned by
+#'   [chaid_normalize_group_label()]), or `NA`.
+#' @return The same string with every `"> N"` part rewritten to `"N <"`;
+#'   non-interval parts (category names, `"Missing"`, `"All"`) pass through
+#'   unchanged.
+chaid_display_symbol_after_number <- function(label) {
+  if (length(label) != 1 || is.na(label)) {
+    return(label)
+  }
+  parts <- strsplit(label, CHAID_GROUP_SEPARATOR, fixed = TRUE)[[1]]
+  parts <- vapply(parts, function(part) {
+    interval <- chaid_parse_interval(part)
+    if (!is.null(interval) && is.na(interval$upper)) {
+      return(paste0(interval$lower, ' <'))
+    }
+    part
+  }, character(1), USE.NAMES = FALSE)
+  paste(parts, collapse = CHAID_GROUP_SEPARATOR)
 }
 
 #' Collapse a run of adjacent numeric bin labels into single ranges.
