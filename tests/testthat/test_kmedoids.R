@@ -181,7 +181,7 @@ test_that('the PCoA map is computed once at fit time and cached, not recomputed 
 })
 
 test_that('a minimal (all-tied) fit still produces a usable cached map', {
-  data <- tibble::tibble(x = c(1, 1), y = c(1, 1))
+  data <- tibble::tibble(x = c(1, 1, 1), y = c(1, 1, 1))
   result <- data %>% exploratory:::exp_kmedoids(x, y, centers = 2, seed = 1)
   model <- result$model[[1]]
 

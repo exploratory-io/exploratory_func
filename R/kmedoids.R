@@ -681,7 +681,15 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   # calls broom::tidy() directly for the representation_rate attribute) -- used to
   # each recompute it from scratch, tripling the cost for no benefit since the
   # result depends only on fields already present on `model` at this point.
-  model$map_result <- .kmedoids_map(model)
+  # A degenerate map input (e.g. every sampled row identical, so cmdscale() has
+  # no positive eigenvalues to project onto) is caught here and downgraded to
+  # the same empty-map sentinel .kmedoids_map() already returns for the n < 2
+  # case, instead of letting it abort the whole fit -- previously this class of
+  # failure only broke the Cluster Map / Fitted Vectors tabs individually.
+  model$map_result <- tryCatch(
+    .kmedoids_map(model),
+    error = function(e) .kmedoids_empty('map')
+  )
   class(model) <- c(
     'pam_exploratory',
     if (identical(fit$algorithm, 'pam')) 'pam' else 'clara',
