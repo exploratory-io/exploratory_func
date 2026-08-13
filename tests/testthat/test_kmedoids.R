@@ -27,8 +27,8 @@ test_that('exp_kmedoids supports both distance metrics and standardization', {
   expect_equal(euclidean$model[[1]]$distance, 'euclidean')
   expect_equal(manhattan$model[[1]]$distance, 'manhattan')
   expect_false(isTRUE(all.equal(
-    euclidean$model[[1]]$pam$clustering,
-    manhattan$model[[1]]$pam$clustering
+    euclidean$model[[1]]$clustering,
+    manhattan$model[[1]]$clustering
   )))
 })
 
@@ -55,6 +55,7 @@ test_that('report tidy types are available', {
 
   expect_true(all(vapply(output, is.data.frame, logical(1))))
   expect_true(nrow(output$profile) > 0)
+  expect_equal(nrow(output$profile), 9)
   expect_true(nrow(output$variable_importance) > 0)
   expect_true(nrow(output$map) > 0)
   expect_true(any(output$map$row_type == 'vector'))
@@ -72,4 +73,117 @@ test_that('non-numeric variables are rejected clearly', {
     iris %>% exploratory:::exp_kmedoids(Species, Sepal.Length, centers = 2),
     'requires numeric variables'
   )
+})
+
+test_that('algorithm selection uses compact PAM output for small data', {
+  result <- mtcars %>% exploratory:::exp_kmedoids(
+    mpg, disp, hp, centers = 3, algorithm = 'pam', elbow_method_mode = 'none', seed = 7
+  )
+  model <- result$model[[1]]
+
+  expect_equal(model$requested_algorithm, 'pam')
+  expect_equal(model$effective_algorithm, 'pam')
+  expect_false(model$is_approximate)
+  expect_false('pam' %in% names(model))
+  expect_equal(length(model$medoid_indices), 3)
+})
+
+test_that('PAM silhouette scores retain their original row indexes', {
+  result <- iris %>% exploratory:::exp_kmedoids(
+    Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+    centers = 3, algorithm = 'pam', elbow_method_mode = 'none', seed = 42
+  )
+  model <- result$model[[1]]
+  reference <- cluster::pam(
+    model$mat, k = 3, metric = 'manhattan', stand = FALSE,
+    keep.diss = FALSE, keep.data = FALSE, pamonce = 5
+  )
+  expect_equal(
+    model$silhouette_row_indices,
+    as.integer(rownames(reference$silinfo$widths))
+  )
+  expect_false(identical(model$silhouette_row_indices, seq_along(model$silhouette_widths)))
+})
+
+test_that('CLARA is available and preserves full-data assignments', {
+  result <- iris %>% exploratory:::exp_kmedoids(
+    Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+    centers = 3, algorithm = 'clara', clara_samples = 3,
+    clara_sample_size = 50, silhouette_sample_size = 50,
+    elbow_method_mode = 'none', map_sample_size = 20, seed = 42
+  )
+  model <- result$model[[1]]
+  output_data <- broom::tidy(model, type = 'data')
+
+  expect_equal(model$effective_algorithm, 'clara')
+  expect_true(model$is_approximate)
+  expect_equal(length(model$clustering), nrow(iris))
+  expect_equal(sum(!is.na(output_data$cluster)), nrow(iris))
+  expect_equal(sum(!is.na(output_data$silhouette_score)), length(model$silhouette_widths))
+  expect_equal(nrow(broom::tidy(model, type = 'medoid_details')), 3)
+})
+
+test_that('auto switches to CLARA and explicit PAM fails safely for large data', {
+  set.seed(19)
+  data <- tibble::tibble(x = rnorm(5001), y = rnorm(5001))
+
+  auto <- data %>% exploratory:::exp_kmedoids(
+    x, y, centers = 3, algorithm = 'auto', elbow_method_mode = 'none',
+    silhouette_sample_size = 100, map_sample_size = 20, seed = 19
+  )
+  expect_equal(auto$model[[1]]$effective_algorithm, 'clara')
+
+  expect_error(
+    data %>% exploratory:::exp_kmedoids(
+      x, y, centers = 3, algorithm = 'pam', elbow_method_mode = 'none', seed = 19
+    ),
+    'Select algorithm = "clara"'
+  )
+})
+
+test_that('diagnostic and map sample sizes bound expensive outputs', {
+  result <- mtcars %>% exploratory:::exp_kmedoids(
+    mpg, disp, hp, centers = 3, silhouette_sample_size = 10,
+    map_sample_size = 8, map_variable_n = 2, elbow_method_mode = 'silhouette', seed = 1
+  )
+  model <- result$model[[1]]
+  map <- broom::tidy(model, type = 'map')
+  counts <- broom::tidy(model, type = 'counts')
+
+  expect_lte(sum(map$row_type == 'observation'), 8)
+  expect_lte(sum(map$row_type == 'vector') / 2, 2)
+  expect_equal(counts$diagnostic_nrow, min(model$valid_nrow, 10))
+  expect_equal(counts$map_sample_nrow, min(model$valid_nrow, max(8, model$centers)))
+})
+
+test_that('diagnostic and map counts use bounded integer sample sizes', {
+  result <- mtcars %>% exploratory:::exp_kmedoids(
+    mpg, disp, hp, centers = 3, silhouette_sample_size = 10.9,
+    map_sample_size = 8.9, elbow_method_mode = 'none', seed = 1
+  )
+  model <- result$model[[1]]
+  counts <- broom::tidy(model, type = 'counts')
+
+  expect_identical(model$silhouette_sample_size, 10L)
+  expect_identical(model$map_sample_size, 8L)
+  expect_identical(counts$diagnostic_nrow, 10L)
+  expect_identical(counts$map_sample_nrow, 8L)
+
+  model$valid_nrow <- 6001L
+  model$mat <- matrix(rnorm(12002), ncol = 2)
+  model$medoid_indices <- 1:3
+  model$silhouette_sample_size <- 6001L
+  expect_equal(nrow(exploratory:::.kmedoids_diagnostic_mat(model)$mat), 5000)
+  model$map_sample_size <- 6001L
+  expect_identical(broom::tidy(model, type = 'counts')$map_sample_nrow, 5000L)
+})
+
+test_that('CLARA candidate samples are capped before fitting', {
+  set.seed(1)
+  fit <- exploratory:::.kmedoids_fit(
+    matrix(rnorm(200), ncol = 2), centers = 3, distance = 'euclidean',
+    algorithm = 'clara', clara_samples = 1, clara_sample_size = 100,
+    pam_max_n = 20
+  )
+  expect_identical(fit$clara_sample_size, 20L)
 })
