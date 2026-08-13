@@ -289,3 +289,37 @@ pretending that a 50,000-row eigendecomposition is practical.
 4. Implement bounded diagnostics and scalable map sampling.
 5. Apply secondary vectorization/output reductions, then run the benchmark
    matrix to calibrate thresholds and CLARA defaults.
+
+## Follow-up: cache the PCoA map at fit time (2026-08-13)
+
+Bounding `map_sample_size` (this increment) made a single PCoA affordable,
+but a live tam Analytics Run trace of this exact scenario (1,000 rows,
+`map_sample_size = 2000`, `algorithm = "auto"`) showed the total Run still
+taking ~27s, with `stats::dist()` + `stats::cmdscale()` inside
+`.kmedoids_map()` running to completion THREE separate times for the same
+fitted model:
+
+1. tam's `set_kmedoids_analytics_params()` helper, called immediately after
+   fit to read the `representation_rate` attribute for axis titles.
+2. The Cluster Map chart tab's own `tidy_rowwise(model, type = 'map')`.
+3. The Fitted Vectors chart tab's own `tidy_rowwise(model, type = 'map')`.
+
+`.kmedoids_map()` was not memoized -- every `tidy(type = 'map')` call
+recomputed it from scratch, ~8s each in the traced Run, even though the
+result depends only on fields already fixed at fit time. Fix: compute it
+once right after fit and cache it as `model$map_result`, mirroring the
+existing `elbow_result` / `silhouette_result` pattern in this file;
+`tidy.pam_exploratory(type = 'map')` now just reads the cached tibble
+(including its `representation_rate` attribute, so the tam helper above
+needs no change). A same-machine before/after check on the traced scenario:
+fit + 2 `tidy(type = 'map')` calls dropped from ~24s to ~9s total, with both
+`tidy()` calls now single-digit milliseconds.
+
+One behavior change: because the map is now computed unconditionally at fit
+time, a degenerate map input (e.g. every sampled row identical, so
+`cmdscale()` has no positive eigenvalues to project onto) is caught with
+`tryCatch` and downgraded to the existing empty-map sentinel instead of
+aborting the whole fit -- previously this failure mode only broke the
+Cluster Map / Fitted Vectors tabs individually. Found live while testing
+this change against an all-tied-values fixture; not a previously known or
+reported issue.

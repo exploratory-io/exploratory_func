@@ -156,6 +156,50 @@ test_that('diagnostic and map sample sizes bound expensive outputs', {
   expect_equal(counts$map_sample_nrow, min(model$valid_nrow, max(8, model$centers)))
 })
 
+test_that('the PCoA map is computed once at fit time and cached, not recomputed per tidy() call', {
+  set.seed(1)
+  result <- mtcars %>% exploratory:::exp_kmedoids(mpg, disp, hp, centers = 3, seed = 1)
+  model <- result$model[[1]]
+
+  # The fit itself must already carry the map result -- tidy(type='map') should
+  # be a pure cache read, not a fresh stats::dist()/stats::cmdscale() computation.
+  expect_true(is.data.frame(model$map_result))
+  expect_true(nrow(model$map_result) > 0)
+
+  first_call <- broom::tidy(model, type = 'map')
+  second_call <- broom::tidy(model, type = 'map')
+
+  expect_identical(first_call, model$map_result)
+  expect_identical(second_call, model$map_result)
+  expect_identical(first_call, second_call)
+
+  # tam's set_kmedoids_analytics_params() helper reads this attribute directly
+  # via broom::tidy(..., type='map') (bypassing tidy_rowwise's unnesting), so the
+  # cached tibble must still carry it, not just a fresh .kmedoids_map() call.
+  expect_true(is.numeric(attr(model$map_result, 'representation_rate')))
+  expect_true(is.numeric(attr(first_call, 'representation_rate')))
+})
+
+test_that('models created before map caching still produce their map', {
+  result <- mtcars %>% exploratory:::exp_kmedoids(mpg, disp, hp, centers = 3, seed = 1)
+  model <- result$model[[1]]
+  model$map_result <- NULL
+
+  map <- broom::tidy(model, type = 'map')
+
+  expect_true(nrow(map) > 0)
+  expect_true(any(map$row_type == 'vector'))
+})
+
+test_that('a minimal (all-tied) fit still produces a usable cached map', {
+  data <- tibble::tibble(x = c(1, 1, 1), y = c(1, 1, 1))
+  result <- data %>% exploratory:::exp_kmedoids(x, y, centers = 2, seed = 1)
+  model <- result$model[[1]]
+
+  expect_true(is.data.frame(model$map_result))
+  expect_true(is.data.frame(broom::tidy(model, type = 'map')))
+})
+
 test_that('diagnostic and map counts use bounded integer sample sizes', {
   result <- mtcars %>% exploratory:::exp_kmedoids(
     mpg, disp, hp, centers = 3, silhouette_sample_size = 10.9,

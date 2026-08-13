@@ -673,6 +673,23 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   } else {
     NULL
   }
+  # Compute the PCoA map once at fit time and cache it, mirroring elbow_result /
+  # silhouette_result above. .kmedoids_map() runs stats::dist() + stats::cmdscale()
+  # over up to map_sample_size rows, which is expensive (multiple seconds at the
+  # default map_sample_size). Every tidy(type='map') caller -- the Cluster Map tab,
+  # the Fitted Vectors tab, and tam's set_kmedoids_analytics_params() helper (which
+  # calls broom::tidy() directly for the representation_rate attribute) -- used to
+  # each recompute it from scratch, tripling the cost for no benefit since the
+  # result depends only on fields already present on `model` at this point.
+  # A degenerate map input (e.g. every sampled row identical, so cmdscale() has
+  # no positive eigenvalues to project onto) is caught here and downgraded to
+  # the same empty-map sentinel .kmedoids_map() already returns for the n < 2
+  # case, instead of letting it abort the whole fit -- previously this class of
+  # failure only broke the Cluster Map / Fitted Vectors tabs individually.
+  model$map_result <- tryCatch(
+    .kmedoids_map(model),
+    error = function(e) .kmedoids_empty('map')
+  )
   class(model) <- c(
     'pam_exploratory',
     if (identical(fit$algorithm, 'pam')) 'pam' else 'clara',
@@ -693,7 +710,7 @@ tidy.pam_exploratory <- function(x, type = 'summary', with_excluded_rows = FALSE
     representative_values = .kmedoids_representative_values(x),
     distribution = .kmedoids_distribution(x),
     cohesion = .kmedoids_cohesion(x),
-    map = .kmedoids_map(x),
+    map = x$map_result %||% .kmedoids_map(x),
     medoid_details = .kmedoids_medoid_details(x),
     counts = .kmedoids_counts(x),
     data = {
