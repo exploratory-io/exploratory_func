@@ -41,7 +41,7 @@
 
 .kmedoids_fit <- function(mat, centers, distance, seed = NULL,
                           algorithm = 'pam', clara_samples = 20,
-                          clara_sample_size = NULL,
+                          clara_sample_size = NULL, nstart = 1,
                           pam_max_n = .kmedoids_pam_max_n) {
   algorithm <- match.arg(algorithm, c('auto', 'pam', 'clara'))
   if (algorithm == 'auto') {
@@ -60,10 +60,25 @@
     set.seed(seed)
   }
   if (algorithm == 'pam') {
-    raw <- cluster::pam(
-      mat, k = centers, metric = distance, stand = FALSE,
-      keep.diss = FALSE, keep.data = FALSE, pamonce = 5
-    )
+    # medoids = if(is.numeric(nstart)) "random" -- cluster::pam() switches from
+    # its default deterministic "build" algorithm to random-start search the
+    # instant ANY numeric nstart is passed. Forward nstart only when the user
+    # asked for more than one trial, so nstart = 1 (the default) stays
+    # byte-identical to the pre-nstart call and every existing saved analytics
+    # keeps its current medoids.
+    pam_nstart <- as.integer(round(nstart %||% 1))
+    raw <- if (!is.na(pam_nstart) && pam_nstart > 1) {
+      cluster::pam(
+        mat, k = centers, metric = distance, stand = FALSE,
+        keep.diss = FALSE, keep.data = FALSE, pamonce = 5,
+        medoids = 'random', nstart = pam_nstart
+      )
+    } else {
+      cluster::pam(
+        mat, k = centers, metric = distance, stand = FALSE,
+        keep.diss = FALSE, keep.data = FALSE, pamonce = 5
+      )
+    }
     silhouette <- .kmedoids_silhouette_components(raw)
     silhouette_widths <- silhouette$widths
     silhouette_row_indices <- silhouette$indices
@@ -311,7 +326,7 @@
       .kmedoids_fit(
         diagnostic_mat, center, x$distance,
         if (is.null(x$seed)) NULL else x$seed + center,
-        algorithm = 'pam'
+        algorithm = 'pam', nstart = x$nstart
       ),
       error = function(e) NULL
     )
@@ -343,7 +358,7 @@
       .kmedoids_fit(
         diagnostic_mat, center, x$distance,
         if (is.null(x$seed)) NULL else x$seed + center,
-        algorithm = 'pam'
+        algorithm = 'pam', nstart = x$nstart
       ),
       error = function(e) NULL
     )
@@ -577,6 +592,11 @@
 #' @param profile_variable_order Profile variable ordering mode.
 #' @param map_variable_n Maximum number of variables shown on the map.
 #' @param algorithm Algorithm to use: `auto`, `pam`, or `clara`.
+#' @param nstart Number of random-medoid trials for PAM; the best result is
+#'   kept. Values greater than 1 switch `cluster::pam()` from its default
+#'   deterministic "build" medoid selection to random-start search (mirrors
+#'   `nstart` in `kmeans()`). Ignored when the effective algorithm is CLARA,
+#'   which already samples multiple candidate sets via `clara_samples`.
 #' @param clara_samples Number of candidate samples used by CLARA.
 #' @param clara_sample_size Number of rows in each CLARA candidate sample.
 #' @param map_sample_size Maximum number of rows used for the PCoA map.
@@ -588,7 +608,7 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
                          elbow_method_mode = 'silhouette', max_centers = 10,
                          silhouette_sample_size = 5000, profile_top_n = 10,
                          profile_show_all = TRUE, profile_variable_order = 'effect_size',
-                         map_variable_n = 10, algorithm = 'auto',
+                         map_variable_n = 10, algorithm = 'auto', nstart = 1,
                          clara_samples = 20, clara_sample_size = NULL,
                          map_sample_size = 2000) {
   selected_cols <- tidyselect::vars_select(names(df), !!!rlang::quos(...))
@@ -609,6 +629,11 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   distance <- match.arg(distance, c('euclidean', 'manhattan'))
   elbow_method_mode <- match.arg(as.character(elbow_method_mode), c('none', 'silhouette', 'elbow'))
   algorithm <- match.arg(as.character(algorithm), c('auto', 'pam', 'clara'))
+  nstart <- .kmedoids_safe_numeric(nstart)
+  if (is.null(nstart) || nstart < 1) {
+    stop('nstart must be a positive number.', call. = FALSE)
+  }
+  nstart <- as.integer(floor(nstart))
   clara_samples <- .kmedoids_safe_numeric(clara_samples)
   if (is.null(clara_samples) || clara_samples < 1) {
     stop('clara_samples must be a positive number.', call. = FALSE)
@@ -670,7 +695,7 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
     mat[is.nan(mat)] <- 0
   }
   fit <- .kmedoids_fit(
-    mat, centers, distance, seed, algorithm = algorithm,
+    mat, centers, distance, seed, algorithm = algorithm, nstart = nstart,
     clara_samples = clara_samples, clara_sample_size = clara_sample_size
   )
   model <- list(
@@ -687,7 +712,7 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
     clara_samples = fit$clara_samples, clara_sample_size = fit$clara_sample_size,
     valid_nrow = nrow(fit_data),
     sampled_nrow = nrow(source_data), excluded_nrow = excluded_nrow,
-    distance = distance, centers = centers, iterMax = iterMax, seed = seed,
+    distance = distance, centers = centers, iterMax = iterMax, nstart = nstart, seed = seed,
     normalize_data = normalize_data, max_centers = max_centers,
     silhouette_sample_size = silhouette_sample_size, profile_top_n = profile_top_n,
     profile_show_all = profile_show_all, profile_variable_order = profile_variable_order,
