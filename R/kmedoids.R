@@ -9,6 +9,24 @@
 }
 
 .kmedoids_pam_max_n <- 5000L
+.kmedoids_map_max_n <- 5000L
+
+.kmedoids_silhouette_components <- function(raw) {
+  widths <- if (!is.null(raw$silinfo$widths)) {
+    raw$silinfo$widths[, 'sil_width']
+  } else {
+    NULL
+  }
+  indices <- if (is.null(widths)) {
+    integer()
+  } else {
+    suppressWarnings(as.integer(rownames(raw$silinfo$widths)))
+  }
+  if (length(indices) != length(widths) || anyNA(indices)) {
+    indices <- seq_along(widths)
+  }
+  list(widths = widths, indices = indices)
+}
 
 .kmedoids_distance_to_medoids <- function(mat, medoid_mat, cluster_ids, metric) {
   if (nrow(mat) == 0) return(numeric())
@@ -46,41 +64,26 @@
       mat, k = centers, metric = distance, stand = FALSE,
       keep.diss = FALSE, keep.data = FALSE, pamonce = 5
     )
-    silhouette_widths <- if (!is.null(raw$silinfo$widths)) {
-      raw$silinfo$widths[, 'sil_width']
-    } else {
-      NULL
-    }
-    silhouette_row_indices <- if (is.null(silhouette_widths)) {
-      integer()
-    } else {
-      seq_along(silhouette_widths)
-    }
+    silhouette <- .kmedoids_silhouette_components(raw)
+    silhouette_widths <- silhouette$widths
+    silhouette_row_indices <- silhouette$indices
     medoid_indices <- raw$id.med
   } else {
     if (is.null(clara_sample_size)) {
       clara_sample_size <- min(nrow(mat), max(100L, 40L + 2L * centers))
     }
-    clara_sample_size <- max(centers + 1L, min(nrow(mat), floor(clara_sample_size)))
+    clara_sample_size <- as.integer(max(
+      centers + 1L,
+      min(nrow(mat), pam_max_n, floor(clara_sample_size))
+    ))
     raw <- cluster::clara(
       mat, k = centers, metric = distance, stand = FALSE,
-      samples = max(1L, floor(clara_samples)), sampsize = clara_sample_size,
+      samples = max(1L, as.integer(floor(clara_samples))), sampsize = clara_sample_size,
       keep.data = FALSE, rngR = TRUE
     )
-    silhouette_widths <- if (!is.null(raw$silinfo$widths)) {
-      raw$silinfo$widths[, 'sil_width']
-    } else {
-      NULL
-    }
-    silhouette_row_indices <- if (is.null(silhouette_widths)) {
-      integer()
-    } else {
-      suppressWarnings(as.integer(rownames(raw$silinfo$widths)))
-    }
-    if (length(silhouette_row_indices) != length(silhouette_widths) ||
-        anyNA(silhouette_row_indices)) {
-      silhouette_row_indices <- seq_along(silhouette_widths)
-    }
+    silhouette <- .kmedoids_silhouette_components(raw)
+    silhouette_widths <- silhouette$widths
+    silhouette_row_indices <- silhouette$indices
     medoid_indices <- raw$i.med
   }
   list(
@@ -99,7 +102,7 @@
       as.numeric(raw$silinfo$avg.width)
     },
     clara_sample_size = if (algorithm == 'clara') clara_sample_size else NULL,
-    clara_samples = if (algorithm == 'clara') max(1L, floor(clara_samples)) else NULL
+    clara_samples = if (algorithm == 'clara') max(1L, as.integer(floor(clara_samples))) else NULL
   )
 }
 
@@ -191,7 +194,7 @@
 
 .kmedoids_diagnostic_mat <- function(x, seed_offset = 0L) {
   indices <- .kmedoids_sample_indices(
-    x, x$silhouette_sample_size,
+    x, min(x$silhouette_sample_size, .kmedoids_pam_max_n),
     include = x$medoid_indices, seed_offset = seed_offset
   )
   list(mat = x$mat[indices, , drop = FALSE], indices = indices)
@@ -307,7 +310,7 @@
       .kmedoids_fit(
         diagnostic_mat, center, x$distance,
         if (is.null(x$seed)) NULL else x$seed + center,
-        algorithm = 'pam', pam_max_n = Inf
+        algorithm = 'pam'
       ),
       error = function(e) NULL
     )
@@ -339,7 +342,7 @@
       .kmedoids_fit(
         diagnostic_mat, center, x$distance,
         if (is.null(x$seed)) NULL else x$seed + center,
-        algorithm = 'pam', pam_max_n = Inf
+        algorithm = 'pam'
       ),
       error = function(e) NULL
     )
@@ -429,7 +432,7 @@
 
 .kmedoids_map <- function(x) {
   map_indices <- .kmedoids_sample_indices(
-    x, x$map_sample_size,
+    x, min(x$map_sample_size, .kmedoids_map_max_n),
     include = x$medoid_indices, seed_offset = 3000L
   )
   map_mat <- x$mat[map_indices, , drop = FALSE]
@@ -514,8 +517,13 @@
     effective_algorithm = x$effective_algorithm,
     is_approximate = x$is_approximate,
     fit_sample_nrow = x$valid_nrow,
-    diagnostic_nrow = min(x$valid_nrow, x$silhouette_sample_size),
-    map_sample_nrow = min(x$valid_nrow, max(x$map_sample_size, length(x$medoid_indices)))
+    diagnostic_nrow = min(
+      x$valid_nrow, x$silhouette_sample_size, .kmedoids_pam_max_n
+    ),
+    map_sample_nrow = min(
+      x$valid_nrow, max(x$map_sample_size, length(x$medoid_indices)),
+      .kmedoids_map_max_n
+    )
   )
 }
 
@@ -534,9 +542,10 @@
 #' @param elbow_method_mode Which optimal-cluster diagnostics to compute.
 #' @param max_centers Maximum number of centers for diagnostics.
 #' @param silhouette_sample_size Maximum number of rows used for diagnostics.
-#' @param profile_top_n Reserved for parity with the Analytics UI.
-#' @param profile_show_all Reserved for parity with the Analytics UI.
-#' @param profile_variable_order Reserved for parity with the Analytics UI.
+#' @param profile_top_n Maximum variables shown per cluster when `profile_show_all`
+#'   is `FALSE`.
+#' @param profile_show_all Whether to show all profile variables.
+#' @param profile_variable_order Profile variable ordering mode.
 #' @param map_variable_n Maximum number of variables shown on the map.
 #' @param algorithm Algorithm to use: `auto`, `pam`, or `clara`.
 #' @param clara_samples Number of candidate samples used by CLARA.
@@ -549,7 +558,7 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
                          seed = 1, normalize_data = TRUE,
                          elbow_method_mode = 'silhouette', max_centers = 10,
                          silhouette_sample_size = 5000, profile_top_n = 10,
-                         profile_show_all = FALSE, profile_variable_order = 'effect_size',
+                         profile_show_all = TRUE, profile_variable_order = 'effect_size',
                          map_variable_n = 10, algorithm = 'auto',
                          clara_samples = 20, clara_sample_size = NULL,
                          map_sample_size = 2000) {
@@ -563,6 +572,8 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   centers <- .kmedoids_safe_numeric(centers)
   max_centers <- .kmedoids_safe_numeric(max_centers)
   iterMax <- .kmedoids_safe_numeric(iterMax)
+  centers <- if (is.null(centers)) NULL else as.integer(floor(centers))
+  max_centers <- if (is.null(max_centers)) NULL else as.integer(floor(max_centers))
   if (is.null(centers) || centers < 2 || is.null(iterMax) || iterMax < 1) {
     stop('centers must be at least 2 and iterMax must be positive.', call. = FALSE)
   }
@@ -573,25 +584,35 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   if (is.null(clara_samples) || clara_samples < 1) {
     stop('clara_samples must be a positive number.', call. = FALSE)
   }
+  clara_samples <- as.integer(floor(clara_samples))
   if (!is.null(clara_sample_size)) {
     clara_sample_size <- .kmedoids_safe_numeric(clara_sample_size)
+    clara_sample_size <- if (is.null(clara_sample_size)) NULL else as.integer(floor(clara_sample_size))
     if (is.null(clara_sample_size) || clara_sample_size < centers + 1) {
       stop('clara_sample_size must be greater than the number of clusters.', call. = FALSE)
     }
   }
   silhouette_sample_size <- .kmedoids_safe_numeric(silhouette_sample_size)
+  silhouette_sample_size <- if (is.null(silhouette_sample_size)) {
+    NULL
+  } else {
+    as.integer(floor(silhouette_sample_size))
+  }
   if (is.null(silhouette_sample_size) || silhouette_sample_size < centers + 1) {
     stop('silhouette_sample_size must be greater than the number of clusters.', call. = FALSE)
   }
   profile_top_n <- .kmedoids_safe_numeric(profile_top_n)
+  profile_top_n <- if (is.null(profile_top_n)) NULL else as.integer(floor(profile_top_n))
   if (is.null(profile_top_n) || profile_top_n < 1) {
     stop('profile_top_n must be positive.', call. = FALSE)
   }
   map_variable_n <- .kmedoids_safe_numeric(map_variable_n)
+  map_variable_n <- if (is.null(map_variable_n)) NULL else as.integer(floor(map_variable_n))
   if (is.null(map_variable_n) || map_variable_n < 1) {
     stop('map_variable_n must be positive.', call. = FALSE)
   }
   map_sample_size <- .kmedoids_safe_numeric(map_sample_size)
+  map_sample_size <- if (is.null(map_sample_size)) NULL else as.integer(floor(map_sample_size))
   if (is.null(map_sample_size) || map_sample_size < 1) {
     stop('map_sample_size must be positive.', call. = FALSE)
   }
@@ -611,8 +632,8 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   excluded_nrow <- sum(!valid)
   fit_data <- source_data[valid, , drop = FALSE]
   row_ids <- original_row_ids[valid]
-  if (nrow(fit_data) <= centers) {
-    stop('The number of valid rows must be greater than the number of clusters.', call. = FALSE)
+  if (nrow(fit_data) < centers) {
+    stop('The number of valid rows must be greater than or equal to the number of clusters.', call. = FALSE)
   }
   mat <- as.matrix(fit_data)
   if (isTRUE(normalize_data)) {
@@ -624,7 +645,7 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
     clara_samples = clara_samples, clara_sample_size = clara_sample_size
   )
   model <- list(
-    pam = fit$raw, mat = mat, original_fit_mat = as.matrix(fit_data),
+    mat = mat, original_fit_mat = as.matrix(fit_data),
     source_data = source_data, original_data = original_data,
     row_ids = row_ids, source_row_ids = original_row_ids, selected_cols = selected_cols,
     valid_indices = which(valid), clustering = fit$clustering,
