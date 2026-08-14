@@ -656,6 +656,27 @@ calc_vif_polr <- function(model) {
     stop("model contains fewer than 2 terms")
   }
 
+  # A numerically singular Hessian (e.g. a near-tautological predictor/target
+  # relationship, such as an "age decade" predictor used against an age-binned
+  # target -- clm's own warning: "Hessian is numerically singular: parameters
+  # are not uniquely determined") makes vcov() come back with NA/Inf entries.
+  # Unlike the rank-deficient case above, no single term is cleanly "dropped"
+  # here -- every surviving coefficient is implicated, and cov2cor()/det() on
+  # an NA-laced matrix silently propagate NA through EVERY term's GVIF with no
+  # error at all. Left unchecked, calc_vif_polr() "succeeds" with a matrix of
+  # all-NA VIF values, so the caller's `'error' %in% class(x$model[[1]]$vif)`
+  # check never fires -- the Collinearity chart and Analytics Guide prose then
+  # silently render as if VIF were simply absent, instead of explaining why.
+  # Surfaced with the SAME message/marker as perfect collinearity so the
+  # existing caller-side handling (report chart + guide prose) covers this
+  # case identically, without needing its own separate detection.
+  if (any(!is.finite(v))) {
+    stop(paste0(
+      "Variables causing perfect collinearity : ",
+      paste(all_term_labels[term_ids], collapse = ", ")
+    ))
+  }
+
   R <- stats::cov2cor(v)
   detR <- det(R)
   result <- matrix(0, n_terms, 3)

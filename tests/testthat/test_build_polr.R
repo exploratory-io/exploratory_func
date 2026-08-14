@@ -447,6 +447,48 @@ test_that("tidy(type='vif') survives a term MASS::polr itself drops for rank-def
   expect_true(is.numeric(east_model$vif))
 })
 
+test_that("tidy(type='vif') surfaces a numerically singular Hessian as perfect collinearity, not silent all-NA VIF", {
+  # Distinct from BOTH VIF failure modes above: no term is dropped by clm's own
+  # rank-deficiency handling (every coefficient survives into coef_names/vcov),
+  # but the design is still degenerate enough that clm's optimizer converges
+  # only loosely ("Hessian is numerically singular: parameters are not uniquely
+  # determined") -- vcov() then comes back with NA/Inf entries and
+  # cov2cor()/det() silently propagate NA through EVERY term's GVIF with no
+  # error at all. Reported live (#37700 follow-up): an "age decade" predictor
+  # used alongside a target that is itself age binned into quantiles is
+  # near-tautological and reliably triggers this.
+  set.seed(7)
+  n <- 300
+  age <- round(stats::runif(n, 20, 65))
+  decade <- paste0(floor(age / 10) * 10, "s")
+  df <- data.frame(
+    age = age,
+    decade = decade,
+    other = round(stats::rnorm(n), 2),
+    stringsAsFactors = FALSE
+  )
+  df$age_bin <- cut(df$age, breaks = stats::quantile(df$age, probs = seq(0, 1, length.out = 4)),
+                     include.lowest = TRUE, ordered_result = TRUE)
+
+  trial <- suppressWarnings(df %>% build_polr(age_bin, decade, other,
+    predictor_funs = list(decade = "none", other = "none"), test_split_type = "random"))
+  m1 <- trial$model[[1]]
+
+  # Without the fix, m1$vif is a matrix/array of all-NA GVIF values (no error
+  # class at all) -- calc_vif_polr() "succeeds" with unusable output.
+  expect_true(inherits(m1$vif, "error"))
+  expect_true(grepl("perfect collinearity", conditionMessage(m1$vif), fixed = TRUE))
+  # No single term is cleanly at fault here (unlike the rank-deficiency case
+  # above) -- every surviving term is implicated, so all of them are listed.
+  expect_true(grepl("decade", conditionMessage(m1$vif), fixed = TRUE))
+  expect_true(grepl("other", conditionMessage(m1$vif), fixed = TRUE))
+
+  # tidy_rowwise(type='vif') must skip this group instead of returning a
+  # data frame full of NA VIF values that looks like real data downstream.
+  vif_df <- tidy_rowwise(trial, model, type = "vif")
+  expect_equal(nrow(vif_df), 0)
+})
+
 test_that("evaluate_polr() reports the ordinal-aware metrics the spec requires", {
   df <- make_ordinal_test_df(n = 200)
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
