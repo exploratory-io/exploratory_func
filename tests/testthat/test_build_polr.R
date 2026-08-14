@@ -447,16 +447,10 @@ test_that("tidy(type='vif') survives a term MASS::polr itself drops for rank-def
   expect_true(is.numeric(east_model$vif))
 })
 
-test_that("tidy(type='vif') surfaces a numerically singular Hessian as perfect collinearity, not silent all-NA VIF", {
-  # Distinct from BOTH VIF failure modes above: no term is dropped by clm's own
-  # rank-deficiency handling (every coefficient survives into coef_names/vcov),
-  # but the design is still degenerate enough that clm's optimizer converges
-  # only loosely ("Hessian is numerically singular: parameters are not uniquely
-  # determined") -- vcov() then comes back with NA/Inf entries and
-  # cov2cor()/det() silently propagate NA through EVERY term's GVIF with no
-  # error at all. Reported live (#37700 follow-up): an "age decade" predictor
-  # used alongside a target that is itself age binned into quantiles is
-  # near-tautological and reliably triggers this.
+test_that("tidy(type='vif') reports a numerical singularity without calling it perfect collinearity", {
+  # The predictors are full rank, but the age-decade predictor nearly determines
+  # the ordinal target. clm can therefore produce a non-finite vcov() without
+  # any structural collinearity in the design matrix.
   set.seed(7)
   n <- 300
   age <- round(stats::runif(n, 20, 65))
@@ -468,25 +462,43 @@ test_that("tidy(type='vif') surfaces a numerically singular Hessian as perfect c
     stringsAsFactors = FALSE
   )
   df$age_bin <- cut(df$age, breaks = stats::quantile(df$age, probs = seq(0, 1, length.out = 4)),
-                     include.lowest = TRUE, ordered_result = TRUE)
+                    include.lowest = TRUE, ordered_result = TRUE)
 
   trial <- suppressWarnings(df %>% build_polr(age_bin, decade, other,
     predictor_funs = list(decade = "none", other = "none"), test_split_type = "random"))
-  m1 <- trial$model[[1]]
+  model <- trial$model[[1]]
+  design <- stats::model.matrix(model)$X
 
-  # Without the fix, m1$vif is a matrix/array of all-NA GVIF values (no error
-  # class at all) -- calc_vif_polr() "succeeds" with unusable output.
-  expect_true(inherits(m1$vif, "error"))
-  expect_true(grepl("perfect collinearity", conditionMessage(m1$vif), fixed = TRUE))
-  # No single term is cleanly at fault here (unlike the rank-deficiency case
-  # above) -- every surviving term is implicated, so all of them are listed.
-  expect_true(grepl("decade", conditionMessage(m1$vif), fixed = TRUE))
-  expect_true(grepl("other", conditionMessage(m1$vif), fixed = TRUE))
+  expect_equal(qr(design)$rank, ncol(design))
+  expect_true(inherits(model$vif, "error"))
+  expect_match(conditionMessage(model$vif), "Numerically singular Hessian")
+  expect_false(grepl("perfect collinearity", conditionMessage(model$vif), fixed = TRUE))
+  expect_equal(nrow(tidy_rowwise(trial, model, type = "vif")), 0)
+})
 
-  # tidy_rowwise(type='vif') must skip this group instead of returning a
-  # data frame full of NA VIF values that looks like real data downstream.
-  vif_df <- tidy_rowwise(trial, model, type = "vif")
-  expect_equal(nrow(vif_df), 0)
+test_that("tidy(type='vif') does not mislabel full-rank separation as collinearity", {
+  # x completely separates the three ordered outcome levels; z is independent,
+  # so the predictor design remains full rank while the ordinal Hessian is
+  # numerically singular.
+  set.seed(1)
+  n <- 300
+  x <- stats::rnorm(n)
+  z <- stats::rnorm(n)
+  df <- data.frame(
+    y = ordered(cut(x, breaks = c(-Inf, -0.5, 0.5, Inf),
+                    labels = c("Low", "Medium", "High"))),
+    x = x,
+    z = z
+  )
+
+  trial <- suppressWarnings(df %>% build_polr(y, x, z))
+  model <- trial$model[[1]]
+  design <- stats::model.matrix(model)$X
+
+  expect_equal(qr(design)$rank, ncol(design))
+  expect_true(inherits(model$vif, "error"))
+  expect_match(conditionMessage(model$vif), "Numerically singular Hessian")
+  expect_false(grepl("perfect collinearity", conditionMessage(model$vif), fixed = TRUE))
 })
 
 test_that("evaluate_polr() reports the ordinal-aware metrics the spec requires", {
