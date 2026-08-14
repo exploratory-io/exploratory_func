@@ -447,6 +447,60 @@ test_that("tidy(type='vif') survives a term MASS::polr itself drops for rank-def
   expect_true(is.numeric(east_model$vif))
 })
 
+test_that("tidy(type='vif') reports a numerical singularity without calling it perfect collinearity", {
+  # The predictors are full rank, but the age-decade predictor nearly determines
+  # the ordinal target. clm can therefore produce a non-finite vcov() without
+  # any structural collinearity in the design matrix.
+  set.seed(7)
+  n <- 300
+  age <- round(stats::runif(n, 20, 65))
+  decade <- paste0(floor(age / 10) * 10, "s")
+  df <- data.frame(
+    age = age,
+    decade = decade,
+    other = round(stats::rnorm(n), 2),
+    stringsAsFactors = FALSE
+  )
+  df$age_bin <- cut(df$age, breaks = stats::quantile(df$age, probs = seq(0, 1, length.out = 4)),
+                    include.lowest = TRUE, ordered_result = TRUE)
+
+  trial <- suppressWarnings(df %>% build_polr(age_bin, decade, other,
+    predictor_funs = list(decade = "none", other = "none"), test_split_type = "random"))
+  model <- trial$model[[1]]
+  design <- stats::model.matrix(model)$X
+
+  expect_equal(qr(design)$rank, ncol(design))
+  expect_true(inherits(model$vif, "error"))
+  expect_match(conditionMessage(model$vif), "Numerically singular Hessian")
+  expect_false(grepl("perfect collinearity", conditionMessage(model$vif), fixed = TRUE))
+  expect_equal(nrow(tidy_rowwise(trial, model, type = "vif")), 0)
+})
+
+test_that("tidy(type='vif') does not mislabel full-rank separation as collinearity", {
+  # x completely separates the three ordered outcome levels; z is independent,
+  # so the predictor design remains full rank while the ordinal Hessian is
+  # numerically singular.
+  set.seed(1)
+  n <- 300
+  x <- stats::rnorm(n)
+  z <- stats::rnorm(n)
+  df <- data.frame(
+    y = ordered(cut(x, breaks = c(-Inf, -0.5, 0.5, Inf),
+                    labels = c("Low", "Medium", "High"))),
+    x = x,
+    z = z
+  )
+
+  trial <- suppressWarnings(df %>% build_polr(y, x, z))
+  model <- trial$model[[1]]
+  design <- stats::model.matrix(model)$X
+
+  expect_equal(qr(design)$rank, ncol(design))
+  expect_true(inherits(model$vif, "error"))
+  expect_match(conditionMessage(model$vif), "Numerically singular Hessian")
+  expect_false(grepl("perfect collinearity", conditionMessage(model$vif), fixed = TRUE))
+})
+
 test_that("evaluate_polr() reports the ordinal-aware metrics the spec requires", {
   df <- make_ordinal_test_df(n = 200)
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)

@@ -656,6 +656,21 @@ calc_vif_polr <- function(model) {
     stop("model contains fewer than 2 terms")
   }
 
+  # A numerically singular Hessian can make vcov() return NA/Inf entries even
+  # when the predictor design is full rank (for example, under complete or
+  # quasi separation). That is not evidence of perfect collinearity, so keep
+  # the existing collinearity message only for a rank-deficient design and use
+  # a neutral diagnostic for the full-rank case.
+  if (any(!is.finite(v))) {
+    if (qr(mm)$rank < ncol(mm)) {
+      stop(paste0(
+        "Variables causing perfect collinearity : ",
+        paste(all_term_labels[term_ids], collapse = ", ")
+      ))
+    }
+    stop("Numerically singular Hessian: VIF cannot be calculated")
+  }
+
   R <- stats::cov2cor(v)
   detR <- det(R)
   result <- matrix(0, n_terms, 3)
