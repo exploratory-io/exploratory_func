@@ -595,69 +595,43 @@ polr_macro_precision_recall_specificity <- function(actual, predicted) {
 #      model.matrix(clm) returns a LIST whose $X carries the design matrix, and
 #      that matrix DOES include an intercept column (assign == 0).
 #
-# Find the predictor term(s) responsible for a numerically singular ordinal
-# fit. A full-rank design can still have a singular Hessian under complete or
-# quasi separation, so rank/alias checks cannot identify the culprit. Refit
-# one term at a time: a term whose univariate model is singular is directly
-# separating the outcome. If none is singular alone, use leave-one-term-out
-# fits to identify terms whose removal restores a finite covariance matrix.
-identify_singular_polr_terms <- function(model, term_labels) {
-  model_data <- model$model
-  if (!is.data.frame(model_data) || length(term_labels) == 0) {
+# Return the terms with the largest slope loadings in the Hessian's least
+# stable direction. This is intentionally a candidate diagnostic: a singular
+# ordinal likelihood identifies an unstable coefficient combination, not a
+# unique causal variable. Unlike refitting subsets of the model, it adds no
+# model fits to the failure path.
+identify_possible_singular_polr_terms <- function(model, term_labels, term_ids, coef_names) {
+  hessian <- model$Hessian
+  if (!is.matrix(hessian) || nrow(hessian) != ncol(hessian) ||
+      any(!is.finite(hessian)) || is.null(colnames(hessian))) {
     return(character())
   }
 
-  response_label <- paste(deparse(stats::formula(model)[[2]]), collapse = "")
-  model_weights <- stats::model.weights(model_data)
-
-  vcov_status <- function(labels) {
-    if (length(labels) == 0) {
-      return("failed")
-    }
-    diagnostic_formula <- tryCatch(
-      stats::reformulate(labels, response = response_label),
-      error = function(e) NULL
-    )
-    if (is.null(diagnostic_formula)) {
-      return("failed")
-    }
-    fit_args <- list(
-      formula = diagnostic_formula,
-      data = model_data,
-      link = model$link,
-      threshold = model$threshold
-    )
-    if (!is.null(model_weights)) {
-      fit_args$weights <- model_weights
-    }
-    fit <- tryCatch(
-      suppressWarnings(do.call(ordinal::clm, fit_args)),
-      error = function(e) NULL
-    )
-    if (is.null(fit)) {
-      return("failed")
-    }
-    covariance <- tryCatch(stats::vcov(fit), error = function(e) NULL)
-    if (is.null(covariance) || length(covariance) == 0) {
-      return("failed")
-    }
-    if (all(is.finite(covariance))) "finite" else "singular"
+  hessian_vector <- tryCatch(
+    base::svd(hessian, nu = 0, nv = ncol(hessian))$v[, ncol(hessian)],
+    error = function(e) NULL
+  )
+  hessian_idx <- match(coef_names, colnames(hessian))
+  if (is.null(hessian_vector) || anyNA(hessian_idx) || length(term_ids) != length(coef_names)) {
+    return(character())
   }
 
-  singular_alone <- term_labels[vapply(
-    term_labels,
-    function(term) identical(vcov_status(term), "singular"),
-    logical(1)
-  )]
-  if (length(singular_alone) > 0) {
-    return(singular_alone)
+  slope_loadings <- abs(hessian_vector[hessian_idx])
+  unique_term_ids <- sort(unique(term_ids))
+  term_scores <- vapply(
+    unique_term_ids,
+    function(term_id) sqrt(sum(slope_loadings[term_ids == term_id]^2)),
+    numeric(1)
+  )
+  max_score <- max(term_scores)
+  if (!is.finite(max_score) || max_score == 0) {
+    return(character())
   }
 
-  term_labels[vapply(
-    seq_along(term_labels),
-    function(i) identical(vcov_status(term_labels[-i]), "finite"),
-    logical(1)
-  )]
+  # Keep terms that materially contribute to the least stable direction. The
+  # cutoff intentionally leaves the result as a compact candidate list rather
+  # than claiming every coefficient with numerical noise is responsible.
+  term_labels[unique_term_ids[term_scores >= max_score * 0.1]]
 }
 
 # Verified to agree with car::vif() to 4 decimal places.
@@ -733,11 +707,13 @@ calc_vif_polr <- function(model) {
         paste(all_term_labels[term_ids], collapse = ", ")
       ))
     }
-    singular_terms <- identify_singular_polr_terms(model, all_term_labels[term_ids])
-    if (length(singular_terms) > 0) {
+    possible_terms <- identify_possible_singular_polr_terms(
+      model, all_term_labels, surv_term_idx, coef_names
+    )
+    if (length(possible_terms) > 0) {
       stop(paste0(
-        "Variables causing numerical singularity : ",
-        paste(gsub("`", "", singular_terms, fixed = TRUE), collapse = ", ")
+        "Variables possibly causing numerical singularity : ",
+        paste(gsub("`", "", possible_terms, fixed = TRUE), collapse = ", ")
       ))
     }
     stop("Numerically singular Hessian: VIF cannot be calculated")
