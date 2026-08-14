@@ -595,6 +595,45 @@ polr_macro_precision_recall_specificity <- function(actual, predicted) {
 #      model.matrix(clm) returns a LIST whose $X carries the design matrix, and
 #      that matrix DOES include an intercept column (assign == 0).
 #
+# Return the terms with the largest slope loadings in the Hessian's least
+# stable direction. This is intentionally a candidate diagnostic: a singular
+# ordinal likelihood identifies an unstable coefficient combination, not a
+# unique causal variable. Unlike refitting subsets of the model, it adds no
+# model fits to the failure path.
+identify_possible_singular_polr_terms <- function(model, term_labels, term_ids, coef_names) {
+  hessian <- model$Hessian
+  if (!is.matrix(hessian) || nrow(hessian) != ncol(hessian) ||
+      any(!is.finite(hessian)) || is.null(colnames(hessian))) {
+    return(character())
+  }
+
+  hessian_vector <- tryCatch(
+    base::svd(hessian, nu = 0, nv = ncol(hessian))$v[, ncol(hessian)],
+    error = function(e) NULL
+  )
+  hessian_idx <- match(coef_names, colnames(hessian))
+  if (is.null(hessian_vector) || anyNA(hessian_idx) || length(term_ids) != length(coef_names)) {
+    return(character())
+  }
+
+  slope_loadings <- abs(hessian_vector[hessian_idx])
+  unique_term_ids <- sort(unique(term_ids))
+  term_scores <- vapply(
+    unique_term_ids,
+    function(term_id) sqrt(sum(slope_loadings[term_ids == term_id]^2)),
+    numeric(1)
+  )
+  max_score <- max(term_scores)
+  if (!is.finite(max_score) || max_score == 0) {
+    return(character())
+  }
+
+  # Keep terms that materially contribute to the least stable direction. The
+  # cutoff intentionally leaves the result as a compact candidate list rather
+  # than claiming every coefficient with numerical noise is responsible.
+  term_labels[unique_term_ids[term_scores >= max_score * 0.1]]
+}
+
 # Verified to agree with car::vif() to 4 decimal places.
 calc_vif_polr <- function(model) {
   # Slopes only -- clm's coef() also contains the thresholds.
@@ -666,6 +705,15 @@ calc_vif_polr <- function(model) {
       stop(paste0(
         "Variables causing perfect collinearity : ",
         paste(all_term_labels[term_ids], collapse = ", ")
+      ))
+    }
+    possible_terms <- identify_possible_singular_polr_terms(
+      model, all_term_labels, surv_term_idx, coef_names
+    )
+    if (length(possible_terms) > 0) {
+      stop(paste0(
+        "Variables possibly causing numerical singularity : ",
+        paste(gsub("`", "", possible_terms, fixed = TRUE), collapse = ", ")
       ))
     }
     stop("Numerically singular Hessian: VIF cannot be calculated")
