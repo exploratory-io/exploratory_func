@@ -595,6 +595,71 @@ polr_macro_precision_recall_specificity <- function(actual, predicted) {
 #      model.matrix(clm) returns a LIST whose $X carries the design matrix, and
 #      that matrix DOES include an intercept column (assign == 0).
 #
+# Find the predictor term(s) responsible for a numerically singular ordinal
+# fit. A full-rank design can still have a singular Hessian under complete or
+# quasi separation, so rank/alias checks cannot identify the culprit. Refit
+# one term at a time: a term whose univariate model is singular is directly
+# separating the outcome. If none is singular alone, use leave-one-term-out
+# fits to identify terms whose removal restores a finite covariance matrix.
+identify_singular_polr_terms <- function(model, term_labels) {
+  model_data <- model$model
+  if (!is.data.frame(model_data) || length(term_labels) == 0) {
+    return(character())
+  }
+
+  response_label <- paste(deparse(stats::formula(model)[[2]]), collapse = "")
+  model_weights <- stats::model.weights(model_data)
+
+  vcov_status <- function(labels) {
+    if (length(labels) == 0) {
+      return("failed")
+    }
+    diagnostic_formula <- tryCatch(
+      stats::reformulate(labels, response = response_label),
+      error = function(e) NULL
+    )
+    if (is.null(diagnostic_formula)) {
+      return("failed")
+    }
+    fit_args <- list(
+      formula = diagnostic_formula,
+      data = model_data,
+      link = model$link,
+      threshold = model$threshold
+    )
+    if (!is.null(model_weights)) {
+      fit_args$weights <- model_weights
+    }
+    fit <- tryCatch(
+      suppressWarnings(do.call(ordinal::clm, fit_args)),
+      error = function(e) NULL
+    )
+    if (is.null(fit)) {
+      return("failed")
+    }
+    covariance <- tryCatch(stats::vcov(fit), error = function(e) NULL)
+    if (is.null(covariance) || length(covariance) == 0) {
+      return("failed")
+    }
+    if (all(is.finite(covariance))) "finite" else "singular"
+  }
+
+  singular_alone <- term_labels[vapply(
+    term_labels,
+    function(term) identical(vcov_status(term), "singular"),
+    logical(1)
+  )]
+  if (length(singular_alone) > 0) {
+    return(singular_alone)
+  }
+
+  term_labels[vapply(
+    seq_along(term_labels),
+    function(i) identical(vcov_status(term_labels[-i]), "finite"),
+    logical(1)
+  )]
+}
+
 # Verified to agree with car::vif() to 4 decimal places.
 calc_vif_polr <- function(model) {
   # Slopes only -- clm's coef() also contains the thresholds.
@@ -666,6 +731,13 @@ calc_vif_polr <- function(model) {
       stop(paste0(
         "Variables causing perfect collinearity : ",
         paste(all_term_labels[term_ids], collapse = ", ")
+      ))
+    }
+    singular_terms <- identify_singular_polr_terms(model, all_term_labels[term_ids])
+    if (length(singular_terms) > 0) {
+      stop(paste0(
+        "Variables causing numerical singularity : ",
+        paste(gsub("`", "", singular_terms, fixed = TRUE), collapse = ", ")
       ))
     }
     stop("Numerically singular Hessian: VIF cannot be calculated")

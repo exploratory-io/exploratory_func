@@ -447,7 +447,7 @@ test_that("tidy(type='vif') survives a term MASS::polr itself drops for rank-def
   expect_true(is.numeric(east_model$vif))
 })
 
-test_that("tidy(type='vif') reports a numerical singularity without calling it perfect collinearity", {
+test_that("tidy(type='vif') names the predictor causing a numerical singularity", {
   # The predictors are full rank, but the age-decade predictor nearly determines
   # the ordinal target. clm can therefore produce a non-finite vcov() without
   # any structural collinearity in the design matrix.
@@ -471,12 +471,13 @@ test_that("tidy(type='vif') reports a numerical singularity without calling it p
 
   expect_equal(qr(design)$rank, ncol(design))
   expect_true(inherits(model$vif, "error"))
-  expect_match(conditionMessage(model$vif), "Numerically singular Hessian")
+  expect_match(conditionMessage(model$vif), "Variables causing numerical singularity : decade", fixed = TRUE)
+  expect_false(grepl("other", conditionMessage(model$vif), fixed = TRUE))
   expect_false(grepl("perfect collinearity", conditionMessage(model$vif), fixed = TRUE))
   expect_equal(nrow(tidy_rowwise(trial, model, type = "vif")), 0)
 })
 
-test_that("tidy(type='vif') does not mislabel full-rank separation as collinearity", {
+test_that("tidy(type='vif') names a fully separating predictor without mislabeling it as collinearity", {
   # x completely separates the three ordered outcome levels; z is independent,
   # so the predictor design remains full rank while the ordinal Hessian is
   # numerically singular.
@@ -497,8 +498,39 @@ test_that("tidy(type='vif') does not mislabel full-rank separation as collineari
 
   expect_equal(qr(design)$rank, ncol(design))
   expect_true(inherits(model$vif, "error"))
-  expect_match(conditionMessage(model$vif), "Numerically singular Hessian")
+  expect_match(conditionMessage(model$vif), "Variables causing numerical singularity : x", fixed = TRUE)
+  expect_false(grepl("z", conditionMessage(model$vif), fixed = TRUE))
   expect_false(grepl("perfect collinearity", conditionMessage(model$vif), fixed = TRUE))
+})
+
+test_that("tidy(type='vif') identifies jointly separating predictors through leave-one-out fits", {
+  set.seed(2)
+  n <- 400
+  x <- stats::rnorm(n)
+  z <- stats::rnorm(n)
+  combined <- x + z
+  df <- data.frame(
+    y = ordered(cut(combined, breaks = c(-Inf, -0.5, 0.5, Inf),
+                    labels = c("Low", "Medium", "High"))),
+    x = x,
+    z = z
+  )
+
+  trial <- suppressWarnings(df %>% build_polr(y, x, z))
+  model <- trial$model[[1]]
+  message <- conditionMessage(model$vif)
+
+  expect_true(inherits(model$vif, "error"))
+  expect_match(message, "Variables causing numerical singularity :", fixed = TRUE)
+  expect_true(grepl("x", message, fixed = TRUE))
+  expect_true(grepl("z", message, fixed = TRUE))
+})
+
+test_that("singularity diagnosis does not name a term whose diagnostic refit cannot be constructed", {
+  df <- make_ordinal_test_df(n = 100)
+  model <- suppressWarnings(df %>% build_polr(`満足度`, `年齢`, `部署 名!#`))$model[[1]]
+
+  expect_equal(identify_singular_polr_terms(model, "not a valid term"), character())
 })
 
 test_that("evaluate_polr() reports the ordinal-aware metrics the spec requires", {
