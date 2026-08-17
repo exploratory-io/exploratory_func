@@ -724,7 +724,22 @@ ca_build_dimension_matrix_long <- function(metrics, max_dimensions = 5, only_def
       expected_contribution_pct = round(expected_contribution_pct, 1),
       contribution_above_average, cos2_quality, count, share
     ) %>%
-    dplyr::arrange(variable_order, category_order, dimension)
+    dplyr::arrange(variable_order, category_order, dimension) %>%
+    # #37847: the tam "Dimension x Category" report renders this as a PIVOT
+    # (rowh0 = Variable, rowh1 = Category, colh0 = Dimension). A pivot builds
+    # its headers with dplyr::group_by() + arrange(), which sorts a CHARACTER
+    # column by codepoint and only honors a declared order for a FACTOR --
+    # so arranging the flat rows above is NOT sufficient on its own. Carry the
+    # order as factor LEVELS as well, or the rendered table re-sorts
+    # alphabetically even though these rows are already in the right order.
+    # unique() after the arrange() yields exactly the desired level order.
+    # dimension_header is included because it is the column header and a
+    # character sort would place "Dimension 10 (..)" before "Dimension 2 (..)".
+    dplyr::mutate(
+      variable = factor(variable, levels = unique(variable)),
+      category = factor(category, levels = unique(category)),
+      dimension_header = factor(dimension_header, levels = unique(dimension_header))
+    )
 }
 
 # 5-3 details
