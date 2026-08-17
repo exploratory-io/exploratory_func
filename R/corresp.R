@@ -104,9 +104,14 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
       for (i in 1:length(cleaned_df)) {
         if (colnames(cleaned_df)[i] %in% selected_cols) {
           original_col <- cleaned_df[[i]]
+          category_values <- as.character(original_col)
+          category_values[is.na(category_values)] <- "NA"
           ordered_levels <- ca_get_category_levels(original_col)
+          if (anyNA(original_col) && !"NA" %in% ordered_levels) {
+            ordered_levels <- c(ordered_levels, "NA")
+          }
           cleaned_df[i] <- factor(
-            paste0("V", i, ":", as.character(original_col)),
+            paste0("V", i, ":", category_values),
             levels = paste0("V", i, ":", ordered_levels)
           )
         }

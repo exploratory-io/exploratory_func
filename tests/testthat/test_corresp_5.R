@@ -75,6 +75,22 @@ test_that("MCA (3+ variables): dimension_matrix and category_details keep the so
   expect_equal(dm_churn, c("TRUE", "FALSE"))
 })
 
+test_that("MCA: missing categories retain their prefixed category ids", {
+  df <- data.frame(
+    plan = factor(c("Free", NA, "Standard", "Professional", "Enterprise"),
+                  levels = plan_levels),
+    churn = c(FALSE, TRUE, FALSE, TRUE, FALSE),
+    resptime = factor(c("1 hour or less", "2-3 days", NA, "4+ days", "2-3 days"),
+                      levels = c("1 hour or less", "2-3 days", "4+ days")),
+    stringsAsFactors = FALSE
+  )
+  model <- (df %>% exp_mca(plan, churn, resptime, ncp = 2))$model[[1]]
+  lookup <- model$category_lookup
+
+  expect_true(all(grepl("^V[0-9]+:", lookup$category_id)))
+  expect_equal(lookup$variable[lookup$category == "NA"], c("plan", "resptime"))
+})
+
 test_that("CA (2 variables): dimension_matrix and category_details keep the source factor's level order", {
   df <- make_order_data()
   m <- df %>% exp_mca(plan, resptime, ncp = 5)
