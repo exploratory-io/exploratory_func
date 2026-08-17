@@ -364,14 +364,15 @@ test_that("tidy() joins the reference (base) level for each categorical predicto
 
   expect_true("Base Level" %in% colnames(tidied))
 
-  # The model's term names carry backticks for a column whose name needs quoting,
-  # so match on the model's OWN dummy terms rather than a hand-built string.
   model <- trial$model[[1]]
   dept_levels <- model$xlevels[["部署 名!#"]]
   expect_false(is.null(dept_levels))
-  dummy_terms <- names(stats::coef(model))
-  dummy_terms <- dummy_terms[grepl("部署", dummy_terms, fixed = TRUE)]
-  dummy_rows <- tidied[tidied$Term %in% dummy_terms, ]
+
+  # #37862: tidy.clm_exploratory_0() now prettifies a categorical predictor's dummy term
+  # into "<Variable>: <Level>" (matching build_glm()'s own coefficient-table convention),
+  # so match on that format rather than the model's raw (unprettified) coefficient names.
+  expected_dummy_terms <- paste0("部署 名!#: ", dept_levels[-1])
+  dummy_rows <- tidied[tidied$Term %in% expected_dummy_terms, ]
   expect_true(nrow(dummy_rows) > 0)
 
   # The reference level is whichever level ends up FIRST after build_polr's
@@ -385,6 +386,48 @@ test_that("tidy() joins the reference (base) level for each categorical predicto
   # A numeric predictor and the intercept (threshold) rows have no base level.
   expect_true(is.na(tidied$`Base Level`[tidied$Term == "年齢"]))
   expect_true(all(is.na(tidied$`Base Level`[tidied$Type == "intercept"])))
+})
+
+test_that("an ORDERED-factor predictor gets treatment contrasts (readable terms + a base level), not polynomial ones (#37862)", {
+  # Reproduces the reported bug: a predictor column that is already an ORDERED factor
+  # (e.g. built via "Set Category Values and Order" upstream) used to keep R's default
+  # contr.poly contrasts, producing opaque ".L"/".Q"/".C" term suffixes and leaving Base
+  # Level entirely blank (the join key never matches a polynomial-contrast term).
+  set.seed(11)
+  n <- 200
+  df <- data.frame(
+    `満足度` = factor(sample(c("Low", "Medium", "High"), n, TRUE),
+                      levels = c("Low", "Medium", "High"), ordered = TRUE),
+    `年齢` = stats::rnorm(n, 40, 10),
+    `契約プラン` = factor(sample(c("Free", "Standard", "Professional"), n, TRUE),
+                          levels = c("Free", "Standard", "Professional"), ordered = TRUE),
+    check.names = FALSE
+  )
+  expect_true(is.ordered(df[["契約プラン"]]))
+
+  trial <- df %>% build_polr(`満足度`, `年齢`, `契約プラン`)
+  tidied <- tidy_rowwise(trial, model, pretty.name = TRUE)
+
+  # No polynomial-contrast codes -- one readable "<Variable>: <Level>" term per
+  # non-reference level, exactly like build_glm()'s own coefficient table.
+  expect_false(any(grepl("契約プラン\\.[LQC]$", tidied$Term)))
+  expect_true(all(c("契約プラン: Standard", "契約プラン: Professional") %in% tidied$Term))
+
+  # Base Level is populated (the reference/first level after un-ordering, "Free").
+  plan_rows <- tidied[tidied$Term %in% c("契約プラン: Standard", "契約プラン: Professional"), ]
+  expect_equal(nrow(plan_rows), 2)
+  expect_true(all(plan_rows$`Base Level` == "Free"))
+})
+
+test_that("prettify_polr_factor_terms() reformats a factor dummy term and leaves everything else untouched", {
+  xlevels <- list(plan = c("Free", "Standard", "Professional"), `a b` = c("x", "y"))
+  terms <- c("Low|Mid", "age", "planStandard", "planProfessional", "`a b`y")
+  expect_equal(
+    prettify_polr_factor_terms(terms, xlevels),
+    c("Low|Mid", "age", "plan: Standard", "plan: Professional", "a b: y")
+  )
+  # No factor predictors at all (numeric-only model) -- every term passes through unchanged.
+  expect_equal(prettify_polr_factor_terms(terms, list()), terms)
 })
 
 test_that("evaluate_polr() carries a Max VIF column, matching build_lm.R's convention", {
