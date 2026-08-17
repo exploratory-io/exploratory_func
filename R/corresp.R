@@ -94,9 +94,26 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
       var_names_map <- colnames(cleaned_df)
       names(var_names_map) <- paste0("V", 1:length(var_names_map))
       # Prefix category values with the column index so they are unique across columns.
+      # Build the prefixed factor with EXPLICIT levels (via ca_get_category_levels(),
+      # #37847) instead of as.factor() -- as.factor() on a plain character vector
+      # always re-sorts alphabetically, which would discard the source column's own
+      # Factor level order (or its Logical TRUE/FALSE order, or its raw row order)
+      # even though FactoMineR::MCA's category_id rownames -- and therefore every
+      # section-5 report table/chart's display order -- come straight from these
+      # factor levels.
       for (i in 1:length(cleaned_df)) {
         if (colnames(cleaned_df)[i] %in% selected_cols) {
-          cleaned_df[i] <- as.factor(paste0("V", i, ":", cleaned_df[[i]]))
+          original_col <- cleaned_df[[i]]
+          category_values <- as.character(original_col)
+          category_values[is.na(category_values)] <- "NA"
+          ordered_levels <- ca_get_category_levels(original_col)
+          if (anyNA(original_col) && !"NA" %in% ordered_levels) {
+            ordered_levels <- c(ordered_levels, "NA")
+          }
+          cleaned_df[i] <- factor(
+            paste0("V", i, ":", category_values),
+            levels = paste0("V", i, ":", ordered_levels)
+          )
         }
       }
       quanti_sup_idx <- which(colnames(cleaned_df) %in% quanti_sups)
@@ -580,7 +597,11 @@ tidy.ca_exploratory <- function(x, type = "categories", ...) {
   m <- x$section5$all_metrics
   wide <- m %>%
     dplyr::filter(dimension %in% c(1, 2)) %>%
-    dplyr::select(variable, category, dimension, coordinate, contribution_pct, cos2, count, share) %>%
+    # variable_order/category_order are kept only to order the rows below; they
+    # are dropped again by the closing transmute() so the column contract is
+    # unchanged.
+    dplyr::select(variable_order, category_order, variable, category, dimension,
+                  coordinate, contribution_pct, cos2, count, share) %>%
     tidyr::pivot_wider(
       names_from = dimension,
       values_from = c(coordinate, contribution_pct, cos2),
@@ -591,9 +612,14 @@ tidy.ca_exploratory <- function(x, type = "categories", ...) {
     if (!col %in% names(wide)) wide[[col]] <- NA_real_
   }
   wide %>%
+    # #37847: the 2D category map colors by Variable, whose legend is built by
+    # a group_by()/arrange() that sorts a character column by codepoint. Carry
+    # the source order as factor levels so the legend follows the variable
+    # selection order instead of an alphabetical one.
+    dplyr::arrange(variable_order, category_order) %>%
     dplyr::transmute(
-      Variable = variable,
-      Category = category,
+      Variable = factor(variable, levels = unique(variable)),
+      Category = factor(category, levels = unique(category)),
       `Dimension 1` = coordinate_1,
       `Dimension 2` = coordinate_2,
       Count = count,
