@@ -13,10 +13,13 @@
 # Section 3 / 4: helpers
 # ============================================================
 
-# Category display order: factor -> defined levels, character -> first appearance.
+# Category display order: factor -> defined levels, logical -> TRUE before FALSE,
+# character/other -> first appearance in the data.
 ca_get_category_levels <- function(x) {
   if (is.factor(x)) {
     levels(droplevels(x))
+  } else if (is.logical(x)) {
+    intersect(c("TRUE", "FALSE"), unique(as.character(x[!is.na(x)])))
   } else {
     unique(as.character(x[!is.na(x)]))
   }
@@ -189,7 +192,14 @@ ca_analyze_one_variable_pair_from_counts <- function(
   cramers_v <- ca_calculate_cramers_v(contingency_table, chi_square_statistic)
   association_strength <- ca_classify_cramers_v(cramers_v, nrow(contingency_table), ncol(contingency_table))
 
-  cell_results <- as.data.frame(as.table(contingency_table), stringsAsFactors = FALSE)
+  # stringsAsFactors=TRUE keeps row_category/column_category as factors whose
+  # levels mirror contingency_table's own dimnames order (already the correct
+  # original-data order via ca_get_category_levels() above) -- as.data.frame.table
+  # never re-sorts dimnames, only as.character() would discard the order. tam's
+  # pivot/bar chart rendering sorts a character column alphabetically but respects
+  # a factor's level order, so this is required for the tam-side report to honor
+  # the original data order (#37847).
+  cell_results <- as.data.frame(as.table(contingency_table), stringsAsFactors = TRUE)
   names(cell_results) <- c("row_category", "column_category", "observed_count")
   n <- sum(contingency_table)
 
@@ -720,12 +730,15 @@ ca_build_dimension_matrix_long <- function(metrics, max_dimensions = 5, only_def
 # 5-3 details
 ca_build_category_details <- function(metrics) {
   metrics %>%
+    # Arrange by variable_order/category_order (the original data order, #37847)
+    # BEFORE transmute, not by the plain `variable`/`category` text -- arranging
+    # by the text columns would re-sort alphabetically, discarding the order.
+    dplyr::arrange(dimension, variable_order, category_order) %>%
     dplyr::transmute(
       dimension, explained_pct, cumulative_pct, variable, category, side,
       coordinate, contribution_pct, expected_contribution_pct, contribution_above_average,
       contribution_rank, cos2, cos2_quality, count, share, low_frequency_status, default_display
-    ) %>%
-    dplyr::arrange(dimension, variable, category)
+    )
 }
 
 # Public: build all section-5 outputs from a FactoMineR result

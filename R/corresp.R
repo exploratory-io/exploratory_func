@@ -94,9 +94,21 @@ exp_mca <- function(df, ..., max_nrow = NULL, allow_single_column = FALSE, ncp =
       var_names_map <- colnames(cleaned_df)
       names(var_names_map) <- paste0("V", 1:length(var_names_map))
       # Prefix category values with the column index so they are unique across columns.
+      # Build the prefixed factor with EXPLICIT levels (via ca_get_category_levels(),
+      # #37847) instead of as.factor() -- as.factor() on a plain character vector
+      # always re-sorts alphabetically, which would discard the source column's own
+      # Factor level order (or its Logical TRUE/FALSE order, or its raw row order)
+      # even though FactoMineR::MCA's category_id rownames -- and therefore every
+      # section-5 report table/chart's display order -- come straight from these
+      # factor levels.
       for (i in 1:length(cleaned_df)) {
         if (colnames(cleaned_df)[i] %in% selected_cols) {
-          cleaned_df[i] <- as.factor(paste0("V", i, ":", cleaned_df[[i]]))
+          original_col <- cleaned_df[[i]]
+          ordered_levels <- ca_get_category_levels(original_col)
+          cleaned_df[i] <- factor(
+            paste0("V", i, ":", as.character(original_col)),
+            levels = paste0("V", i, ":", ordered_levels)
+          )
         }
       }
       quanti_sup_idx <- which(colnames(cleaned_df) %in% quanti_sups)
