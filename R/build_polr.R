@@ -893,9 +893,17 @@ prettify_polr_factor_terms <- function(term, xlevels) {
   if (length(xlevels) == 0) {
     return(term)
   }
+  # Only terms that are exact entries in the factor-term table are eligible for
+  # prettification. A prefix-only check would misclassify an unrelated numeric
+  # predictor (for example, `age` when a factor predictor is named `a`) as a
+  # factor dummy term.
+  factor_terms <- xlevels_to_base_level_table(xlevels)$term
   vnames <- names(xlevels)
   vnames <- vnames[order(-nchar(vnames))]
   purrr::map_chr(term, function(one_term) {
+    if (!(one_term %in% factor_terms)) {
+      return(one_term)
+    }
     for (vname in vnames) {
       # Mirrors xlevels_to_base_level_table()'s own backtick-quoting rule so the prefix we
       # strip here matches exactly what that function (and R's own term-labeling) produces.

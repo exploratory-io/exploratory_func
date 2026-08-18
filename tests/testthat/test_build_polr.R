@@ -430,6 +430,25 @@ test_that("prettify_polr_factor_terms() reformats a factor dummy term and leaves
   expect_equal(prettify_polr_factor_terms(terms, list()), terms)
 })
 
+test_that("factor-term prettification does not rewrite a numeric predictor with a matching prefix", {
+  set.seed(12)
+  n <- 200
+  df <- data.frame(
+    y = factor(sample(c("Low", "Medium", "High"), n, TRUE),
+               levels = c("Low", "Medium", "High"), ordered = TRUE),
+    a = factor(sample(c("No", "Yes"), n, TRUE), levels = c("No", "Yes")),
+    age = stats::rnorm(n),
+    check.names = FALSE
+  )
+
+  trial <- df %>% build_polr(y, a, age)
+  tidied <- tidy_rowwise(trial, model, pretty.name = TRUE)
+
+  expect_true("age" %in% tidied$Term)
+  expect_false("a: ge" %in% tidied$Term)
+  expect_true(is.na(tidied$`Base Level`[tidied$Term == "age"]))
+})
+
 test_that("evaluate_polr() carries a Max VIF column, matching build_lm.R's convention", {
   df <- make_ordinal_test_df(n = 150)
   trial <- df %>% build_polr(`満足度`, `年齢`, `部署 名!#`)
