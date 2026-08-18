@@ -66,6 +66,53 @@ test_that("exclude_empty = FALSE keeps blank answers", {
   expect_true("" %in% result$Answer)
 })
 
+test_that("exclude_empty = TRUE (default) still preserves a row whose target column is genuinely NA (#37922)", {
+  # A respondent who left the question entirely blank (NA, not a blank
+  # token from splitting) must still show up as a row, matching the Chart
+  # side's "(NA)" category (#37591) -- exclude_empty only governs blank
+  # tokens produced by splitting a non-empty cell, never a missing cell.
+  df <- data.frame(
+    id = c(1, 2, 3),
+    store = c("Yamada,Edion", NA, "Bic Camera"),
+    stringsAsFactors = FALSE
+  )
+  result <- df %>% exp_multiple_answers_to_longer(store, sep = ",")
+
+  expect_equal(nrow(result), 4)
+  expect_equal(result$`Original Row ID`, c(1, 1, 2, 3))
+  expect_true(is.na(result$Answer[result$`Original Row ID` == 2]))
+  expect_equal(result$id[result$`Original Row ID` == 2], 2)
+  expect_equal(sort(result$Answer[!is.na(result$Answer)]), c("Bic Camera", "Edion", "Yamada"))
+})
+
+test_that("a genuinely-NA target column keeps its row even when a SECOND target column has real values (#37922)", {
+  # Two Multiple-Answers columns on the same original row: one left blank,
+  # one answered. Each column's own piece is independent (stacked, not
+  # cross-joined), so the NA column must still surface a Question=NA-column,
+  # Answer=NA row alongside the other column's normal split rows.
+  df <- data.frame(
+    id = c(1),
+    q13 = NA_character_,
+    q14 = c("Design,Price"),
+    stringsAsFactors = FALSE
+  )
+  result <- df %>% exp_multiple_answers_to_longer(q13, q14, sep = ",")
+
+  expect_equal(nrow(result), 3)
+  expect_true(is.na(result$Answer[result$Question == "q13"]))
+  expect_equal(sort(result$Answer[result$Question == "q14"]), c("Design", "Price"))
+})
+
+test_that("exclude_empty = TRUE still drops a blank TOKEN (not NA) from an otherwise-answered cell (#37922 regression guard)", {
+  # Distinguishes the #37922 fix (NA is always kept) from the pre-existing
+  # "drops blank answers" behavior (a "" token from splitting IS dropped).
+  df <- data.frame(id = c(1), store = c("Yamada,,Edion"), stringsAsFactors = FALSE)
+  result <- df %>% exp_multiple_answers_to_longer(store, sep = ",")
+  expect_equal(nrow(result), 2)
+  expect_false(any(is.na(result$Answer)))
+  expect_false("" %in% result$Answer)
+})
+
 test_that("dedupe_within_row = TRUE (default) collapses a repeated answer in one cell to one row", {
   df <- data.frame(id = c(1), store = c("Yamada,Yamada,Edion"), stringsAsFactors = FALSE)
   result <- df %>% exp_multiple_answers_to_longer(store, sep = ",")
