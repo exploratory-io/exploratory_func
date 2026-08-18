@@ -3841,8 +3841,11 @@ pivot_wider <- function(data, names_from, values_from = NULL, ...) {
 #'   Default "Answer".
 #' @param trim_ws Trim leading/trailing whitespace around each split choice.
 #'   Default TRUE.
-#' @param exclude_empty Drop blank/NA choices (e.g. from "A,,B" or a fully
-#'   blank cell) instead of emitting an empty-string row. Default TRUE.
+#' @param exclude_empty Drop blank-token choices produced by splitting a
+#'   non-empty cell (e.g. the middle "" of "A,,B") instead of emitting an
+#'   empty-string row. Does NOT drop a row whose original cell is genuinely
+#'   NA (no answer at all) -- that row is always kept, with `NA` in
+#'   `answer_col`, regardless of this option (#37922). Default TRUE.
 #' @param dedupe_within_row Collapse a choice repeated within the same
 #'   original cell (e.g. "A,A,B") down to one row. Default TRUE.
 #' @param add_row_id Add a column identifying which original row each output
@@ -3931,7 +3934,13 @@ exp_multiple_answers_to_longer <- function(df, ...,
       piece$value <- trimws(piece$value)
     }
     if (exclude_empty) {
-      piece <- piece[!is.na(piece$value) & piece$value != "", , drop = FALSE]
+      # A genuine NA (a cell with no answer at all) was never split by
+      # separate_rows() -- it survives as its own single-row piece. Only
+      # drop blank *tokens* produced by splitting an otherwise-answered
+      # cell (e.g. the middle "" of "A,,B"); a genuinely missing cell must
+      # still produce a row so the original row is not silently dropped
+      # from the output (#37922).
+      piece <- piece[is.na(piece$value) | piece$value != "", , drop = FALSE]
     }
     if (dedupe_within_row) {
       piece <- piece[!duplicated(piece[c(row_id_col_internal, "value")]), , drop = FALSE]
