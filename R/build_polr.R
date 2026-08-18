@@ -74,9 +74,23 @@ build_polr <- function(df,
   }
 
   # make character predictors factor sorted by frequency, mirroring build_glm()/build_lm.fast().
+  # A factor predictor that is already ORDERED (e.g. a column that went through "Set Category
+  # Values and Order" upstream) must also be un-ordered before modeling (issue #37862) -- R's
+  # default contrasts for an ORDERED factor are polynomial (contr.poly), which produces one term
+  # per polynomial degree (".L"/".Q"/".C"/...) instead of one term per non-reference LEVEL, and
+  # those polynomial term names never match xlevels_to_base_level_table()'s join key (a plain
+  # <variable><level> string), so the fitted model's Base Level column comes out entirely blank
+  # for that predictor. An UNORDERED factor uses treatment contrasts (one dummy term per
+  # non-reference level, readable term names, a real base level) -- exactly the same fix
+  # build_lm.R/build_glm() already apply to their own predictor columns (see build_lm.R's factor
+  # branch: "if it is ordered factor, turn it into unordered"). Level ORDER -- and therefore
+  # which level becomes the reference/base level -- is preserved; only the "ordered" class (and
+  # its polynomial-contrast side effect) is dropped.
   for (col in orig_selected_cols) {
     if (is.character(df[[col]])) {
       df[[col]] <- forcats::fct_infreq(df[[col]])
+    } else if (is.factor(df[[col]]) && is.ordered(df[[col]])) {
+      df[[col]] <- factor(df[[col]], levels = levels(df[[col]]), ordered = FALSE)
     }
   }
 
@@ -866,6 +880,46 @@ partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(dat
   pd
 }
 
+# Reformat a categorical predictor's raw dummy-variable term (e.g. "契約プランStandard" --
+# the variable name directly concatenated with its non-reference level, backtick-quoted when
+# the variable name needs it, exactly the shape terms() gives a treatment-contrast factor) into
+# build_glm()-style "<Variable>: <Level>" text (e.g. "契約プラン: Standard"), issue #37862.
+# `xlevels` is the fitted model's own $xlevels (list of ALL levels per factor predictor, as
+# used by xlevels_to_base_level_table() above) -- every VARIABLE name in it is a candidate
+# prefix to strip off each term. Longest-variable-name-first so a variable name that is itself
+# a prefix of another variable name (e.g. "x" and "x2") cannot match the wrong one. A term with
+# no matching prefix (a numeric predictor, or a threshold/intercept term) is returned unchanged.
+prettify_polr_factor_terms <- function(term, xlevels) {
+  if (length(xlevels) == 0) {
+    return(term)
+  }
+  # Only terms that are exact entries in the factor-term table are eligible for
+  # prettification. A prefix-only check would misclassify an unrelated numeric
+  # predictor (for example, `age` when a factor predictor is named `a`) as a
+  # factor dummy term.
+  factor_terms <- xlevels_to_base_level_table(xlevels)$term
+  vnames <- names(xlevels)
+  vnames <- vnames[order(-nchar(vnames))]
+  purrr::map_chr(term, function(one_term) {
+    if (!(one_term %in% factor_terms)) {
+      return(one_term)
+    }
+    for (vname in vnames) {
+      # Mirrors xlevels_to_base_level_table()'s own backtick-quoting rule so the prefix we
+      # strip here matches exactly what that function (and R's own term-labeling) produces.
+      quoted <- if (grepl("[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]", vname, perl = TRUE)) {
+        paste0("`", vname, "`")
+      } else {
+        vname
+      }
+      if (startsWith(one_term, quoted) && nchar(one_term) > nchar(quoted)) {
+        return(paste0(vname, ": ", substring(one_term, nchar(quoted) + 1)))
+      }
+    }
+    one_term
+  })
+}
+
 #' Coefficient / odds-ratio table for an Ordered Logistic Regression model.
 #' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param type What to return: "coefficients" (default), "vif", "importance",
@@ -986,6 +1040,16 @@ tidy.clm_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, co
   if (length(x$xlevels) > 0) {
     base_level_table <- xlevels_to_base_level_table(x$xlevels)
     ret <- ret %>% dplyr::left_join(base_level_table, by = "term")
+    # Reformat a categorical predictor's raw dummy term ("<var><level>", the same shape the
+    # join above just matched on) into build_glm()-style "<var>: <level>" text (issue #37862),
+    # e.g. "契約プラン: Standard" instead of "契約プランStandard" -- matches Logistic
+    # Regression's own coefficient table exactly. Must run AFTER the base_level_table join
+    # (which needs the RAW term text) and BEFORE the pretty.name rename below (which only
+    # touches column names, not values). build_polr() fits directly on the original
+    # (backtick-quoted where needed) column names -- unlike build_lm()/build_glm(), which
+    # rename predictors to "c1_"/"c2_"/... internally and map back via map_terms_to_orig() --
+    # so that existing helper's "^c[0-9]+_" prefix match does not apply here.
+    ret$term <- prettify_polr_factor_terms(ret$term, x$xlevels)
   }
 
   if (pretty.name) {
