@@ -521,6 +521,72 @@ test_that("factor_count / parallel_screeplot report the HIGHEST adopted factor, 
   expect_equal(fc_none$`Recommended Number of Factors`[fc_none$Method == "Parallel Analysis"], "0")
 })
 
+test_that("factor_count / parallel_screeplot / variances_judged NEVER disagree on the Parallel Analysis recommendation, across many randomized adoption patterns (issue tam#37972 -- regression guard)", {
+  # This is a PROPERTY/INVARIANT test, not a fixed-fixture regression test (see the block above it).
+  # tam#37972 happened because THREE tidy() types independently computed "the same" recommended
+  # factor count -- factor_count's table, parallel_screeplot's hidden column, and
+  # variances_judged's per-factor status -- and only two of the three were ever fixed together
+  # (tam#37943/#37947), because nobody wrote a fixture for the specific way the third one diverged.
+  # A hand-picked fixture only catches a shape someone already thought of. This instead fuzzes MANY
+  # random non-contiguous / all-NA / none-adopted adoption patterns and cross-checks all three
+  # outputs against EACH OTHER on every draw, so it keeps catching this whole CLASS of bug even if
+  # a future change reintroduces divergence via a path nobody wrote a fixture for. Mirrors the
+  # sibling cross-LANGUAGE property test in tam's exp_factanal.test.js
+  # ("judged_status_count (library.r) and extractFactorCountRecommendation (JS) never disagree,
+  # across randomized adoption patterns"), which guards the OTHER two (already-fixed) siblings the
+  # same way, one repo/language over.
+  set.seed(20260819)
+  n_iter <- 200
+  for (i in seq_len(n_iter)) {
+    n_factors <- sample(2:8, 1)
+    # TRUE = adopted, FALSE = not adopted, NA = not judgeable (deliberately allows non-contiguous,
+    # all-FALSE, and all-NA draws -- the exact shapes tam#37972 fell through on).
+    adopted <- sample(c(TRUE, FALSE, NA), n_factors, replace = TRUE, prob = c(0.4, 0.4, 0.2))
+    threshold <- rep(1, n_factors)
+    actual <- ifelse(is.na(adopted), NA_real_,
+                      ifelse(adopted, 1 + stats::runif(n_factors), stats::runif(n_factors)))
+
+    fake_fit <- list(
+      correlation = diag(n_factors),
+      factors = max(1L, n_factors - 1L),
+      parallel = list(
+        method = "factor_model",
+        recommended_n = compute_parallel_recommended_n(ifelse(is.na(actual), 0, actual), threshold),
+        table = tibble::tibble(
+          factor_number = seq_len(n_factors),
+          actual_eigenvalue = actual,
+          random_eigenvalue_threshold = threshold,
+          retained = rep(FALSE, n_factors) # unused by build_factor_count_diagnostics
+        )
+      )
+    )
+    class(fake_fit) <- "fa_exploratory"
+
+    diagnostics <- build_factor_count_diagnostics(fake_fit)
+    expected <- factanal_max_adopted_factor(diagnostics$parallel_adopted)
+    info <- paste0("iteration ", i, ", adopted = [", paste(adopted, collapse = ","), "]")
+
+    fc <- tidy.fa_exploratory(fake_fit, type = "factor_count")
+    fc_value <- fc$`Recommended Number of Factors`[fc$Method == "Parallel Analysis"]
+    expect_equal(fc_value, if (is.na(expected)) "Not available" else as.character(expected), info = info)
+
+    ps <- tidy.fa_exploratory(fake_fit, type = "parallel_screeplot")
+    ps_value <- unique(ps$`Recommended Number of Factors`)
+    expect_equal(ps_value, if (is.na(expected)) NA_integer_ else expected, info = info)
+
+    vj <- tidy.fa_exploratory(fake_fit, type = "variances_judged")
+    vj_adopted_factors <- suppressWarnings(as.integer(vj$Factor[vj$parallel_status == "adopted"]))
+    vj_expected <- if (length(vj_adopted_factors) > 0) {
+      max(vj_adopted_factors)
+    } else if (all(vj$parallel_status == "na")) {
+      NA_integer_
+    } else {
+      0L
+    }
+    expect_equal(vj_expected, expected, info = info)
+  }
+})
+
 test_that("report part 3: variances_judged, suitability P value format, analysis_method order (issue tam#37340)", {
   model_df <- mtcars %>%
     exp_factanal(mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 2, fm = "minres",
