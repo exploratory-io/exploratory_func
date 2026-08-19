@@ -564,6 +564,24 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
   res
 }
 
+# The highest-numbered factor currently TRUE (adopted) in a per-factor logical vector that may
+# contain NA (not judgeable) entries -- issue tam#37972, sibling of tam#37943/#37947. Mirrors
+# library.r's judged_status_count() and FactanalReportBindUtil.js's maxFactorForStatus(): the
+# HIGHEST adopted row, NOT a count/leading-run stop, because the parallel-analysis random-data
+# threshold is a Monte-Carlo quantile and is not guaranteed to be monotonically decreasing -- a
+# real data set can show e.g. Factor 1 Not Adopted, Factor 2 Adopted, Factor 3 Not Adopted, and
+# the recommendation must point at Factor 2, not stop counting at Factor 1.
+# Returns NA_integer_ when adoption could not be judged for ANY factor (every entry NA -- caller
+# should render "Not available"), 0L when every judged factor was Not Adopted, otherwise the
+# highest adopted factor number.
+factanal_max_adopted_factor <- function(adopted) {
+  if (length(adopted) == 0 || all(is.na(adopted))) {
+    return(NA_integer_)
+  }
+  idx <- which(adopted)
+  if (length(idx) == 0) 0L else max(idx)
+}
+
 # Factor-count diagnostics shared by the normal scree plot, parallel-analysis
 # chart, and factor-count table. Keeping the alignment here prevents those three
 # report outputs from independently interpreting the parallel-analysis table.
@@ -939,10 +957,24 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   else if (type == "factor_count") {
     # Kaiser criterion always reads the plain correlation-matrix eigenvalues (issue tam#37332
     # section 10): it is a separate, well-known rule of thumb that this change does not touch.
+    # Kaiser's adoption is always a contiguous leading run (correlation eigenvalues sort
+    # descending), so a plain count IS the highest adopted row there -- no fix needed.
     eig <- eigen(x$correlation, symmetric = TRUE, only.values = TRUE)$values
     kaiser_n <- sum(eig > 1)
     par <- x$parallel
-    parallel_rec <- if (is.null(par)) "Not available" else as.character(par$recommended_n)
+    # issue tam#37972 (sibling of tam#37943/#37947): this used to read par$recommended_n, a
+    # LEADING-CONTIGUOUS-RUN count (see compute_parallel_recommended_n() above) that disagrees
+    # with variances_judged's parallel_status -- the per-factor decision table, the chart's
+    # reference line (library.r judged_status_count(), #37947) and the report prose
+    # (FactanalReportBindUtil.js, #37947) all derive from build_factor_count_diagnostics()'s raw
+    # per-factor comparison instead. Route through the SAME diagnostics/helper so this table can
+    # never disagree with those three again.
+    parallel_rec <- if (is.null(par)) {
+      "Not available"
+    } else {
+      max_adopted <- factanal_max_adopted_factor(build_factor_count_diagnostics(x)$parallel_adopted)
+      if (is.na(max_adopted)) "Not available" else as.character(max_adopted)
+    }
     # The description names which eigenvalue the Parallel Analysis row actually compared, so it
     # stays honest once the method is selectable (issue tam#37332).
     parallel_description <- if (is.null(par)) {
@@ -989,7 +1021,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   }
   else if (type == "parallel_screeplot") {
     diagnostics <- build_factor_count_diagnostics(x)
-    recommended_n <- if (is.null(x$parallel)) NA_integer_ else x$parallel$recommended_n
+    # issue tam#37972: same fix as the factor_count table above -- keep this column's semantics
+    # (highest adopted factor) identical everywhere it's named "Recommended Number of Factors",
+    # instead of par$recommended_n's leading-contiguous-run count.
+    recommended_n <- if (is.null(x$parallel)) {
+      NA_integer_
+    } else {
+      max_adopted <- factanal_max_adopted_factor(diagnostics$parallel_adopted)
+      if (is.na(max_adopted)) NA_integer_ else max_adopted
+    }
     res <- diagnostics %>% dplyr::transmute(
       Factor = factor_number,
       `Actual Data Eigenvalue` = parallel_eigenvalue,

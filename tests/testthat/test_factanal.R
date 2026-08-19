@@ -447,6 +447,80 @@ test_that("parallel analysis method: factor_model vs smc (issue #37332)", {
   expect_equal(legacy_am$Value[[which(legacy_am$Item == "Parallel Analysis Method")]], "Factor Model")
 })
 
+test_that("factanal_max_adopted_factor (issue tam#37972)", {
+  expect_true(is.na(factanal_max_adopted_factor(c(NA, NA, NA))))
+  expect_true(is.na(factanal_max_adopted_factor(logical(0))))
+  expect_equal(factanal_max_adopted_factor(c(FALSE, FALSE)), 0L)
+  expect_equal(factanal_max_adopted_factor(c(FALSE, TRUE, FALSE)), 2L)
+  expect_equal(factanal_max_adopted_factor(c(TRUE, TRUE, TRUE)), 3L)
+  # NA entries (out-of-range / not judgeable) do not stop or confuse the scan.
+  expect_equal(factanal_max_adopted_factor(c(TRUE, NA, FALSE)), 1L)
+})
+
+test_that("factor_count / parallel_screeplot report the HIGHEST adopted factor, not a leading-run count (issue tam#37972)", {
+  # Reproduces the non-contiguous adoption repro from tam#37943/#37947 (Factor 1 Not Adopted,
+  # Factor 2 Adopted, Factor 3 Not Adopted) directly against tidy.fa_exploratory(), bypassing the
+  # randomness of a real parallel analysis run. compute_parallel_recommended_n() (a
+  # LEADING-CONTIGUOUS-RUN count) stops at Factor 1 and reports 0 -- exactly the pre-fix bug, since
+  # the factor_count/parallel_screeplot tidy types used to read x$parallel$recommended_n directly --
+  # while build_factor_count_diagnostics()$parallel_adopted (a raw per-factor comparison, what
+  # variances_judged / the chart refline (library.r, #37947) / the report prose
+  # (FactanalReportBindUtil.js, #37947) already use) correctly shows Factor 2 as the highest
+  # adopted row.
+  fake_fit <- list(
+    correlation = matrix(c(1, 0.3, 0.3, 0.3, 1, 0.3, 0.3, 0.3, 1), nrow = 3),
+    factors = 2,
+    parallel = list(
+      method = "factor_model",
+      recommended_n = compute_parallel_recommended_n(c(0.5, 2, 0.5), c(1, 1, 1)), # leading-count == 0
+      table = tibble::tibble(
+        factor_number = 1:3,
+        actual_eigenvalue = c(0.5, 2, 0.5),
+        random_eigenvalue_threshold = c(1, 1, 1),
+        retained = c(FALSE, TRUE, FALSE)
+      )
+    )
+  )
+  class(fake_fit) <- "fa_exploratory"
+
+  # Pin the setup: the OLD, buggy leading-run value really is 0 here, so this test cannot pass by
+  # accident just because the new code happens to also compute 0.
+  expect_equal(fake_fit$parallel$recommended_n, 0)
+
+  diagnostics <- build_factor_count_diagnostics(fake_fit)
+  expect_equal(diagnostics$parallel_adopted, c(FALSE, TRUE, FALSE))
+  expect_equal(factanal_max_adopted_factor(diagnostics$parallel_adopted), 2L)
+
+  fc <- tidy.fa_exploratory(fake_fit, type = "factor_count")
+  expect_equal(fc$`Recommended Number of Factors`[fc$Method == "Parallel Analysis"], "2")
+  # Kaiser is untouched -- correlation eigenvalues sort descending, so its adoption is always a
+  # contiguous leading run and a plain count already equals the highest adopted row.
+  expect_equal(fc$`Recommended Number of Factors`[fc$Method == "Kaiser Criterion"],
+               as.character(sum(eigen(fake_fit$correlation, symmetric = TRUE, only.values = TRUE)$values > 1)))
+
+  ps <- tidy.fa_exploratory(fake_fit, type = "parallel_screeplot")
+  expect_equal(unique(ps$`Recommended Number of Factors`), 2)
+
+  # variances_judged (already fixed by #37947's siblings) must agree with factor_count -- the
+  # whole point of this fix is that these can never disagree again.
+  vj <- tidy.fa_exploratory(fake_fit, type = "variances_judged")
+  expect_equal(vj$parallel_status, c("not_adopted", "adopted", "not_adopted"))
+  vj_max_adopted <- max(as.integer(vj$Factor[vj$parallel_status == "adopted"]))
+  expect_equal(as.character(vj_max_adopted), fc$`Recommended Number of Factors`[fc$Method == "Parallel Analysis"])
+
+  # No parallel analysis at all -> "Not available", never "0" or NA-derived garbage.
+  no_par_fit <- fake_fit
+  no_par_fit$parallel <- NULL
+  fc_no_par <- tidy.fa_exploratory(no_par_fit, type = "factor_count")
+  expect_equal(fc_no_par$`Recommended Number of Factors`[fc_no_par$Method == "Parallel Analysis"], "Not available")
+
+  # Every factor genuinely NOT adopted -> a real "0" (distinct from "Not available").
+  none_adopted_fit <- fake_fit
+  none_adopted_fit$parallel$table$actual_eigenvalue <- c(0.1, 0.2, 0.3)
+  fc_none <- tidy.fa_exploratory(none_adopted_fit, type = "factor_count")
+  expect_equal(fc_none$`Recommended Number of Factors`[fc_none$Method == "Parallel Analysis"], "0")
+})
+
 test_that("report part 3: variances_judged, suitability P value format, analysis_method order (issue tam#37340)", {
   model_df <- mtcars %>%
     exp_factanal(mpg, cyl, disp, hp, drat, wt, qsec, nfactors = 2, fm = "minres",
