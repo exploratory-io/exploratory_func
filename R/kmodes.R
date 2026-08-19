@@ -23,21 +23,34 @@ KMODES_AUTO_CATEGORY_MAX_DISTINCT <- 10
 # no rounding happens R-side, so the display layer can still tell 0 from 1e-40.
 
 #' Convert one column to the character categories K-Modes works on.
+#'
+#' The clustering algorithm itself only asks "same category or not", so it does
+#' not care about display order (`kmodes_prepare_data`'s own integer encoding
+#' still uses `sort(unique(...))`, unchanged). But the REPORT (Category
+#' Composition Ratio by Cluster, Categories that Characterize Each Cluster)
+#' shows these values as row headers, and those must honor the column's own
+#' display order -- a user-declared factor's `levels()`, or the natural
+#' ascending bin order `cut()` already assigns before it gets flattened to
+#' character. `display_levels` carries that order forward; NULL means "no
+#' explicit order" (character / logical / values-as-category numeric), and the
+#' caller falls back to `sort(unique(...))`, i.e. today's behavior (#37936).
 #' @param x The column.
 #' @param numeric_handling One of "auto", "as_category", "equal_width".
 #' @param numeric_bins Number of equal-width bins used when binning.
-#' @return A list of the converted character vector and how a numeric column was treated.
+#' @return A list of the converted character vector, how a numeric column was
+#'   treated, and the column's display level order (or NULL).
 kmodes_prepare_column <- function(x, numeric_handling = "auto", numeric_bins = 10) {
   if (is.factor(x)) {
-    # Ordered factors lose their order on purpose: K-Modes only ever asks
-    # "same category or not", never "how far apart".
-    return(list(values = as.character(x), conversion = NA_character_))
+    # Ordered factors lose their order on purpose FOR THE ALGORITHM: K-Modes
+    # only ever asks "same category or not", never "how far apart" -- but the
+    # DISPLAY order (levels(x)) is preserved via display_levels below.
+    return(list(values = as.character(x), conversion = NA_character_, display_levels = levels(x)))
   }
   if (is.logical(x)) {
-    return(list(values = as.character(x), conversion = NA_character_))
+    return(list(values = as.character(x), conversion = NA_character_, display_levels = NULL))
   }
   if (is.character(x)) {
-    return(list(values = x, conversion = NA_character_))
+    return(list(values = x, conversion = NA_character_, display_levels = NULL))
   }
   if (is.numeric(x)) {
     finite_values <- x[!is.na(x)]
@@ -50,14 +63,16 @@ kmodes_prepare_column <- function(x, numeric_handling = "auto", numeric_bins = 1
       }
     }
     if (identical(method, "as_category")) {
-      return(list(values = as.character(x), conversion = "as_category"))
+      return(list(values = as.character(x), conversion = "as_category", display_levels = NULL))
     }
     # equal_width. A constant column cannot be cut, so fall back to categories.
     if (length(finite_values) == 0 || dplyr::n_distinct(finite_values) <= 1) {
-      return(list(values = as.character(x), conversion = "as_category"))
+      return(list(values = as.character(x), conversion = "as_category", display_levels = NULL))
     }
     binned <- cut(x, breaks = numeric_bins, include.lowest = TRUE)
-    return(list(values = as.character(binned), conversion = "equal_width"))
+    # levels(binned) is cut()'s own ascending bin order -- capture it BEFORE
+    # as.character() flattens it, or "(10,11]" sorts before "(2,3]" as text.
+    return(list(values = as.character(binned), conversion = "equal_width", display_levels = levels(binned)))
   }
   stop(paste0("K-Modes does not support the type of the selected variable: ", class(x)[[1]],
               ". Select character, factor, logical or numeric variables."))
@@ -68,10 +83,13 @@ kmodes_prepare_column <- function(x, numeric_handling = "auto", numeric_bins = 1
 #' @param selected_cols Names of the columns to convert.
 #' @param numeric_handling One of "auto", "as_category", "equal_width".
 #' @param numeric_bins Number of equal-width bins.
-#' @return A list of the prepared data frame (all character) and numeric conversion metadata.
+#' @return A list of the prepared data frame (all character), numeric
+#'   conversion metadata, and a name-keyed list of each column's display
+#'   level order (or NULL) -- see `kmodes_prepare_column`.
 kmodes_prepare_data <- function(df, selected_cols, numeric_handling = "auto", numeric_bins = 10) {
   prepared <- list()
   conversions <- list()
+  display_levels <- list()
   for (col in selected_cols) {
     converted <- kmodes_prepare_column(df[[col]], numeric_handling = numeric_handling,
                                        numeric_bins = numeric_bins)
@@ -79,13 +97,48 @@ kmodes_prepare_data <- function(df, selected_cols, numeric_handling = "auto", nu
     if (!is.na(converted$conversion)) {
       conversions[[col]] <- converted$conversion
     }
+    display_levels[[col]] <- converted$display_levels
   }
   numeric_conversion <- if (length(conversions) == 0) {
     tibble::tibble(variable = character(0), conversion = character(0))
   } else {
     tibble::tibble(variable = names(conversions), conversion = unlist(conversions, use.names = FALSE))
   }
-  list(prepared = tibble::as_tibble(prepared), numeric_conversion = numeric_conversion)
+  list(prepared = tibble::as_tibble(prepared), numeric_conversion = numeric_conversion,
+       display_levels = display_levels)
+}
+
+#' Display level order for each selected variable.
+#'
+#' The report tables are LONG (`variable`, `category`) tables. A single factor
+#' cannot represent two variables that share a category label but declare
+#' different orders, so keep the per-variable vectors for the numeric
+#' `category_order` sort key as well as building a compatibility union below.
+#' @param prepared_df Prepared (all character) data frame of the rows used.
+#' @param display_levels Name-keyed list from `kmodes_prepare_data()` (NULL
+#'   entries allowed, and allowed to be NULL itself for full backward
+#'   compatibility with old callers).
+#' @return Name-keyed list of category levels for each variable.
+kmodes_category_display_levels_by_variable <- function(prepared_df, display_levels) {
+  cols <- names(prepared_df)
+  levels_by_variable <- lapply(cols, function(col) {
+    dl <- if (!is.null(display_levels)) display_levels[[col]] else NULL
+    if (!is.null(dl)) as.character(dl) else sort(unique(prepared_df[[col]]))
+  })
+  stats::setNames(levels_by_variable, cols)
+}
+
+#' Compatibility factor levels for a LONG (variable, category) column.
+#'
+#' The factor is retained for consumers that only support one global category
+#' order. Consumers that need the exact source order for every variable should
+#' use the `category_order` column returned by the report tables.
+#' @param prepared_df Prepared (all character) data frame of the rows used.
+#' @param display_levels Name-keyed list from `kmodes_prepare_data()`, or NULL.
+#' @return Character vector of the factor levels, in variable order.
+kmodes_category_display_levels <- function(prepared_df, display_levels) {
+  unique(unlist(kmodes_category_display_levels_by_variable(prepared_df, display_levels),
+                use.names = FALSE))
 }
 
 #' The most frequent value, with a deterministic tie-break.
@@ -387,9 +440,15 @@ kmodes_variable_importance <- function(prepared_df, cluster) {
 #' Categories that are unusually common or rare inside each cluster.
 #' @param prepared_df Prepared (all character) data frame of the rows used.
 #' @param cluster Integer cluster assignment.
-#' @return A tibble of one row per cluster, variable and category.
-kmodes_characteristic_categories <- function(prepared_df, cluster) {
+#' @param display_levels Name-keyed list from `kmodes_prepare_data()`, or NULL
+#'   to fall back to `sort(unique(...))` per variable (#37936).
+#' @return A tibble of one row per cluster, variable and category. `category`
+#'   is a factor for compatibility with global-order consumers, while
+#'   `category_order` preserves the exact per-variable order when two
+#'   variables reuse labels with different orders.
+kmodes_characteristic_categories <- function(prepared_df, cluster, display_levels = NULL) {
   total_n <- length(cluster)
+  category_levels_by_variable <- kmodes_category_display_levels_by_variable(prepared_df, display_levels)
   cluster_sizes <- as.data.frame(table(cluster), stringsAsFactors = FALSE)
   names(cluster_sizes) <- c("cluster", "cluster_size")
   cluster_sizes$cluster <- as.integer(cluster_sizes$cluster)
@@ -420,12 +479,15 @@ kmodes_characteristic_categories <- function(prepared_df, cluster) {
         adjusted_standardized_residual = kmodes_adjusted_residual(observed, expected,
                                                                   cluster_size / total_n,
                                                                   overall_count / total_n),
-        is_mode = category == mode_category
+        is_mode = category == mode_category,
+        category_order = match(category, category_levels_by_variable[[col]])
       ) %>%
-      dplyr::select(cluster, variable, category, observed, expected, cluster_pct, overall_pct,
+      dplyr::select(cluster, variable, category, category_order, observed, expected, cluster_pct, overall_pct,
                     observed_expected_ratio, adjusted_standardized_residual, is_mode)
   })
+  category_levels <- kmodes_category_display_levels(prepared_df, display_levels)
   dplyr::bind_rows(rows) %>%
+    dplyr::mutate(category = factor(category, levels = category_levels)) %>%
     dplyr::arrange(cluster, dplyr::desc(abs(adjusted_standardized_residual)))
 }
 
@@ -444,8 +506,13 @@ kmodes_adjusted_residual <- function(observed, expected, row_prop, col_prop) {
 #' @param prepared_df Prepared (all character) data frame of the rows used.
 #' @param cluster Integer cluster assignment.
 #' @param importance The variable importance table, used for the default display order.
-#' @return A tibble of one row per variable, cluster and category.
-kmodes_category_composition <- function(prepared_df, cluster, importance) {
+#' @param display_levels Name-keyed list from `kmodes_prepare_data()`, or NULL
+#'   to fall back to `sort(unique(...))` per variable (#37936).
+#' @return A tibble of one row per variable, cluster and category. `category`
+#'   is a factor for compatibility with global-order consumers, while
+#'   `category_order` preserves the exact per-variable order.
+kmodes_category_composition <- function(prepared_df, cluster, importance, display_levels = NULL) {
+  category_levels_by_variable <- kmodes_category_display_levels_by_variable(prepared_df, display_levels)
   order_lookup <- importance %>%
     dplyr::mutate(variable_order = dplyr::row_number()) %>%
     dplyr::select(variable, cramers_v, variable_order)
@@ -462,13 +529,16 @@ kmodes_category_composition <- function(prepared_df, cluster, importance) {
       # The denominator is the number of valid rows for this cluster and variable.
       dplyr::mutate(pct = if (sum(n) > 0) n / sum(n) else rep(NA_real_, dplyr::n())) %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(variable = col) %>%
-      dplyr::select(variable, cluster, category, n, pct)
+      dplyr::mutate(variable = col,
+                    category_order = match(category, category_levels_by_variable[[col]])) %>%
+      dplyr::select(variable, cluster, category, category_order, n, pct)
   })
+  category_levels <- kmodes_category_display_levels(prepared_df, display_levels)
   dplyr::bind_rows(rows) %>%
     dplyr::left_join(order_lookup, by = "variable") %>%
     dplyr::left_join(original_lookup, by = "variable") %>%
-    dplyr::arrange(variable_order, cluster, category)
+    dplyr::mutate(category = factor(category, levels = category_levels)) %>%
+    dplyr::arrange(variable_order, cluster, category_order)
 }
 
 #' MCA coordinates for observations, categories and cluster representatives.
@@ -686,8 +756,10 @@ exp_kmodes <- function(df, ...,
       nearest_cluster = silhouette$nearest_cluster)
 
     importance <- kmodes_variable_importance(prepared_df, fit$cluster)
-    characteristic <- kmodes_characteristic_categories(prepared_df, fit$cluster)
-    composition <- kmodes_category_composition(prepared_df, fit$cluster, importance)
+    characteristic <- kmodes_characteristic_categories(prepared_df, fit$cluster,
+                                                       display_levels = prepared_all$display_levels)
+    composition <- kmodes_category_composition(prepared_df, fit$cluster, importance,
+                                                display_levels = prepared_all$display_levels)
     map <- kmodes_build_mca_map(prepared_df, fit$cluster, characteristic,
                                 map_sample_size = map_sample_size,
                                 map_category_top_n = map_category_top_n)
