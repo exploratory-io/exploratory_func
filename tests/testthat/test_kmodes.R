@@ -107,6 +107,47 @@ test_that("numeric handling keeps low-cardinality values and bins wide ones", {
   expect_equal(dplyr::n_distinct(forced$prepared$wide), 60)
 })
 
+test_that("kmodes_prepare_data preserves a factor's declared level order for display (#37936)", {
+  df <- tibble::tibble(
+    a = factor(c("High", "Mid", "Low", "High"), levels = c("High", "Mid", "Low")),
+    b = c("x", "x", "y", "x")
+  )
+  prepared <- kmodes_prepare_data(df, c("a", "b"))
+  # The algorithm-facing values are unaffected -- still plain character.
+  expect_type(prepared$prepared$a, "character")
+  # But the display order the factor declared is captured separately.
+  expect_equal(prepared$display_levels$a, c("High", "Mid", "Low"))
+  # A plain character column has no explicit order to capture.
+  expect_null(prepared$display_levels$b)
+})
+
+test_that("kmodes_prepare_data captures the natural bin order for equal-width numeric binning (#37936)", {
+  df <- tibble::tibble(wide = seq_len(60))
+  prepared <- kmodes_prepare_data(df, "wide", numeric_handling = "equal_width", numeric_bins = 4)
+  expected_levels <- levels(cut(df$wide, breaks = 4, include.lowest = TRUE))
+  expect_equal(prepared$display_levels$wide, expected_levels)
+  # Proves the fix matters for this fixture: natural cut() order differs from
+  # codepoint/string order (e.g. "(10,11]" would otherwise sort before "(2,3]").
+  expect_false(identical(expected_levels, sort(expected_levels)))
+})
+
+test_that("kmodes_category_display_levels unions per-variable orders in variable order, deduping shared values (#37936)", {
+  prepared_df <- tibble::tibble(
+    a = c("High", "Mid", "Low"),
+    b = c("Yes", "No", "Yes")
+  )
+  display_levels <- list(a = c("High", "Mid", "Low"), b = c("Yes", "No"))
+  levels_out <- kmodes_category_display_levels(prepared_df, display_levels)
+  expect_equal(levels_out, c("High", "Mid", "Low", "Yes", "No"))
+
+  # NULL entries (no declared order) fall back to sort(unique(...)) per
+  # variable -- the pre-fix behavior, preserved for columns with no order to
+  # honor. A NULL display_levels altogether (old callers) behaves the same.
+  levels_fallback <- kmodes_category_display_levels(prepared_df, list(a = NULL, b = NULL))
+  expect_equal(levels_fallback, c("High", "Low", "Mid", "No", "Yes"))
+  expect_equal(kmodes_category_display_levels(prepared_df, NULL), levels_fallback)
+})
+
 test_that("kmodes_mode_value breaks ties deterministically", {
   expect_equal(kmodes_mode_value(c("b", "a", "a", "b")), "a")
   expect_equal(kmodes_mode_value(c("c", "c", "a")), "c")
@@ -283,15 +324,51 @@ test_that("characteristic categories carry the ratio, residual and Mode flag", {
   expect_true(all(under$adjusted_standardized_residual < 0, na.rm = TRUE))
 
   # The Mode flag must agree with the Mode column of the summary table.
+  # `category` is a factor now (#37936, display order fix), so compare on
+  # character values -- the flag/value agreement is what this test checks,
+  # not the column's class (covered separately below).
   modes <- model_df$model[[1]]$modes
   mode_of_cluster_1 <- modes$`利用目的`[modes$cluster == 1]
   flagged <- res %>% dplyr::filter(cluster == 1, variable == "利用目的", is_mode)
-  expect_equal(flagged$category, mode_of_cluster_1)
+  expect_equal(as.character(flagged$category), mode_of_cluster_1)
 
   # Sorted by absolute residual within each cluster.
   first_cluster <- res %>% dplyr::filter(cluster == 1)
   expect_equal(abs(first_cluster$adjusted_standardized_residual),
                sort(abs(first_cluster$adjusted_standardized_residual), decreasing = TRUE))
+})
+
+test_that("characteristic_categories and category_composition honor a factor's declared level order (#37936)", {
+  set.seed(7)
+  n <- 120
+  df <- tibble::tibble(
+    tenure = factor(sample(c("3年以上", "1年-3年", "1年未満", "6ヶ月未満"), n, TRUE),
+                    levels = c("6ヶ月未満", "1年未満", "1年-3年", "3年以上")),
+    plan = sample(c("Enterprise", "Free", "Standard"), n, TRUE)
+  )
+  model_df <- exp_kmodes(df, tenure, plan, centers = 2, seed = 1, elbow_method_mode = "none")
+
+  characteristic <- model_df %>% tidy_rowwise(model, type = "characteristic_categories")
+  tenure_char_levels <- characteristic %>% dplyr::filter(variable == "tenure") %>%
+    dplyr::pull(category)
+  expect_s3_class(tenure_char_levels, "factor")
+  expect_equal(levels(droplevels(tenure_char_levels)), c("6ヶ月未満", "1年未満", "1年-3年", "3年以上"))
+  # Proves the fixture actually exercises the fix: alphabetical/codepoint
+  # order would be different from the declared factor level order here.
+  expect_false(identical(levels(droplevels(tenure_char_levels)), sort(levels(droplevels(tenure_char_levels)))))
+
+  composition <- model_df %>% tidy_rowwise(model, type = "category_composition")
+  tenure_comp_levels <- composition %>% dplyr::filter(variable == "tenure") %>%
+    dplyr::pull(category)
+  expect_s3_class(tenure_comp_levels, "factor")
+  expect_equal(levels(droplevels(tenure_comp_levels)), c("6ヶ月未満", "1年未満", "1年-3年", "3年以上"))
+
+  # A plain character (non-factor) source column still gets a factor OUTPUT
+  # column, falling back to alphabetical order (the pre-fix behavior) -- the
+  # fix does not depend on every selected variable being a factor.
+  plan_comp_levels <- composition %>% dplyr::filter(variable == "plan") %>% dplyr::pull(category)
+  expect_s3_class(plan_comp_levels, "factor")
+  expect_equal(levels(droplevels(plan_comp_levels)), sort(unique(df$plan)))
 })
 
 test_that("the observed/expected ratio is NA rather than Inf when nothing is expected", {
