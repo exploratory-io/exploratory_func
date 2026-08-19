@@ -425,15 +425,32 @@
   })
 }
 
+#' Per-row, per-variable distribution rows (tam#37938: クラスター内のばらつき boxplot,
+#' one row per observation x variable). `value` is the raw value of the variable, always
+#' -- a Medoid's own value must stay raw regardless of `normalize_data`, since it is an
+#' actual observed row (tam's own medoid_points chart reads only this column).
+#' `standardized_value` mirrors K-Means's `tidy(type="gathered_data", normalize_data=...)`
+#' report boxplot (R/prcomp.R, the `type == "gathered_data"` branch): reuses `x$mat`, the
+#' SAME matrix `cluster::pam`/`clara` fit on (row-aligned 1:1 with `original_mat`, both
+#' derived from `fit_data` at model build time -- `.kmedoids_original_fit_mat` returns
+#' `original_fit_mat <- as.matrix(fit_data)`, `x$mat` is `as.matrix(fit_data)` optionally
+#' `scale()`d, per the SAME `normalize_data` boolean the user set for the whole model), so
+#' no separate call-time toggle or recomputation is needed -- when `normalize_data` was
+#' TRUE at fit time this is exactly `exploratory::normalize()`'s own per-column z-score
+#' (both ultimately reduce to `scale()`, with the identical NaN-from-zero-variance case
+#' already replaced by 0 at fit time, `mat[is.nan(mat)] <- 0`); when FALSE it is the raw
+#' value again, same as `value`.
 .kmedoids_distribution <- function(x) {
   ids <- x$clustering
   medoid_indices <- x$medoid_indices
   original_mat <- .kmedoids_original_fit_mat(x)
+  standardized_mat <- x$mat
   purrr::map_dfr(seq_len(nrow(original_mat)), function(index) {
     tibble::tibble(
       cluster = as.integer(ids[[index]]),
       variable = colnames(original_mat),
       value = as.numeric(original_mat[index, ]),
+      standardized_value = as.numeric(standardized_mat[index, ]),
       is_medoid = index %in% medoid_indices
     )
   })
