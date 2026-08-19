@@ -108,31 +108,37 @@ kmodes_prepare_data <- function(df, selected_cols, numeric_handling = "auto", nu
        display_levels = display_levels)
 }
 
-#' Display level order for a LONG (variable, category) column that mixes rows
-#' from every selected variable into one character column.
+#' Display level order for each selected variable.
 #'
-#' No single source factor can supply the levels of a column shaped like this,
-#' so build the union in VARIABLE order (`names(prepared_df)`), taking each
-#' variable's own display order when known and falling back to
-#' `sort(unique(...))` (today's behavior) otherwise. Safe even when two
-#' different variables happen to share a literal category value: Variable is
-#' always the PRIMARY group/sort key downstream of this (rowh0/rowh1 =
-#' Variable before Category in both report tables that use this), so a shared
-#' level's position never leaks across two different variables' own row
-#' groups -- only the RELATIVE order within a single variable's own values
-#' matters, and the union preserves that for every variable independently.
+#' The report tables are LONG (`variable`, `category`) tables. A single factor
+#' cannot represent two variables that share a category label but declare
+#' different orders, so keep the per-variable vectors for the numeric
+#' `category_order` sort key as well as building a compatibility union below.
 #' @param prepared_df Prepared (all character) data frame of the rows used.
 #' @param display_levels Name-keyed list from `kmodes_prepare_data()` (NULL
 #'   entries allowed, and allowed to be NULL itself for full backward
 #'   compatibility with old callers).
-#' @return Character vector: the category factor's levels, in display order.
-kmodes_category_display_levels <- function(prepared_df, display_levels) {
+#' @return Name-keyed list of category levels for each variable.
+kmodes_category_display_levels_by_variable <- function(prepared_df, display_levels) {
   cols <- names(prepared_df)
-  per_col <- lapply(cols, function(col) {
+  levels_by_variable <- lapply(cols, function(col) {
     dl <- if (!is.null(display_levels)) display_levels[[col]] else NULL
     if (!is.null(dl)) as.character(dl) else sort(unique(prepared_df[[col]]))
   })
-  unique(unlist(per_col, use.names = FALSE))
+  stats::setNames(levels_by_variable, cols)
+}
+
+#' Compatibility factor levels for a LONG (variable, category) column.
+#'
+#' The factor is retained for consumers that only support one global category
+#' order. Consumers that need the exact source order for every variable should
+#' use the `category_order` column returned by the report tables.
+#' @param prepared_df Prepared (all character) data frame of the rows used.
+#' @param display_levels Name-keyed list from `kmodes_prepare_data()`, or NULL.
+#' @return Character vector of the factor levels, in variable order.
+kmodes_category_display_levels <- function(prepared_df, display_levels) {
+  unique(unlist(kmodes_category_display_levels_by_variable(prepared_df, display_levels),
+                use.names = FALSE))
 }
 
 #' The most frequent value, with a deterministic tie-break.
@@ -437,12 +443,12 @@ kmodes_variable_importance <- function(prepared_df, cluster) {
 #' @param display_levels Name-keyed list from `kmodes_prepare_data()`, or NULL
 #'   to fall back to `sort(unique(...))` per variable (#37936).
 #' @return A tibble of one row per cluster, variable and category. `category`
-#'   is a factor whose levels are each variable's own display order (see
-#'   `kmodes_category_display_levels`), not a plain character column -- so a
-#'   consumer that re-sorts by column class (e.g. the report's pivot chart)
-#'   honors the source column's factor/bin order instead of codepoint order.
+#'   is a factor for compatibility with global-order consumers, while
+#'   `category_order` preserves the exact per-variable order when two
+#'   variables reuse labels with different orders.
 kmodes_characteristic_categories <- function(prepared_df, cluster, display_levels = NULL) {
   total_n <- length(cluster)
+  category_levels_by_variable <- kmodes_category_display_levels_by_variable(prepared_df, display_levels)
   cluster_sizes <- as.data.frame(table(cluster), stringsAsFactors = FALSE)
   names(cluster_sizes) <- c("cluster", "cluster_size")
   cluster_sizes$cluster <- as.integer(cluster_sizes$cluster)
@@ -473,9 +479,10 @@ kmodes_characteristic_categories <- function(prepared_df, cluster, display_level
         adjusted_standardized_residual = kmodes_adjusted_residual(observed, expected,
                                                                   cluster_size / total_n,
                                                                   overall_count / total_n),
-        is_mode = category == mode_category
+        is_mode = category == mode_category,
+        category_order = match(category, category_levels_by_variable[[col]])
       ) %>%
-      dplyr::select(cluster, variable, category, observed, expected, cluster_pct, overall_pct,
+      dplyr::select(cluster, variable, category, category_order, observed, expected, cluster_pct, overall_pct,
                     observed_expected_ratio, adjusted_standardized_residual, is_mode)
   })
   category_levels <- kmodes_category_display_levels(prepared_df, display_levels)
@@ -502,10 +509,10 @@ kmodes_adjusted_residual <- function(observed, expected, row_prop, col_prop) {
 #' @param display_levels Name-keyed list from `kmodes_prepare_data()`, or NULL
 #'   to fall back to `sort(unique(...))` per variable (#37936).
 #' @return A tibble of one row per variable, cluster and category. `category`
-#'   is a factor whose levels are each variable's own display order (see
-#'   `kmodes_category_display_levels`), so `dplyr::arrange()` sorts it by that
-#'   order instead of codepoint order.
+#'   is a factor for compatibility with global-order consumers, while
+#'   `category_order` preserves the exact per-variable order.
 kmodes_category_composition <- function(prepared_df, cluster, importance, display_levels = NULL) {
+  category_levels_by_variable <- kmodes_category_display_levels_by_variable(prepared_df, display_levels)
   order_lookup <- importance %>%
     dplyr::mutate(variable_order = dplyr::row_number()) %>%
     dplyr::select(variable, cramers_v, variable_order)
@@ -522,15 +529,16 @@ kmodes_category_composition <- function(prepared_df, cluster, importance, displa
       # The denominator is the number of valid rows for this cluster and variable.
       dplyr::mutate(pct = if (sum(n) > 0) n / sum(n) else rep(NA_real_, dplyr::n())) %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(variable = col) %>%
-      dplyr::select(variable, cluster, category, n, pct)
+      dplyr::mutate(variable = col,
+                    category_order = match(category, category_levels_by_variable[[col]])) %>%
+      dplyr::select(variable, cluster, category, category_order, n, pct)
   })
   category_levels <- kmodes_category_display_levels(prepared_df, display_levels)
   dplyr::bind_rows(rows) %>%
     dplyr::left_join(order_lookup, by = "variable") %>%
     dplyr::left_join(original_lookup, by = "variable") %>%
     dplyr::mutate(category = factor(category, levels = category_levels)) %>%
-    dplyr::arrange(variable_order, cluster, category)
+    dplyr::arrange(variable_order, cluster, category_order)
 }
 
 #' MCA coordinates for observations, categories and cluster representatives.

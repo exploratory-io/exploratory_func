@@ -148,6 +148,23 @@ test_that("kmodes_category_display_levels unions per-variable orders in variable
   expect_equal(kmodes_category_display_levels(prepared_df, NULL), levels_fallback)
 })
 
+test_that("report category_order keeps conflicting shared factor orders per variable", {
+  df <- tibble::tibble(
+    a = factor(c("A", "B", "A", "B"), levels = c("A", "B")),
+    b = factor(c("A", "B", "A", "B"), levels = c("B", "A"))
+  )
+  model_df <- exp_kmodes(df, a, b, centers = 2, seed = 1, elbow_method_mode = "none")
+
+  for (type in c("category_composition", "characteristic_categories")) {
+    result <- tidy_rowwise(model_df, model, type = type)
+    orders <- result %>%
+      dplyr::distinct(variable, category, category_order) %>%
+      dplyr::arrange(variable, category_order)
+    expect_equal(as.character(orders$category[orders$variable == "a"]), c("A", "B"))
+    expect_equal(as.character(orders$category[orders$variable == "b"]), c("B", "A"))
+  }
+})
+
 test_that("kmodes_mode_value breaks ties deterministically", {
   expect_equal(kmodes_mode_value(c("b", "a", "a", "b")), "a")
   expect_equal(kmodes_mode_value(c("c", "c", "a")), "c")
@@ -304,7 +321,7 @@ test_that("characteristic categories carry the ratio, residual and Mode flag", {
   model_df <- exp_kmodes(df, `利用目的`, `契約タイプ`, `導入経路`, centers = 3, seed = 1,
                          elbow_method_mode = "none")
   res <- model_df %>% tidy_rowwise(model, type = "characteristic_categories")
-  expect_equal(colnames(res), c("cluster", "variable", "category", "observed", "expected",
+  expect_equal(colnames(res), c("cluster", "variable", "category", "category_order", "observed", "expected",
                                 "cluster_pct", "overall_pct", "observed_expected_ratio",
                                 "adjusted_standardized_residual", "is_mode"))
   # Observed counts must add back up to each cluster's size, per variable.
@@ -380,7 +397,7 @@ test_that("category composition sums to 100% within each cluster and variable", 
   res <- exp_kmodes(df, `利用目的`, `契約タイプ`, `導入経路`, flag, centers = 3, seed = 1,
                     elbow_method_mode = "none") %>%
     tidy_rowwise(model, type = "category_composition")
-  expect_equal(colnames(res), c("variable", "cluster", "category", "n", "pct",
+  expect_equal(colnames(res), c("variable", "cluster", "category", "category_order", "n", "pct",
                                 "cramers_v", "variable_order", "original_order"))
   totals <- res %>%
     dplyr::group_by(variable, cluster) %>%
