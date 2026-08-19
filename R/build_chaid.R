@@ -280,6 +280,9 @@ exp_chaid <- function(df,
       model$formula_terms <- stats::terms(fml)
       attr(model$formula_terms, ".Environment") <- NULL
       model$orig_target_col <- target_col
+      # CHAID also trains on cleanup_df(map_name = FALSE) names, so record the name
+      # the training data carries alongside the original one (tam #37985).
+      model$clean_target_col <- unname(clean_target_col)
       model$is_target_logical <- is_target_logical
       model$is_target_ordered <- is_target_ordered
       model$ordered_levels <- target_ordered_levels

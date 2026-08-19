@@ -897,9 +897,10 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     }
     newdata
   } else if (!is.null(data)) {
-    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
-      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
-    }
+    # This is only for Analytics View. relocate_target_col_last() resolves the
+    # target column against the names source.data actually carries, and no-ops
+    # when it is absent (tam #37985).
+    data <- relocate_target_col_last(data, x)
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
       # rather than trying to make it pass through following code, which can be complex.
@@ -1003,9 +1004,10 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 
     newdata
   } else if (!is.null(data)) {
-    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
-      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
-    }
+    # This is only for Analytics View. relocate_target_col_last() resolves the
+    # target column against the names source.data actually carries, and no-ops
+    # when it is absent (tam #37985).
+    data <- relocate_target_col_last(data, x)
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
@@ -1117,7 +1119,10 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     }
     newdata
   } else if (!is.null(data)) {
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Bring the target column to the last so that it is next to the predicted
+    # value in the output. exp_rpart trains on cleanup_df(map_name = FALSE) names,
+    # so source.data can carry a cleaned target name (tam #37985).
+    data <- relocate_target_col_last(data, x)
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
       # rather than trying to make it pass through following code, which can be complex.
@@ -1244,7 +1249,10 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 
     newdata
   } else if (!is.null(data)) {
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Bring the target column to the last so that it is next to the predicted
+    # value in the output. exp_rpart trains on cleanup_df(map_name = FALSE) names,
+    # so source.data can carry a cleaned target name (tam #37985).
+    data <- relocate_target_col_last(data, x)
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
@@ -2126,6 +2134,67 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
+# Apply the same column-name cleaning cleanup_df(map_name = FALSE) applies, to a
+# single name. Kept next to cleanup_df() so the two cannot drift apart.
+clean_column_name_minimally <- function(name) {
+  gsub('[,]', '.', name)
+}
+
+# Resolve the target column's name AS IT APPEARS in a data frame produced by the
+# model-building pipeline.
+#
+# Models store the ORIGINAL target column name in `orig_target_col` (the name the
+# user sees), but `source.data` carries the name cleanup_df() produced at training
+# time. For calc_feature_imp/xgboost/lightgbm/catboost those are the same string,
+# because those paths restore the original column names on source.data before
+# returning it. exp_rpart/exp_chaid use cleanup_df(map_name = FALSE) and do NOT
+# restore, so their source.data keeps the cleaned name -- which differs from the
+# original as soon as the target column name contains a comma (tam #37985).
+# Looking the target up by `orig_target_col` then either errors out
+# (dplyr::relocate: "Can't select columns that don't exist") or silently yields
+# nothing, depending on the caller.
+#
+# Resolution order:
+#   1. `clean_target_col` stored on the model (exact; models built by this version
+#      onward),
+#   2. `orig_target_col` when the data really carries it (every restore-the-names
+#      path, and every target name that needs no cleaning),
+#   3. the cleaned form of `orig_target_col` (compatibility path for models cached
+#      by an older version, which have no `clean_target_col`),
+#   4. NULL when the column is genuinely absent, so the caller can degrade rather
+#      than abort.
+resolve_model_target_col <- function(model, data) {
+  if (is.null(model) || is.null(data)) {
+    return(NULL)
+  }
+  cols <- colnames(data)
+  if (is.null(cols)) {
+    return(NULL)
+  }
+  candidates <- c(model$clean_target_col, model$orig_target_col)
+  if (!is.null(model$orig_target_col)) {
+    candidates <- c(candidates, clean_column_name_minimally(model$orig_target_col))
+  }
+  for (candidate in candidates) {
+    if (!is.null(candidate) && length(candidate) == 1 && !is.na(candidate) && candidate %in% cols) {
+      return(unname(candidate))
+    }
+  }
+  NULL
+}
+
+# Move the target column to the end so that it sits next to the predicted value in
+# the output. A no-op when the target column is not in the data -- the reorder is
+# cosmetic, and aborting the whole Analytics chart over it is never the right
+# trade (tam #37985).
+relocate_target_col_last <- function(data, model) {
+  target_col <- resolve_model_target_col(model, data)
+  if (is.null(target_col)) {
+    return(data)
+  }
+  data %>% dplyr::relocate(!!rlang::sym(target_col), .after = dplyr::last_col())
+}
+
 cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE, convert_logical=TRUE) {
   df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
                                                  filter_predictor_numeric_na=filter_numeric_na)
@@ -2615,6 +2684,10 @@ calc_feature_imp <- function(df,
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
+      # The name the training data (and therefore source.data) actually carries.
+      # Differs from orig_target_col whenever cleanup_df() had to change the name
+      # -- e.g. a target column whose name contains a comma (tam #37985).
+      model$clean_target_col <- unname(clean_target_col)
       if (!is.null(target_funs)) {
         model$target_funs <- target_funs
       }
@@ -2835,8 +2908,12 @@ dtree_report_multiclass_probabilities <- function(df) {
   train_data <- if (length(test_index) > 0) source_data[-test_index, , drop = FALSE] else source_data
   test_data <- if (length(test_index) > 0) source_data[test_index, , drop = FALSE] else source_data[0, , drop = FALSE]
 
-  target_col <- model$orig_target_col
-  if (is.null(target_col) || !target_col %in% colnames(source_data)) return(data.frame())
+  # source.data carries the cleaned column names exp_rpart trained on, which differ
+  # from orig_target_col when the target name contains a comma -- looking it up by
+  # the original name returned an empty frame, blanking the category charts that
+  # build on this (tam #37985).
+  target_col <- resolve_model_target_col(model, source_data)
+  if (is.null(target_col)) return(data.frame())
 
   levels_target <- attr(model, "ylevels")
   if (is.null(levels_target)) levels_target <- model$ylevels
@@ -3853,6 +3930,10 @@ exp_rpart <- function(df,
       }
 
       model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
+      # The name the training data (and therefore source.data) actually carries.
+      # Differs from orig_target_col whenever cleanup_df() had to change the name
+      # -- e.g. a target column whose name contains a comma (tam #37985).
+      model$clean_target_col <- unname(clean_target_col)
       if (!is.null(target_funs)) {
         model$target_funs <- target_funs
       }
