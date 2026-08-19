@@ -32,6 +32,62 @@ test_that('exp_kmedoids supports both distance metrics and standardization', {
   )))
 })
 
+test_that('distribution standardized_value matches a hand z-score when normalize_data is TRUE, and raw value stays untouched (tam#37938)', {
+  set.seed(1)
+  result <- iris %>% exploratory:::exp_kmedoids(
+    Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+    centers = 3, distance = 'euclidean', normalize_data = TRUE, seed = 1
+  )
+  model <- result$model[[1]]
+  distribution <- broom::tidy(model, type = 'distribution')
+
+  vars <- c('Sepal.Length', 'Sepal.Width', 'Petal.Length', 'Petal.Width')
+  for (v in vars) {
+    rows <- distribution[distribution$variable == v, , drop = FALSE]
+    # `value` (raw) must still be the untouched original iris value.
+    expect_equal(sort(rows$value), sort(iris[[v]]))
+    # `standardized_value` must equal a hand-computed z-score of the same raw values,
+    # not a value re-derived from some other, differently-ordered/sampled set of rows.
+    expected_z <- as.numeric(scale(rows$value))
+    # Order by row position (as.integer(rownames) isn't reliable here) -- compare the
+    # SET of standardized values instead, since row order in `distribution` need not
+    # match `sort(value)`'s order.
+    expect_equal(sort(round(rows$standardized_value, 6)), sort(round(expected_z, 6)))
+  }
+  # A standardized column, unlike the raw one, must have ~zero mean and unit variance
+  # per variable (up to floating point).
+  for (v in vars) {
+    rows <- distribution[distribution$variable == v, , drop = FALSE]
+    expect_true(abs(mean(rows$standardized_value)) < 1e-8)
+    expect_equal(stats::sd(rows$standardized_value), 1, tolerance = 1e-6)
+  }
+})
+
+test_that('distribution standardized_value equals the raw value when normalize_data is FALSE (tam#37938)', {
+  set.seed(1)
+  result <- iris %>% exploratory:::exp_kmedoids(
+    Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+    centers = 3, distance = 'euclidean', normalize_data = FALSE, seed = 1
+  )
+  model <- result$model[[1]]
+  distribution <- broom::tidy(model, type = 'distribution')
+
+  expect_equal(distribution$standardized_value, distribution$value)
+})
+
+test_that('distribution standardized_value is 0, not NaN, for a zero-variance variable (tam#37938)', {
+  set.seed(1)
+  data <- tibble::tibble(x = c(1, 2, 3, 4, 5, 6), constant = rep(7, 6))
+  result <- data %>% exploratory:::exp_kmedoids(x, constant, centers = 2, normalize_data = TRUE, seed = 1)
+  model <- result$model[[1]]
+  distribution <- broom::tidy(model, type = 'distribution')
+  constant_rows <- distribution[distribution$variable == 'constant', , drop = FALSE]
+
+  expect_true(all(constant_rows$value == 7))
+  expect_false(any(is.nan(constant_rows$standardized_value)))
+  expect_true(all(constant_rows$standardized_value == 0))
+})
+
 test_that('excluded rows are represented without failing the model', {
   data <- tibble::tibble(x = c(1, 2, 3, NA), y = c(1, 2, 4, 5))
   result <- data %>% exploratory:::exp_kmedoids(x, y, centers = 2, seed = 1)
@@ -59,7 +115,8 @@ test_that('report tidy types are available', {
   expect_true(nrow(output$variable_importance) > 0)
   expect_true(nrow(output$map) > 0)
   expect_true(any(output$map$row_type == 'vector'))
-  expect_true(all(c('cluster', 'variable', 'value') %in% colnames(output$distribution)))
+  expect_true(all(c('cluster', 'variable', 'value', 'standardized_value') %in%
+    colnames(output$distribution)))
   expect_true(all(c('cluster', 'row_id', 'mpg', 'disp', 'hp') %in%
     colnames(broom::tidy(model, type = 'medoid_details'))))
   expect_equal(nrow(output$counts), 1)
