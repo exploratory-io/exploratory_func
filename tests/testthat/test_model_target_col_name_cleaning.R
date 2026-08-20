@@ -39,7 +39,7 @@ build_model <- function(fun, target_col, target_type) {
   eval(parse(text = expr), list(df = df))
 }
 
-test_that("resolve_model_target_col prefers the stored clean name, then falls back", {
+test_that("resolve_model_target_col uses the available target name and falls back", {
   data_cleaned <- data.frame(a = 1)
   colnames(data_cleaned) <- cleaned_target
 
@@ -74,6 +74,25 @@ test_that("resolve_model_target_col prefers the stored clean name, then falls ba
   named <- c(x = tricky_target)
   expect_null(names(exploratory:::resolve_model_target_col(
     list(orig_target_col = named), data_orig)))
+
+  # map_name = TRUE models restore source.data to the original names. If a
+  # predictor happens to use the cleaned alias (for example c1_), the original
+  # target must win over that alias.
+  data_with_clean_alias_collision <- data.frame(
+    target = 1:2,
+    c1_ = 3:4,
+    predictor = 5:6,
+    check.names = FALSE
+  )
+  collision_model <- list(clean_target_col = "c1_", orig_target_col = "target")
+  expect_equal(
+    exploratory:::resolve_model_target_col(
+      collision_model, data_with_clean_alias_collision),
+    "target")
+  expect_equal(
+    colnames(exploratory:::relocate_target_col_last(
+      data_with_clean_alias_collision, collision_model)),
+    c("c1_", "predictor", "target"))
 })
 
 test_that("relocate_target_col_last moves the target last and no-ops when absent", {
@@ -143,15 +162,35 @@ test_that("a plain target column name is unaffected", {
   expect_equal(nrow(exploratory:::dtree_report_multiclass_probabilities(model_df)), 150 * 3)
 })
 
-test_that("other model types keep working with a comma in the target column name", {
-  # calc_feature_imp / xgboost / lightgbm / catboost restore the original column
-  # names on source.data, so they were never broken -- pin that they stay that way
-  # now that they share the same resolver.
-  for (fun in c("calc_feature_imp", "exp_xgboost", "exp_lightgbm", "exp_catboost")) {
-    model_df <- build_model(fun, tricky_target, "bin")
-    both <- model_df %>% prediction(data = "training_and_test")
-    expect_equal(nrow(both), 150)
-    expect_true(tricky_target %in% colnames(both),
-                info = paste0(fun, " should keep the original target column name"))
-  }
+test_that("calc_feature_imp keeps the original target column name", {
+  testthat::skip_if_not_installed("randomForest")
+  testthat::skip_if_not_installed("ranger")
+  model_df <- build_model("calc_feature_imp", tricky_target, "bin")
+  both <- model_df %>% prediction(data = "training_and_test")
+  expect_equal(nrow(both), 150)
+  expect_true(tricky_target %in% colnames(both))
+})
+
+test_that("exp_xgboost keeps the original target column name", {
+  testthat::skip_if_not_installed("xgboost")
+  model_df <- build_model("exp_xgboost", tricky_target, "bin")
+  both <- model_df %>% prediction(data = "training_and_test")
+  expect_equal(nrow(both), 150)
+  expect_true(tricky_target %in% colnames(both))
+})
+
+test_that("exp_lightgbm keeps the original target column name", {
+  testthat::skip_if_not_installed("lightgbm")
+  model_df <- build_model("exp_lightgbm", tricky_target, "bin")
+  both <- model_df %>% prediction(data = "training_and_test")
+  expect_equal(nrow(both), 150)
+  expect_true(tricky_target %in% colnames(both))
+})
+
+test_that("exp_catboost keeps the original target column name", {
+  testthat::skip_if_not_installed("catboost")
+  model_df <- build_model("exp_catboost", tricky_target, "bin")
+  both <- model_df %>% prediction(data = "training_and_test")
+  expect_equal(nrow(both), 150)
+  expect_true(tricky_target %in% colnames(both))
 })

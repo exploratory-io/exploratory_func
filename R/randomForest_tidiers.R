@@ -2155,14 +2155,16 @@ clean_column_name_minimally <- function(name) {
 # nothing, depending on the caller.
 #
 # Resolution order:
-#   1. `clean_target_col` stored on the model (exact; models built by this version
-#      onward),
-#   2. `orig_target_col` when the data really carries it (every restore-the-names
+#   1. `orig_target_col` when the data really carries it (every restore-the-names
 #      path, and every target name that needs no cleaning),
+#   2. `clean_target_col` stored on the model (exact for models whose data keeps
+#      the cleaned names),
 #   3. the cleaned form of `orig_target_col` (compatibility path for models cached
 #      by an older version, which have no `clean_target_col`),
 #   4. NULL when the column is genuinely absent, so the caller can degrade rather
-#      than abort.
+#      than abort. The original name must win when both names are present because
+#      map_name = TRUE models restore source.data to original names, where a
+#      predictor may legitimately use the cleaned alias.
 resolve_model_target_col <- function(model, data) {
   if (is.null(model) || is.null(data)) {
     return(NULL)
@@ -2171,7 +2173,7 @@ resolve_model_target_col <- function(model, data) {
   if (is.null(cols)) {
     return(NULL)
   }
-  candidates <- c(model$clean_target_col, model$orig_target_col)
+  candidates <- c(model$orig_target_col, model$clean_target_col)
   if (!is.null(model$orig_target_col)) {
     candidates <- c(candidates, clean_column_name_minimally(model$orig_target_col))
   }
