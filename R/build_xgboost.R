@@ -365,7 +365,9 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Bring the target column to the last so that it is next to the predicted value
+    # in the output; a no-op when the target column is absent (tam #37985).
+    data <- relocate_target_col_last(data, x)
     predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
@@ -470,7 +472,9 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Bring the target column to the last so that it is next to the predicted value
+    # in the output; a no-op when the target column is absent (tam #37985).
+    data <- relocate_target_col_last(data, x)
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
@@ -552,7 +556,9 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Bring the target column to the last so that it is next to the predicted value
+    # in the output; a no-op when the target column is absent (tam #37985).
+    data <- relocate_target_col_last(data, x)
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")

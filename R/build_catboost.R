@@ -737,7 +737,9 @@ augment.catboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tr
   if (is.null(data) || nrow(data) == 0) {
     return(data.frame())
   }
-  data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col())
+  # Bring the target column to the last so that it is next to the predicted value
+  # in the output; a no-op when the target column is absent (tam #37985).
+  data <- relocate_target_col_last(data, x)
   predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
   if (data_type == "test") {
     predicted_nona <- extract_predicted(x, type = "test")
@@ -758,7 +760,9 @@ augment.catboost_binary <- function(x, data = NULL, newdata = NULL, data_type = 
   if (is.null(data) || nrow(data) == 0) {
     return(data.frame())
   }
-  data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col())
+  # Bring the target column to the last so that it is next to the predicted value
+  # in the output; a no-op when the target column is absent (tam #37985).
+  data <- relocate_target_col_last(data, x)
   predicted_value_col <- avoid_conflict(colnames(data), "predicted_label")
   predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
   if (data_type == "test") {
@@ -785,7 +789,9 @@ augment.catboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "
   if (is.null(data) || nrow(data) == 0) {
     return(data.frame())
   }
-  data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col())
+  # Bring the target column to the last so that it is next to the predicted value
+  # in the output; a no-op when the target column is absent (tam #37985).
+  data <- relocate_target_col_last(data, x)
   if (data_type == "test") {
     predicted_value_nona <- extract_predicted_multiclass_labels(x, type = "test")
     predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
