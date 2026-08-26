@@ -194,3 +194,62 @@ test_that('chaid_group_level_order prefers the user-declared factor levels', {
     chaid_normalize_group_label('人事 + 営業', chaid_group_level_order(model, '部署')),
     '営業 + 人事')
 })
+
+# tam #38107: cleanup_df(..., map_name = FALSE) replaces commas with periods in
+# column names before chaid_fit() ever runs (mmpf::marginalPrediction does not
+# handle commas well) -- model$nodes$split_variable / rule /
+# category_merge_map$variable are therefore built entirely in this CLEANED
+# name space. model$terms_mapping (clean -> original) is only computed by
+# exp_chaid() after chaid_fit() returns, so report functions must resolve it
+# back at display time via chaid_map_display_name()/chaid_map_display_names_in_text().
+
+test_that('chaid_map_display_name maps a clean name back to its original, and is a no-op otherwise', {
+  tm <- c('部署.1' = '部署,1', '年齢' = '年齢')
+  expect_equal(chaid_map_display_name('部署.1', tm), '部署,1')
+  # A name that IS its own mapping (no comma) is unchanged.
+  expect_equal(chaid_map_display_name('年齢', tm), '年齢')
+  # A name absent from terms_mapping passes through untouched.
+  expect_equal(chaid_map_display_name('存在しない列', tm), '存在しない列')
+  # NULL/empty terms_mapping is always a no-op (e.g. a hand-built model in a test).
+  expect_equal(chaid_map_display_name('部署.1', NULL), '部署.1')
+  expect_equal(chaid_map_display_name('部署.1', character(0)), '部署.1')
+  # NA passes through.
+  expect_true(is.na(chaid_map_display_name(NA_character_, tm)))
+  # Vectorized.
+  expect_equal(chaid_map_display_name(c('部署.1', '年齢', NA), tm), c('部署,1', '年齢', NA))
+})
+
+test_that('chaid_map_display_names_in_text rewrites every embedded clean name in a composite rule string', {
+  tm <- c('部署.1' = '部署,1', '年齢' = '年齢')
+  # Single condition.
+  expect_equal(
+    chaid_map_display_names_in_text('部署.1 in {営業 + 人事}', tm),
+    '部署,1 in {営業 + 人事}')
+  # Multi-condition rule ("&"-joined), one variable renamed, one not.
+  expect_equal(
+    chaid_map_display_names_in_text('Root & 部署.1 in {営業} & 年齢 in {<= 26}', tm),
+    'Root & 部署,1 in {営業} & 年齢 in {<= 26}')
+  # A longer clean name that is a PREFIX of a shorter one is not partially
+  # substituted before the shorter one gets its turn (longest-first ordering).
+  tm2 <- c('a' = 'a-original', 'ab' = 'ab-original')
+  expect_equal(chaid_map_display_names_in_text('ab in {x}', tm2), 'ab-original in {x}')
+  expect_equal(chaid_map_display_names_in_text('a in {x}', tm2), 'a-original in {x}')
+  # NA passes through; NULL/empty terms_mapping is a no-op.
+  expect_true(is.na(chaid_map_display_names_in_text(NA_character_, tm)))
+  expect_equal(chaid_map_display_names_in_text('部署.1 in {x}', NULL), '部署.1 in {x}')
+})
+
+test_that('chaid_group_level_order resolves a CLEAN variable name through terms_mapping before looking up original_factor_levels', {
+  # Without this, a comma-renamed factor predictor's declared level order is
+  # invisible to chaid_group_level_order (original_factor_levels is keyed by
+  # the ORIGINAL name, captured before cleanup) and silently falls through to
+  # predictor_info's clean-keyed ordered/levels, or further to alphabetical.
+  model <- list(
+    terms_mapping = c('部署.1' = '部署,1'),
+    original_factor_levels = list('部署,1' = c('営業', '研究開発', '人事')),
+    predictor_info = list('部署.1' = list(ordered = FALSE, levels = c('研究開発', '人事', '営業')))
+  )
+  # Callers always pass the CLEAN name (matching predictor_info's key space,
+  # exactly as chaid_numeric_intervals()/chaid_category_merge_table() do).
+  expect_equal(chaid_group_level_order(model, '部署.1'), c('営業', '研究開発', '人事'))
+})

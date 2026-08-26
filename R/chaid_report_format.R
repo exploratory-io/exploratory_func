@@ -283,17 +283,96 @@ chaid_order_group_parts <- function(parts, levels = NULL) {
   parts[order(position)]
 }
 
+#' Map a clean (fit-time) predictor/column name back to its original name.
+#'
+#' `cleanup_df()`'s `map_name = FALSE` mode (used by `exp_chaid()`) replaces
+#' commas with periods in column names -- `mmpf::marginalPrediction` does not
+#' handle commas well -- before `chaid_fit()` ever runs. Everything `chaid_fit()`
+#' builds (`model$nodes$split_variable`, `model$nodes$rule`,
+#' `model$category_merge_map$variable`) is therefore keyed/embedded in this
+#' CLEANED name space, not the column's real name. `model$terms_mapping`
+#' (clean -> original) is computed by `exp_chaid()` only AFTER `chaid_fit()`
+#' returns (`build_chaid.R`), so report functions resolve it back through this
+#' helper at DISPLAY time.
+#'
+#' This is display-only. Internal tree traversal for scoring
+#' (`traverse_chaid_tree()` / `chaid_assign_nodes()`) reads split variable
+#' names from `model$.node_metadata`, a separate structure this never touches,
+#' and stays in clean-name space; `model$numeric_binning_map` and
+#' `model$predictor_info` are also clean-keyed and must be looked up with the
+#' CLEAN name before being mapped for display (see `chaid_numeric_intervals()`
+#' / `chaid_category_merge_table()` in `chaid.R`).
+#'
+#' @param name A clean column name (or character vector of them). `NA` passes through.
+#' @param terms_mapping `model$terms_mapping` (named character vector, clean -> original), or `NULL`.
+#' @return `name`, with any entry found in `terms_mapping` replaced by its original.
+chaid_map_display_name <- function(name, terms_mapping) {
+  name <- as.character(name)
+  if (is.null(terms_mapping) || length(terms_mapping) == 0 || length(name) == 0) {
+    return(name)
+  }
+  hit <- !is.na(name) & name %in% names(terms_mapping)
+  name[hit] <- unname(terms_mapping[name[hit]])
+  name
+}
+
+#' Rewrite every occurrence of a clean column name inside a composite rule/
+#' condition string back to its original name (display-only -- see
+#' [chaid_map_display_name()]). Longest-clean-name-first, so a clean name that
+#' happens to be a substring of another is never partially substituted first.
+#'
+#' @param text A character vector of rule strings (each may join multiple
+#'   `" & "`-separated conditions, one variable name per condition).
+#' @param terms_mapping `model$terms_mapping` (named character vector, clean -> original), or `NULL`.
+#' @return `text`, with every embedded clean name replaced by its original.
+chaid_map_display_names_in_text <- function(text, terms_mapping) {
+  text <- as.character(text)
+  if (is.null(terms_mapping) || length(terms_mapping) == 0 || length(text) == 0) {
+    return(text)
+  }
+  clean_names <- names(terms_mapping)[names(terms_mapping) != unname(terms_mapping)]
+  if (length(clean_names) == 0) {
+    return(text)
+  }
+  # A SEQUENTIAL gsub()/stri_replace_all_fixed() call per clean name lets an
+  # EARLIER replacement's OWN OUTPUT be re-matched by a LATER pattern -- e.g.
+  # clean names "a" -> "a-original" and "ab" -> "ab-original": after "a" is
+  # replaced, the output "a-original" itself contains the literal substring
+  # "a" again (inside "original"), which a later pass then wrongly touches a
+  # second time. Locate every match FIRST (gregexpr against the ORIGINAL,
+  # unmodified text), THEN substitute all of them at once via
+  # `regmatches<-` -- matched positions are fixed before any text changes, so
+  # a replacement's own output is never rescanned.
+  clean_names <- clean_names[order(nchar(clean_names), decreasing = TRUE)]
+  escape_regex <- function(x) gsub("([\\{}()\\[\\].^$|?*+])", "\\\\\\1", x, perl = TRUE)
+  pattern <- paste0("(", paste(vapply(clean_names, escape_regex, character(1)), collapse = "|"), ")")
+  not_na <- !is.na(text)
+  ml <- gregexpr(pattern, text[not_na], perl = TRUE)
+  matched <- regmatches(text[not_na], ml)
+  regmatches(text[not_na], ml) <- lapply(matched, function(names_found) {
+    unname(terms_mapping[names_found])
+  })
+  text
+}
+
 #' Level order to use when ordering a predictor's category group.
 #'
 #' @param model A fitted `exploratory_chaid` model.
-#' @param variable Predictor name.
+#' @param variable Predictor name, in CLEAN (fit-time) name space -- matching
+#'   `model$predictor_info`'s keys, exactly as every existing caller already
+#'   passes it.
 #' @return Character vector of levels, or `NULL` when alphabetical order applies.
 chaid_group_level_order <- function(model, variable) {
   # A predictor that was a factor in the USER's data frame keeps its declared
   # level order. This has to come from the pre-cleanup frame: cleanup_df() turns
   # every character predictor into a factor whose levels are merely
   # data-appearance order, so `predictor_info` cannot tell the two apart.
-  declared <- model$original_factor_levels[[variable]]
+  # `original_factor_levels` is captured BEFORE cleanup (build_chaid.R), so it
+  # is keyed by the ORIGINAL column name -- resolve `variable` (clean) through
+  # terms_mapping first, or this silently misses every renamed (e.g.
+  # comma-containing) column and falls through to the alphabetical default.
+  declared_name <- chaid_map_display_name(variable, model$terms_mapping)
+  declared <- model$original_factor_levels[[declared_name]]
   if (!is.null(declared) && length(declared) > 0) {
     return(declared)
   }
