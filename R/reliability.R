@@ -560,10 +560,6 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
     total_missing_n <- sum(is.na(cleaned_df))
     rows_with_missing_n <- sum(!stats::complete.cases(cleaned_df))
 
-    standardized_alpha <- reliability_alpha_from_correlation(r)
-    average_r <- mean(r[upper.tri(r)], na.rm = TRUE)
-    median_r <- stats::median(r[upper.tri(r)], na.rm = TRUE)
-
     coefficient_name <- switch(selected_method,
       pearson = "Cronbach's Alpha",
       polychoric = "Ordinal Alpha",
@@ -576,7 +572,17 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
       error = function(e) NULL)
 
     # psych determines reverse keys from the first principal component. Apply
-    # the same keys to every matrix-based statistic, not just alpha itself.
+    # the same keys to every matrix-based statistic -- standardized_alpha,
+    # average_r and median_r included, not just matrix_alpha_object itself.
+    # These three MUST be (re)computed from the possibly-reversed `r` BELOW,
+    # not the original one above: for a non-pearson correlation_method,
+    # display_alpha <- standardized_alpha (see below), so computing it from
+    # the pre-correction matrix made check_keys a silent no-op for
+    # Polychoric/Mixed correlation -- verified live, identical Ordinal Alpha
+    # with check_keys FALSE vs TRUE on a fixture with one reverse-worded
+    # ordinal item. item_stats' r.drop/r.cor already used the corrected `r`
+    # (computed further down from this same variable), so only these three
+    # summary-level numbers were stale.
     key_signs <- reliability_extract_key_signs(matrix_alpha_object, colnames(r))
     if (isTRUE(check_keys) && any(key_signs < 0)) {
       key_matrix <- diag(key_signs)
@@ -587,6 +593,10 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
                                       warnings = FALSE)),
         error = function(e) NULL)
     }
+
+    standardized_alpha <- reliability_alpha_from_correlation(r)
+    average_r <- mean(r[upper.tri(r)], na.rm = TRUE)
+    median_r <- stats::median(r[upper.tri(r)], na.rm = TRUE)
 
     g6 <- if (!is.null(matrix_alpha_object)) {
       reliability_safe_number(matrix_alpha_object$total[["G6(smc)"]])

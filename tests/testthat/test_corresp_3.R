@@ -179,6 +179,27 @@ test_that("exp_mca_aggregated clamps the number of dimensions to the table size"
   expect_error(model %>% (function(m) m$section5$dimension_summary), NA)
 })
 
+test_that("tidy(type='data') names its coordinate column 'Dimension 1' even when only 1 dimension was fit", {
+  # A 2-row-category cross tab (min(dim)-1 == 1) makes FactoMineR::CA()
+  # return $row$coord as a bare named numeric vector instead of a 1-column
+  # matrix -- as.data.frame() on that vector names the column after the
+  # deparsed expression ("x$row$coord") rather than "Dim 1", since a plain
+  # atomic vector carries no column-name hint of its own. The multi-dimension
+  # fixture used by "produces every report tidy type" above never exercises
+  # this shape (its table is 4x4, 3 usable dimensions), so this gap survived
+  # undetected.
+  df <- data.frame(brand = c("A", "B"), x = c(70, 40), y = c(30, 60),
+                   stringsAsFactors = FALSE)
+  model_df <- df %>% exp_mca_aggregated(brand, x, y)
+  expect_equal(model_df$model[[1]]$n_dims, 1)
+
+  data_out <- model_df %>% tidy_rowwise(model, type = "data")
+  expect_true("Dimension 1" %in% colnames(data_out),
+             info = paste0("expected a 'Dimension 1' column, got: ",
+                            paste(colnames(data_out), collapse = ", ")))
+  expect_false(any(grepl("coord", colnames(data_out), fixed = TRUE)))
+})
+
 test_that("exp_mca_aggregated works with Repeat By", {
   wide <- make_ca_wide_data()
   grouped <- dplyr::bind_rows(

@@ -198,6 +198,49 @@ test_that("check_keys reverses reverse-worded items across report statistics", {
   expect_true(all(!is.na(with_keys$model[[1]]$alpha_if_deleted$alpha_if_dropped)))
 })
 
+test_that("check_keys reverses reverse-worded items for polychoric and mixed too (tam#38107)", {
+  # Regression test for a defect the tam analytics-harness-loop found with no
+  # bug report: standardized_alpha/average_r/median_r used to be computed from
+  # the correlation matrix BEFORE the check_keys reverse-sign correction was
+  # applied to it (the correction only ran a few lines later). For pearson
+  # this was invisible -- display_alpha uses raw_alpha, a completely separate
+  # computation that always respected check_keys correctly. But
+  # display_alpha <- standardized_alpha for every OTHER correlation_method, so
+  # check_keys silently did nothing at all for polychoric/mixed: the same
+  # (stale) Ordinal/Mixed-Correlation Alpha came back whether check_keys was
+  # TRUE or FALSE. item_stats' r.drop/r.cor were unaffected (they read `r`
+  # AFTER the correction, further down), which is why the bug hid behind
+  # otherwise-correct-looking item-level output.
+  set.seed(11)
+  n <- 200
+  latent <- rnorm(n)
+  make_ordinal <- function(coef) {
+    raw <- coef * latent + rnorm(n, sd = 0.6)
+    breaks <- quantile(raw, probs = c(0, 1 / 3, 2 / 3, 1))
+    breaks[1] <- -Inf; breaks[4] <- Inf
+    ordered(c("low", "mid", "high")[cut(raw, breaks = breaks, labels = FALSE,
+                                        include.lowest = TRUE)],
+            levels = c("low", "mid", "high"))
+  }
+  df <- tibble::tibble(
+    q1 = make_ordinal(1), q2 = make_ordinal(1),
+    q3 = make_ordinal(-1)  # reverse-worded relative to q1/q2
+  )
+
+  for (method in c("polychoric", "mixed")) {
+    without_keys <- exp_cronbach_alpha(df, dplyr::everything(),
+                                       correlation_method = method, check_keys = FALSE)
+    with_keys <- exp_cronbach_alpha(df, dplyr::everything(),
+                                    correlation_method = method, check_keys = TRUE)
+    expect_gt(with_keys$model[[1]]$alpha, without_keys$model[[1]]$alpha,
+              label = paste0(method, ": check_keys=TRUE alpha"))
+    expect_gt(with_keys$model[[1]]$alpha, 0.5,
+              label = paste0(method, ": check_keys=TRUE alpha should be a healthy positive value"))
+    expect_gt(with_keys$model[[1]]$average_r, without_keys$model[[1]]$average_r,
+              label = paste0(method, ": check_keys=TRUE average_r"))
+  }
+})
+
 test_that("exp_cronbach_alpha handles mixed correlation", {
   df <- make_reliability_df() %>%
     dplyr::mutate(
