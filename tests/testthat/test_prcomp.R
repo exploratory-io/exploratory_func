@@ -527,8 +527,89 @@ test_that("do_prcomp Pearson output is unchanged by the polychoric support (issu
   # Same decomposition as a plain prcomp() on the raw data (up to the sign stabilization sweep).
   expect_equal(fit$sdev, reference$sdev, tolerance = 1e-10)
   expect_equal(abs(unname(fit$rotation)), abs(unname(reference$rotation)), tolerance = 1e-10)
-  # The Pearson path keeps recomputing the loadings from the data, so no cache is attached.
-  expect_null(fit$signed_loadings)
+  # The Pearson path now caches its signed loadings too (issue tam#38107), and for all-numeric
+  # input that cache is bit-identical to the cor(data, scores) the old fallback recomputed on
+  # every read -- which is what makes the change invisible to an existing Pearson analysis.
+  expect_false(is.null(fit$signed_loadings))
+  expect_equal(unname(fit$signed_loadings), unname(cor(df, fit$x)), tolerance = 1e-12)
+  expect_equal(unname(exploratory:::prcomp_signed_loadings(fit)),
+               unname(cor(df, fit$x)), tolerance = 1e-12)
+})
+
+test_that("Pearson-resolved categorical input still renders every loadings chart (issue tam#38107)", {
+  # An ordered factor with SIX OR MORE categories makes select_factor_correlation_type() choose
+  # Pearson under Auto, so this combination -- categorical columns on the Pearson branch --
+  # needs no manual override to reach. Before the fix prcomp_signed_loadings() fell through to
+  # cor() on the UN-ENCODED x$df and every chart below aborted with "'x' must be numeric".
+  set.seed(38107)
+  n <- 300
+  latent <- rnorm(n)
+  to_seven <- function(z) factor(pmin(7L, pmax(1L, as.integer(round(4 + 1.2 * z)))),
+                                 levels = 1:7, ordered = TRUE)
+  df <- data.frame(a = to_seven(latent + rnorm(n, 0, 0.45)),
+                   b = to_seven(latent + rnorm(n, 0, 0.60)),
+                   c = to_seven(latent + rnorm(n, 0, 0.75)))
+
+  model_df <- df %>% do_prcomp(a, b, c)
+  fit <- model_df$model[[1]]
+  expect_equal(fit$correlation_type, "pearson")
+  expect_false(isTRUE(fit$is_categorical_correlation))
+
+  for (ty in c("component_profiles", "loadings_signed", "loadings_signed_wide",
+               "representation", "variable_map")) {
+    res <- model_df %>% tidy_rowwise(model, type = ty)
+    expect_gt(nrow(res), 0)
+  }
+
+  # The cached loadings must come from the ENCODED (numeric-coded) frame, i.e. the same data the
+  # decomposition itself ran on -- not from the raw factor columns, which cor() cannot take.
+  encoded <- as.data.frame(lapply(df, function(column) as.numeric(as.integer(column))))
+  expect_equal(unname(fit$signed_loadings), unname(cor(encoded, fit$x)), tolerance = 1e-12)
+
+  # Selecting Pearson by hand on a 5-point scale is the same shape, and was equally broken.
+  to_five <- function(z) factor(pmin(5L, pmax(1L, as.integer(round(3 + 1.0 * z)))),
+                                levels = 1:5, ordered = TRUE)
+  five <- data.frame(a = to_five(latent + rnorm(n, 0, 0.45)),
+                     b = to_five(latent + rnorm(n, 0, 0.60)),
+                     c = to_five(latent + rnorm(n, 0, 0.75)))
+  forced <- five %>% do_prcomp(a, b, c, cor_type = "pearson")
+  expect_equal(forced$model[[1]]$correlation_type, "pearson")
+  expect_gt(nrow(forced %>% tidy_rowwise(model, type = "representation")), 0)
+})
+
+test_that("a categorical correlation judges Kaiser even with normalize_data = FALSE (issue tam#38107)", {
+  # A correlation-matrix PCA is standardized by construction, so normalize_data cannot change
+  # its eigenvalues -- and must not change whether the Kaiser criterion is reported. Before the
+  # fix the Component Selection table blanked the column while the Analysis Conditions table
+  # reported the same fit AS normalized.
+  df <- make_ordinal_survey()
+  off <- df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric", normalize_data = FALSE)
+  on <- df %>% do_prcomp(q1, q2, q3, q4, q5, q6, cor_type = "polychoric", normalize_data = TRUE)
+
+  vj_off <- off %>% tidy_rowwise(model, type = "variances_judged")
+  vj_on <- on %>% tidy_rowwise(model, type = "variances_judged")
+
+  # Identical eigenvalues are what make a differing judgment a contradiction.
+  expect_equal(vj_off$Eigenvalue, vj_on$Eigenvalue, tolerance = 1e-12)
+  expect_equal(vj_off$`Kaiser Criterion`, vj_on$`Kaiser Criterion`)
+  expect_equal(vj_off$kaiser_status, vj_on$kaiser_status)
+  expect_false(any(vj_off$kaiser_status == "na"))
+
+  # And it agrees with the Analysis Conditions table's own Normalization row.
+  conditions <- off %>% tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(conditions$Value[conditions$Metric == "Normalization"], "TRUE")
+})
+
+test_that("a PEARSON fit with normalize_data = FALSE still reports no Kaiser judgment", {
+  # The control for the case above: on the Pearson branch normalize_data really does change the
+  # basis (covariance, not correlation), so blanking the column there is correct.
+  set.seed(38107)
+  n <- 200
+  df <- data.frame(a = rnorm(n, 0, 100), b = rnorm(n), c = rnorm(n))
+  vj <- df %>% do_prcomp(a, b, c, normalize_data = FALSE) %>%
+    tidy_rowwise(model, type = "variances_judged")
+  expect_true(all(vj$kaiser_status == "na"))
+  expect_true(all(vj$`Kaiser Criterion` == "-"))
 })
 
 test_that("do_prcomp rejects nominal categorical variables", {
