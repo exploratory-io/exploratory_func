@@ -370,17 +370,34 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       fit$rotation <- sweep(fit$rotation, 2, sign_multiplier, "*")
       fit$x <- sweep(fit$x, 2, sign_multiplier, "*")
 
-      if (isTRUE(fit$is_categorical_correlation)) {
-        # Cache the signed loadings AFTER the sign sweep. Every report branch reads them through
-        # prcomp_signed_loadings() so no branch silently recomputes a FRESH PEARSON
-        # cor(cleaned_df, x$x) on top of a polychoric solution -- and so a factor column, which
-        # cor() cannot take at all, never reaches cor(). (issue #37294)
-        fit$signed_loadings <- tryCatch({
-          loadings <- fit$rotation %*% diag(fit$sdev, nrow = length(fit$sdev))
-          dimnames(loadings) <- list(rownames(fit$rotation), colnames(fit$rotation))
-          loadings
-        }, error = function(e) NULL)
-      }
+      # Cache the signed loadings AFTER the sign sweep. Every report branch reads them through
+      # prcomp_signed_loadings() so no branch silently recomputes a FRESH PEARSON
+      # cor(cleaned_df, x$x) on top of a polychoric solution -- and so a factor column, which
+      # cor() cannot take at all, never reaches cor(). (issue #37294)
+      #
+      # Cached for EVERY report-data fit, not just the categorical ones (issue tam#38107). The
+      # Pearson branch used to fall through to prcomp_signed_loadings()'s own
+      # cor(x$df[, names(variable_sd)], x$x), and x$df is the UN-ENCODED frame -- so the one
+      # branch that reached cor() was the one branch whose input could still be categorical.
+      # A Likert PCA whose correlation resolves to Pearson (which Auto does whenever an ordered
+      # factor has six or more categories, and which the Correlation Type dropdown can select
+      # outright) therefore aborted component_profiles / loadings_signed / loadings_signed_wide /
+      # representation / variable_map with a bare "'x' must be numeric" -- exactly the error this
+      # helper was introduced to prevent. Computing from `encoded_df` fixes that with no change
+      # to the all-numeric case: encode_factanal_data() is a no-op there, so encoded_df is
+      # cleaned_df and cor(encoded_df, fit$x) is the identical matrix the fallback produced.
+      fit$signed_loadings <- tryCatch({
+        loadings <- if (isTRUE(fit$is_categorical_correlation)) {
+          # A correlation-matrix PCA has no exact scores to correlate against; the component
+          # loading IS eigenvector * sqrt(eigenvalue), which is that same correlation.
+          out <- fit$rotation %*% diag(fit$sdev, nrow = length(fit$sdev))
+          dimnames(out) <- list(rownames(fit$rotation), colnames(fit$rotation))
+          out
+        } else {
+          cor(encoded_df, fit$x)
+        }
+        loadings
+      }, error = function(e) NULL)
 
       fit$parallel <- tryCatch(
         # method = "pca": keep PCA's own parallel analysis on plain (untouched-diagonal) correlation
@@ -762,7 +779,15 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       pct_variance <- eigenvalue / total_variance * 100
       cum_pct_variance <- cumsum(pct_variance)
       component <- paste0("PC", seq_len(n_comp))
-      normalized <- isTRUE(x$normalize_data)
+      # A categorical correlation is standardized by construction (the analysis runs on the
+      # correlation matrix), so the Kaiser criterion applies whatever normalize_data says --
+      # the SAME rule the analysis_conditions and analysis_method branches above use, and the
+      # same one do_prcomp() itself uses to decide whether to compute fit$kaiser_components.
+      # Without the is_categorical_correlation clause a Polychoric/Tetrachoric/Mixed fit with
+      # normalization unchecked blanked this whole column while the Analysis Conditions table
+      # one tab away reported the data AS normalized -- on identical eigenvalues, since
+      # normalize_data cannot change a correlation-matrix decomposition. (issue tam#38107)
+      normalized <- isTRUE(x$normalize_data) || isTRUE(x$is_categorical_correlation)
 
       # Parallel Analysis: adopt when actual eigenvalue > random threshold, keyed by component
       # index (factor_number). NULL parallel -> Not Available / na.
