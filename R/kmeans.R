@@ -7,9 +7,17 @@ iterate_kmeans <- function(df, max_centers = 10,
                            normalize_data = TRUE,
                            seed = NULL
                            ) {
-  # Limit the numbers of centers to search up to nrow(df) - 1.
-  # Otherwise we will get "Centers should be less than rows" error.
-  n_centers <- seq(min(max_centers, nrow(df) - 1))
+  # Cap k by the number of DISTINCT data points, not just the row count:
+  # stats::kmeans() errors with "more cluster centers than distinct data points"
+  # long before it runs out of rows, and any repeated row makes the two differ
+  # (a few coarse-grained numeric variables produce duplicates immediately).
+  # Hitting that error here aborts the whole exp_kmeans() call, so the user
+  # loses every chart rather than just the elbow one. iterate_silhouette() below
+  # already caps this way; this is its sibling. (tam#38107)
+  # max(1, ...) because seq(0) is c(1, 0), not an empty sequence: data with a
+  # single distinct row would otherwise ask for centers = 0.
+  mat_for_cap <- as_numeric_matrix_(df, columns = colnames(df))
+  n_centers <- seq_len(max(1, min(max_centers, nrow(unique(mat_for_cap)) - 1)))
   ret <- data.frame(center = n_centers)
   ret <- ret %>% dplyr::mutate(model = purrr::map(center, function(x) {
     tryCatch({

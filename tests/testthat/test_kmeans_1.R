@@ -69,8 +69,9 @@ test_that("exp_kmeans elbow method mode", {
   df <- df %>% head(9)
   model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
   res <- model_df$model[[1]]$elbow_result
-  # Search should be limited up to 8 (9 - 1).
-  expect_equal(nrow(res), 8)
+  # Search is limited by distinct rows, not raw row count. This fixture has
+  # seven distinct (cyl, mpg, hp) rows, so the sweep ends at 6.
+  expect_equal(nrow(res), nrow(unique(df[, c("cyl", "mpg", "hp")])) - 1)
 })
 
 test_that("exp_kmeans silhouette method mode", {
