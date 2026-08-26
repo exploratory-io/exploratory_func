@@ -508,3 +508,65 @@ test_that('the cached PCoA map keeps its full contract after replacing cmdscale(
   expect_identical(map$Dim1, map2$Dim1)
   expect_identical(map$Dim2, map2$Dim2)
 })
+
+test_that('too few rows for the requested cluster count is reported in the caller\'s terms', {
+  # cluster::pam() aborts with 'number of cluster centres must lie between 1
+  # and nrow(x)-1', which names an argument the Analytics UI never shows and
+  # counts rows AFTER missing-value removal -- so the number in the message
+  # does not match what the user sees in the table either.
+  df <- tibble::tibble(a = c(1, 2, 3), b = c(4, 5, 6))
+
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, seed = 1),
+    'must be greater than the number of clusters')
+
+  # The boundary is nrow > centers, not nrow >= centers: pam needs at least one
+  # non-medoid row to assign.
+  expect_error(exploratory:::exp_kmedoids(df, a, b, centers = 2, seed = 1), NA)
+})
+
+test_that('a stale clara_sample_size does not block a PAM run', {
+  # The Analytics dialog keeps the CLARA fields populated after the user
+  # switches the algorithm away from CLARA, and PAM never reads this value.
+  # Validating it unconditionally failed a legitimate run with an error naming
+  # a parameter that was no longer on screen.
+  df <- tibble::tibble(a = rnorm(60), b = rnorm(60))
+
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, algorithm = 'pam',
+                               clara_sample_size = 2, seed = 1),
+    NA)
+
+  # 'auto' resolves to pam or clara from the row count inside the fit, and
+  # supplies its own sample size when it picks clara -- so it must not be
+  # validated up front either.
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, algorithm = 'auto',
+                               clara_sample_size = 2, seed = 1),
+    NA)
+
+  # Non-regression: when CLARA is the chosen algorithm the value IS read, and
+  # an unusable one is still rejected.
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, algorithm = 'clara',
+                               clara_sample_size = 2, seed = 1),
+    'clara_sample_size must be greater than the number of clusters')
+})
+
+test_that('silhouette_sample_size is only validated when a silhouette is computed', {
+  df <- tibble::tibble(a = rnorm(60), b = rnorm(60))
+
+  for (mode in c('none', 'elbow')) {
+    expect_error(
+      exploratory:::exp_kmedoids(df, a, b, centers = 3, elbow_method_mode = mode,
+                                 silhouette_sample_size = 2, seed = 1),
+      NA,
+      info = paste('nothing reads silhouette_sample_size in mode', mode))
+  }
+
+  # Non-regression: the silhouette mode does read it.
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, elbow_method_mode = 'silhouette',
+                               silhouette_sample_size = 2, seed = 1),
+    'silhouette_sample_size must be greater than the number of clusters')
+})
