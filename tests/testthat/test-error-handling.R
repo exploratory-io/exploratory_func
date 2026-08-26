@@ -39,30 +39,23 @@ expect_error_with_context <- function(expr, pattern) {
 # Phase 1: K-means error handling tests
 # =============================================================================
 
-test_that("iterate_kmeans reports error with centers context", {
-  # Create data with only 2 distinct points - will fail for centers > 2
-  # This triggers an error inside the purrr::map in iterate_kmeans
+test_that("iterate_kmeans caps the sweep before duplicate-center errors", {
+  # Create data with only 2 distinct points. The sweep is now capped at
+  # distinct rows - 1, so it should complete instead of reaching an invalid k.
   df <- data.frame(x = c(1, 1, 1, 2, 2, 2), y = c(1, 1, 1, 2, 2, 2))
 
-  # The error message should contain "centers=" to indicate which center value failed
-  # Note: iterate_kmeans is an internal function, accessed via :::
-  expect_error_with_context(
-    exploratory:::iterate_kmeans(df, max_centers = 5),
-    "centers="
-  )
+  result <- exploratory:::iterate_kmeans(df, max_centers = 5)
+  expect_equal(result$center, 1L)
 })
 
-test_that("exp_kmeans elbow method reports error with centers context", {
-  # Create data where elbow method iteration will fail
-  # Only 2 distinct points, so centers > 2 will fail in iterate_kmeans
+test_that("exp_kmeans elbow method completes with duplicate rows", {
+  # With only 2 distinct points, the elbow sweep should contain only k = 1.
   df <- data.frame(x = c(1, 1, 1, 2, 2, 2), y = c(1, 1, 1, 2, 2, 2))
 
-  # Use centers=1 for the main k-means (which will succeed)
-  # but max_centers=5 for elbow method (which will fail at centers=3)
-  expect_error_with_context(
-    exploratory:::exp_kmeans(df, x, y, centers = 1, elbow_method_mode = TRUE, max_centers = 5),
-    "centers="
+  result <- exploratory:::exp_kmeans(
+    df, x, y, centers = 1, elbow_method_mode = TRUE, max_centers = 5
   )
+  expect_equal(result$model[[1]]$elbow_result$center, 1L)
 })
 
 test_that("exp_kmeans normal operation works correctly", {
