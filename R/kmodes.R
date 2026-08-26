@@ -18,6 +18,16 @@
 # renders it as "< 0.001". Kept here only as documentation of the contract --
 # no rounding happens R-side, so the display layer can still tell 0 from 1e-40.
 
+#' Sort character labels in a platform-independent order.
+#'
+#' Radix sorting requires UTF-8, Latin-1 or byte-encoded strings. Normalize
+#' native-encoded input first, then sort by UTF-8 byte order.
+#' @param x A character vector.
+#' @return `x` sorted by UTF-8 byte order.
+kmodes_sort_character <- function(x) {
+  sort(enc2utf8(x), method = "radix")
+}
+
 #' Convert one column to the character categories K-Modes works on.
 #'
 #' The clustering algorithm itself only asks "same category or not", so it does
@@ -133,7 +143,7 @@ kmodes_category_display_levels_by_variable <- function(prepared_df, display_leve
   cols <- names(prepared_df)
   levels_by_variable <- lapply(cols, function(col) {
     dl <- if (!is.null(display_levels)) display_levels[[col]] else NULL
-    if (!is.null(dl)) as.character(dl) else sort(unique(prepared_df[[col]]))
+    if (!is.null(dl)) as.character(dl) else kmodes_sort_character(unique(prepared_df[[col]]))
   })
   stats::setNames(levels_by_variable, cols)
 }
@@ -154,7 +164,10 @@ kmodes_category_display_levels <- function(prepared_df, display_levels) {
 #' The most frequent value, with a deterministic tie-break.
 #'
 #' Ties go to the value that sorts first so that the same input always yields
-#' the same Mode regardless of row order.
+#' the same Mode regardless of row order -- and, for character labels,
+#' regardless of platform: the default `sort()` method collates by locale,
+#' which Windows resolves differently from Mac/Linux for multibyte category
+#' labels and silently changes which tied category wins.
 #' @param x A vector of category codes or labels.
 #' @return The modal value.
 kmodes_mode_value <- function(x) {
@@ -170,7 +183,7 @@ kmodes_mode_value <- function(x) {
   if (is.numeric(x)) {
     return(sort(as.numeric(best))[[1]])
   }
-  sort(best)[[1]]
+  kmodes_sort_character(best)[[1]]
 }
 
 #' Mismatch count between every row of a code matrix and one Mode.
@@ -737,7 +750,13 @@ exp_kmodes <- function(df, ...,
 
     # Encode to integer codes once. Every later step -- fitting, the distance
     # matrix, the Modes -- works on these codes, and the levels map them back.
-    levels_by_col <- lapply(prepared_df, function(x) sort(unique(x)))
+    # kmodes_sort_character() pins the code assigned to each category to its
+    # UTF-8 byte order instead of the platform's locale collation: with the
+    # default method, Windows can order multibyte category labels differently
+    # from Mac/Linux, which reassigns which category gets the lowest code and
+    # silently changes kmodes_mode_value()'s numeric tie-break, and from there
+    # the whole clustering result (#windows-kmodes-chart-test-882c62).
+    levels_by_col <- lapply(prepared_df, function(x) kmodes_sort_character(unique(x)))
     mat <- vapply(names(prepared_df), function(col) {
       match(prepared_df[[col]], levels_by_col[[col]])
     }, integer(nrow(prepared_df)))
