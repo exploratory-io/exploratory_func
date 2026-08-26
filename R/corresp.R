@@ -433,12 +433,25 @@ exp_mca_aggregated_long <- function(df, row_category, column_category, count,
     dplyr::ungroup()
 }
 
+# FactoMineR drops a *$coord matrix (row/col/ind/var) to a plain NAMED VECTOR
+# whenever only 1 dimension was fit (ncp=1, or a contingency table capped to
+# min(dim)-1==1 -- e.g. a 2x2 aggregated cross tab). as.data.frame() on that
+# bare vector names its one column after the DEPARSED EXPRESSION passed in
+# (e.g. "x$row$coord"), not "Dim 1" -- as.data.frame.default's fallback for an
+# atomic vector with no other naming hint. Always coerce to an explicitly
+# "Dim 1"-named matrix first so every consumer sees the same shape regardless
+# of how many dimensions were computed.
+.ca_coord_as_matrix <- function(coord) {
+  if (is.matrix(coord)) {
+    return(coord)
+  }
+  matrix(as.numeric(coord), ncol = 1, dimnames = list(names(coord), "Dim 1"))
+}
+
 # Coerce a CA part matrix/vector (coord or contrib) to a wide tibble with
 # category + Dimension 1..k columns, guaranteeing Dimension 1 and Dimension 2 exist.
 .ca_part_coord_wide <- function(mat, variable_name) {
-  if (!is.matrix(mat)) {
-    mat <- matrix(as.numeric(mat), ncol = 1, dimnames = list(names(mat), "Dim 1"))
-  }
+  mat <- .ca_coord_as_matrix(mat)
   res <- tibble::rownames_to_column(as.data.frame(mat, check.names = FALSE), var = "category")
   res <- res %>% dplyr::rename_with(~gsub("^Dim ", "Dimension ", .), dplyr::starts_with("Dim "))
   if (!"Dimension 1" %in% names(res)) res$`Dimension 1` <- 0
@@ -524,14 +537,18 @@ tidy.ca_exploratory <- function(x, type = "categories", ...) {
   else if (type == "data") {
     if (analysis_type == "CA") {
       # Join each observation's row-variable category coordinates (dimension scores).
-      coord <- tibble::rownames_to_column(as.data.frame(x$row$coord), var = ".__row_cat")
+      # .ca_coord_as_matrix guards the 1-dimension case, where x$row$coord is a
+      # bare named vector rather than a 1-column matrix (see its own comment).
+      coord <- tibble::rownames_to_column(
+        as.data.frame(.ca_coord_as_matrix(x$row$coord), check.names = FALSE), var = ".__row_cat")
       coord <- coord %>% dplyr::rename_with(~gsub("Dim ", "Dimension ", .), dplyr::starts_with("Dim "))
       res <- x$df
       res$.__row_cat <- as.character(res[[x$row_variable_name]])
       res <- res %>% dplyr::left_join(coord, by = ".__row_cat") %>% dplyr::select(-.__row_cat)
       return(res)
     }
-    res <- as.data.frame(x$ind$coord)
+    # Same 1-dimension guard as the CA branch above, for MCA's x$ind$coord.
+    res <- as.data.frame(.ca_coord_as_matrix(x$ind$coord), check.names = FALSE)
     res <- x$df %>% dplyr::bind_cols(res)
     res <- res %>% dplyr::rename_with(~gsub("Dim ", "Dimension ", .), dplyr::starts_with("Dim "))
     return(res)
