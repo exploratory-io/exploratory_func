@@ -107,6 +107,65 @@ test_that("numeric handling keeps low-cardinality values and bins wide ones", {
   expect_equal(dplyr::n_distinct(forced$prepared$wide), 60)
 })
 
+test_that("the auto threshold follows the configured number of bins, not a constant", {
+  # The threshold used to be a hardcoded 10, which happens to equal
+  # numeric_bins' own default -- so at default settings the two agreed and
+  # nothing looked wrong. They diverge as soon as the user changes the field.
+  # A column with 15 distinct values is the case that exposes it: above the old
+  # constant, at or below a raised bin count.
+  df <- tibble::tibble(mid = rep(1:15, 8))
+
+  raised <- kmodes_prepare_data(df, "mid", numeric_handling = "auto", numeric_bins = 20)
+  expect_equal(raised$numeric_conversion$conversion, "as_category",
+               info = "15 distinct values with 20 bins requested are already the categories")
+  expect_setequal(unique(raised$prepared$mid), as.character(1:15))
+
+  # Binning into more bins than there are distinct values can only produce bins
+  # that are empty by construction, and replaces values the reader recognises
+  # with interval labels.
+  expect_false(any(grepl("^[[(].*,.*[])]$", unique(raised$prepared$mid))))
+
+  default <- kmodes_prepare_data(df, "mid", numeric_handling = "auto", numeric_bins = 10)
+  expect_equal(default$numeric_conversion$conversion, "equal_width",
+               info = "15 distinct values into 10 bins is genuine binning")
+  expect_equal(dplyr::n_distinct(default$prepared$mid), 10)
+})
+
+test_that("a lowered bin count is honoured by the auto threshold", {
+  # The mirror-image of the case above: with a hardcoded threshold of 10, an
+  # 8-distinct column stayed 8 categories however low the bin count was set.
+  df <- tibble::tibble(v = rep(1:8, 25))
+
+  lowered <- kmodes_prepare_data(df, "v", numeric_handling = "auto", numeric_bins = 5)
+  expect_equal(lowered$numeric_conversion$conversion, "equal_width")
+  expect_equal(dplyr::n_distinct(lowered$prepared$v), 5)
+
+  at_threshold <- kmodes_prepare_data(df, "v", numeric_handling = "auto", numeric_bins = 8)
+  expect_equal(at_threshold$numeric_conversion$conversion, "as_category",
+               info = "distinct == bins needs no binning")
+})
+
+test_that("a non-finite value does not abort the conversion", {
+  # Inf is what a ratio column with a zero denominator produces. It used to
+  # reach cut() and abort the whole analytics with base R's
+  # "'to' must be a finite number", which named nothing the user could act on.
+  wide <- c(seq_len(40), Inf)
+
+  prepared <- kmodes_prepare_column(wide, "auto", 10)
+  expect_equal(prepared$conversion, "equal_width")
+  expect_true(is.na(prepared$values[length(prepared$values)]),
+              info = "a non-finite entry carries no category and is treated as missing")
+  expect_equal(dplyr::n_distinct(prepared$values[!is.na(prepared$values)]), 10)
+
+  # -Inf and NaN take the same path.
+  expect_silent(kmodes_prepare_column(c(seq_len(40), -Inf), "auto", 10))
+  expect_silent(kmodes_prepare_column(c(seq_len(40), NaN), "auto", 10))
+
+  # And end to end, through exp_kmodes itself.
+  df <- tibble::tibble(cat = rep(c("a", "b", "c"), 20), num = c(Inf, seq_len(59)))
+  expect_error(exp_kmodes(df, cat, num, centers = 2, seed = 1), NA)
+})
+
 test_that("kmodes_prepare_data preserves a factor's declared level order for display (#37936)", {
   df <- tibble::tibble(
     a = factor(c("High", "Mid", "Low", "High"), levels = c("High", "Mid", "Low")),

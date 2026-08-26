@@ -14,10 +14,6 @@
 #' based, and MCA coordinates are an interpretation aid -- they are NOT the
 #' space K-Modes optimizes in.
 
-# Numeric columns with at most this many distinct non-NA values are kept as
-# categories under numeric_handling = "auto"; anything wider is binned.
-KMODES_AUTO_CATEGORY_MAX_DISTINCT <- 10
-
 # A p-value smaller than this is reported to the UI as-is; the display layer
 # renders it as "< 0.001". Kept here only as documentation of the contract --
 # no rounding happens R-side, so the display layer can still tell 0 from 1e-40.
@@ -53,10 +49,24 @@ kmodes_prepare_column <- function(x, numeric_handling = "auto", numeric_bins = 1
     return(list(values = x, conversion = NA_character_, display_levels = NULL))
   }
   if (is.numeric(x)) {
-    finite_values <- x[!is.na(x)]
+    # Only genuinely finite values can be cut(): Inf makes cut() abort with
+    # "'to' must be a finite number", which named nothing the user could act
+    # on. A ratio column with a zero denominator produces Inf routinely, so
+    # this is ordinary data, not a pathological case. Non-finite entries are
+    # treated as missing -- they carry no category.
+    finite_values <- x[is.finite(x)]
+    if (any(!is.finite(x) & !is.na(x))) {
+      x[!is.finite(x)] <- NA_real_
+    }
     method <- numeric_handling
     if (identical(method, "auto")) {
-      method <- if (dplyr::n_distinct(finite_values) <= KMODES_AUTO_CATEGORY_MAX_DISTINCT) {
+      # The threshold is the CONFIGURED number of bins, not a constant. Cutting
+      # a column into more bins than it has distinct values can only produce
+      # bins that are empty by construction, and replaces values the reader
+      # recognises (1..15) with interval labels ((1.7,2.4]). Keying off a fixed
+      # 10 also ignored a LOWERED bin count: with numeric_bins = 5 an
+      # 8-distinct column stayed 8 categories instead of being binned into 5.
+      method <- if (dplyr::n_distinct(finite_values) <= numeric_bins) {
         "as_category"
       } else {
         "equal_width"
