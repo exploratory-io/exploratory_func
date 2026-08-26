@@ -1364,7 +1364,9 @@ chaid_node_summary <- function(model) {
     Node = model$nodes$node_id,
     # tam #37177: readable form -- no "Root & " prefix, contiguous numeric bins
     # collapsed to one inequality. The root row reads "All".
-    Rule = chaid_readable_condition(model$nodes$rule),
+    # `rule`/`split_variable` are in CLEAN (fit-time) name space -- map back to
+    # the column's real name for display (chaid_map_display_name(_in_text)()).
+    Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule, model$terms_mapping)),
     Rows = model$nodes$n,
     `%` = model$nodes$n / root.n * 100,
     `Predicted Class` = model$nodes$predicted_class,
@@ -1373,7 +1375,7 @@ chaid_node_summary <- function(model) {
       format_chaid_distribution,
       character(1)
     ),
-    `Split Variable` = model$nodes$split_variable,
+    `Split Variable` = chaid_map_display_name(model$nodes$split_variable, model$terms_mapping),
     `p-value` = model$nodes$p_value,
     `Adjusted p-value` = model$nodes$adjusted_p_value,
     stringsAsFactors = FALSE,
@@ -1391,8 +1393,8 @@ chaid_rule_table <- function(model) {
   terminal <- model$nodes$is_terminal
   data.frame(
     Node = model$nodes$node_id[terminal],
-    # tam #37177: see chaid_node_summary().
-    Rule = chaid_readable_condition(model$nodes$rule[terminal]),
+    # tam #37177: see chaid_node_summary(). tam#38107: map clean -> original name.
+    Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule[terminal], model$terms_mapping)),
     Prediction = model$nodes$predicted_class[terminal],
     Probability = vapply(
       model$nodes$class_distribution[terminal],
@@ -1444,7 +1446,10 @@ chaid_category_merge_table <- function(model) {
   }
   data.frame(
     Node = merge.data$node_id,
-    Variable = merge.data$variable,
+    # tam#38107: merge.data$variable stays CLEAN (fit-time name) for the
+    # chaid_group_level_order/binmap lookups above -- only the OUTPUT column
+    # is mapped back to the real column name.
+    Variable = chaid_map_display_name(merge.data$variable, model$terms_mapping),
     `Merged Category` = merge.data$merged_group,
     `Original Categories` = merge.data$original_categories,
     `Merge p-value` = merge.data$merge_p_value,
@@ -1471,7 +1476,9 @@ chaid_split_summary <- function(model) {
   data.frame(
     Depth = model$nodes$depth[split.rows],
     Node = node.ids,
-    `Split Variable` = model$nodes$split_variable[split.rows],
+    # tam#38107: split_variable is in CLEAN (fit-time) name space -- map back
+    # to the column's real name for display.
+    `Split Variable` = chaid_map_display_name(model$nodes$split_variable[split.rows], model$terms_mapping),
     `p-value` = model$nodes$p_value[split.rows],
     `Adjusted p-value` = model$nodes$adjusted_p_value[split.rows],
     `Number of Children` = vapply(node.ids, function(node.id) {
@@ -1530,7 +1537,10 @@ chaid_numeric_intervals <- function(model) {
     }, character(1), USE.NAMES = FALSE)
     data.frame(
       Node = node_id,
-      Variable = variable,
+      # tam#38107: `variable` stays CLEAN (fit-time name) for the binmap/
+      # chaid_group_level_order lookups above -- only the OUTPUT column is
+      # mapped back to the real column name.
+      Variable = chaid_map_display_name(variable, model$terms_mapping),
       `Binning Method` = binmap[[variable]]$method,
       `Initial Bins` = length(binmap[[variable]]$labels),
       `Final Intervals` = paste(child_labels, collapse = " / "),
