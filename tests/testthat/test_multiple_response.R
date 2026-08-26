@@ -262,3 +262,22 @@ test_that("combine_multiple_response_column output order follows the columns arg
 
   expect_equal(ret$combined, "c,a,b")
 })
+
+test_that("combine_multiple_response_column accepts a bare NA (not NA_character_) as no_selection", {
+  df <- data.frame(
+    id = 1:3,
+    q_a = c(1, NA, NA),
+    q_b = c(NA, 1, NA)
+  )
+
+  ret <- combine_multiple_response_column(
+    df,
+    columns = c("q_a", "q_b"),
+    output_column = "combined",
+    option_name_type = "remove_prefix",
+    option_name_prefix = "q_",
+    no_selection = NA
+  )
+
+  expect_equal(ret$combined, c("a", "b", NA_character_))
+})

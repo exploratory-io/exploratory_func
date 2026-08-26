@@ -34,9 +34,10 @@ combine_multiple_response_column <- function(
 
   option_name_type <- match.arg(option_name_type)
 
-  if (!(is.character(no_selection) || (length(no_selection) == 1 && is.na(no_selection)))) {
+  if (!((is.character(no_selection) && length(no_selection) == 1) || (length(no_selection) == 1 && is.na(no_selection)))) {
     stop("no_selection must be a character string or NA.")
   }
+  no_selection <- as.character(no_selection)
 
   if (length(columns) == 0) {
     stop("At least one column must be specified.")
