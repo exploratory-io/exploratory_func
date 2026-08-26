@@ -212,3 +212,53 @@ test_that("combine_multiple_response_column handles column names with spaces, mu
 
   expect_equal(ret$combined, c("a", "b"))
 })
+
+test_that("combine_multiple_response_column errors when no_selection is not character/NA", {
+  df <- data.frame(id = 1:2, q_a = c(1, 0), q_b = c(0, 1))
+
+  expect_error(
+    combine_multiple_response_column(
+      df,
+      columns = c("q_a", "q_b"),
+      output_column = "combined",
+      option_name_type = "remove_prefix",
+      option_name_prefix = "q_",
+      no_selection = 0
+    ),
+    "no_selection must be a character string or NA"
+  )
+})
+
+test_that("combine_multiple_response_column errors when columns contains duplicates", {
+  df <- data.frame(id = 1:2, q_a = c(1, 0), q_b = c(0, 1))
+
+  expect_error(
+    combine_multiple_response_column(
+      df,
+      columns = c("q_a", "q_a", "q_b"),
+      output_column = "combined",
+      option_name_type = "remove_prefix",
+      option_name_prefix = "q_"
+    ),
+    "columns must not contain duplicates"
+  )
+})
+
+test_that("combine_multiple_response_column output order follows the columns argument order, not the data frame's physical column order", {
+  df <- data.frame(
+    id = 1L,
+    q_a = 1,
+    q_b = 1,
+    q_c = 1
+  )
+
+  ret <- combine_multiple_response_column(
+    df,
+    columns = c("q_c", "q_a", "q_b"),
+    output_column = "combined",
+    option_name_type = "remove_prefix",
+    option_name_prefix = "q_"
+  )
+
+  expect_equal(ret$combined, "c,a,b")
+})
