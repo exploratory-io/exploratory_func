@@ -207,6 +207,26 @@ test_that("kmodes_category_display_levels unions per-variable orders in variable
   expect_equal(kmodes_category_display_levels(prepared_df, NULL), levels_fallback)
 })
 
+test_that("character category sorting normalizes native encodings", {
+  values <- c("ア", "あ", "é", "a")
+  Encoding(values) <- "unknown"
+
+  expect_equal(kmodes_sort_character(values), c("a", "é", "あ", "ア"))
+  expect_equal(kmodes_mode_value(rep(values[1:2], each = 2)), "あ")
+
+  japanese <- rep(c("あ", "ア"), each = 20)
+  Encoding(japanese) <- "unknown"
+  df <- tibble::tibble(
+    japanese = japanese,
+    segment = rep(c("x", "y"), each = 20)
+  )
+  expect_error(
+    exp_kmodes(df, japanese, segment, centers = 2, seed = 1,
+               elbow_method_mode = "none", map_sample_size = 0),
+    NA
+  )
+})
+
 test_that("report category_order keeps conflicting shared factor orders per variable", {
   df <- tibble::tibble(
     a = factor(c("A", "B", "A", "B"), levels = c("A", "B")),
