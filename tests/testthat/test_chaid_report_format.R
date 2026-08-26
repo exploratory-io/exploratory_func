@@ -219,7 +219,7 @@ test_that('chaid_map_display_name maps a clean name back to its original, and is
   expect_equal(chaid_map_display_name(c('部署.1', '年齢', NA), tm), c('部署,1', '年齢', NA))
 })
 
-test_that('chaid_map_display_names_in_text rewrites every embedded clean name in a composite rule string', {
+test_that('chaid_map_display_names_in_text maps only condition variable names', {
   tm <- c('部署.1' = '部署,1', '年齢' = '年齢')
   # Single condition.
   expect_equal(
@@ -234,6 +234,14 @@ test_that('chaid_map_display_names_in_text rewrites every embedded clean name in
   tm2 <- c('a' = 'a-original', 'ab' = 'ab-original')
   expect_equal(chaid_map_display_names_in_text('ab in {x}', tm2), 'ab-original in {x}')
   expect_equal(chaid_map_display_names_in_text('a in {x}', tm2), 'a-original in {x}')
+  # A category value equal to the clean variable name must not be rewritten.
+  expect_equal(
+    chaid_map_display_names_in_text('A. B in {A. B}', c('A. B' = 'A, B')),
+    'A, B in {A. B}')
+  # Literal matching also handles backslashes in cleaned names.
+  expect_equal(
+    chaid_map_display_names_in_text('A\\B. C in {x}', c('A\\B. C' = 'A\\B, C')),
+    'A\\B, C in {x}')
   # NA passes through; NULL/empty terms_mapping is a no-op.
   expect_true(is.na(chaid_map_display_names_in_text(NA_character_, tm)))
   expect_equal(chaid_map_display_names_in_text('部署.1 in {x}', NULL), '部署.1 in {x}')

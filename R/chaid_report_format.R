@@ -316,43 +316,36 @@ chaid_map_display_name <- function(name, terms_mapping) {
   name
 }
 
-#' Rewrite every occurrence of a clean column name inside a composite rule/
-#' condition string back to its original name (display-only -- see
-#' [chaid_map_display_name()]). Longest-clean-name-first, so a clean name that
-#' happens to be a substring of another is never partially substituted first.
+#' Rewrite clean column names in the variable side of composite rule strings
+#' back to their original names (display-only -- see
+#' [chaid_map_display_name()]). Category values are deliberately left alone.
 #'
 #' @param text A character vector of rule strings (each may join multiple
 #'   `" & "`-separated conditions, one variable name per condition).
 #' @param terms_mapping `model$terms_mapping` (named character vector, clean -> original), or `NULL`.
-#' @return `text`, with every embedded clean name replaced by its original.
+#' @return `text`, with condition variable names replaced by their originals.
 chaid_map_display_names_in_text <- function(text, terms_mapping) {
   text <- as.character(text)
   if (is.null(terms_mapping) || length(terms_mapping) == 0 || length(text) == 0) {
     return(text)
   }
-  clean_names <- names(terms_mapping)[names(terms_mapping) != unname(terms_mapping)]
-  if (length(clean_names) == 0) {
-    return(text)
+  map_condition <- function(condition) {
+    marker <- regexpr(" in \\{", condition, perl = TRUE)[[1]]
+    if (marker < 1) {
+      return(condition)
+    }
+    variable <- substr(condition, 1, marker - 1)
+    suffix <- substr(condition, marker, nchar(condition))
+    paste0(chaid_map_display_name(variable, terms_mapping), suffix)
   }
-  # A SEQUENTIAL gsub()/stri_replace_all_fixed() call per clean name lets an
-  # EARLIER replacement's OWN OUTPUT be re-matched by a LATER pattern -- e.g.
-  # clean names "a" -> "a-original" and "ab" -> "ab-original": after "a" is
-  # replaced, the output "a-original" itself contains the literal substring
-  # "a" again (inside "original"), which a later pass then wrongly touches a
-  # second time. Locate every match FIRST (gregexpr against the ORIGINAL,
-  # unmodified text), THEN substitute all of them at once via
-  # `regmatches<-` -- matched positions are fixed before any text changes, so
-  # a replacement's own output is never rescanned.
-  clean_names <- clean_names[order(nchar(clean_names), decreasing = TRUE)]
-  escape_regex <- function(x) gsub("([\\{}()\\[\\].^$|?*+])", "\\\\\\1", x, perl = TRUE)
-  pattern <- paste0("(", paste(vapply(clean_names, escape_regex, character(1)), collapse = "|"), ")")
-  not_na <- !is.na(text)
-  ml <- gregexpr(pattern, text[not_na], perl = TRUE)
-  matched <- regmatches(text[not_na], ml)
-  regmatches(text[not_na], ml) <- lapply(matched, function(names_found) {
-    unname(terms_mapping[names_found])
-  })
-  text
+  vapply(text, function(rule) {
+    if (is.na(rule)) {
+      return(NA_character_)
+    }
+    conditions <- chaid_split_conditions(rule)
+    paste(vapply(conditions, map_condition, character(1)),
+          collapse = CHAID_CONDITION_SEPARATOR)
+  }, character(1), USE.NAMES = FALSE)
 }
 
 #' Level order to use when ordering a predictor's category group.
