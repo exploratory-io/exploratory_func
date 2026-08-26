@@ -77,12 +77,13 @@ combine_multiple_response_column <- function(
   }
 
   values <- data[, columns, drop = FALSE]
-  mat <- as.matrix(values)
-  sel_mat <- !is.na(mat) & (mat == selected_value)
+  sel_mat <- do.call(cbind, lapply(values, function(value) {
+    !is.na(value) & (value == selected_value)
+  }))
 
   result <- vapply(seq_len(nrow(sel_mat)), function(i) {
     sel <- sel_mat[i, ]
-    if (!any(sel)) {
+    if (!any(sel, na.rm = TRUE)) {
       no_selection
     } else {
       paste(option_names[sel], collapse = separator)

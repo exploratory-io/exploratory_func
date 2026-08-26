@@ -281,3 +281,41 @@ test_that("combine_multiple_response_column accepts a bare NA (not NA_character_
 
   expect_equal(ret$combined, c("a", "b", NA_character_))
 })
+
+test_that("combine_multiple_response_column preserves matching across mixed source column types", {
+  df <- data.frame(
+    id = 1:3,
+    q_a = c(1, 0, NA),
+    q_b = c("0", "1", NA),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- combine_multiple_response_column(
+    df,
+    columns = c("q_a", "q_b"),
+    output_column = "combined",
+    option_name_type = "remove_prefix",
+    option_name_prefix = "q_"
+  )
+
+  expect_equal(ret$combined, c("a", "b", NA_character_))
+})
+
+test_that("combine_multiple_response_column treats NA selected_value as no match", {
+  df <- data.frame(
+    id = 1:2,
+    q_a = c(1, 0),
+    q_b = c(0, 1)
+  )
+
+  ret <- combine_multiple_response_column(
+    df,
+    columns = c("q_a", "q_b"),
+    output_column = "combined",
+    selected_value = NA,
+    option_name_type = "remove_prefix",
+    option_name_prefix = "q_"
+  )
+
+  expect_equal(ret$combined, c(NA_character_, NA_character_))
+})
