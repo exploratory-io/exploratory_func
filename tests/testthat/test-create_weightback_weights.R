@@ -11,6 +11,15 @@ test_that("create_weightback_weights rejects absent and duplicate population key
   expect_error(create_weightback_weights(data, tibble::tibble(gender = c("Male", "Male"), population_pct = c(.5, .5)), "gender"), "unique keys")
 })
 
+test_that("create_weightback_weights rejects population combinations without sample coverage", {
+  data <- tibble::tibble(gender = c("Male", "Male"))
+  pop <- tibble::tibble(gender = c("Male", "Female"), population_pct = c(.5, .5))
+  expect_error(
+    create_weightback_weights(data, pop, "gender"),
+    "Every sample and population combination"
+  )
+})
+
 test_that("create_weightback_weights supports unnormalized population values", {
   data <- tibble::tibble(gender = c("Male", "Male", "Female"))
   pop <- tibble::tibble(gender = c("Male", "Female"), population_pct = c(2, 1))

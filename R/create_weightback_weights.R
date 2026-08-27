@@ -34,8 +34,10 @@ create_weightback_weights <- function(data, pop_dist, weight_vars,
   sample.dist <- dplyr::ungroup(data) %>%
     dplyr::count(dplyr::across(dplyr::all_of(weight_vars)), name = ".sample_n") %>%
     dplyr::mutate(.sample_pct = .sample_n / sum(.sample_n))
-  if (nrow(dplyr::anti_join(sample.dist, pop.dist, by = weight_vars)) > 0) {
-    stop("Every sample combination must be present in pop_dist.", call. = FALSE)
+  missing.in.pop <- dplyr::anti_join(sample.dist, pop.dist, by = weight_vars)
+  missing.in.sample <- dplyr::anti_join(pop.dist, sample.dist, by = weight_vars)
+  if (nrow(missing.in.pop) > 0 || nrow(missing.in.sample) > 0) {
+    stop("Every sample and population combination must be present in both data sets.", call. = FALSE)
   }
   weight.tmp <- ".weightback_weight_internal"
   while (weight.tmp %in% names(data)) weight.tmp <- paste0(weight.tmp, "_")
