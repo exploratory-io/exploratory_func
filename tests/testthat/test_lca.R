@@ -1,3 +1,5 @@
+testthat::skip_if_not_installed("poLCA")
+
 test_that("exp_lca selects a BIC-minimum categorical model and exposes its report outputs", {
   set.seed(24817)
   n <- 180
@@ -41,6 +43,27 @@ test_that("exp_lca selects a BIC-minimum categorical model and exposes its repor
   expect_true(all(is.na(assignments$`Latent Class`[assignments$`Is Excluded`])))
   expect_true(all(assignments$`Assignment Confidence`[!assignments$`Is Excluded`] >= 0))
   expect_true(nrow(tidy(model, type = "relationship")) > 0)
+})
+
+test_that("exp_lca respects the requested lower class bound for tiny data", {
+  df <- data.frame(a = c("x", "y"), b = c("m", "n"))
+  model <- exp_lca(df, a, b, min_nclass = 2, max_nclass = 6,
+                   nrep = 1, maxiter = 20)$model[[1]]
+
+  expect_equal(tidy(model, type = "class_selection")$number_of_classes, 2L)
+})
+
+test_that("exp_lca does not report convergence when maxiter is reached", {
+  set.seed(24818)
+  df <- data.frame(
+    a = sample(c("x", "y", "z"), 80, replace = TRUE),
+    b = sample(c("m", "n", "o"), 80, replace = TRUE),
+    c = sample(c("low", "mid", "high"), 80, replace = TRUE)
+  )
+  model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                   nrep = 1, maxiter = 1)$model[[1]]
+
+  expect_false(tidy(model, type = "class_selection")$converged)
 })
 
 test_that("exp_lca rejects non-categorical, insufficient, and invalid class selections", {

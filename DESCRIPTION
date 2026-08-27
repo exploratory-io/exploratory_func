@@ -45,10 +45,10 @@ Imports:
     pwr,
     readr,
     MASS,
-    ordinal,
-    poLCA
+    ordinal
 Suggests:
     polycor,
+    poLCA,
     testthat,
     twitteR,
     sentimentr,

@@ -87,10 +87,11 @@ exp_lca <- function(df, ...,
       stop("Each selected variable must contain at least 2 categories after rows with missing values are removed.")
     }
     distinct_patterns <- nrow(dplyr::distinct(used))
-    candidate_counts <- seq.int(min_nclass, min(max_nclass, distinct_patterns, nrow(used) - 1L))
-    if (!length(candidate_counts)) {
+    max_candidate_nclass <- min(max_nclass, distinct_patterns, nrow(used))
+    if (max_candidate_nclass < min_nclass) {
       stop("There are not enough distinct complete rows to fit at least 2 latent classes.")
     }
+    candidate_counts <- seq.int(min_nclass, max_candidate_nclass)
 
     formula <- stats::as.formula(paste0("cbind(", paste(vapply(names(used), lca_quote_name, character(1)), collapse = ", "), ") ~ 1"))
     candidates <- lapply(candidate_counts, function(k) {
@@ -204,12 +205,20 @@ lca_class_selection_table <- function(candidates) {
       minimum_class_share = min(fit$P),
       mean_maximum_membership_probability = mean(max_posterior),
       pct_low_confidence = mean(max_posterior < 0.6),
-      # poLCA sets eflag when every start terminates in an error; FALSE is a
-      # successful fit (attempts contains the corresponding log likelihoods).
-      converged = !isTRUE(fit$eflag),
+      # poLCA's eflag records numerical/start errors, not iteration-limit
+      # termination. A fit is known to have converged only when it stopped
+      # before maxiter and did not encounter such an error.
+      converged = lca_fit_converged(fit),
       error = NA_character_
     )
   }))
+}
+
+lca_fit_converged <- function(fit) {
+  !isTRUE(fit$eflag) &&
+    !is.null(fit$numiter) &&
+    !is.null(fit$maxiter) &&
+    isTRUE(fit$numiter < fit$maxiter)
 }
 
 lca_profile_table <- function(fit, observed, cols) {
