@@ -97,10 +97,21 @@ reliability_detect_item_type <- function(x) {
   if (is.logical(x)) {
     return("dichotomous")
   }
+  # Factor / ordered-factor items must be classified from their DECLARED category
+  # levels, not from how many distinct values happen to be observed in this
+  # (possibly row-sampled, see max_nrow above) data (issue #38122). Using
+  # unique_count here silently collapsed a genuinely multi-category factor to
+  # "dichotomous" whenever only two of its levels were observed -- e.g. a
+  # 5-level Likert factor sampled down to two responses -- discarding the other
+  # declared categories from the item-type decision (and, downstream, from the
+  # correlation-method selection in reliability_select_method). nlevels(x)
+  # reflects every level the factor was defined with, observed or not, mirroring
+  # the type-based classification already used for Factor Analysis / PCA in
+  # inspect_factor_variable() (factanal_correlation.R, issue #37344).
   if (is.ordered(x)) {
-    if (unique_count <= 2) "dichotomous" else "ordinal"
+    if (nlevels(x) <= 2) "dichotomous" else "ordinal"
   } else if (is.factor(x)) {
-    if (unique_count <= 2) "dichotomous" else "nominal"
+    if (nlevels(x) <= 2) "dichotomous" else "nominal"
   } else if (is.numeric(x) || is.integer(x)) {
     if (unique_count <= 2) "dichotomous" else "continuous"
   } else {

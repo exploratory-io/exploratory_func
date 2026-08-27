@@ -276,6 +276,41 @@ test_that("exp_cronbach_alpha rejects nominal (unordered, 3+ level) factor colum
                "nominal")
 })
 
+test_that("reliability_detect_item_type classifies factor/ordered items from their DECLARED levels, not the values observed in this data (tam#38122)", {
+  # A factor's category space is what it was DEFINED with (levels()); which of
+  # those categories happen to appear in a particular (possibly row-sampled --
+  # see max_nrow in exp_cronbach_alpha) slice of data must not change the item
+  # type. Only 2 of the 5 declared levels are observed below.
+  sparse_ordered <- factor(c("2", "2", "4", "4", "2"), levels = as.character(1:5), ordered = TRUE)
+  expect_equal(reliability_detect_item_type(sparse_ordered), "ordinal")
+
+  sparse_nominal <- factor(c("A", "A", "C", "C", "A"), levels = c("A", "B", "C"))
+  expect_equal(reliability_detect_item_type(sparse_nominal), "nominal")
+
+  # A genuinely 2-level factor still reports dichotomous.
+  two_level <- factor(c("Yes", "No", "Yes"), levels = c("Yes", "No"))
+  expect_equal(reliability_detect_item_type(two_level), "dichotomous")
+
+  # Numeric items have no declared "levels" -- they are still classified from
+  # the values actually observed (the type-based, not value-shape, exception
+  # documented for the 0/1 dummy case, matching Factor Analysis/PCA).
+  expect_equal(reliability_detect_item_type(c(1, 2, 1, 2, 1)), "dichotomous")
+  expect_equal(reliability_detect_item_type(c(1, 2, 3, 1, 2)), "continuous")
+})
+
+test_that("exp_cronbach_alpha rejects a nominal factor even when only 2 of its 3 declared levels are observed (tam#38122)", {
+  # `部署` declares 3 unordered categories but this data only ever shows "A"/"B" --
+  # before the fix, unique_count()<=2 misclassified it "dichotomous", which is
+  # NOT in the nominal/unsupported reject list, so it silently slipped into the
+  # correlation matrix as if it were an ordered/binary item. It must still be
+  # rejected as nominal, exactly like the fully-observed 3-level case above.
+  df <- make_reliability_df() %>%
+    dplyr::mutate(`部署` = factor(rep(c("A", "B"), length.out = dplyr::n()),
+                                  levels = c("A", "B", "C")))
+  expect_error(exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "auto"),
+               "nominal")
+})
+
 test_that("exp_cronbach_alpha treats all-factor Likert columns as ordinal under auto/polychoric", {
   df <- make_reliability_df() %>%
     dplyr::mutate(dplyr::across(dplyr::everything(), ~ factor(.x)))
