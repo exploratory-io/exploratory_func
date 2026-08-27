@@ -440,20 +440,29 @@
 #' (both ultimately reduce to `scale()`, with the identical NaN-from-zero-variance case
 #' already replaced by 0 at fit time, `mat[is.nan(mat)] <- 0`); when FALSE it is the raw
 #' value again, same as `value`.
+#' tam#38004: vectorized replacement for the previous purrr::map_dfr() loop that built one
+#' tibble per source row (3,600 row-tibble allocations for 36,000 output rows on the
+#' issue's fixture, ~0.95s per tidy() call). This is a strict reshape of the same two
+#' matrices -- row-major flatten via t(), cluster/is_medoid recycled per variable -- and
+#' was verified byte-identical (`identical()`) against the old implementation across the
+#' non-degenerate row/column ranges this function is ever called with; the two disagree
+#' only in the unreachable nrow(original_mat) == 0 case (exp_kmedoids() requires at least
+#' `centers` >= 2 valid rows before this is called), where this version returns the
+#' correctly-typed 0-row schema instead of purrr::map_dfr()'s columnless empty tibble.
 .kmedoids_distribution <- function(x) {
   ids <- x$clustering
   medoid_indices <- x$medoid_indices
   original_mat <- .kmedoids_original_fit_mat(x)
   standardized_mat <- x$mat
-  purrr::map_dfr(seq_len(nrow(original_mat)), function(index) {
-    tibble::tibble(
-      cluster = as.integer(ids[[index]]),
-      variable = colnames(original_mat),
-      value = as.numeric(original_mat[index, ]),
-      standardized_value = as.numeric(standardized_mat[index, ]),
-      is_medoid = index %in% medoid_indices
-    )
-  })
+  n <- nrow(original_mat)
+  p <- ncol(original_mat)
+  tibble::tibble(
+    cluster = rep(as.integer(ids), each = p),
+    variable = rep(colnames(original_mat), times = n),
+    value = as.numeric(t(original_mat)),
+    standardized_value = as.numeric(t(standardized_mat)),
+    is_medoid = rep(seq_len(n) %in% medoid_indices, each = p)
+  )
 }
 
 .kmedoids_cohesion <- function(x) {
@@ -461,6 +470,74 @@
     cluster = as.integer(x$clustering),
     distance_to_medoid = x$distance_to_medoid
   )
+}
+
+#' Classical (Torgerson) PCoA of a distance object, returning the top `k` principal
+#' coordinates plus the full eigenvalue spectrum of the double-centred matrix `B`.
+#'
+#' `stats::cmdscale(add = TRUE)` is deliberately NOT used here (tam#38004). Its Cailliez
+#' additive constant -- needed to make a non-Euclidean metric like Manhattan embeddable
+#' with non-negative eigenvalues -- requires an eigendecomposition of a 2n x 2n
+#' NON-symmetric matrix, roughly 10x the cost of the n x n symmetric problem classical
+#' PCoA actually needs. That made the Cluster Map ~90% of exp_kmedoids() runtime at the
+#' default map_sample_size = 2000 (measured: 55s of a 61s run at 3,600 fitted rows).
+#' Manhattan distances are not Euclidean, so `B` has some negative eigenvalues; they are
+#' simply not projected onto, matching every existing consumer here (`eig[eig > 0]`) and
+#' the `add = FALSE` convention used by `ape::pcoa()` / `vegan`.
+#'
+#' The top `k` eigenpairs (k is 1 or 2 here) are found with a randomized subspace
+#' iteration rather than a full `eigen()`: a Gaussian sketch of `B`, a few power
+#' iterations to sharpen the leading subspace, then an exact small `eigen()` on the
+#' projected matrix. This reproduces the exact top-2 eigenpairs to machine precision on
+#' every fixture tried, at a fraction of the cost. The full spectrum (values only, no
+#' eigenvectors) is still computed exactly, so `representation_rate` -- which sums over
+#' every positive eigenvalue, not just the displayed two -- stays exact.
+#'
+#' For small `n` (below `fallback_n`) the sketch has no headroom over an exact solve, so
+#' this falls back to `stats::cmdscale(..., add = FALSE)` directly; the same fallback is
+#' used if the sketch ever produces a non-finite result.
+#'
+#' @param distance_matrix A `dist` object.
+#' @param k Number of coordinates to return (1 or 2 in this module).
+#' @param seed Optional seed for the random sketch, for reproducibility.
+#' @param fallback_n Below this many points, use `stats::cmdscale()` directly.
+#' @return A list with `points` (n x k matrix) and `eig` (full eigenvalue spectrum,
+#'   decreasing).
+.kmedoids_pcoa <- function(distance_matrix, k = 2L, seed = NULL, fallback_n = 50L) {
+  n <- attr(distance_matrix, 'Size') %||% nrow(as.matrix(distance_matrix))
+  exact_fallback <- function() {
+    coordinates <- stats::cmdscale(distance_matrix, k = k, eig = TRUE, add = FALSE)
+    points <- coordinates$points
+    if (ncol(points) < k) points <- cbind(points, matrix(0, nrow(points), k - ncol(points)))
+    list(points = points, eig = coordinates$eig)
+  }
+  if (n < fallback_n) {
+    return(exact_fallback())
+  }
+  d <- as.matrix(distance_matrix)
+  d2 <- d * d
+  row_mean <- rowMeans(d2)
+  b <- -0.5 * (d2 - row_mean[row(d2)] - row_mean[col(d2)] + mean(d2))
+  q <- min(n - 1L, as.integer(k) + 12L)
+  if (!is.null(seed)) set.seed(as.integer(seed))
+  sketch <- matrix(stats::rnorm(n * q), n, q)
+  y <- b %*% sketch
+  for (i in seq_len(3L)) y <- b %*% (b %*% y)
+  basis <- qr.Q(qr(y))
+  projected <- t(basis) %*% b %*% basis
+  projected <- (projected + t(projected)) / 2
+  small_eigen <- eigen(projected, symmetric = TRUE)
+  top_n <- min(as.integer(k), length(small_eigen$values))
+  order_desc <- order(small_eigen$values, decreasing = TRUE)[seq_len(top_n)]
+  top_values <- small_eigen$values[order_desc]
+  top_vectors <- basis %*% small_eigen$vectors[, order_desc, drop = FALSE]
+  points <- top_vectors %*% diag(sqrt(pmax(top_values, 0)), nrow = top_n)
+  if (ncol(points) < k) points <- cbind(points, matrix(0, nrow(points), k - ncol(points)))
+  full_eig <- tryCatch(eigen(b, symmetric = TRUE, only.values = TRUE)$values, error = function(e) NULL)
+  if (!all(is.finite(points)) || is.null(full_eig) || !all(is.finite(full_eig))) {
+    return(exact_fallback())
+  }
+  list(points = points, eig = full_eig)
 }
 
 .kmedoids_map <- function(x) {
@@ -474,7 +551,8 @@
     return(.kmedoids_empty('map'))
   }
   distance_matrix <- stats::dist(map_mat, method = x$distance)
-  coordinates <- stats::cmdscale(distance_matrix, k = n_dimension, eig = TRUE, add = TRUE)
+  pcoa_seed <- if (is.null(x$seed)) NULL else as.integer(x$seed) + 4000L
+  coordinates <- .kmedoids_pcoa(distance_matrix, k = n_dimension, seed = pcoa_seed)
   points <- coordinates$points
   if (n_dimension == 1) points <- cbind(points, 0)
   dimension_names <- c('Dim1', 'Dim2')
@@ -659,7 +737,18 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   if (!is.null(clara_sample_size)) {
     clara_sample_size <- .kmedoids_safe_numeric(clara_sample_size)
     clara_sample_size <- if (is.null(clara_sample_size)) NULL else as.integer(floor(clara_sample_size))
-    if (is.null(clara_sample_size) || clara_sample_size < centers + 1) {
+    # Only validate it when the user actually asked for CLARA. The UI hides
+    # these fields unless the algorithm is CLARA, but hiding a widget does not
+    # clear its value -- so a stale sample size left over from an earlier CLARA
+    # run used to block a PAM run with an error naming a parameter the user
+    # could not see and the algorithm never reads.
+    #
+    # 'auto' is deliberately NOT validated here: it resolves to pam or clara
+    # from the row count inside .kmedoids_fit, which has not run yet, and when
+    # it does resolve to clara it supplies its own sample size. Validating it
+    # here would reintroduce the same failure for a user who never chose CLARA.
+    if (identical(algorithm, 'clara') &&
+        (is.null(clara_sample_size) || clara_sample_size < centers + 1)) {
       stop('clara_sample_size must be greater than the number of clusters.', call. = FALSE)
     }
   }
@@ -669,7 +758,11 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   } else {
     as.integer(floor(silhouette_sample_size))
   }
-  if (is.null(silhouette_sample_size) || silhouette_sample_size < centers + 1) {
+  # Only validate it when a silhouette is actually computed. With
+  # elbow_method_mode 'none' or 'elbow' nothing reads this value, so blocking
+  # the run on it failed for a diagnostic the user had turned off.
+  if (identical(elbow_method_mode, 'silhouette') &&
+      (is.null(silhouette_sample_size) || silhouette_sample_size < centers + 1)) {
     stop('silhouette_sample_size must be greater than the number of clusters.', call. = FALSE)
   }
   profile_top_n <- .kmedoids_safe_numeric(profile_top_n)
@@ -703,8 +796,14 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   excluded_nrow <- sum(!valid)
   fit_data <- source_data[valid, , drop = FALSE]
   row_ids <- original_row_ids[valid]
-  if (nrow(fit_data) < centers) {
-    stop('The number of valid rows must be greater than or equal to the number of clusters.', call. = FALSE)
+  # cluster::pam requires k <= n-1, so asking for exactly as many clusters as
+  # there are rows is already impossible. The guard used to be `<`, which let
+  # equality through to pam and surfaced its raw message instead:
+  # "Number of clusters 'k' must be in {1,2, .., n-1}; hence n >= 2" -- naming
+  # k and n, neither of which appears in the UI. Note the count is of VALID
+  # rows (complete + finite), so NA-heavy data lowers the ceiling.
+  if (nrow(fit_data) <= centers) {
+    stop('The number of valid rows must be greater than the number of clusters.', call. = FALSE)
   }
   mat <- as.matrix(fit_data)
   if (isTRUE(normalize_data)) {

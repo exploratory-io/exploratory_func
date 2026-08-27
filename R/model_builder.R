@@ -97,7 +97,7 @@ build_kmeans.kv_ <- function(df,
     }
     rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
-      kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
+      kmeans(mat, centers = centers, iter.max = iter.max, nstart = nstart, algorithm = algorithm, trace = trace)},
       error = function(e){
         if(e$message == "cannot take a sample larger than the population when 'replace = FALSE'"){
           # falls into here when group is 2 and centers > 2
@@ -210,7 +210,7 @@ build_kmeans.cols <- function(df, ...,
         # Replace them with 0.
         mat[is.nan(mat)] <- 0
       }
-      kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+      kmeans(mat, centers = centers, iter.max = iter.max, nstart = nstart, algorithm = algorithm, trace = trace)
     }, error = function(e) {
       if(e$message == "invalid first argument"){
         stop("Created matrix is invalid")

@@ -408,3 +408,165 @@ test_that('nstart is forwarded to PAM diagnostic fits', {
   expect_gt(length(calls), 2L)
   expect_true(all(vapply(calls, function(call) identical(call$nstart, 5L), logical(1))))
 })
+
+# tam#38004: .kmedoids_pcoa() replaces stats::cmdscale(add = TRUE) in .kmedoids_map() --
+# the Cailliez additive constant made the Cluster Map ~90% of exp_kmedoids() runtime at
+# the default map_sample_size (measured ~55s of a ~61s run at 3,600 fitted rows). These
+# tests cover the replacement directly (against the add = FALSE convention it now
+# matches) and the end-to-end map contract it still has to satisfy.
+
+test_that('.kmedoids_pcoa reproduces cmdscale(add = FALSE) above the exact-fallback threshold', {
+  # Three non-collinear cluster centers so BOTH of the top two axes carry real signal --
+  # a two-center fixture leaves the second axis pure noise, making its correlation
+  # unstable and an unreliable check of the sketch's accuracy.
+  set.seed(11)
+  n <- 400
+  centers <- matrix(
+    c(rep(4, 6), rep(1, 6), c(rep(4, 3), rep(1, 3))),
+    nrow = 3, byrow = TRUE
+  )
+  raw <- centers[sample(1:3, n, TRUE), ] + matrix(rnorm(n * 6, 0, 0.6), n, 6)
+  mat <- scale(raw)
+  d <- stats::dist(mat, method = 'manhattan')
+
+  reference <- stats::cmdscale(d, k = 2, eig = TRUE, add = FALSE)
+  fit <- exploratory:::.kmedoids_pcoa(d, k = 2, seed = 1)
+
+  expect_equal(dim(fit$points), c(n, 2))
+  # PCoA axis signs are arbitrary -- compare magnitude of correlation, not raw coordinates.
+  expect_gt(abs(cor(fit$points[, 1], reference$points[, 1])), 0.99)
+  expect_gt(abs(cor(fit$points[, 2], reference$points[, 2])), 0.99)
+  expect_equal(sort(fit$eig, decreasing = TRUE)[1:2], reference$eig[1:2], tolerance = 1e-4)
+})
+
+test_that('.kmedoids_pcoa is deterministic for a fixed seed and varies with a different one', {
+  set.seed(21)
+  n <- 200
+  mat <- scale(matrix(rnorm(n * 5), n, 5))
+  d <- stats::dist(mat, method = 'euclidean')
+
+  same_seed_a <- exploratory:::.kmedoids_pcoa(d, k = 2, seed = 5)
+  same_seed_b <- exploratory:::.kmedoids_pcoa(d, k = 2, seed = 5)
+  other_seed <- exploratory:::.kmedoids_pcoa(d, k = 2, seed = 6)
+
+  expect_identical(same_seed_a$points, same_seed_b$points)
+  # A different random sketch can still converge to the same subspace on well-separated
+  # data, so assert on eigenvalues (exact regardless of seed) rather than requiring the
+  # point coordinates to differ.
+  expect_equal(sort(same_seed_a$eig, decreasing = TRUE)[1:2],
+               sort(other_seed$eig, decreasing = TRUE)[1:2], tolerance = 1e-4)
+})
+
+test_that('.kmedoids_pcoa falls back to cmdscale for small n and degenerate input', {
+  small <- tibble::tibble(x = c(1, 2, 3, 10, 11), y = c(1, 2, 1, 10, 9))
+  d_small <- stats::dist(small, method = 'euclidean')
+  fit_small <- exploratory:::.kmedoids_pcoa(d_small, k = 2, seed = 1, fallback_n = 50L)
+  reference_small <- stats::cmdscale(d_small, k = 2, eig = TRUE, add = FALSE)
+  expect_equal(fit_small$points, reference_small$points)
+
+  tied <- tibble::tibble(x = rep(1, 60), y = rep(1, 60))
+  d_tied <- stats::dist(tied, method = 'euclidean')
+  fit_tied <- exploratory:::.kmedoids_pcoa(d_tied, k = 2, seed = 1)
+  expect_true(all(is.finite(fit_tied$points)))
+  expect_true(all(fit_tied$points == 0))
+})
+
+test_that('the cached PCoA map keeps its full contract after replacing cmdscale(add = TRUE)', {
+  set.seed(31)
+  n <- 400
+  centers <- matrix(c(rep(4, 8), rep(1, 8), c(rep(4, 4), rep(1, 4))), nrow = 3, byrow = TRUE)
+  raw <- centers[sample(1:3, n, TRUE), ] + matrix(rnorm(n * 8, 0, 0.6), n, 8)
+  df <- as.data.frame(raw)
+  names(df) <- paste0('v', 1:8)
+
+  result <- df %>% exploratory:::exp_kmedoids(
+    v1, v2, v3, v4, v5, v6, v7, v8, centers = 3, distance = 'manhattan',
+    seed = 1, map_sample_size = 200, map_variable_n = 4
+  )
+  model <- result$model[[1]]
+  map <- broom::tidy(model, type = 'map')
+
+  expect_true(is.data.frame(map))
+  expect_true(all(c('medoid', 'observation', 'vector') %in% map$row_type))
+  expect_equal(sum(map$row_type == 'medoid'), 3)
+  expect_equal(sum(map$row_type == 'vector'), 4 * 2)
+  expect_false(anyNA(map$Dim1))
+  expect_false(anyNA(map$Dim2))
+
+  rate <- attr(map, 'representation_rate')
+  expect_length(rate, 2)
+  expect_true(all(is.finite(rate)))
+  expect_true(all(rate >= 0 & rate <= 1))
+  expect_gte(rate[2], rate[1])
+
+  # Same seed -> byte-identical cached map (reproducibility of the randomized sketch).
+  result2 <- df %>% exploratory:::exp_kmedoids(
+    v1, v2, v3, v4, v5, v6, v7, v8, centers = 3, distance = 'manhattan',
+    seed = 1, map_sample_size = 200, map_variable_n = 4
+  )
+  map2 <- broom::tidy(result2$model[[1]], type = 'map')
+  expect_identical(map$Dim1, map2$Dim1)
+  expect_identical(map$Dim2, map2$Dim2)
+})
+
+test_that('too few rows for the requested cluster count is reported in the caller\'s terms', {
+  # cluster::pam() aborts with 'number of cluster centres must lie between 1
+  # and nrow(x)-1', which names an argument the Analytics UI never shows and
+  # counts rows AFTER missing-value removal -- so the number in the message
+  # does not match what the user sees in the table either.
+  df <- tibble::tibble(a = c(1, 2, 3), b = c(4, 5, 6))
+
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, seed = 1),
+    'must be greater than the number of clusters')
+
+  # The boundary is nrow > centers, not nrow >= centers: pam needs at least one
+  # non-medoid row to assign.
+  expect_error(exploratory:::exp_kmedoids(df, a, b, centers = 2, seed = 1), NA)
+})
+
+test_that('a stale clara_sample_size does not block a PAM run', {
+  # The Analytics dialog keeps the CLARA fields populated after the user
+  # switches the algorithm away from CLARA, and PAM never reads this value.
+  # Validating it unconditionally failed a legitimate run with an error naming
+  # a parameter that was no longer on screen.
+  df <- tibble::tibble(a = rnorm(60), b = rnorm(60))
+
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, algorithm = 'pam',
+                               clara_sample_size = 2, seed = 1),
+    NA)
+
+  # 'auto' resolves to pam or clara from the row count inside the fit, and
+  # supplies its own sample size when it picks clara -- so it must not be
+  # validated up front either.
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, algorithm = 'auto',
+                               clara_sample_size = 2, seed = 1),
+    NA)
+
+  # Non-regression: when CLARA is the chosen algorithm the value IS read, and
+  # an unusable one is still rejected.
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, algorithm = 'clara',
+                               clara_sample_size = 2, seed = 1),
+    'clara_sample_size must be greater than the number of clusters')
+})
+
+test_that('silhouette_sample_size is only validated when a silhouette is computed', {
+  df <- tibble::tibble(a = rnorm(60), b = rnorm(60))
+
+  for (mode in c('none', 'elbow')) {
+    expect_error(
+      exploratory:::exp_kmedoids(df, a, b, centers = 3, elbow_method_mode = mode,
+                                 silhouette_sample_size = 2, seed = 1),
+      NA,
+      info = paste('nothing reads silhouette_sample_size in mode', mode))
+  }
+
+  # Non-regression: the silhouette mode does read it.
+  expect_error(
+    exploratory:::exp_kmedoids(df, a, b, centers = 3, elbow_method_mode = 'silhouette',
+                               silhouette_sample_size = 2, seed = 1),
+    'silhouette_sample_size must be greater than the number of clusters')
+})

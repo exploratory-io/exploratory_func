@@ -703,3 +703,68 @@ test_that("chaid_firm_importance returns NULL when there is no partial dependenc
   expect_null(chaid_firm_importance(NULL, list(classification_type = "binary"), c("a", "b")))
   expect_null(chaid_firm_importance(data.frame(a = 1), list(classification_type = "binary"), character()))
 })
+
+# tam #38107: a predictor column name containing a comma reaches the report
+# tables mangled ("A, B" -> "A. B") -- cleanup_df(..., map_name = FALSE)
+# replaces commas with periods for mmpf::marginalPrediction compatibility
+# before chaid_fit() ever runs, and the report functions that read
+# model$nodes$split_variable / rule / category_merge_map$variable directly
+# (chaid_node_summary, chaid_rule_table, chaid_split_summary,
+# chaid_numeric_intervals, chaid_category_merge_table) never mapped that
+# CLEAN name back to the real column name -- unlike build_chaid_tree_nodes()
+# (the interactive tree / dtree_report_characteristic_groups() feed), which
+# already did via its own local map_name() closure.
+test_that("a comma-containing predictor column name survives report tables uncorrupted (tam #38107)", {
+  set.seed(11)
+  n <- 300
+  # A near-deterministic signal on the comma-named predictor so a real split
+  # is found reliably at the default alpha, and a category-merge is likely
+  # too (4 categories, 2 of which behave identically).
+  df <- data.frame(
+    `気に入った, 理由` = sample(c("価格", "品質", "デザイン", "サポート"), n, replace = TRUE),
+    price = rnorm(n, 50, 10),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  df$satisfaction <- ifelse(
+    df[["気に入った, 理由"]] %in% c("価格", "品質"),
+    sample(c("高", "低"), n, replace = TRUE, prob = c(0.85, 0.15)),
+    sample(c("高", "低"), n, replace = TRUE, prob = c(0.15, 0.85))
+  )
+
+  model_df <- suppressWarnings(exp_chaid(
+    df, satisfaction, `気に入った, 理由`, price,
+    min_split = 20, min_bucket = 5, alpha_split = 0.2, alpha_merge = 0.2
+  ))
+  model <- model_df$model[[1]]
+
+  node_summary <- chaid_node_summary(model)
+  split_summary <- chaid_split_summary(model)
+  rules <- chaid_rule_table(model)
+
+  # At least one split must actually have been found on the comma-named
+  # column, or this test proves nothing about the display path.
+  expect_true("気に入った, 理由" %in% split_summary$`Split Variable`)
+  expect_false(any(grepl("気に入った. 理由", split_summary$`Split Variable`, fixed = TRUE)))
+
+  expect_true(any(grepl("気に入った, 理由", node_summary$Rule, fixed = TRUE)))
+  expect_false(any(grepl("気に入った. 理由", node_summary$Rule, fixed = TRUE)))
+
+  expect_true(any(grepl("気に入った, 理由", rules$Rule, fixed = TRUE)))
+  expect_false(any(grepl("気に入った. 理由", rules$Rule, fixed = TRUE)))
+
+  # If any category merge happened on the comma-named column, its Variable
+  # column must show the original name too.
+  merges <- chaid_category_merge_table(model)
+  if (nrow(merges) > 0 && "気に入った, 理由" %in% c(merges$Variable, "気に入った. 理由")) {
+    expect_true("気に入った, 理由" %in% merges$Variable)
+    expect_false("気に入った. 理由" %in% merges$Variable)
+  }
+
+  # A numeric predictor with no comma is unaffected either way (regression
+  # guard: the fix must not touch names that need no mapping).
+  intervals <- chaid_numeric_intervals(model)
+  if (nrow(intervals) > 0) {
+    expect_true(all(intervals$Variable %in% c("price", "気に入った, 理由")))
+  }
+})
