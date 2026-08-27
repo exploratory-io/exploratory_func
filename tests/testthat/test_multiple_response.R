@@ -95,6 +95,27 @@ test_that("combine_multiple_response_column with custom separator and no_selecti
   expect_equal(ret$combined, c("a / b", "None Selected"))
 })
 
+test_that("combine_multiple_response_column puts the new column first when remove_original = FALSE too", {
+  df <- data.frame(
+    id = 1:2,
+    q_a = c(1, 0),
+    q_b = c(0, 1),
+    other = c("x", "y"),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- combine_multiple_response_column(
+    df,
+    columns = c("q_a", "q_b"),
+    output_column = "combined",
+    option_name_type = "remove_prefix",
+    option_name_prefix = "q_",
+    remove_original = FALSE
+  )
+
+  expect_equal(names(ret), c("combined", "id", "q_a", "q_b", "other"))
+})
+
 test_that("combine_multiple_response_column with remove_original = TRUE drops source columns", {
   df <- data.frame(
     id = 1:2,
@@ -113,7 +134,9 @@ test_that("combine_multiple_response_column with remove_original = TRUE drops so
     remove_original = TRUE
   )
 
-  expect_equal(names(ret), c("id", "other", "combined"))
+  # The new combined column comes FIRST -- matches the desktop app's own
+  # "highlight this as a new column" convention (tam #38097 follow-up).
+  expect_equal(names(ret), c("combined", "id", "other"))
   expect_equal(ret$combined, c("a", "b"))
 })
 

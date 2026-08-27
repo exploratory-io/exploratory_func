@@ -96,5 +96,11 @@ combine_multiple_response_column <- function(
     data <- data[, setdiff(names(data), columns), drop = FALSE]
   }
 
+  # Put the newly-created combined column FIRST, matching the desktop app's
+  # own "this is a new column" highlight convention -- easier to spot the
+  # result next to the columns that produced it than buried after the
+  # (possibly still-present) source columns.
+  data <- data[, c(output_column, setdiff(names(data), output_column)), drop = FALSE]
+
   data
 }
