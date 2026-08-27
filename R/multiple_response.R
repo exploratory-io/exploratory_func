@@ -76,6 +76,12 @@ combine_multiple_response_column <- function(
     option_names <- columns
   }
 
+  # Position of the FIRST selected source column in the ORIGINAL column
+  # order -- the new combined column lands there, not always at position 1.
+  # e.g. selecting columns 2-5 puts the new column at position 2.
+  orig_names <- names(data)
+  first_selected_index <- min(match(columns, orig_names))
+
   values <- data[, columns, drop = FALSE]
   sel_mat <- do.call(cbind, lapply(values, function(value) {
     !is.na(value) & (value == selected_value)
@@ -96,11 +102,17 @@ combine_multiple_response_column <- function(
     data <- data[, setdiff(names(data), columns), drop = FALSE]
   }
 
-  # Put the newly-created combined column FIRST, matching the desktop app's
-  # own "this is a new column" highlight convention -- easier to spot the
-  # result next to the columns that produced it than buried after the
-  # (possibly still-present) source columns.
-  data <- data[, c(output_column, setdiff(names(data), output_column)), drop = FALSE]
+  # Reassemble: columns that originally sat before the first selected
+  # column (and are still present -- some may have been dropped by
+  # remove_original) keep their order and go before the new column;
+  # everything else -- from the first selected column onward, still
+  # present, in original order -- goes after. `setdiff` preserves the
+  # order of its first argument, so this never needs an explicit sort.
+  remaining_names <- setdiff(names(data), output_column)
+  names_before <- intersect(orig_names[seq_len(first_selected_index - 1)], remaining_names)
+  names_after <- setdiff(remaining_names, names_before)
+
+  data <- data[, c(names_before, output_column, names_after), drop = FALSE]
 
   data
 }

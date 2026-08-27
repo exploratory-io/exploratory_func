@@ -95,7 +95,7 @@ test_that("combine_multiple_response_column with custom separator and no_selecti
   expect_equal(ret$combined, c("a / b", "None Selected"))
 })
 
-test_that("combine_multiple_response_column puts the new column first when remove_original = FALSE too", {
+test_that("combine_multiple_response_column puts the new column at the first selected column's position when remove_original = FALSE too", {
   df <- data.frame(
     id = 1:2,
     q_a = c(1, 0),
@@ -113,7 +113,9 @@ test_that("combine_multiple_response_column puts the new column first when remov
     remove_original = FALSE
   )
 
-  expect_equal(names(ret), c("combined", "id", "q_a", "q_b", "other"))
+  # q_a is the first SELECTED column, and it originally sat at position 2
+  # (after id) -- the new column lands there, not at position 1.
+  expect_equal(names(ret), c("id", "combined", "q_a", "q_b", "other"))
 })
 
 test_that("combine_multiple_response_column with remove_original = TRUE drops source columns", {
@@ -134,10 +136,48 @@ test_that("combine_multiple_response_column with remove_original = TRUE drops so
     remove_original = TRUE
   )
 
-  # The new combined column comes FIRST -- matches the desktop app's own
-  # "highlight this as a new column" convention (tam #38097 follow-up).
-  expect_equal(names(ret), c("combined", "id", "other"))
+  # The new combined column still lands at the first selected column's
+  # original position (tam #38097 follow-up), which here is position 2.
+  expect_equal(names(ret), c("id", "combined", "other"))
   expect_equal(ret$combined, c("a", "b"))
+})
+
+test_that("combine_multiple_response_column places the new column first when the first selected column is the data frame's first column", {
+  df <- data.frame(
+    q_a = c(1, 0),
+    id = 1:2,
+    other = c("x", "y"),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- combine_multiple_response_column(
+    df,
+    columns = c("q_a"),
+    output_column = "combined",
+    option_name_type = "full_column_name",
+    remove_original = FALSE
+  )
+
+  expect_equal(names(ret), c("combined", "q_a", "id", "other"))
+})
+
+test_that("combine_multiple_response_column places the new column last when the (only) selected column is last and removed", {
+  df <- data.frame(
+    id = 1:2,
+    other = c("x", "y"),
+    q_a = c(1, 0),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- combine_multiple_response_column(
+    df,
+    columns = c("q_a"),
+    output_column = "combined",
+    option_name_type = "full_column_name",
+    remove_original = TRUE
+  )
+
+  expect_equal(names(ret), c("id", "other", "combined"))
 })
 
 test_that("combine_multiple_response_column treats NA as not selected", {
