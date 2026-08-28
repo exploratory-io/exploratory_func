@@ -1140,6 +1140,64 @@ stripTrailingSemicolon <- function(query) {
   sub("[[:space:]]*;[[:space:]]*$", "", query)
 }
 
+# RMariaDB uses the seeded RDS CA bundle for Aurora on Linux. Keep this
+# normalization in one place so connection creation and eviction use the same
+# pool key and the same certificate path.
+normalize_mysql_ssl_ca <- function(sslCA, sysname = Sys.info()[["sysname"]]) {
+  if (is.null(sslCA) || length(sslCA) == 0) {
+    return("")
+  }
+  sslCA <- as.character(sslCA[[1]])
+  if (is.na(sslCA) || sslCA == "") {
+    return("")
+  }
+  if (isTRUE(unname(sysname) == "Linux")) {
+    return("/etc/ssl/certs/rds-combined-ca-bundle.pem")
+  }
+  sslCA
+}
+
+# Single source of truth for the MySQL/MariaDB connection pool key. The SSL
+# mode is part of the key because it changes the security properties of a
+# connection, and the CA path is normalized before it is included.
+mysql_pool_key <- function(host, port, databaseName, username, timezone,
+                           sslCA = "", sslMode = "",
+                           sysname = Sys.info()[["sysname"]]) {
+  sslCA <- normalize_mysql_ssl_ca(sslCA, sysname = sysname)
+  paste("mysql", host, port, databaseName, username, timezone, sslCA,
+        sslMode, sep = ":")
+}
+
+# RMariaDB does not expose a PostgreSQL-style sslmode argument. Its supported
+# interface uses client flags: CLIENT_SSL enforces TLS and
+# CLIENT_SSL_VERIFY_SERVER_CERT enables server certificate verification. The
+# verify-ca mode shares CLIENT_SSL because RMariaDB has no separate client flag
+# for CA-only verification; ssl.ca supplies the configured trust store.
+rmariadb_client_flag <- function(sslMode,
+                                 sslFlag = RMariaDB::CLIENT_SSL,
+                                 verifyServerCertFlag = RMariaDB::CLIENT_SSL_VERIFY_SERVER_CERT) {
+  switch(sslMode,
+    "require" = sslFlag,
+    "verify-ca" = sslFlag,
+    "verify-full" = bitwOr(sslFlag, verifyServerCertFlag),
+    0L
+  )
+}
+
+rmariadb_ssl_connection_args <- function(sslCA, sslMode,
+                                          sslFlag = RMariaDB::CLIENT_SSL,
+                                          verifyServerCertFlag = RMariaDB::CLIENT_SSL_VERIFY_SERVER_CERT) {
+  args <- list(client.flag = rmariadb_client_flag(
+    sslMode = sslMode,
+    sslFlag = sslFlag,
+    verifyServerCertFlag = verifyServerCertFlag
+  ))
+  if (sslMode != "disable" && sslCA != "") {
+    args$ssl.ca <- sslCA
+  }
+  args
+}
+
 #' Returns specified connection from pool if it exists in the pool.
 #' If not, new connection is created and returned.
 #' @export
@@ -1207,13 +1265,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
 
-    # When the Amazon Aurora data source is executed on Linux, it's possible that sslCA parameter is defined, for this case switch it to use seeded pem file for now.
-    # Also, when getDBConnection is called from queryMySQL, the type argument is set as "mysql" for both MariaDB and Aurora, so stop checking type
-    # and simply check if sslCA is empty string or not.
-    if(Sys.info()["sysname"] == "Linux" && sslCA != ""){
-      sslCA <- "/etc/ssl/certs/rds-combined-ca-bundle.pem";
-    }
-    key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sslMode, sep = ":")
+    sslCA <- normalize_mysql_ssl_ca(sslCA)
+    key <- mysql_pool_key(host, port, databaseName, username, timezone, sslCA, sslMode)
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -1238,26 +1291,15 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
-    # Map PostgreSQL-style sslMode values to RMariaDB ssl.mode constants.
-    rmariadb_ssl_mode <- switch(sslMode,
-      "disable"    = "SSL_MODE_DISABLED",
-      "allow"      = "SSL_MODE_PREFERRED",
-      "prefer"     = "SSL_MODE_PREFERRED",
-      "require"    = "SSL_MODE_REQUIRED",
-      "verify-ca"  = "SSL_MODE_VERIFY_CA",
-      "verify-full"= "SSL_MODE_VERIFY_IDENTITY",
-      NULL  # empty string or unknown -> let RMariaDB use its default
-    )
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
       tz_args <- if (timezone != "") list(timezone = timezone, timezone_out = timezone) else list()
-      ca_args  <- if (sslCA != "") list(ssl.ca = sslCA) else list()
-      mode_args <- if (!is.null(rmariadb_ssl_mode)) list(ssl.mode = rmariadb_ssl_mode) else list()
+      ssl_args <- rmariadb_ssl_connection_args(sslCA = sslCA, sslMode = sslMode)
       conn <- do.call(RMariaDB::dbConnect, c(
         list(RMariaDB::MariaDB(), dbname = databaseName, username = username,
              password = password, host = host, port = port, bigint = "numeric"),
-        tz_args, ca_args, mode_args
+        tz_args, ssl_args
       ))
       connection_pool[[key]] <- conn
     }
@@ -2149,7 +2191,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
   }
   else if (type %in% c("mysql", "aurora")) {
     # they use common key "mysql"
-    key <- paste("mysql", host, port, databaseName, username, timezone, sslCA, sslMode, sep = ":")
+    key <- mysql_pool_key(host, port, databaseName, username, timezone, sslCA, sslMode)
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({ # try to close connection and ignore error
@@ -2282,7 +2324,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
     columns <- DBI::dbListFields(conn, table)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username)
+    clearDBConnection(type, host, port, databaseName, username, sslMode = sslMode, sslCA = sslCA)
     if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
