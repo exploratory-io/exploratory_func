@@ -159,6 +159,28 @@ test_that("response distribution uses Summary View numeric binning", {
   expect_equal(nrow(missing), 0)
 })
 
+test_that("response distribution keeps unused declared Factor levels of that column (tam#38122)", {
+  # 上司との関係 is Factor with levels 1:5 plus A. Level 1 (and A) exist but have
+  # 0 rows -- Summary View already shows this. Answer Distribution must reserve
+  # those declared levels rather than dropping them or borrowing from siblings.
+  df <- tibble::tibble(
+    `上司との関係` = factor(
+      c(rep("2", 4), rep("3", 2), rep("4", 1), rep("5", 1)),
+      levels = c("1", "2", "3", "4", "5", "A")
+    ),
+    `残業は適切か` = c(2L, 2L, 3L, 4L, 5L, 5L, 2L, 3L)
+  )
+
+  res <- reliability_response_distribution(df)
+  boss <- res %>% dplyr::filter(variable == "上司との関係")
+  expect_equal(as.character(boss$response), c("1", "2", "3", "4", "5", "A"))
+  expect_equal(boss$count, c(0L, 4L, 2L, 1L, 1L, 0L))
+
+  # Numeric still uses observed min-max, not Factor levels from another column.
+  overtime <- res %>% dplyr::filter(variable == "残業は適切か")
+  expect_equal(as.character(overtime$response), c("2", "3", "4", "5"))
+})
+
 test_that("exp_cronbach_alpha auto-selects polychoric for ordered factors (Ordinal Alpha)", {
   df <- make_reliability_df() %>% dplyr::mutate(dplyr::across(dplyr::everything(), ~ ordered(.x)))
 

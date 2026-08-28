@@ -385,9 +385,14 @@ reliability_numeric_response_values <- function(x) {
   format_cut_output(binned_values, decimal.digits = 2, right = TRUE)
 }
 
+# Factor items must keep THEIR OWN declared levels, including unused ones
+# (count 0). Summary View already shows this (tam#38122: 上司との関係 has
+# level 1 with 0 rows). Do not borrow levels from sibling variables.
 reliability_response_values <- function(x) {
   if (is.numeric(x)) {
     reliability_numeric_response_values(x)
+  } else if (is.factor(x)) {
+    factor(as.character(x[!is.na(x)]), levels = levels(x), ordered = is.ordered(x))
   } else {
     x[!is.na(x)]
   }
