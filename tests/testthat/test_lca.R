@@ -42,6 +42,15 @@ test_that("exp_lca selects a BIC-minimum categorical model and exposes its repor
   expect_true(any(assignments$`Is Excluded`))
   expect_true(all(is.na(assignments$`Latent Class`[assignments$`Is Excluded`])))
   expect_true(all(assignments$`Assignment Confidence`[!assignments$`Is Excluded`] >= 0))
+  probability_columns <- paste("Class", seq_len(glance(model)$selected_classes), "Probability")
+  expect_true(all(probability_columns %in% names(assignments)))
+  included <- !assignments$`Is Excluded`
+  posterior <- as.matrix(assignments[included, probability_columns, drop = FALSE])
+  expect_equal(unname(rowSums(posterior)), rep(1, sum(included)), tolerance = 1e-8)
+  expect_equal(as.character(assignments$`Latent Class`[included]),
+               paste("Class", max.col(posterior, ties.method = "first")))
+  expect_equal(unname(assignments$`Assignment Confidence`[included]), unname(apply(posterior, 1, max)), tolerance = 1e-8)
+  expect_true(all(is.na(as.matrix(assignments[!included, probability_columns, drop = FALSE]))))
   expect_true(nrow(tidy(model, type = "relationship")) > 0)
 })
 

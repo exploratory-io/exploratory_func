@@ -241,11 +241,16 @@ lca_profile_table <- function(fit, observed, cols) {
 }
 
 lca_assignment_table <- function(original, used_row_ids, fit) {
-  assigned <- tibble::tibble(
-    .lca_row_id = used_row_ids,
-    `Latent Class` = factor(paste("Class", fit$predclass), levels = paste("Class", seq_along(fit$P))),
-    `Assignment Confidence` = apply(fit$posterior, 1, max),
-    `Is Excluded` = FALSE
+  class_probabilities <- tibble::as_tibble(fit$posterior, .name_repair = "minimal")
+  names(class_probabilities) <- paste("Class", seq_len(ncol(fit$posterior)), "Probability")
+  assigned <- dplyr::bind_cols(
+    tibble::tibble(
+      .lca_row_id = used_row_ids,
+      `Latent Class` = factor(paste("Class", fit$predclass), levels = paste("Class", seq_along(fit$P))),
+      `Assignment Confidence` = apply(fit$posterior, 1, max)
+    ),
+    class_probabilities,
+    tibble::tibble(`Is Excluded` = FALSE)
   )
   original %>%
     dplyr::left_join(assigned, by = ".lca_row_id") %>%
