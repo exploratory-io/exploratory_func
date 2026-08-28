@@ -737,7 +737,18 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   if (!is.null(clara_sample_size)) {
     clara_sample_size <- .kmedoids_safe_numeric(clara_sample_size)
     clara_sample_size <- if (is.null(clara_sample_size)) NULL else as.integer(floor(clara_sample_size))
-    if (is.null(clara_sample_size) || clara_sample_size < centers + 1) {
+    # Only validate it when the user actually asked for CLARA. The UI hides
+    # these fields unless the algorithm is CLARA, but hiding a widget does not
+    # clear its value -- so a stale sample size left over from an earlier CLARA
+    # run used to block a PAM run with an error naming a parameter the user
+    # could not see and the algorithm never reads.
+    #
+    # 'auto' is deliberately NOT validated here: it resolves to pam or clara
+    # from the row count inside .kmedoids_fit, which has not run yet, and when
+    # it does resolve to clara it supplies its own sample size. Validating it
+    # here would reintroduce the same failure for a user who never chose CLARA.
+    if (identical(algorithm, 'clara') &&
+        (is.null(clara_sample_size) || clara_sample_size < centers + 1)) {
       stop('clara_sample_size must be greater than the number of clusters.', call. = FALSE)
     }
   }
@@ -747,7 +758,11 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   } else {
     as.integer(floor(silhouette_sample_size))
   }
-  if (is.null(silhouette_sample_size) || silhouette_sample_size < centers + 1) {
+  # Only validate it when a silhouette is actually computed. With
+  # elbow_method_mode 'none' or 'elbow' nothing reads this value, so blocking
+  # the run on it failed for a diagnostic the user had turned off.
+  if (identical(elbow_method_mode, 'silhouette') &&
+      (is.null(silhouette_sample_size) || silhouette_sample_size < centers + 1)) {
     stop('silhouette_sample_size must be greater than the number of clusters.', call. = FALSE)
   }
   profile_top_n <- .kmedoids_safe_numeric(profile_top_n)
@@ -781,8 +796,14 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   excluded_nrow <- sum(!valid)
   fit_data <- source_data[valid, , drop = FALSE]
   row_ids <- original_row_ids[valid]
-  if (nrow(fit_data) < centers) {
-    stop('The number of valid rows must be greater than or equal to the number of clusters.', call. = FALSE)
+  # cluster::pam requires k <= n-1, so asking for exactly as many clusters as
+  # there are rows is already impossible. The guard used to be `<`, which let
+  # equality through to pam and surfaced its raw message instead:
+  # "Number of clusters 'k' must be in {1,2, .., n-1}; hence n >= 2" -- naming
+  # k and n, neither of which appears in the UI. Note the count is of VALID
+  # rows (complete + finite), so NA-heavy data lowers the ceiling.
+  if (nrow(fit_data) <= centers) {
+    stop('The number of valid rows must be greater than the number of clusters.', call. = FALSE)
   }
   mat <- as.matrix(fit_data)
   if (isTRUE(normalize_data)) {

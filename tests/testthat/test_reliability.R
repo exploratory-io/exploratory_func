@@ -198,6 +198,49 @@ test_that("check_keys reverses reverse-worded items across report statistics", {
   expect_true(all(!is.na(with_keys$model[[1]]$alpha_if_deleted$alpha_if_dropped)))
 })
 
+test_that("check_keys reverses reverse-worded items for polychoric and mixed too (tam#38107)", {
+  # Regression test for a defect the tam analytics-harness-loop found with no
+  # bug report: standardized_alpha/average_r/median_r used to be computed from
+  # the correlation matrix BEFORE the check_keys reverse-sign correction was
+  # applied to it (the correction only ran a few lines later). For pearson
+  # this was invisible -- display_alpha uses raw_alpha, a completely separate
+  # computation that always respected check_keys correctly. But
+  # display_alpha <- standardized_alpha for every OTHER correlation_method, so
+  # check_keys silently did nothing at all for polychoric/mixed: the same
+  # (stale) Ordinal/Mixed-Correlation Alpha came back whether check_keys was
+  # TRUE or FALSE. item_stats' r.drop/r.cor were unaffected (they read `r`
+  # AFTER the correction, further down), which is why the bug hid behind
+  # otherwise-correct-looking item-level output.
+  set.seed(11)
+  n <- 200
+  latent <- rnorm(n)
+  make_ordinal <- function(coef) {
+    raw <- coef * latent + rnorm(n, sd = 0.6)
+    breaks <- quantile(raw, probs = c(0, 1 / 3, 2 / 3, 1))
+    breaks[1] <- -Inf; breaks[4] <- Inf
+    ordered(c("low", "mid", "high")[cut(raw, breaks = breaks, labels = FALSE,
+                                        include.lowest = TRUE)],
+            levels = c("low", "mid", "high"))
+  }
+  df <- tibble::tibble(
+    q1 = make_ordinal(1), q2 = make_ordinal(1),
+    q3 = make_ordinal(-1)  # reverse-worded relative to q1/q2
+  )
+
+  for (method in c("polychoric", "mixed")) {
+    without_keys <- exp_cronbach_alpha(df, dplyr::everything(),
+                                       correlation_method = method, check_keys = FALSE)
+    with_keys <- exp_cronbach_alpha(df, dplyr::everything(),
+                                    correlation_method = method, check_keys = TRUE)
+    expect_gt(with_keys$model[[1]]$alpha, without_keys$model[[1]]$alpha,
+              label = paste0(method, ": check_keys=TRUE alpha"))
+    expect_gt(with_keys$model[[1]]$alpha, 0.5,
+              label = paste0(method, ": check_keys=TRUE alpha should be a healthy positive value"))
+    expect_gt(with_keys$model[[1]]$average_r, without_keys$model[[1]]$average_r,
+              label = paste0(method, ": check_keys=TRUE average_r"))
+  }
+})
+
 test_that("exp_cronbach_alpha handles mixed correlation", {
   df <- make_reliability_df() %>%
     dplyr::mutate(
@@ -229,6 +272,41 @@ test_that("exp_cronbach_alpha errors with fewer than 2 variables", {
 test_that("exp_cronbach_alpha rejects nominal (unordered, 3+ level) factor columns", {
   df <- make_reliability_df() %>%
     dplyr::mutate(`部署` = factor(rep(c("A", "B", "C"), length.out = dplyr::n())))
+  expect_error(exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "auto"),
+               "nominal")
+})
+
+test_that("reliability_detect_item_type classifies factor/ordered items from their DECLARED levels, not the values observed in this data (tam#38122)", {
+  # A factor's category space is what it was DEFINED with (levels()); which of
+  # those categories happen to appear in a particular (possibly row-sampled --
+  # see max_nrow in exp_cronbach_alpha) slice of data must not change the item
+  # type. Only 2 of the 5 declared levels are observed below.
+  sparse_ordered <- factor(c("2", "2", "4", "4", "2"), levels = as.character(1:5), ordered = TRUE)
+  expect_equal(reliability_detect_item_type(sparse_ordered), "ordinal")
+
+  sparse_nominal <- factor(c("A", "A", "C", "C", "A"), levels = c("A", "B", "C"))
+  expect_equal(reliability_detect_item_type(sparse_nominal), "nominal")
+
+  # A genuinely 2-level factor still reports dichotomous.
+  two_level <- factor(c("Yes", "No", "Yes"), levels = c("Yes", "No"))
+  expect_equal(reliability_detect_item_type(two_level), "dichotomous")
+
+  # Numeric items have no declared "levels" -- they are still classified from
+  # the values actually observed (the type-based, not value-shape, exception
+  # documented for the 0/1 dummy case, matching Factor Analysis/PCA).
+  expect_equal(reliability_detect_item_type(c(1, 2, 1, 2, 1)), "dichotomous")
+  expect_equal(reliability_detect_item_type(c(1, 2, 3, 1, 2)), "continuous")
+})
+
+test_that("exp_cronbach_alpha rejects a nominal factor even when only 2 of its 3 declared levels are observed (tam#38122)", {
+  # `部署` declares 3 unordered categories but this data only ever shows "A"/"B" --
+  # before the fix, unique_count()<=2 misclassified it "dichotomous", which is
+  # NOT in the nominal/unsupported reject list, so it silently slipped into the
+  # correlation matrix as if it were an ordered/binary item. It must still be
+  # rejected as nominal, exactly like the fully-observed 3-level case above.
+  df <- make_reliability_df() %>%
+    dplyr::mutate(`部署` = factor(rep(c("A", "B"), length.out = dplyr::n()),
+                                  levels = c("A", "B", "C")))
   expect_error(exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "auto"),
                "nominal")
 })
