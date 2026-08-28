@@ -95,10 +95,76 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
     # NAs in val column is already filtered out, and we don't need to add na.rm = TRUE to fun.aggregate.
     df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(val)))
     # NAs in col column is already filtered out and we don't need to handle it.
-    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(col), value = .temp_value_col, fill=fill)
+    df <- df %>% dplyr::ungroup()
 
-    df <- df %>% tibble::column_to_rownames(var=row)
-    x <- df %>% as.matrix()
+    # Build the result matrix with a single allocation.
+    #
+    # The previous implementation went through
+    #   tidyr::spread() -> tibble::column_to_rownames() -> as.matrix()
+    # which materializes an R x (C+1) data frame and then a second R x C copy
+    # before returning. Only the final R x C matrix is part of this function's
+    # output contract, so the intermediate wide data frame is pure overhead.
+    # Here the aggregated long form (one row per observed row/col pair, which
+    # is at most R*C but usually far fewer) is scattered directly into one
+    # matrix through index arithmetic, so exactly one dense object is created.
+    #
+    # Ordering must stay byte-for-byte identical to what spread() produced:
+    #   - for a factor key, the observed level order is used
+    #   - for any other key, the values are sorted with method = "radix", which
+    #     orders character data by byte in the C locale. That is the ordering
+    #     spread() itself applies, and it is deliberately NOT the ordering that
+    #     dplyr::group_by() left the rows in: the two disagree for multibyte
+    #     keys, so taking the order of appearance here would silently transpose
+    #     such a matrix. Sorting the original (typed) values rather than their
+    #     character form keeps numeric, Date and POSIXct keys in value order.
+    row_values <- df[[row]]
+    col_values <- df[[col]]
+    values <- df[[".temp_value_col"]]
+
+    if (nrow(df) == 0L) {
+      # Nothing was observed. Fall back to the original widening path, which is
+      # trivially cheap on an empty frame and keeps the exact empty-result type.
+      df <- df %>% tidyr::spread(key = !!rlang::sym(col), value = .temp_value_col, fill=fill)
+      df <- df %>% tibble::column_to_rownames(var=row)
+      return(df %>% as.matrix())
+    }
+
+    key_levels <- function(v) {
+      if (is.factor(v)) {
+        return(levels(droplevels(v)))
+      }
+      u <- unique(v)
+      # method = "radix" is the C-locale ordering spread() applies. It refuses
+      # character data whose encoding is flagged "unknown", which happens for
+      # multibyte values read under a C locale, so fall back to sort()'s own
+      # ordering there (identical to radix whenever the locale is C).
+      sorted <- tryCatch(sort(u, method = "radix"), error = function(e) sort(u))
+      as.character(sorted)
+    }
+    row_levels <- key_levels(row_values)
+    col_levels <- key_levels(col_values)
+
+    n_row <- length(row_levels)
+    n_col <- length(col_levels)
+
+    # matrix() starts from fill, then the observed cells overwrite it. Starting
+    # from fill (rather than NA) reproduces spread(fill=)'s semantics, and the
+    # assignment below promotes the storage type the same way spread() would.
+    x <- matrix(fill, nrow = n_row, ncol = n_col,
+                dimnames = list(row_levels, col_levels))
+    if (length(values) > 0L) {
+      row_index <- match(as.character(row_values), row_levels)
+      col_index <- match(as.character(col_values), col_levels)
+      # Single linear index avoids allocating an n x 2 index matrix.
+      x[row_index + (col_index - 1L) * n_row] <- values
+      # spread(fill=) replaces every NA in the widened result, not just the
+      # cells that had no observation, so an aggregated value that is itself
+      # NA also becomes fill. Reproduce that here.
+      if (!is.na(fill) && anyNA(x)) {
+        x[is.na(x)] <- fill
+      }
+    }
+    x
   }
 }
 

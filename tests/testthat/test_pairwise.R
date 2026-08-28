@@ -302,3 +302,79 @@ test_that("do_dist with NA values", {
     }
   }
 })
+
+kl_test_df <- data.frame(
+  subject = rep(paste0("s", seq(3)), each = 3),
+  key = rep(paste0("k", seq(3)), 3),
+  val = c(1, 2, 3, 2, 1, 3, 3, 2, 1),
+  stringsAsFactors = FALSE)
+
+test_that("test do_kl_dist.kv_", {
+  loadNamespace("dplyr")
+  result <- kl_test_df %>%
+    do_kl_dist.kv_("subject", "key", "val")
+
+  expect_equal(colnames(result), c("subject.x", "subject.y", "value"))
+  # 3 subjects, no diagonal and no NA/zero rows -> 3 * 2 ordered pairs
+  expect_equal(nrow(result), 6)
+  expect_true(all(result[[1]] != result[[2]]))
+  expect_true(all(result[["value"]] > 0))
+
+  # KL distance as computed here is symmetric between the two subjects
+  pair_value <- function(a, b) {
+    result[result[[1]] == a & result[[2]] == b, ][["value"]]
+  }
+  expect_equal(pair_value("s1", "s2"), pair_value("s2", "s1"))
+  expect_equal(pair_value("s1", "s3"), pair_value("s3", "s1"))
+  # s1 and s2 differ in two keys, s1 and s3 in three, so s1-s3 is the larger gap
+  expect_true(pair_value("s1", "s2") < pair_value("s1", "s3"))
+})
+
+test_that("test do_kl_dist.kv_ distinct TRUE", {
+  loadNamespace("dplyr")
+  distinct_result <- kl_test_df %>%
+    do_kl_dist.kv_("subject", "key", "val", distinct = TRUE)
+  full_result <- kl_test_df %>%
+    do_kl_dist.kv_("subject", "key", "val", distinct = FALSE)
+
+  # distinct = TRUE keeps the full n * n grid and puts NA outside the
+  # strict upper triangle, so it is not a row subset of distinct = FALSE
+  expect_equal(nrow(distinct_result), 9)
+  expect_equal(colnames(distinct_result), c("subject.x", "subject.y", "value"))
+  expect_equal(sum(!is.na(distinct_result[["value"]])), 3)
+
+  kept <- distinct_result[!is.na(distinct_result[["value"]]), ]
+  expect_true(all(kept[[1]] < kept[[2]]))
+  for (i in seq(nrow(kept))) {
+    same_pair <- full_result[[1]] == kept[[1]][i] & full_result[[2]] == kept[[2]][i]
+    expect_equal(kept[["value"]][i], full_result[same_pair, ][["value"]])
+  }
+})
+
+test_that("test do_kl_dist.kv_ for grouped data frame", {
+  loadNamespace("dplyr")
+  grouped_df <- dplyr::bind_rows(
+    dplyr::mutate(kl_test_df, group = "g1"),
+    dplyr::mutate(kl_test_df, group = "g2"))
+
+  result <- grouped_df %>%
+    dplyr::group_by(group) %>%
+    do_kl_dist.kv_("subject", "key", "val")
+
+  expect_true("group" %in% colnames(result))
+  # each group is calculated independently and yields the ungrouped result
+  expect_equal(nrow(result), 12)
+  expect_equal(sort(unique(result[["group"]])), c("g1", "g2"))
+  g1 <- result[result[["group"]] == "g1", ][["value"]]
+  g2 <- result[result[["group"]] == "g2", ][["value"]]
+  expect_equal(g1, g2)
+})
+
+test_that("test do_kl_dist.kv_ for grouped data frame as subject error", {
+  loadNamespace("dplyr")
+  expect_error({
+    kl_test_df %>%
+      dplyr::group_by(subject) %>%
+      do_kl_dist.kv_("subject", "key", "val")
+  })
+})
