@@ -129,20 +129,26 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
       return(df %>% as.matrix())
     }
 
+    # Returns the ordered key values in their ORIGINAL type. Keeping the type
+    # here matters: matching the long form against typed values avoids
+    # converting the two full-length key columns to character, which for a
+    # pairwise input (one row per pair) is the largest temporary in this
+    # function.
     key_levels <- function(v) {
       if (is.factor(v)) {
-        return(levels(droplevels(v)))
+        return(factor(levels(droplevels(v)), levels = levels(droplevels(v))))
       }
       u <- unique(v)
       # method = "radix" is the C-locale ordering spread() applies. It refuses
       # character data whose encoding is flagged "unknown", which happens for
       # multibyte values read under a C locale, so fall back to sort()'s own
       # ordering there (identical to radix whenever the locale is C).
-      sorted <- tryCatch(sort(u, method = "radix"), error = function(e) sort(u))
-      as.character(sorted)
+      tryCatch(sort(u, method = "radix"), error = function(e) sort(u))
     }
-    row_levels <- key_levels(row_values)
-    col_levels <- key_levels(col_values)
+    row_keys <- key_levels(row_values)
+    col_keys <- key_levels(col_values)
+    row_levels <- as.character(row_keys)
+    col_levels <- as.character(col_keys)
 
     n_row <- length(row_levels)
     n_col <- length(col_levels)
@@ -153,16 +159,18 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
     x <- matrix(fill, nrow = n_row, ncol = n_col,
                 dimnames = list(row_levels, col_levels))
     if (length(values) > 0L) {
-      row_index <- match(as.character(row_values), row_levels)
-      col_index <- match(as.character(col_values), col_levels)
-      # Single linear index avoids allocating an n x 2 index matrix.
-      x[row_index + (col_index - 1L) * n_row] <- values
       # spread(fill=) replaces every NA in the widened result, not just the
       # cells that had no observation, so an aggregated value that is itself
-      # NA also becomes fill. Reproduce that here.
-      if (!is.na(fill) && anyNA(x)) {
-        x[is.na(x)] <- fill
+      # NA also becomes fill. Cells with no observation already hold fill, so
+      # substituting into the (short) value vector before scattering gives the
+      # same result without ever building an R x C logical mask.
+      if (!is.na(fill) && anyNA(values)) {
+        values[is.na(values)] <- fill
       }
+      row_index <- match(row_values, row_keys)
+      col_index <- match(col_values, col_keys)
+      # Single linear index avoids allocating an n x 2 index matrix.
+      x[row_index + (col_index - 1L) * n_row] <- values
     }
     x
   }
