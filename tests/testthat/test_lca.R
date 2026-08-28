@@ -63,6 +63,11 @@ test_that("exp_lca respects the requested lower class bound for tiny data", {
                    nrep = 1, maxiter = 20)$model[[1]]
 
   expect_equal(tidy(model, type = "class_selection")$number_of_classes, 2L)
+  assignments <- tidy(model, type = "data")
+  probability_columns <- c("Class 1 Probability", "Class 2 Probability")
+  expect_true(all(probability_columns %in% names(assignments)))
+  expect_equal(unname(rowSums(as.matrix(assignments[, probability_columns]))),
+               rep(1, nrow(assignments)), tolerance = 1e-8)
 })
 
 test_that("exp_lca does not report convergence when maxiter is reached", {
