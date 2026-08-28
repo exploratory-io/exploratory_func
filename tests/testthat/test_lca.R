@@ -51,7 +51,10 @@ test_that("exp_lca selects a BIC-minimum categorical model and exposes its repor
                paste("Class", max.col(posterior, ties.method = "first")))
   expect_equal(unname(assignments$`Assignment Confidence`[included]), unname(apply(posterior, 1, max)), tolerance = 1e-8)
   expect_true(all(is.na(as.matrix(assignments[!included, probability_columns, drop = FALSE]))))
-  expect_true(nrow(tidy(model, type = "relationship")) > 0)
+  relationship <- tidy(model, type = "relationship")
+  expect_true(nrow(relationship) > 0)
+  expect_equal(as.integer(tapply(relationship$rows, relationship$class, sum)),
+               tabulate(model$selected_fit$predclass, nbins = glance(model)$selected_classes))
 })
 
 test_that("exp_lca respects the requested lower class bound for tiny data", {
