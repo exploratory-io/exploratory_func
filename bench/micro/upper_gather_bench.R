@@ -24,8 +24,11 @@ measure <- function(fn, ...) {
   invisible(gc(reset = TRUE, full = TRUE))
   t <- system.time(res <- fn(...))[["elapsed"]]
   g <- gc(full = TRUE)
-  # columns 6 and 5 of gc() are max used Mb for Vcells and Ncells
-  peak <- sum(g[, 6])
+  # "max used (Mb)" is always the LAST column of gc(), but its INDEX is not
+  # fixed: gc() adds a "limit (Mb)" column when a memory limit is set (see
+  # mem.maxVSize / R_MAX_VSIZE), which shifts column 6 from "max used (Mb)" to
+  # "max used" in cells. Index from the end so both shapes report Mb.
+  peak <- sum(g[, ncol(g)])
   list(sec = t, peak_mb = peak, rows = nrow(res))
 }
 
