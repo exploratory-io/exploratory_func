@@ -387,24 +387,9 @@
 }
 
 .kmedoids_variable_importance <- function(x) {
-  ids <- factor(x$clustering)
-  purrr::map_dfr(seq_len(ncol(x$mat)), function(index) {
-    value <- x$mat[, index]
-    grand_mean <- mean(value, na.rm = TRUE)
-    between <- sum(tapply(value, ids, function(group) {
-      length(group) * (mean(group, na.rm = TRUE) - grand_mean)^2
-    }), na.rm = TRUE)
-    total <- sum((value - grand_mean)^2, na.rm = TRUE)
-    eta_squared <- if (total > 0) between / total else 0
-    fit <- tryCatch(stats::aov(value ~ ids), error = function(e) NULL)
-    fit_table <- if (is.null(fit)) NULL else summary(fit)[[1]]
-    tibble::tibble(
-      variable = colnames(x$mat)[[index]],
-      eta_squared = eta_squared,
-      test_statistic = if (is.null(fit_table)) NA_real_ else fit_table[['F value']][[1]],
-      p_value = if (is.null(fit_table)) NA_real_ else fit_table[['Pr(>F)']][[1]]
-    )
-  })
+  # Shared with K-Means (tam#38160) -- see cluster_variable_importance.R. K-Medoids' `x$mat`
+  # is already the (optionally normalized) numeric fit matrix, so this is a direct pass-through.
+  cluster_variable_importance_anova(x$mat, x$clustering)
 }
 
 .kmedoids_representative_values <- function(x) {

@@ -155,6 +155,19 @@ compute_silhouette_per_row <- function(cluster_ids, mat, d = NULL, sample_idx = 
   na_result
 }
 
+# "Characteristic Variables" for K-Means (tam#38160), reusing the K-Medoids ANOVA/eta-squared
+# machinery (cluster_variable_importance.R) -- K-Means, like K-Medoids, clusters purely numeric
+# variables, so the same one-way-ANOVA-per-variable statistic applies directly. `x` is the
+# prcomp_exploratory fit `exp_kmeans()` attaches `x$kmeans`/`x$df`/`x$selected_cols` to; see
+# tidy.prcomp_exploratory(type = "variable_importance") in prcomp.R for the call site.
+# `x$df` is the same (NA-filtered, sampled) data build_kmeans.cols() fit `x$kmeans` on -- see
+# exp_kmeans()'s single shared `df` feeding both build_kmeans.cols() and do_prcomp() -- so the
+# rows in `x$df[, x$selected_cols]` are row-for-row aligned with `x$kmeans$cluster`.
+.kmeans_variable_importance <- function(x) {
+  mat <- as_numeric_matrix_(x$df, columns = x$selected_cols)
+  cluster_variable_importance_anova(mat, x$kmeans$cluster)
+}
+
 #' analytics function for K-means view
 #' @export
 exp_kmeans <- function(df, ...,
