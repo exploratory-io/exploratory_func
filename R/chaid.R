@@ -62,39 +62,73 @@ chaid_fit <- function(data,
     verbose = verbose
   )
 
+  numeric.target <- chaid_is_numeric_target(data[[target]])
+
   prepared <- prepare_chaid_data(
     data = data,
     target = target,
     predictors = validation$predictors,
-    parameters = validation$parameters
+    parameters = validation$parameters,
+    numeric_target = numeric.target
   )
-  target.factor <- prepared$data[[target]]
-  class.levels <- levels(target.factor)
-  class.counts <- tabulate(target.factor, nbins = length(class.levels))
-  predicted.class <- class.levels[which.max(class.counts)]
-  class.distribution <- if (sum(class.counts) == 0) {
-    rep(0, length(class.levels))
-  } else {
-    class.counts / sum(class.counts)
-  }
 
-  nodes <- data.frame(
-    node_id = 1L,
-    parent_id = NA_integer_,
-    depth = 0L,
-    is_terminal = TRUE,
-    n = nrow(prepared$data),
-    weighted_n = nrow(prepared$data),
-    predicted_class = predicted.class,
-    split_variable = NA_character_,
-    p_value = NA_real_,
-    adjusted_p_value = NA_real_,
-    split_statistic = NA_real_,
-    split_df = NA_real_,
-    rule = 'Root',
-    stringsAsFactors = FALSE
-  )
-  nodes$class_distribution <- list(setNames(class.distribution, class.levels))
+  if (numeric.target) {
+    root.summary <- chaid_numeric_node_summary(prepared$data[[target]])
+    class.levels <- NULL
+    nodes <- data.frame(
+      node_id = 1L,
+      parent_id = NA_integer_,
+      depth = 0L,
+      is_terminal = TRUE,
+      n = nrow(prepared$data),
+      weighted_n = nrow(prepared$data),
+      predicted_class = root.summary$label,
+      split_variable = NA_character_,
+      p_value = NA_real_,
+      adjusted_p_value = NA_real_,
+      split_statistic = NA_real_,
+      split_df = NA_real_,
+      split_df1 = NA_real_,
+      split_df2 = NA_real_,
+      node_mean = root.summary$mean,
+      node_sd = root.summary$sd,
+      rule = 'Root',
+      stringsAsFactors = FALSE
+    )
+    nodes$class_distribution <- list(NULL)
+  } else {
+    target.factor <- prepared$data[[target]]
+    class.levels <- levels(target.factor)
+    class.counts <- tabulate(target.factor, nbins = length(class.levels))
+    predicted.class <- class.levels[which.max(class.counts)]
+    class.distribution <- if (sum(class.counts) == 0) {
+      rep(0, length(class.levels))
+    } else {
+      class.counts / sum(class.counts)
+    }
+
+    nodes <- data.frame(
+      node_id = 1L,
+      parent_id = NA_integer_,
+      depth = 0L,
+      is_terminal = TRUE,
+      n = nrow(prepared$data),
+      weighted_n = nrow(prepared$data),
+      predicted_class = predicted.class,
+      split_variable = NA_character_,
+      p_value = NA_real_,
+      adjusted_p_value = NA_real_,
+      split_statistic = NA_real_,
+      split_df = NA_real_,
+      split_df1 = NA_real_,
+      split_df2 = NA_real_,
+      node_mean = NA_real_,
+      node_sd = NA_real_,
+      rule = 'Root',
+      stringsAsFactors = FALSE
+    )
+    nodes$class_distribution <- list(setNames(class.distribution, class.levels))
+  }
 
   model <- list(
     nodes = nodes,
@@ -121,7 +155,9 @@ chaid_fit <- function(data,
     numeric_binning_map = prepared$numeric_binning_map,
     class_levels = class.levels,
     target = target,
-    target_type = if (is.logical(data[[target]])) {
+    target_type = if (numeric.target) {
+      'numeric'
+    } else if (is.logical(data[[target]])) {
       'logical'
     } else if (is.factor(data[[target]])) {
       'factor'
@@ -139,8 +175,12 @@ chaid_fit <- function(data,
   )
   low.expected.split <- FALSE
   grew.tree <- FALSE
+  # Numeric targets skip the `length(class.levels) > 1` gate (there are no
+  # class levels); a numeric target with zero variance still fits, it simply
+  # produces a root-only tree (section 36: SS_total == 0 -> Terminal Node, not
+  # an error) via the purity check inside grow_node().
   if (length(prepared$predictors) > 0 && nrow(prepared$data) > 0 &&
-      length(class.levels) > 1) {
+      (numeric.target || length(class.levels) > 1)) {
     grew.tree <- TRUE
     tree <- grow_chaid_tree(
       data = prepared$data,
@@ -148,7 +188,8 @@ chaid_fit <- function(data,
       predictors = prepared$predictors,
       parameters = validation$parameters,
       predictor_info = prepared$predictor_info,
-      class_levels = class.levels
+      class_levels = class.levels,
+      numeric_target = numeric.target
     )
     tree <- chaid_renumber_nodes_bfs(tree)
     model$nodes <- tree$nodes
@@ -206,10 +247,20 @@ emit_chaid_warnings <- function(numeric_binned, root_only, low_expected) {
 #' @param target Target column name.
 #' @param predictors Predictor column names.
 #' @param parameters Validated CHAID parameters.
+#' @param numeric_target Whether the target column is numeric.
 #' @return A list containing prepared data and transformation metadata.
-prepare_chaid_data <- function(data, target, predictors, parameters) {
+prepare_chaid_data <- function(data, target, predictors, parameters,
+                               numeric_target = FALSE) {
   target.raw <- data[[target]]
-  row.keep <- !is.na(target.raw)
+  # tam #38166 spec section 36: rows whose (numeric) target is Inf/-Inf are
+  # dropped from every statistic/test, mirroring the empty-data-frame min/max
+  # rule at global/r-integration.md#r-min-max-inf-empty-dataframe -- keeping
+  # them would let a non-finite value poison every sum()/mean() downstream.
+  row.keep <- if (numeric_target) {
+    !is.na(target.raw) & is.finite(as.numeric(target.raw))
+  } else {
+    !is.na(target.raw)
+  }
   predictor.values <- list()
   predictor.info <- list()
   numeric.binning.map <- list()
@@ -280,18 +331,22 @@ prepare_chaid_data <- function(data, target, predictors, parameters) {
     ))
   }
 
-  target.levels <- if (is.factor(target.raw)) {
-    levels(target.raw)
-  } else if (is.logical(target.raw)) {
-    # Stable, deterministic order with the positive class (TRUE) first, so
-    # class_levels[1] is the positive class for binary/logical targets.
-    c('TRUE', 'FALSE')
-  } else {
-    unique(as.character(target.raw[!is.na(target.raw)]))
-  }
-  target.factor <- factor(as.character(target.raw[row.keep]), levels = target.levels)
   prepared.data <- data.frame(row.names = seq_len(sum(row.keep)))
-  prepared.data[[target]] <- target.factor
+  if (numeric_target) {
+    prepared.data[[target]] <- as.numeric(target.raw[row.keep])
+  } else {
+    target.levels <- if (is.factor(target.raw)) {
+      levels(target.raw)
+    } else if (is.logical(target.raw)) {
+      # Stable, deterministic order with the positive class (TRUE) first, so
+      # class_levels[1] is the positive class for binary/logical targets.
+      c('TRUE', 'FALSE')
+    } else {
+      unique(as.character(target.raw[!is.na(target.raw)]))
+    }
+    target.factor <- factor(as.character(target.raw[row.keep]), levels = target.levels)
+    prepared.data[[target]] <- target.factor
+  }
   for (variable in predictors.kept) {
     prepared.data[[variable]] <- predictor.values[[variable]][row.keep]
     prepared.data[[variable]] <- as.character(prepared.data[[variable]])
@@ -454,6 +509,137 @@ compute_chisq_test <- function(x, y, method = 'pearson') {
   compute_chisq_from_counts(observed, method = method)
 }
 
+#' Whether a column should be treated as a numeric CHAID target.
+#'
+#' tam #38166: numeric targets use a One-way ANOVA F-test instead of the
+#' chi-square association test. Date/POSIXct/difftime columns are explicitly
+#' out of scope (spec section 3) even though some are numeric-backed, so they
+#' are excluded by class rather than by `is.numeric()` alone.
+#'
+#' @param x A vector.
+#' @return TRUE when `x` should be fit as a numeric CHAID target.
+chaid_is_numeric_target <- function(x) {
+  is.numeric(x) && !inherits(x, c('Date', 'POSIXct', 'POSIXt', 'difftime'))
+}
+
+#' Summarize a numeric CHAID node's target values.
+#'
+#' @param y Numeric target values within one node (already NA/non-finite free).
+#' @return `list(mean, sd, label)`; `label` is a compact string for display.
+chaid_numeric_node_summary <- function(y) {
+  y <- y[is.finite(y)]
+  node.mean <- if (length(y) > 0) mean(y) else NA_real_
+  node.sd <- if (length(y) > 1) stats::sd(y) else NA_real_
+  list(
+    mean = as.numeric(node.mean),
+    sd = as.numeric(node.sd),
+    label = if (is.na(node.mean)) NA_character_ else format_chaid_break(node.mean)
+  )
+}
+
+#' Compute a one-way ANOVA F-test from per-group sufficient statistics.
+#'
+#' Mirrors [compute_chisq_from_counts()]'s role for the categorical/logical
+#' target: category merging calls this once per merge candidate and once for
+#' the overall (post-merge) split test, each time on a `stats` matrix built by
+#' summing per-CATEGORY sufficient statistics -- never by rescanning raw rows.
+#'
+#' `stats` has 3 rows (`n`, `sum`, `sumsq`) and one column per group; because
+#' sum and sum-of-squares are additive over disjoint row sets, a group's
+#' column is exactly the column-wise sum of its member categories' columns
+#' (identical to how the chi-square path sums contingency-table columns), so
+#' [merge_categories()] can reuse the very same `col_of_group()`/`rowSums()`
+#' machinery for both target types.
+#'
+#' F = MS_between / MS_within, df1 = k - 1, df2 = N - k (k = number of
+#' non-empty groups, N = total rows). For k == 2 this is algebraically
+#' identical to `t^2` from an equal-variance two-sample t-test (tam #38166
+#' spec section 4-14 / test requirement in section 38).
+#'
+#' Special cases (spec section 36), all returned WITHOUT signaling an R
+#' condition -- the caller folds a non-computable test into "not significant"
+#' via `p_value >= alpha_merge`/`alpha_split`, and NA into "not a candidate":
+#' - Fewer than 2 non-empty groups, or `df2 <= 0` (not enough rows to spare a
+#'   residual degree of freedom): the test cannot be run -> `statistic`/
+#'   `p_value` are `NA`.
+#' - `SS_within == 0` and `SS_between <= 0` (every value, in every group, is
+#'   identical -- `SS_total == 0`): no evidence of any group difference ->
+#'   `p_value = 1` (never "significant"), not an error.
+#' - `SS_within == 0` and `SS_between > 0` (perfect between-group separation,
+#'   zero within-group spread): the largest possible F -> `statistic = Inf`,
+#'   `p_value = 0` (always "significant").
+#'
+#' @param stats A numeric matrix with row names `n`, `sum`, `sumsq`; one
+#'   column per group (as produced by summing category columns).
+#' @return A list with `statistic`, `p_value`, `df1`, `df2`, `df` (alias for
+#'   `df2`, kept for parity with `compute_chisq_from_counts()`'s single `df`),
+#'   `low_expected` (always `FALSE`; the concept does not apply to ANOVA),
+#'   `group_means`, and `group_sizes`.
+compute_anova_from_stats <- function(stats) {
+  empty <- list(statistic = NA_real_, p_value = NA_real_, df1 = NA_real_,
+               df2 = NA_real_, df = NA_real_, low_expected = FALSE,
+               group_means = numeric(0), group_sizes = numeric(0))
+  keep <- stats['n', ] > 0
+  stats <- stats[, keep, drop = FALSE]
+  k <- ncol(stats)
+  if (k < 2) {
+    return(empty)
+  }
+  n.i <- as.numeric(stats['n', ])
+  sum.i <- as.numeric(stats['sum', ])
+  sumsq.i <- as.numeric(stats['sumsq', ])
+  group.means <- sum.i / n.i
+  N <- sum(n.i)
+  df1 <- k - 1
+  df2 <- N - k
+  if (df2 <= 0) {
+    empty$df1 <- as.numeric(df1)
+    empty$df2 <- as.numeric(df2)
+    empty$df <- as.numeric(df2)
+    empty$group_means <- group.means
+    empty$group_sizes <- n.i
+    return(empty)
+  }
+  grand.sum <- sum(sum.i)
+  ss.between <- sum(sum.i^2 / n.i) - (grand.sum^2) / N
+  # Per-group within-SS; clamp tiny negative floating-point noise to 0 (a
+  # mathematically-zero within-group SS, e.g. a single-row group, can compute
+  # as a small negative number due to floating point cancellation).
+  ss.within.per.group <- pmax(0, sumsq.i - (sum.i^2) / n.i)
+  ss.within <- sum(ss.within.per.group)
+  ms.between <- ss.between / df1
+  ms.within <- ss.within / df2
+  if (!is.finite(ms.within) || ms.within == 0) {
+    if (!is.finite(ms.between) || ms.between <= 0) {
+      # SS_total == 0: every value (in every group) is identical.
+      statistic <- NA_real_
+      p.value <- 1
+    } else {
+      # Zero within-group spread but a real between-group difference.
+      statistic <- Inf
+      p.value <- 0
+    }
+  } else {
+    statistic <- ms.between / ms.within
+    if (!is.finite(statistic) || statistic < 0) {
+      statistic <- NA_real_
+      p.value <- NA_real_
+    } else {
+      p.value <- stats::pf(statistic, df1 = df1, df2 = df2, lower.tail = FALSE)
+    }
+  }
+  list(
+    statistic = as.numeric(statistic),
+    p_value = as.numeric(p.value),
+    df1 = as.numeric(df1),
+    df2 = as.numeric(df2),
+    df = as.numeric(df2),
+    low_expected = FALSE,
+    group_means = group.means,
+    group_sizes = n.i
+  )
+}
+
 #' Apply Bonferroni correction to a vector of p-values.
 #'
 #' @param p_values Raw p-values.
@@ -533,6 +719,9 @@ chaid_group_pair_key <- function(a, b) {
 #' @param bonferroni Whether to correct the p-values.
 #' @param chi_square Chi-square statistic to use.
 #' @param max_resplit_size Largest nominal group that is enumerated.
+#' @param test_fn Test function taking the per-group stats/contingency matrix
+#'   and returning a list with `p_value` -- `compute_chisq_from_counts()` for a
+#'   categorical/logical target, `compute_anova_from_stats()` for numeric.
 #' @return `list(a, b, p_value, adjusted_p_value)` or NULL when it should stand.
 chaid_best_resplit <- function(group.indices,
                                col_of_group,
@@ -540,7 +729,11 @@ chaid_best_resplit <- function(group.indices,
                                alpha_merge = 0.05,
                                bonferroni = TRUE,
                                chi_square = 'pearson',
-                               max_resplit_size = 12L) {
+                               max_resplit_size = 12L,
+                               test_fn = NULL) {
+  if (is.null(test_fn)) {
+    test_fn <- function(observed) compute_chisq_from_counts(observed, method = chi_square)
+  }
   partitions <- chaid_resplit_partitions(
     group.indices, ordered = ordered, max_resplit_size = max_resplit_size
   )
@@ -549,7 +742,7 @@ chaid_best_resplit <- function(group.indices,
   }
   raw.p.values <- vapply(partitions, function(part) {
     observed <- cbind(col_of_group(part$a), col_of_group(part$b))
-    compute_chisq_from_counts(observed, method = chi_square)$p_value
+    test_fn(observed)$p_value
   }, numeric(1))
   adjusted.p.values <- adjust_p_value_bonferroni(
     raw.p.values, bonferroni = bonferroni, n_tests = length(raw.p.values)
@@ -581,6 +774,10 @@ chaid_best_resplit <- function(group.indices,
 #' @param allow_resplit Whether a compound category of 3+ original categories may
 #'   be split again when its best binary partition is significant (CHAID stage
 #'   3). Off by default, so the greedy merge behaves exactly as before.
+#' @param numeric_target Whether `target` holds numeric values for a One-way
+#'   ANOVA F-test (tam #38166), rather than categorical/logical values for the
+#'   chi-square test. Categorical behavior is completely unchanged when this
+#'   is FALSE (the default) -- every line on that path is identical to before.
 #' @return Category groups and merge/test metadata.
 merge_categories <- function(values,
                              target,
@@ -591,10 +788,16 @@ merge_categories <- function(values,
                              variable = '',
                              node_id = 1L,
                              chi_square = 'pearson',
-                             allow_resplit = FALSE) {
+                             allow_resplit = FALSE,
+                             numeric_target = FALSE) {
   values <- as.character(values)
-  target <- as.character(target)
-  valid <- !is.na(values) & !is.na(target)
+  if (numeric_target) {
+    target <- as.numeric(target)
+    valid <- !is.na(values) & !is.na(target) & is.finite(target)
+  } else {
+    target <- as.character(target)
+    valid <- !is.na(values) & !is.na(target)
+  }
   values <- values[valid]
   target <- target[valid]
   categories <- if (ordered && !is.null(ordered_levels)) {
@@ -603,14 +806,29 @@ merge_categories <- function(values,
     unique(values)
   }
 
-  # Build the target-by-category contingency table ONCE. Every pairwise merge
-  # test and the overall test are then column extractions / sums of this matrix,
-  # so no per-test pass over the raw vectors is needed (the performance fix).
-  target.levels <- unique(target)
-  contingency <- unclass(table(
-    factor(target, levels = target.levels),
-    factor(values, levels = categories)
-  ))
+  if (numeric_target) {
+    # Sufficient-statistics matrix (n, sum, sum-of-squares) per category, built
+    # ONCE. Sum and sum-of-squares are additive over disjoint row sets, so a
+    # merged group's stats are simply the column-wise sum of its member
+    # categories' columns -- the same `col_of_group()`/`rowSums()` shape the
+    # chi-square path below already uses for its contingency table.
+    contingency <- vapply(categories, function(category) {
+      y <- target[values == category]
+      c(n = length(y), sum = sum(y), sumsq = sum(y^2))
+    }, numeric(3))
+    rownames(contingency) <- c('n', 'sum', 'sumsq')
+    test_fn <- function(observed) compute_anova_from_stats(observed)
+  } else {
+    # Build the target-by-category contingency table ONCE. Every pairwise merge
+    # test and the overall test are then column extractions / sums of this matrix,
+    # so no per-test pass over the raw vectors is needed (the performance fix).
+    target.levels <- unique(target)
+    contingency <- unclass(table(
+      factor(target, levels = target.levels),
+      factor(values, levels = categories)
+    ))
+    test_fn <- function(observed) compute_chisq_from_counts(observed, method = chi_square)
+  }
 
   # Each group is a set of column indices into `categories`.
   groups <- as.list(seq_along(categories))
@@ -652,7 +870,7 @@ merge_categories <- function(values,
           next
         }
         pair.observed <- cbind(col_of_group(groups[[i]]), col_of_group(groups[[j]]))
-        test <- compute_chisq_from_counts(pair.observed, method = chi_square)
+        test <- test_fn(pair.observed)
         candidate.index <- candidate.index + 1L
         candidates[[candidate.index]] <- list(
           i = i,
@@ -700,7 +918,8 @@ merge_categories <- function(values,
           ordered = ordered,
           alpha_merge = alpha_merge,
           bonferroni = bonferroni,
-          chi_square = chi_square
+          chi_square = chi_square,
+          test_fn = test_fn
         )
         if (is.null(split)) {
           next
@@ -729,8 +948,9 @@ merge_categories <- function(values,
 
   group.category.lists <- lapply(groups, function(group.indices) categories[group.indices])
   group.labels <- vapply(group.category.lists, paste, character(1), collapse = ' + ')
-  overall.observed <- vapply(groups, col_of_group, numeric(length(target.levels)))
-  overall.test <- compute_chisq_from_counts(overall.observed, method = chi_square)
+  stat.row.count <- nrow(contingency)
+  overall.observed <- vapply(groups, col_of_group, numeric(stat.row.count))
+  overall.test <- test_fn(overall.observed)
   list(
     groups = group.category.lists,
     group_labels = group.labels,
@@ -750,9 +970,11 @@ merge_categories <- function(values,
 #' @param parameters Validated CHAID parameters.
 #' @param predictor_info Predictor metadata.
 #' @param node_id Current node ID.
+#' @param numeric_target Whether `target` is numeric (One-way ANOVA F-test)
+#'   rather than categorical/logical (chi-square test).
 #' @return Predictor evaluation or NULL when no split is possible.
 evaluate_predictor <- function(data, target, variable, parameters,
-                               predictor_info, node_id) {
+                               predictor_info, node_id, numeric_target = FALSE) {
   values <- as.character(data[[variable]])
   if (length(unique(values)) < 2) {
     return(NULL)
@@ -768,7 +990,8 @@ evaluate_predictor <- function(data, target, variable, parameters,
     variable = variable,
     node_id = node_id,
     chi_square = parameters$chi_square,
-    allow_resplit = isTRUE(parameters$allow_resplit)
+    allow_resplit = isTRUE(parameters$allow_resplit),
+    numeric_target = numeric_target
   )
   if (length(merge.result$groups) < 2 || is.na(merge.result$p_value)) {
     return(NULL)
@@ -785,10 +1008,14 @@ evaluate_predictor <- function(data, target, variable, parameters,
 #' @param predictors Prepared predictors.
 #' @param parameters Validated CHAID parameters.
 #' @param predictor_info Predictor metadata.
-#' @param class_levels Target class levels.
+#' @param class_levels Target class levels (NULL when `numeric_target` is TRUE).
+#' @param numeric_target Whether the target is numeric (One-way ANOVA F-test
+#'   splits, node prediction = mean) rather than categorical/logical
+#'   (chi-square splits, node prediction = majority class). tam #38166.
+#'   Categorical behavior is unchanged when this is FALSE (the default).
 #' @return Tree tables and traversal metadata.
 grow_chaid_tree <- function(data, target, predictors, parameters,
-                            predictor_info, class_levels) {
+                            predictor_info, class_levels, numeric_target = FALSE) {
   # An environment (reference semantics) rather than a list: grow_node recurses
   # and mutates this shared state, and nested list-`<<-` updates are prone to
   # lost updates. With an environment, `state$field <- value` mutates in place.
@@ -801,29 +1028,62 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
   state$low_expected <- FALSE
 
   grow_node <- function(node.data, node.id, parent.id, depth, rule) {
-    target.factor <- factor(as.character(node.data[[target]]), levels = class_levels)
-    counts <- tabulate(target.factor, nbins = length(class_levels))
-    distribution <- if (sum(counts) == 0) {
-      rep(0, length(class_levels))
+    if (numeric_target) {
+      y <- as.numeric(node.data[[target]])
+      summary <- chaid_numeric_node_summary(y)
+      record <- list(
+        node_id = as.integer(node.id),
+        parent_id = if (is.null(parent.id)) NA_integer_ else as.integer(parent.id),
+        depth = as.integer(depth),
+        is_terminal = TRUE,
+        n = nrow(node.data),
+        weighted_n = nrow(node.data),
+        predicted_class = summary$label,
+        class_distribution = NULL,
+        node_mean = summary$mean,
+        node_sd = summary$sd,
+        split_variable = NA_character_,
+        p_value = NA_real_,
+        adjusted_p_value = NA_real_,
+        split_statistic = NA_real_,
+        split_df = NA_real_,
+        split_df1 = NA_real_,
+        split_df2 = NA_real_,
+        rule = rule
+      )
+      # section 36: SS_total == 0 (every value in the node identical, or fewer
+      # than 2 finite values to compare) -> Terminal Node, not an error.
+      pure <- length(unique(y[is.finite(y)])) <= 1
     } else {
-      counts / sum(counts)
+      target.factor <- factor(as.character(node.data[[target]]), levels = class_levels)
+      counts <- tabulate(target.factor, nbins = length(class_levels))
+      distribution <- if (sum(counts) == 0) {
+        rep(0, length(class_levels))
+      } else {
+        counts / sum(counts)
+      }
+      record <- list(
+        node_id = as.integer(node.id),
+        parent_id = if (is.null(parent.id)) NA_integer_ else as.integer(parent.id),
+        depth = as.integer(depth),
+        is_terminal = TRUE,
+        n = nrow(node.data),
+        weighted_n = nrow(node.data),
+        predicted_class = class_levels[which.max(counts)],
+        class_distribution = setNames(distribution, class_levels),
+        node_mean = NA_real_,
+        node_sd = NA_real_,
+        split_variable = NA_character_,
+        p_value = NA_real_,
+        adjusted_p_value = NA_real_,
+        split_statistic = NA_real_,
+        split_df = NA_real_,
+        split_df1 = NA_real_,
+        split_df2 = NA_real_,
+        rule = rule
+      )
+      pure <- sum(counts > 0) <= 1
     }
-    record <- list(
-      node_id = as.integer(node.id),
-      parent_id = if (is.null(parent.id)) NA_integer_ else as.integer(parent.id),
-      depth = as.integer(depth),
-      is_terminal = TRUE,
-      n = nrow(node.data),
-      weighted_n = nrow(node.data),
-      predicted_class = class_levels[which.max(counts)],
-      class_distribution = setNames(distribution, class_levels),
-      split_variable = NA_character_,
-      p_value = NA_real_,
-      adjusted_p_value = NA_real_,
-      split_statistic = NA_real_,
-      split_df = NA_real_,
-      rule = rule
-    )
     state$node_records[[as.character(node.id)]] <- record
     state$node_metadata[[as.character(node.id)]] <- list(
       split_variable = NULL,
@@ -831,7 +1091,6 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
       group_labels = NULL
     )
 
-    pure <- sum(counts > 0) <= 1
     if (pure || depth >= parameters$max_depth ||
         nrow(node.data) < parameters$min_split || length(predictors) == 0) {
       return(invisible(NULL))
@@ -853,7 +1112,8 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
         variable = variable,
         parameters = parameters,
         predictor_info = predictor_info,
-        node_id = node.id
+        node_id = node.id,
+        numeric_target = numeric_target
       )
     })
     evaluations <- Filter(Negate(is.null), evaluations)
@@ -874,6 +1134,10 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
     current.record$adjusted_p_value <- best$adjusted_p_value
     current.record$split_statistic <- best$test$statistic
     current.record$split_df <- best$test$df
+    if (numeric_target) {
+      current.record$split_df1 <- best$test$df1
+      current.record$split_df2 <- best$test$df2
+    }
     state$node_records[[as.character(node.id)]] <- current.record
 
     if (is.na(best$p_value) || best$adjusted_p_value > parameters$alpha_split) {
@@ -940,6 +1204,10 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
       adjusted_p_value = record$adjusted_p_value,
       split_statistic = record$split_statistic,
       split_df = record$split_df,
+      split_df1 = record$split_df1 %||% NA_real_,
+      split_df2 = record$split_df2 %||% NA_real_,
+      node_mean = record$node_mean %||% NA_real_,
+      node_sd = record$node_sd %||% NA_real_,
       rule = record$rule,
       stringsAsFactors = FALSE
     )
@@ -1285,56 +1553,87 @@ chaid_class_distribution_matrix <- function(model) {
 #'
 #' @param model A fitted `exploratory_chaid` model.
 #' @param prepared.data Output of `prepare_chaid_new_data()`.
-#' @param type Prediction output type.
+#' @param type Prediction output type. `value` (numeric target only) returns
+#'   the node mean as a numeric vector -- the regression-style counterpart of
+#'   `class`.
 #' @param split.index Optional precomputed `chaid_build_split_index()` result.
 #' @return A vector or data frame of predictions.
 chaid_predict_prepared <- function(model, prepared.data,
-                                   type = c('class', 'prob', 'node', 'all'),
+                                   type = c('class', 'prob', 'node', 'all', 'value'),
                                    split.index = NULL) {
-  prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all'))
+  prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all', 'value'))
+  is.numeric.target <- identical(model$target_type, 'numeric')
   node.ids <- chaid_assign_nodes(prepared.data, model, split.index)
   node.rows <- match(node.ids, model$nodes$node_id)
   predicted.classes <- as.character(model$nodes$predicted_class[node.rows])
-  probability.matrix <- if (length(node.ids) == 0) {
-    matrix(numeric(), nrow = 0, ncol = length(model$class_levels),
-           dimnames = list(NULL, paste0('.pred_prob_', model$class_levels)))
+  predicted.values <- if (is.numeric.target) {
+    as.numeric(model$nodes$node_mean[node.rows])
   } else {
-    chaid_class_distribution_matrix(model)[node.rows, , drop = FALSE]
+    rep(NA_real_, length(node.rows))
   }
-  colnames(probability.matrix) <- paste0('.pred_prob_', model$class_levels)
 
+  if (prediction.type == 'value') {
+    return(predicted.values)
+  }
   if (prediction.type == 'class') {
     return(predicted.classes)
   }
   if (prediction.type == 'node') {
     return(as.integer(node.ids))
   }
-  probability.data <- as.data.frame(probability.matrix, stringsAsFactors = FALSE)
+
+  # A numeric target has no class-probability distribution; `prob` returns a
+  # zero-column frame and `all` skips the `.pred_prob_*` columns, gaining
+  # `.pred_value` instead.
+  if (is.numeric.target) {
+    probability.data <- data.frame(row.names = seq_along(node.ids))[, FALSE]
+  } else {
+    probability.matrix <- if (length(node.ids) == 0) {
+      matrix(numeric(), nrow = 0, ncol = length(model$class_levels),
+             dimnames = list(NULL, paste0('.pred_prob_', model$class_levels)))
+    } else {
+      chaid_class_distribution_matrix(model)[node.rows, , drop = FALSE]
+    }
+    colnames(probability.matrix) <- paste0('.pred_prob_', model$class_levels)
+    probability.data <- as.data.frame(probability.matrix, stringsAsFactors = FALSE)
+  }
   if (prediction.type == 'prob') {
     return(probability.data)
   }
-  data.frame(
-    .chaid_node_id = as.integer(node.ids),
-    .pred_class = predicted.classes,
-    .chaid_rule = model$nodes$rule[node.rows],
-    probability.data,
-    stringsAsFactors = FALSE,
-    check.names = FALSE
-  )
+  if (is.numeric.target) {
+    data.frame(
+      .chaid_node_id = as.integer(node.ids),
+      .pred_class = predicted.classes,
+      .pred_value = predicted.values,
+      .chaid_rule = model$nodes$rule[node.rows],
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+  } else {
+    data.frame(
+      .chaid_node_id = as.integer(node.ids),
+      .pred_class = predicted.classes,
+      .chaid_rule = model$nodes$rule[node.rows],
+      probability.data,
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+  }
 }
 
 #' Predict from a fitted classification CHAID tree.
 #'
 #' @param model A fitted `exploratory_chaid` model.
 #' @param new_data New predictor data.
-#' @param type Prediction output type: `class`, `prob`, `node`, or `all`.
+#' @param type Prediction output type: `class`, `prob`, `node`, `all`, or
+#'   `value` (numeric target only -- see `chaid_predict_prepared()`).
 #' @return A vector or data frame of predictions.
 #' @export
-chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'all')) {
+chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'all', 'value')) {
   if (!inherits(model, 'exploratory_chaid')) {
     stop('model must be an exploratory_chaid object')
   }
-  prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all'))
+  prediction.type <- match.arg(type, choices = c('class', 'prob', 'node', 'all', 'value'))
   prepared.data <- prepare_chaid_new_data(new_data, model)
   chaid_predict_prepared(model, prepared.data, type = prediction.type)
 }
@@ -1348,7 +1647,7 @@ chaid_predict <- function(model, new_data, type = c('class', 'prob', 'node', 'al
 #' @return Predictions from `chaid_predict()`.
 #' @export
 predict.exploratory_chaid <- function(object, newdata,
-                                      type = c('class', 'prob', 'node', 'all'), ...) {
+                                      type = c('class', 'prob', 'node', 'all', 'value'), ...) {
   chaid_predict(object, newdata, type = type)
 }
 
@@ -1360,6 +1659,27 @@ predict.exploratory_chaid <- function(object, newdata,
 chaid_node_summary <- function(model) {
   validate_chaid_model(model)
   root.n <- model$nodes$n[model$nodes$node_id == 1L]
+  # tam #38166: a numeric target has no predicted CLASS/distribution -- report
+  # the node's target Mean / Std. Dev. instead (spec section 20-27 "Node
+  # Statistics": Node, Mean, Std. Dev., Row Count).
+  if (identical(model$target_type, 'numeric')) {
+    return(data.frame(
+      Node = model$nodes$node_id,
+      Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule, model$terms_mapping)),
+      Rows = model$nodes$n,
+      `%` = model$nodes$n / root.n * 100,
+      Mean = model$nodes$node_mean,
+      `Std. Dev.` = model$nodes$node_sd,
+      `Split Variable` = chaid_map_display_name(model$nodes$split_variable, model$terms_mapping),
+      `F Statistic` = model$nodes$split_statistic,
+      df1 = model$nodes$split_df1,
+      df2 = model$nodes$split_df2,
+      `p-value` = model$nodes$p_value,
+      `Adjusted p-value` = model$nodes$adjusted_p_value,
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    ))
+  }
   data.frame(
     Node = model$nodes$node_id,
     # tam #37177: readable form -- no "Root & " prefix, contiguous numeric bins
@@ -1391,6 +1711,18 @@ chaid_node_summary <- function(model) {
 chaid_rule_table <- function(model) {
   validate_chaid_model(model)
   terminal <- model$nodes$is_terminal
+  if (identical(model$target_type, 'numeric')) {
+    return(data.frame(
+      Node = model$nodes$node_id[terminal],
+      Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule[terminal], model$terms_mapping)),
+      Prediction = model$nodes$predicted_class[terminal],
+      Mean = model$nodes$node_mean[terminal],
+      `Std. Dev.` = model$nodes$node_sd[terminal],
+      Rows = model$nodes$n[terminal],
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    ))
+  }
   data.frame(
     Node = model$nodes$node_id[terminal],
     # tam #37177: see chaid_node_summary(). tam#38107: map clean -> original name.
@@ -1473,6 +1805,26 @@ chaid_split_summary <- function(model) {
   validate_chaid_model(model)
   split.rows <- !model$nodes$is_terminal
   node.ids <- model$nodes$node_id[split.rows]
+  # tam #38166 spec section 27 "Split Statistics Table" (numeric target): Node,
+  # Variable, F Statistic, df1, df2, P-value, Adjusted P-value -- the ANOVA
+  # counterpart of the chi-square split summary below.
+  if (identical(model$target_type, 'numeric')) {
+    return(data.frame(
+      Depth = model$nodes$depth[split.rows],
+      Node = node.ids,
+      `Split Variable` = chaid_map_display_name(model$nodes$split_variable[split.rows], model$terms_mapping),
+      `F Statistic` = model$nodes$split_statistic[split.rows],
+      df1 = model$nodes$split_df1[split.rows],
+      df2 = model$nodes$split_df2[split.rows],
+      `p-value` = model$nodes$p_value[split.rows],
+      `Adjusted p-value` = model$nodes$adjusted_p_value[split.rows],
+      `Number of Children` = vapply(node.ids, function(node.id) {
+        sum(model$edges$parent_id == node.id)
+      }, integer(1)),
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    ))
+  }
   data.frame(
     Depth = model$nodes$depth[split.rows],
     Node = node.ids,
@@ -1632,8 +1984,10 @@ chaid_tree_data <- function(model) {
 #' @param model Model to validate.
 #' @return Invisibly TRUE.
 validate_chaid_model <- function(model) {
-  if (!inherits(model, 'exploratory_chaid') ||
-      is.null(model$nodes) || is.null(model$class_levels)) {
+  # tam #38166: a numeric-target model has no class_levels (there is no target
+  # class to enumerate), so only require it for a categorical/logical target.
+  if (!inherits(model, 'exploratory_chaid') || is.null(model$nodes) ||
+      (!identical(model$target_type, 'numeric') && is.null(model$class_levels))) {
     stop('model must be an exploratory_chaid object')
   }
   invisible(TRUE)
@@ -1699,8 +2053,8 @@ validate_chaid_inputs <- function(data,
     stop('target must name an existing column')
   }
   if (!is.factor(data[[target]]) && !is.character(data[[target]]) &&
-      !is.logical(data[[target]])) {
-    stop('target must be character, factor, or logical')
+      !is.logical(data[[target]]) && !chaid_is_numeric_target(data[[target]])) {
+    stop('target must be character, factor, logical, or numeric')
   }
   if (all(is.na(data[[target]]))) {
     stop('target must contain at least one non-missing value')
