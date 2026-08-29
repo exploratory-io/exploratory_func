@@ -42,7 +42,19 @@ test_that("exp_lca selects a BIC-minimum categorical model and exposes its repor
   expect_true(any(assignments$`Is Excluded`))
   expect_true(all(is.na(assignments$`Latent Class`[assignments$`Is Excluded`])))
   expect_true(all(assignments$`Assignment Confidence`[!assignments$`Is Excluded`] >= 0))
-  expect_true(nrow(tidy(model, type = "relationship")) > 0)
+  probability_columns <- paste("Class", seq_len(glance(model)$selected_classes), "Probability")
+  expect_true(all(probability_columns %in% names(assignments)))
+  included <- !assignments$`Is Excluded`
+  posterior <- as.matrix(assignments[included, probability_columns, drop = FALSE])
+  expect_equal(unname(rowSums(posterior)), rep(1, sum(included)), tolerance = 1e-8)
+  expect_equal(as.character(assignments$`Latent Class`[included]),
+               paste("Class", max.col(posterior, ties.method = "first")))
+  expect_equal(unname(assignments$`Assignment Confidence`[included]), unname(apply(posterior, 1, max)), tolerance = 1e-8)
+  expect_true(all(is.na(as.matrix(assignments[!included, probability_columns, drop = FALSE]))))
+  relationship <- tidy(model, type = "relationship")
+  expect_true(nrow(relationship) > 0)
+  expect_equal(as.integer(tapply(relationship$rows, relationship$class, sum)),
+               tabulate(model$selected_fit$predclass, nbins = glance(model)$selected_classes))
 })
 
 test_that("exp_lca respects the requested lower class bound for tiny data", {
@@ -51,6 +63,11 @@ test_that("exp_lca respects the requested lower class bound for tiny data", {
                    nrep = 1, maxiter = 20)$model[[1]]
 
   expect_equal(tidy(model, type = "class_selection")$number_of_classes, 2L)
+  assignments <- tidy(model, type = "data")
+  probability_columns <- c("Class 1 Probability", "Class 2 Probability")
+  expect_true(all(probability_columns %in% names(assignments)))
+  expect_equal(unname(rowSums(as.matrix(assignments[, probability_columns]))),
+               rep(1, nrow(assignments)), tolerance = 1e-8)
 })
 
 test_that("exp_lca does not report convergence when maxiter is reached", {
