@@ -146,6 +146,29 @@ test_that("test exp_ttest_aggregated", {
   expect_true(all(c("x", "y", "statistic", "critical", "p.value") %in% colnames(ret_diff)))
 })
 
+test_that("aggregated t-test uses nonzero null difference in downstream outputs", {
+  aggregated <- data.frame(
+    cat = factor(c("cat1", "cat2")),
+    n = c(10, 10),
+    mean = c(5, 3),
+    sd = c(2, 2)
+  )
+  model <- exp_ttest_aggregated(aggregated, cat, n, mean, sd, mu = 1)$model[[1]]
+  expected_se <- sqrt(2^2 / 10 + 2^2 / 10)
+  expected_t <- (5 - 3 - 1) / expected_se
+
+  expect_equal(unname(model$statistic), expected_t)
+  expect_equal(model$stderr, expected_se)
+
+  summary <- tidy(model, type = "model")
+  expect_equal(summary$`Std Error`, expected_se)
+
+  difference_density <- tidy(model, type = "prob_dist_diff")
+  statistic_row <- difference_density[which(difference_density$statistic %in% TRUE), , drop = FALSE]
+  expect_equal(statistic_row$x, 2)
+  expect_equal(difference_density$x[which.max(difference_density$y)], 1, tolerance = 0.02)
+})
+
 test_that("test two sample t-test with column name", {
   test_df <- data.frame(
     cat=rep(c("cat1", "cat2"), 20),
@@ -640,6 +663,20 @@ test_that("test 2-way ANOVA with exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="pairs_per_variable", pairs_adjust="tukey")
 })
 
+test_that("two-way ANOVA allows an estimable singleton cell", {
+  df <- data.frame(
+    value = c(1, 2, 3, 4, 5, 6, 7),
+    factor_a = factor(c("A", "A", "A", "B", "B", "B", "B")),
+    factor_b = factor(c("X", "X", "Y", "X", "X", "Y", "Y"))
+  )
+
+  model_df <- exp_anova(df, value, c("factor_a", "factor_b"), with_interaction = FALSE)
+  model <- model_df$model[[1]]
+
+  expect_false("error" %in% class(model))
+  expect_true(all(is.finite(coef(model))))
+})
+
 test_that("test 2-way ANOVA with with different data types on var1 and var2.", {
   mtcars2 <- mtcars %>% mutate(`a m`=am == 1, `ge ar`=as.character(gear))
   model_df <- mtcars2 %>% exp_anova(mpg, c("a m","ge ar"), func2=c("aschar","aschar"))
@@ -985,7 +1022,7 @@ test_that("test exp_normality", {
   qq <- ret %>% tidy_rowwise(model, type="qq")
   model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
   expect_equal(colnames(model_summary),
-               c("Column","W Value","P Value","Sample Size","Result"))
+               c("Column","W Value","P Value","Sample Size","Result","Note"))
 })
 
 test_that("test exp_normality with group", {
@@ -1005,7 +1042,7 @@ test_that("test exp_normality with column with almost always same value", {
   qq <- ret %>% tidy_rowwise(model, type="qq")
   model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
   expect_equal(colnames(model_summary),
-               c("Column","W Value","P Value","Sample Size","Result"))
+               c("Column","W Value","P Value","Sample Size","Result","Note"))
 })
 
 test_that("generate_ttest_density_data returns correct structure", {

@@ -1252,8 +1252,16 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
     }
 
-    # Calculate stderr.  Difference (estimate) / t-value (statistic)
-    ret <- ret %>% dplyr::mutate(stderr = estimate / statistic)
+    # Aggregated t-tests already calculate the standard error directly. Using
+    # estimate / statistic only works when the null difference is zero; with a
+    # nonzero mu, t = (estimate - mu) / stderr. Keep the old fallback for raw
+    # t-tests, whose htest object does not carry the precomputed stderr.
+    if (!is.null(x$stderr)) {
+      ret <- ret %>% dplyr::mutate(stderr = !!x$stderr)
+    } else {
+      null_value <- if (is.null(x$null.value)) 0 else unname(x$null.value)[1]
+      ret <- ret %>% dplyr::mutate(stderr = (estimate - !!null_value) / statistic)
+    }
 
     # Get sample sizes for the 2 groups (n1, n2).
     n1 <- x$n1 # number of 1st class
@@ -1387,22 +1395,30 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     # Data for the probability distribution (line) chart on the DIFFERENCE scale. This is
     # the sampling distribution of the difference of means under H0 "no difference", i.e.
     # the t-value distribution relocated/rescaled onto the difference axis via
-    # difference = 0 + t * stderr. We reuse the t-value generator and remap its x column
-    # so the shading semantics (critical region, sig.level based) stay identical to the
-    # t-value tab. The marked statistic point lands at t * stderr = the observed
-    # difference, and the curve peaks at 0 (the hypothesized difference).
+    # difference = null difference + t * stderr. We reuse the t-value generator
+    # and remap its x column so the shading semantics (critical region, sig.level
+    # based) stay identical to the t-value tab. The marked statistic point lands
+    # at the observed difference and the curve peaks at the hypothesized
+    # difference.
     # estimate is c(mean of group1, mean of group2) for an unpaired test, or a single
-    # value (mean of the differences) for a paired test; stderr = difference / t.
+    # value (mean of the differences) for a paired test.
     est <- unname(x$estimate)
     difference <- if (length(est) >= 2) est[1] - est[2] else est[1]
+    null_value <- if (is.null(x$null.value)) 0 else unname(x$null.value)[1]
     t_stat <- unname(x$statistic)
-    se_val <- if (!is.na(t_stat) && t_stat != 0) abs(difference / t_stat) else NA_real_
+    se_val <- if (!is.null(x$stderr)) {
+      unname(x$stderr)[1]
+    } else if (!is.na(t_stat) && t_stat != 0) {
+      abs((difference - null_value) / t_stat)
+    } else {
+      NA_real_
+    }
     if (is.na(se_val) || se_val == 0) {
       ret <- tibble::tibble(x = numeric(0), y = numeric(0)) # degenerate input -> chart no-ops
     } else {
       ret <- generate_ttest_density_data(t = t_stat, p.value = x$p.value, df = unname(x$parameter),
                                          sig_level = x$test_sig_level, alternative = x$alternative) %>%
-        dplyr::mutate(x = x * se_val)
+        dplyr::mutate(x = null_value + x * se_val)
     }
     ret
   }
@@ -1822,7 +1838,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     }
   }
 
-  # If explanatory variable(s) are numeric, logical, or Date/POSIXct, convert
+  # If explanatory variable(s) are numeric, logical, character, or Date/POSIXct, convert
   # them into factor. Previously only numeric was handled: a logical
   # categoryColumn crashed model fitting with an opaque array-dims error
   # (`dims [product N] do not match...`), and a Date/POSIXct categoryColumn
@@ -1831,7 +1847,7 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
   # tam#38168.
   for (i in 1:length(var2_col)) {
     col_i <- df[[var2_col[[i]]]]
-    if (is.numeric(col_i) || is.logical(col_i) ||
+    if (is.numeric(col_i) || is.logical(col_i) || is.character(col_i) ||
         lubridate::is.Date(col_i) || lubridate::is.POSIXct(col_i)) {
       df[[var2_col[[i]]]] <- factor(col_i)
     }
@@ -1945,14 +1961,18 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       # one lone group with n=1 among otherwise-normal groups (max_n > 1)
       # passed this guard and fell through to oneway.test()'s own raw,
       # unfriendly error instead of getting the same graceful degradation
-      # as the all-tiny case. Check min_n instead -- every group needs at
-      # least 2 rows for within-group variance to be defined. tam#38168.
-      count_df <- df %>% group_by(!!!rlang::syms(as.character(var2_col))) %>% summarize(n=n()) %>% ungroup() %>% summarize(min_n=min(n),tot_n=sum(n))
-      if (count_df$min_n <= 1) {
-        e <- simpleError("Every group needs to have 2 or more rows.")
-        class(e) <- c("anova_exploratory", class(e))
-        e$n <- count_df$tot_n
-        return(e)
+      # as the all-tiny case. This requirement applies to the one-way
+      # oneway.test() path; lm()-based two-way ANOVA and ANCOVA can be
+      # estimable with an unbalanced design containing a singleton cell.
+      # tam#38168.
+      if (is.null(covariates) && length(var2_col) == 1 && !with_repeated_measures) {
+        count_df <- df %>% group_by(!!!rlang::syms(as.character(var2_col))) %>% summarize(n=n()) %>% ungroup() %>% summarize(min_n=min(n),tot_n=sum(n))
+        if (count_df$min_n <= 1) {
+          e <- simpleError("Every group needs to have 2 or more rows.")
+          class(e) <- c("anova_exploratory", class(e))
+          e$n <- count_df$tot_n
+          return(e)
+        }
       }
       if (with_repeated_measures) {
         model <- afex::aov_car(formula, data = df, type = "III")
@@ -1973,7 +1993,14 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
           # case fell through to this raw car::Anova message instead of a
           # friendly one. tam#38168.
           if (any(stringr::str_detect(e$message, "there are aliased coefficients in the model"))) {
-            stop('EXP-ANA-9 :: [] :: The model could not be fit. Likely causes: a covariate with no variation (constant), a covariate collinear with another covariate or with the group variable, or (with interaction enabled) a combination of categories with no rows. Try removing or adjusting the covariate(s), or disabling interaction.')
+            alias_message <- 'The model could not be fit. Likely causes: a covariate with no variation (constant), a covariate collinear with another covariate or with the group variable, or (with interaction enabled) a combination of categories with no rows. Try removing or adjusting the covariate(s), or disabling interaction.'
+            # Grouped analyses surface errors as a per-group Note. Keep that
+            # established behavior instead of sending the EXP-ANA translation
+            # code down a path that deliberately rethrows grouped errors.
+            if (length(grouped_cols) > 0) {
+              stop(alias_message)
+            }
+            stop(paste0('EXP-ANA-9 :: [] :: ', alias_message))
           }
           else {
             stop(e)
@@ -3868,7 +3895,9 @@ tidy.one_sample_t_test_exploratory <- function(x, type = "model", conf_level = 0
   } else if (type == "data_summary") {
     conf_threshold <- 1 - (1 - conf_level) / 2
     vec <- x$data[[x$var_col]]
-    vec <- vec[!is.na(vec)]
+    # Keep this summary consistent with the model, which excludes Inf and
+    # -Inf along with NA/NaN before fitting.
+    vec <- vec[is.finite(vec)]
     n <- length(vec)
     mean_val <- mean(vec)
     sd_val <- sd(vec)
