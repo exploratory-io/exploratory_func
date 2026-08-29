@@ -531,10 +531,14 @@ kmodes_adjusted_residual <- function(observed, expected, row_prop, col_prop) {
 #' @param importance The variable importance table, used for the default display order.
 #' @param display_levels Name-keyed list from `kmodes_prepare_data()`, or NULL
 #'   to fall back to `sort(unique(...))` per variable (#37936).
+#' @param numeric_conversion Optional tibble from `kmodes_prepare_data()` with
+#'   `variable` / `conversion`. Used to skip unused-level expansion for
+#'   `equal_width` bins (empty cut() bins are not declared Factor levels).
 #' @return A tibble of one row per variable, cluster and category. `category`
 #'   is a factor for compatibility with global-order consumers, while
 #'   `category_order` preserves the exact per-variable order.
-kmodes_category_composition <- function(prepared_df, cluster, importance, display_levels = NULL) {
+kmodes_category_composition <- function(prepared_df, cluster, importance, display_levels = NULL,
+                                        numeric_conversion = NULL) {
   category_levels_by_variable <- kmodes_category_display_levels_by_variable(prepared_df, display_levels)
   order_lookup <- importance %>%
     dplyr::mutate(variable_order = dplyr::row_number()) %>%
@@ -543,8 +547,25 @@ kmodes_category_composition <- function(prepared_df, cluster, importance, displa
   original_lookup <- tibble::tibble(variable = names(prepared_df),
                                     original_order = seq_along(names(prepared_df)))
 
+  # equal_width numeric conversion stores every cut() bin in display_levels,
+  # including bins that never appear. Those are not user-declared Factor
+  # levels; keep omitting them. Factor columns (conversion NA) keep unused
+  # declared levels as n=0 so Category Composition can reserve them.
+  binned_vars <- character(0)
+  if (!is.null(numeric_conversion) && nrow(numeric_conversion) > 0) {
+    binned_vars <- numeric_conversion$variable[numeric_conversion$conversion == "equal_width"]
+  }
+
   rows <- purrr::map(names(prepared_df), function(col) {
-    counts <- as.data.frame(table(cluster, prepared_df[[col]]), stringsAsFactors = FALSE)
+    values <- prepared_df[[col]]
+    levs <- category_levels_by_variable[[col]]
+    levs <- levs[!is.na(levs)]
+    counted <- if (col %in% binned_vars) {
+      values
+    } else {
+      factor(values, levels = levs)
+    }
+    counts <- as.data.frame(table(cluster, counted), stringsAsFactors = FALSE)
     names(counts) <- c("cluster", "category", "n")
     counts$cluster <- as.integer(counts$cluster)
     counts %>%
@@ -788,7 +809,8 @@ exp_kmodes <- function(df, ...,
     characteristic <- kmodes_characteristic_categories(prepared_df, fit$cluster,
                                                        display_levels = prepared_all$display_levels)
     composition <- kmodes_category_composition(prepared_df, fit$cluster, importance,
-                                                display_levels = prepared_all$display_levels)
+                                                display_levels = prepared_all$display_levels,
+                                                numeric_conversion = prepared_all$numeric_conversion)
     map <- kmodes_build_mca_map(prepared_df, fit$cluster, characteristic,
                                 map_sample_size = map_sample_size,
                                 map_category_top_n = map_category_top_n)
