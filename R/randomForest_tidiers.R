@@ -1482,6 +1482,13 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               else if ("rpart" %in% class(model_object)) { # rpart case
                 null_model_mean <- mean(model_object$y, na.rm=TRUE)
               }
+              else if (inherits(model_object, "exploratory_chaid") &&
+                       identical(model_object$target_type, "numeric")) {
+                # Numeric CHAID stores its training target in `y`, just like
+                # rpart. It has no ranger-style `df`, so using the fallback
+                # below makes the held-out R-squared denominator NA.
+                null_model_mean <- mean(model_object$y, na.rm=TRUE)
+              }
               else { # ranger case
                 null_model_mean <- mean(model_object$df[[all.vars(model_object$formula_terms)[[1]]]], na.rm=TRUE)
               }

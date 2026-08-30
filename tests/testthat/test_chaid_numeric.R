@@ -103,12 +103,12 @@ test_that('merge_categories merges the closest-mean nominal categories first (nu
 })
 
 test_that('an ordered predictor only offers ADJACENT categories as merge candidates', {
-  # Low and High are numerically the CLOSEST pair, but are NOT adjacent in
-  # the declared order (Low, Mid, High) -- they must never be compared, so no
-  # merge can happen even though Low/High "look" mergeable.
+  # Low and High have identical distributions, but are NOT adjacent in the
+  # declared order (Low, Mid, High) -- they must never be compared, so no
+  # merge can happen even though Low/High are mergeable.
   predictor <- rep(c('Low', 'Mid', 'High'), each = 10)
   low_values <- c(9, 10, 11, 9, 10, 11, 9, 10, 11, 10)
-  high_values <- c(10, 11, 12, 10, 11, 12, 10, 11, 12, 11)
+  high_values <- low_values
   mid_values <- rep(1000, 10)
   target <- c(low_values, mid_values, high_values)
 
@@ -124,8 +124,8 @@ test_that('an ordered predictor only offers ADJACENT categories as merge candida
   expect_length(ordered_result$merge_history, 0)
 
   # The SAME data treated as a NOMINAL predictor DOES compare Low and High
-  # directly, and they merge (they are close; the ordered run above proves
-  # this pair is only reachable when adjacency is not enforced).
+  # directly, and they merge. The ordered run above proves this pair is only
+  # reachable when adjacency is not enforced.
   nominal_result <- exploratory:::merge_categories(
     values = predictor, target = target, ordered = FALSE,
     alpha_merge = 0.05, bonferroni = TRUE, variable = 'seg', node_id = 1L,

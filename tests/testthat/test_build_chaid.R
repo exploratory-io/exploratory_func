@@ -113,6 +113,24 @@ test_that("rf_evaluation_training_and_test produces training and test metrics", 
   expect_true("is_test_data" %in% colnames(summary) || any(grepl("Test", colnames(summary))) || nrow(summary) >= 2)
 })
 
+test_that("numeric CHAID produces finite held-out regression metrics", {
+  set.seed(4)
+  n <- 200
+  x <- sample(c("A", "B"), n, replace = TRUE)
+  y <- ifelse(x == "A", 10, 50) + rnorm(n)
+  df <- data.frame(y = y, x = x, stringsAsFactors = FALSE)
+
+  model_df <- suppressWarnings(exp_chaid(
+    df, y, x, test_rate = 0.3, min_split = 10, min_bucket = 5,
+    max_depth = 1
+  ))
+  summary <- model_df %>% rf_evaluation_training_and_test(pretty.name = TRUE)
+
+  expect_equal(nrow(summary), 2)
+  expect_true(all(is.finite(summary$`R Squared`)))
+  expect_true(all(is.finite(summary$RMSE)))
+})
+
 test_that("exp_chaid report_metrics adds ROC AUC / PR AUC like CART", {
   expected_binary <- c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity")
   expected_multi <- c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC")
@@ -371,9 +389,12 @@ test_that("exp_chaid is reproducible with a fixed seed", {
   expect_equal(m1$model[[1]]$nodes$rule, m2$model[[1]]$nodes$rule)
 })
 
-test_that("exp_chaid rejects a numeric target", {
+test_that("exp_chaid supports a numeric target", {
   df <- data.frame(y = 1:10, x = rep(c("a", "b"), 5))
-  expect_error(exp_chaid(df, y, x), "categorical target")
+  model_df <- suppressWarnings(exp_chaid(df, y, x, min_split = 2, min_bucket = 1))
+  expect_s3_class(model_df$model[[1]], "exploratory_chaid")
+  expect_equal(model_df$model[[1]]$target_type, "numeric")
+  expect_equal(model_df$model[[1]]$classification_type, "regression")
 })
 
 test_that("exp_chaid validates test split arguments", {
