@@ -240,9 +240,13 @@ exp_kmeans <- function(df, ...,
                                               seed = NULL, # Seed is already done. Skip it.
                                               na.rm = FALSE) # NA filtering is already done. Skip it to save time. 
 
-  # This is about how UI-side is done, but it can handle single column case, only if it is single column from the beginnig.
-  # Check that and pass that info to do_prcomp() as allow_single_column.
-  allow_single_column <- length(selected_cols) == 1
+  # do_prcomp() removes constant columns before fitting. Allow a one-column PCA when the
+  # selected input has exactly one non-constant variable, even if constant variables were also
+  # selected; K-Means still retains those variables for the characteristic-variable report.
+  n_non_constant_cols <- sum(vapply(df[selected_cols], function(column) {
+    length(unique(column)) > 1
+  }, logical(1)))
+  allow_single_column <- n_non_constant_cols == 1
   ret <- do_prcomp(df, normalize_data = normalize_data, allow_single_column = allow_single_column, seed = NULL,
                    na.rm = FALSE, # Skip NA filtering since it is already done.
                    with_report_data = FALSE, # PCA report data + sign flip are pure-PCA only; k-means fits must not be altered. (#37019)
