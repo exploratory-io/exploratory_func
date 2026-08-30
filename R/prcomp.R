@@ -581,6 +581,18 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       res <- res %>% tibble::add_row(size=x$excluded_nrow)
     }
   }
+  else if (type == "variable_importance") { # This is only for kmeans case (tam#38160). Same shape as K-Medoids' own type='variable_importance' (kmedoids.R).
+    if (!is.null(x$kmeans) && !is.null(x$df) && !is.null(x$selected_cols) && length(x$selected_cols) > 0) {
+      res <- .kmeans_variable_importance(x)
+    }
+    else {
+      # Pure-PCA fit (no kmeans attached), or an old saved model missing the fields
+      # exp_kmeans() stamps -- return an empty, correctly-typed tibble so the chart no-ops
+      # instead of erroring.
+      res <- tibble::tibble(variable = character(0), eta_squared = numeric(0),
+                            test_statistic = numeric(0), p_value = numeric(0))
+    }
+  }
   else if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)

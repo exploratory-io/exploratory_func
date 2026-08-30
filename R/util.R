@@ -587,7 +587,7 @@ str_normalize <- function(text) {
 as_numeric_matrix_ <- function(df, columns) {
   loadNamespace("dplyr")
 
-  orig_mat <- df[,columns] %>%
+  orig_mat <- df[, columns, drop = FALSE] %>%
     as.matrix()
 
   ret <- orig_mat %>%
