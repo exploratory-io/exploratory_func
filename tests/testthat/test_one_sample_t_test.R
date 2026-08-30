@@ -441,6 +441,21 @@ test_that("tidy data_summary type returns summary statistics with confidence int
   expect_equal(result$Maximum, max(vec))
 })
 
+test_that("one-sample t-test data summary excludes non-finite values", {
+  df <- data.frame(x = c(1, 2, Inf, -Inf, NA_real_, NaN))
+  model <- exp_one_sample_t_test(df, x)$model[[1]]
+
+  model_summary <- tidy(model, type = "model")
+  data_summary <- tidy(model, type = "data_summary")
+
+  expect_equal(model_summary$`Number of Rows`, 2)
+  expect_equal(data_summary$Rows, 2)
+  expect_equal(data_summary$Mean, 1.5)
+  expect_equal(data_summary$`Std Deviation`, sd(c(1, 2)))
+  expect_equal(data_summary$Minimum, 1)
+  expect_equal(data_summary$Maximum, 2)
+})
+
 test_that("tidy data_summary conf_level parameter changes confidence intervals", {
   set.seed(42)
   vec <- rnorm(50, mean = 5, sd = 2)
