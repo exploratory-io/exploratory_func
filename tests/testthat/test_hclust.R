@@ -74,6 +74,25 @@ test_that('missing rows and sampling preserve source row ids', {
   expect_equal(broom::tidy(model, type = 'analysis_conditions')$Value[[4]], '2')
 })
 
+test_that('gathered data is observation-variable long data and augment works by default', {
+  result <- mtcars %>% exploratory:::exp_hclust(
+    mpg, disp, hp, centers = 3, elbow_method_mode = 'none', seed = 1
+  )
+  model <- result$model[[1]]
+  gathered <- broom::tidy(model, type = 'gathered_data')
+
+  expect_equal(nrow(gathered), model$valid_nrow * length(model$selected_cols))
+  expect_named(gathered, c('row_id', 'cluster', 'key', 'value', 'standardized_value'))
+  expect_equal(gathered$row_id[seq_len(length(model$selected_cols))],
+               rep(model$row_ids[[1]], length(model$selected_cols)))
+  expect_equal(unname(gathered$key[seq_len(length(model$selected_cols))]),
+               unname(model$selected_cols))
+
+  augmented <- broom::augment(model)
+  expect_equal(nrow(augmented), model$valid_nrow)
+  expect_true('.cluster' %in% colnames(augmented))
+})
+
 test_that('invalid numeric inputs fail with interpretable messages', {
   expect_error(
     exploratory:::exp_hclust(iris, Species, centers = 2),

@@ -287,6 +287,18 @@
   )
 }
 
+.hclust_gathered_data <- function(x) {
+  n <- nrow(x$original_fit_mat)
+  p <- ncol(x$original_fit_mat)
+  tibble::tibble(
+    row_id = rep(x$row_ids, each = p),
+    cluster = rep(as.integer(x$clustering), each = p),
+    key = rep(colnames(x$original_fit_mat), times = n),
+    value = as.numeric(t(x$original_fit_mat)),
+    standardized_value = as.numeric(t(x$mat))
+  )
+}
+
 .hclust_map <- function(x) {
   n <- x$valid_nrow
   map_n <- min(n, x$map_sample_size)
@@ -538,7 +550,7 @@ tidy.hclust_exploratory <- function(x, type = 'summary', with_excluded_rows = FA
       x$elbow_result %>% dplyr::select(center, decrease_ratio),
     profile = .hclust_profile(x),
     radar = .hclust_profile(x),
-    gathered_data = .hclust_profile(x),
+    gathered_data = .hclust_gathered_data(x),
     distribution = .hclust_distribution(x),
     variable_importance = cluster_variable_importance_anova(x$mat, x$clustering),
     map = x$map_result %||% .hclust_empty('map'),
@@ -568,6 +580,7 @@ glance.hclust_exploratory <- function(x, ...) {
 #' @export
 augment.hclust_exploratory <- function(x, data = NULL, ...) {
   if (is.null(data)) data <- x$original_fit_mat
+  data <- tibble::as_tibble(data, .name_repair = 'minimal')
   if (nrow(data) != length(x$clustering)) {
     stop('data must have the same number of rows as the fitted hierarchical clustering data.', call. = FALSE)
   }
