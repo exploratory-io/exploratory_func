@@ -107,3 +107,95 @@ test_that('invalid numeric inputs fail with interpretable messages', {
     'At least two valid rows'
   )
 })
+
+# tam#38157: four defects found by the tam-side analytics harness
+# (src/test/analytics-harness/specs/hclust.json).
+context("exp_hclust defects found by the analytics harness (tam#38157)")
+
+hclust_harness_df <- function() {
+  set.seed(38157)
+  n <- 60
+  base <- data.frame(
+    spend = c(rnorm(20, 1200, 90), rnorm(20, 2000, 90), rnorm(20, 2800, 90)),
+    visits = c(rnorm(20, 5, 0.6), rnorm(20, 10, 0.6), rnorm(20, 7, 0.6)),
+    stay = c(rnorm(20, 23, 2), rnorm(20, 34, 2), rnorm(20, 24, 2))
+  )
+  base$all_na <- NA_real_
+  base$constant <- 7
+  base
+}
+
+test_that("a variable with no finite value is dropped and named, not blamed on the rows", {
+  df <- hclust_harness_df()
+  expect_warning(
+    model <- df %>% exp_hclust(all_na, spend, visits, centers = 3, max_interactive_k = 5),
+    "all_na"
+  )
+  # The analytics must still run on the variables that DO carry data. Before
+  # this, complete.cases() dropped every row and the user was told "At least two
+  # valid rows are required" -- blaming the rows for one unusable column.
+  fit <- model$model[[1]]
+  expect_equal(unname(sort(fit$selected_cols)), c("spend", "visits"))
+  expect_equal(fit$valid_nrow, nrow(df))
+})
+
+test_that("an all-unusable selection fails naming the columns, not the rows", {
+  df <- hclust_harness_df()
+  expect_error(
+    df %>% exp_hclust(all_na, centers = 2),
+    "No usable variable"
+  )
+  expect_error(df %>% exp_hclust(all_na, centers = 2), "all_na")
+})
+
+test_that("a constant variable's error names the column", {
+  df <- hclust_harness_df()
+  expect_error(
+    df %>% exp_hclust(constant, spend, visits, centers = 3),
+    "constant"
+  )
+  # ...and still says what the requirement is.
+  expect_error(
+    df %>% exp_hclust(constant, spend, visits, centers = 3),
+    "non-constant finite values"
+  )
+})
+
+test_that("the merge distance table follows max_interactive_k, not max_centers", {
+  df <- hclust_harness_df()
+  # max_centers stays at its default 10 throughout, so any change here is
+  # max_interactive_k reaching the table.
+  for (k in c(2L, 4L, 8L)) {
+    model <- df %>% exp_hclust(spend, visits, stay, centers = 2, max_interactive_k = k)
+    md <- model %>% tidy_rowwise(model, type = "merge_distance")
+    expect_equal(nrow(md), k - 1L,
+                 info = paste("max_interactive_k =", k))
+    expect_equal(md$cluster[[1]], "2 → 1")
+  }
+})
+
+test_that("the chosen cut's silhouette is reported whatever diagnostic sweep was asked for", {
+  df <- hclust_harness_df()
+  # elbow_method_mode selects which sweep runs OVER k. It says nothing about
+  # whether the quality of the cut the user actually chose is reported, and the
+  # Cluster Summary that shows it is not gated on the mode.
+  for (mode in c("silhouette", "elbow", "none")) {
+    model <- df %>% exp_hclust(spend, visits, stay, centers = 3,
+                               max_interactive_k = 5, elbow_method_mode = mode)
+    summary_df <- model %>% tidy_rowwise(model, type = "summary")
+    expect_equal(sum(is.na(summary_df$avg_silhouette)), 0L,
+                 info = paste("elbow_method_mode =", mode))
+  }
+})
+
+test_that("the diagnostic sweep itself still follows the mode", {
+  # The fix above must not make every mode compute every sweep.
+  df <- hclust_harness_df()
+  sil <- df %>% exp_hclust(spend, visits, centers = 3, max_interactive_k = 5,
+                           elbow_method_mode = "silhouette")
+  elb <- df %>% exp_hclust(spend, visits, centers = 3, max_interactive_k = 5,
+                           elbow_method_mode = "elbow")
+  expect_gt(nrow(sil %>% tidy_rowwise(model, type = "silhouette")), 0L)
+  expect_equal(nrow(elb %>% tidy_rowwise(model, type = "silhouette")), 0L)
+  expect_gt(nrow(elb %>% tidy_rowwise(model, type = "elbow")), 0L)
+})

@@ -198,7 +198,14 @@
 }
 
 .hclust_merge_distance <- function(x) {
-  upper <- min(x$max_centers, x$valid_nrow)
+  # tam#38157: bounded by max_interactive_k, NOT max_centers. The two are
+  # different settings -- max_centers is how far the elbow/silhouette DIAGNOSTIC
+  # sweeps over k, max_interactive_k is how far the dendrogram widget's slider
+  # goes. This table exists to justify a cluster count picked with that slider,
+  # and cuts_json already uses max_interactive_k, so using max_centers here made
+  # the two disagree: at max_interactive_k = 2 the slider offered one cut while
+  # the table listed nine, six of them unreachable.
+  upper <- min(x$max_interactive_k, x$valid_nrow)
   if (upper < 2L) return(.hclust_empty('merge_distance'))
   tibble::tibble(
     cluster = paste(seq.int(2L, upper), '→', seq.int(1L, upper - 1L)),
@@ -451,6 +458,28 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
     df <- df[selected_index, , drop = FALSE]
     source_row_ids <- source_row_ids[selected_index]
   }
+  # tam#38157: a selected variable with no usable value at all makes
+  # complete.cases() drop EVERY row, and the failure then surfaced as "At least
+  # two valid rows are required" -- blaming the rows for one unusable column, and
+  # naming neither. Drop such a column instead, the way K-Means does, and say
+  # which one, so the analytics still runs on the variables that do carry data.
+  unusable <- vapply(df[selected_cols], function(column) {
+    !any(is.finite(suppressWarnings(as.numeric(column))))
+  }, logical(1))
+  if (any(unusable)) {
+    dropped <- selected_cols[unusable]
+    if (all(unusable)) {
+      stop(paste0('No usable variable is left for hierarchical clustering: ',
+                  paste0(dropped, collapse = ', '),
+                  ifelse(length(dropped) > 1L, ' have', ' has'),
+                  ' no finite value.'), call. = FALSE)
+    }
+    warning(paste0('Dropped from the clustering because ',
+                   ifelse(length(dropped) > 1L, 'they have', 'it has'),
+                   ' no finite value: ', paste0(dropped, collapse = ', '), '.'),
+            call. = FALSE)
+    selected_cols <- selected_cols[!unusable]
+  }
   source_data <- df[selected_cols]
   source_mat <- as.matrix(source_data)
   valid <- complete.cases(source_data) & rowSums(!is.finite(source_mat)) == 0L
@@ -462,8 +491,14 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
   }
   if (centers > nrow(fit_data)) stop('centers cannot be greater than the number of valid rows.', call. = FALSE)
   if (max_interactive_k < centers) max_interactive_k <- centers
-  if (any(vapply(fit_data, function(column) length(unique(column)) < 2L, logical(1)))) {
-    stop('Hierarchical clustering requires every selected variable to have non-constant finite values.', call. = FALSE)
+  # tam#38157: name the offending column(s). With several variables selected the
+  # old message left the user to find the constant one by trial and error.
+  constant <- vapply(fit_data, function(column) length(unique(column)) < 2L, logical(1))
+  if (any(constant)) {
+    stop(paste0('Hierarchical clustering requires every selected variable to have non-constant finite values, but ',
+                paste0(names(fit_data)[constant], collapse = ', '),
+                ifelse(sum(constant) > 1L, ' have', ' has'),
+                ' the same value in every row.'), call. = FALSE)
   }
   mat <- as.matrix(fit_data)
   if (isTRUE(normalize_data)) {
@@ -492,10 +527,15 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
     list(metadata = metadata, rootId = n + n - 2L), auto_unbox = TRUE, null = 'null'
   )
   nodes$cuts_json[[1]] <- jsonlite::toJSON(cut_data$cuts, auto_unbox = FALSE, null = 'null')
-  silhouette_indices <- if (elbow_method_mode == 'silhouette') {
-    set.seed(as.integer(seed) + 1000L)
-    sample(seq_len(n), min(n, silhouette_sample_size))
-  } else integer()
+  # tam#38157: always sample. elbow_method_mode selects which SWEEP runs OVER k
+  # (silhouette or elbow); it says nothing about whether the quality of the cut
+  # the user actually chose should be reported. Gating on it blanked the three
+  # silhouette columns of the always-visible Cluster Summary the moment someone
+  # switched the diagnostic to Elbow or None. The per-row silhouette is computed
+  # once, on at most silhouette_sample_size rows, so the cost is the same one
+  # silhouette mode already paid.
+  set.seed(as.integer(seed) + 1000L)
+  silhouette_indices <- sample(seq_len(n), min(n, silhouette_sample_size))
   model <- list(
     hclust = hc, distance_object = distance_object, mat = mat,
     original_fit_mat = as.matrix(fit_data), source_data = source_data,
@@ -517,10 +557,20 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
     seed = as.integer(seed), medoid_like_indices = integer(),
     silhouette_result = NULL, elbow_result = NULL, map_result = NULL
   )
+  # tam#38157: two DIFFERENT things used to live in this one branch.
+  #   * silhouette_result is the SWEEP over k, which is exactly what
+  #     elbow_method_mode selects -- it stays gated.
+  #   * silhouette_values is the per-row silhouette of the cut the user actually
+  #     CHOSE, which the always-visible Cluster Summary reports. Gating it on the
+  #     mode blanked three of that table's columns the moment someone switched
+  #     the diagnostic to Elbow or None -- two settings that say nothing about
+  #     whether the chosen cut's quality should be shown. It is hoisted out.
   if (identical(elbow_method_mode, 'silhouette')) {
     model$silhouette_result <- .hclust_silhouette(model)
-    if (length(silhouette_indices) && nrow(model$silhouette_result) > 0L) {
-      chosen_ids <- .hclust_membership(model, centers)[silhouette_indices]
+  }
+  if (length(silhouette_indices) > 1L) {
+    chosen_ids <- .hclust_membership(model, centers)[silhouette_indices]
+    if (length(unique(chosen_ids)) > 1L) {
       value <- tryCatch(
         cluster::silhouette(
           chosen_ids, stats::dist(mat[silhouette_indices, , drop = FALSE], method = distance)
