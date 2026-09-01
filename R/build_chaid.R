@@ -86,9 +86,12 @@ exp_chaid <- function(df,
   }
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
-  if (is.numeric(df[[target_col]])) {
-    stop("CHAID supports categorical target variables only.")
-  }
+  # tam #38166: numeric targets are supported via a One-way ANOVA F-test
+  # (see chaid_fit()/merge_categories()/compute_anova_from_stats() in
+  # chaid.R); Date/POSIXct/duration columns stay out of scope (spec section 3)
+  # even though some are numeric-backed, hence chaid_is_numeric_target()
+  # rather than a bare is.numeric() check.
+  is_numeric_target_col <- chaid_is_numeric_target(df[[target_col]])
 
   target_funs <- NULL
   if (!is.null(target_fun)) {
@@ -154,9 +157,15 @@ exp_chaid <- function(df,
                                     ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
 
-      unique_val <- unique(df[[clean_target_col]])
-      if (length(unique_val[!is.na(unique_val)]) <= 1) {
-        stop("Categorical Target Variable must have 2 or more unique values.")
+      # tam #38166 spec section 36: a numeric target with a single distinct
+      # value (SS_total == 0) still fits -- it simply produces a root-only
+      # tree (grow_node()'s purity check), so this categorical-only guard is
+      # skipped for a numeric target rather than erroring.
+      if (!is_numeric_target_col) {
+        unique_val <- unique(df[[clean_target_col]])
+        if (length(unique_val[!is.na(unique_val)]) <= 1) {
+          stop("Categorical Target Variable must have 2 or more unique values.")
+        }
       }
 
       model <- chaid_fit(
@@ -169,23 +178,40 @@ exp_chaid <- function(df,
         allow_resplit = allow_resplit,
         max_categories = max_categories
       )
-      model$classification_type <- if (model$target_type == "logical") "binary" else "multi"
+      model$classification_type <- if (model$target_type == "numeric") {
+        "regression"
+      } else if (model$target_type == "logical") {
+        "binary"
+      } else {
+        "multi"
+      }
       model$original_factor_levels <- original_factor_levels
 
       # Store training actual / predicted so tidy() evaluation and conf_mat can
       # reuse the shared model-agnostic evaluation helpers.
-      actual <- factor(as.character(df[[clean_target_col]]), levels = model$class_levels)
       train_all <- chaid_predict(model, df, type = "all")
-      model$y <- actual
-      model$predicted_class <- chaid_predicted_class(
-        model, train_all, binary_classification_threshold
-      )
-      model$predicted_prob <- chaid_positive_probability(model, train_all)
-      # Full class-probability matrix for report_metrics (Macro / One-vs-Rest AUCs).
-      # Column names are the raw class levels so multiclass_auc_by_class() can use them.
-      model$predicted_prob_matrix <- chaid_as_probability_matrix(
-        train_all, model$class_levels
-      )
+      if (model$target_type == "numeric") {
+        # tam #38166: no class to predict -- keep the numeric actual/predicted
+        # pair (for RMSE/R^2 evaluation) and the per-row node id (so
+        # build_chaid_tree_nodes() can build each node's target histogram,
+        # mirroring rpart's x$where).
+        model$y <- as.numeric(df[[clean_target_col]])
+        model$predicted_value <- train_all$.pred_value
+        model$predicted_class <- train_all$.pred_class
+        model$train_node_ids <- train_all$.chaid_node_id
+      } else {
+        actual <- factor(as.character(df[[clean_target_col]]), levels = model$class_levels)
+        model$y <- actual
+        model$predicted_class <- chaid_predicted_class(
+          model, train_all, binary_classification_threshold
+        )
+        model$predicted_prob <- chaid_positive_probability(model, train_all)
+        # Full class-probability matrix for report_metrics (Macro / One-vs-Rest AUCs).
+        # Column names are the raw class levels so multiclass_auc_by_class() can use them.
+        model$predicted_prob_matrix <- chaid_as_probability_matrix(
+          train_all, model$class_levels
+        )
+      }
 
       # Metadata expected by the framework.
       model$terms_mapping <- names(group_name_map)
@@ -204,20 +230,13 @@ exp_chaid <- function(df,
         max_pd_vars_eff <- as.integer(max_pd_vars)
       }
 
-      # tam#37466: `firm` derives importance from the partial-dependence curves,
-      # so unlike `permutation` it has to see the PD of EVERY predictor before it
-      # can rank them. That inverts the order of the two steps below, exactly the
-      # way exp_rpart does it: compute PD over all c_cols, run importance_firm(),
-      # then trim imp_vars and shrink the PD data back down to max_pd_vars.
-      # `identical()` keeps NULL and empty values on the permutation path, too.
-      # This matters for callers that forward an optional UI setting.
-      use_firm_importance <- identical(as.character(importance_measure), "firm") &&
-        length(c_cols) > 1
-
-      if (use_firm_importance) {
-        imp_vars <- c_cols
-      } else {
-        model$importance <- chaid_permutation_importance(
+      if (model$target_type == "numeric") {
+        # tam #38166: `firm` importance and partial dependence both go through
+        # `predict(type = "prob")`, which has no meaning for a numeric target
+        # (see chaid_predict_prepared()) -- deferred as future work (PR body).
+        # Importance uses an RMSE-drop permutation variant instead of
+        # `chaid_permutation_importance()`'s log-loss.
+        model$importance <- chaid_permutation_importance_numeric(
           model = model,
           data = importance_data,
           target = clean_target_col,
@@ -229,23 +248,21 @@ exp_chaid <- function(df,
         imp_vars <- chaid_partial_dependence_vars(
           model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
         )
-      }
+        model$partial_dependence <- NULL
+      } else {
+        # tam#37466: `firm` derives importance from the partial-dependence curves,
+        # so unlike `permutation` it has to see the PD of EVERY predictor before it
+        # can rank them. That inverts the order of the two steps below, exactly the
+        # way exp_rpart does it: compute PD over all c_cols, run importance_firm(),
+        # then trim imp_vars and shrink the PD data back down to max_pd_vars.
+        # `identical()` keeps NULL and empty values on the permutation path, too.
+        # This matters for callers that forward an optional UI setting.
+        use_firm_importance <- identical(as.character(importance_measure), "firm") &&
+          length(c_cols) > 1
 
-      # Partial dependence for Analytics Report {{variable_effect}} /
-      # local_importance_binary (same contract as exp_rpart).
-      model$partial_dependence <- partial_dependence.exploratory_chaid(
-        model, clean_target_col, vars = imp_vars, data = df,
-        n = c(pd_grid_resolution, min(nrow(df), pd_sample_size))
-      )
-
-      if (use_firm_importance) {
-        model$importance <- chaid_firm_importance(
-          # PD is always calculated from the fitted model's training rows.
-          model$partial_dependence, model, imp_vars, "Training"
-        )
-        # Fall back to permutation when FIRM could not be computed (e.g. the
-        # optional `mmpf` package is missing, so partial_dependence is NULL).
-        if (is.null(model$importance)) {
+        if (use_firm_importance) {
+          imp_vars <- c_cols
+        } else {
           model$importance <- chaid_permutation_importance(
             model = model,
             data = importance_data,
@@ -255,14 +272,44 @@ exp_chaid <- function(df,
             seed = seed,
             repeats = 10L
           )
-        }
-        imp_vars <- chaid_partial_dependence_vars(
-          model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
-        )
-        if (!is.null(model$partial_dependence)) {
-          model$partial_dependence <- shrink_partial_dependence_data(
-            model$partial_dependence, imp_vars
+          imp_vars <- chaid_partial_dependence_vars(
+            model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
           )
+        }
+
+        # Partial dependence for Analytics Report {{variable_effect}} /
+        # local_importance_binary (same contract as exp_rpart).
+        model$partial_dependence <- partial_dependence.exploratory_chaid(
+          model, clean_target_col, vars = imp_vars, data = df,
+          n = c(pd_grid_resolution, min(nrow(df), pd_sample_size))
+        )
+
+        if (use_firm_importance) {
+          model$importance <- chaid_firm_importance(
+            # PD is always calculated from the fitted model's training rows.
+            model$partial_dependence, model, imp_vars, "Training"
+          )
+          # Fall back to permutation when FIRM could not be computed (e.g. the
+          # optional `mmpf` package is missing, so partial_dependence is NULL).
+          if (is.null(model$importance)) {
+            model$importance <- chaid_permutation_importance(
+              model = model,
+              data = importance_data,
+              target = clean_target_col,
+              predictors = c_cols,
+              evaluation_data = evaluation_data_label,
+              seed = seed,
+              repeats = 10L
+            )
+          }
+          imp_vars <- chaid_partial_dependence_vars(
+            model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
+          )
+          if (!is.null(model$partial_dependence)) {
+            model$partial_dependence <- shrink_partial_dependence_data(
+              model$partial_dependence, imp_vars
+            )
+          }
         }
       }
 
@@ -652,7 +699,154 @@ chaid_permutation_importance <- function(model, data, target, predictors,
   result
 }
 
+#' Root-mean-squared-error loss for numeric CHAID predictions.
+#'
+#' @param actual Actual numeric target values.
+#' @param predicted Predicted numeric values (`.pred_value` from
+#'   `chaid_predict(type = "all")`).
+#' @return A scalar RMSE, or NA_real_ when no valid rows exist.
+chaid_rmse_loss <- function(actual, predicted) {
+  valid <- is.finite(actual) & is.finite(predicted)
+  if (!any(valid)) {
+    return(NA_real_)
+  }
+  sqrt(mean((actual[valid] - predicted[valid])^2))
+}
 
+#' Model-independent permutation importance for a numeric-target CHAID model.
+#'
+#' Mirrors [chaid_permutation_importance()] (same permutation scheme, same
+#' output schema, same "skip predictors the tree never split on" shortcut) but
+#' scores each permutation by the RMSE INCREASE rather than the log-loss
+#' increase, since a numeric target has no class probability to score. tam
+#' #38166 (spec section 32-36's numeric branch has no importance requirement
+#' of its own; this keeps `imp_vars`/the Importance report table populated
+#' with a real, non-stubbed metric instead of leaving it empty).
+#'
+#' @param model A fitted `exploratory_chaid` model with `target_type == "numeric"`.
+#' @param data Evaluation rows containing target and predictors.
+#' @param target Target column name.
+#' @param predictors Predictor column names.
+#' @param evaluation_data Label for the evaluation rows.
+#' @param seed Random seed for reproducible permutations.
+#' @param repeats Number of permutations per predictor.
+#' @return A stable permutation-importance data frame (`metric == 'rmse'`).
+chaid_permutation_importance_numeric <- function(model, data, target, predictors,
+                                                 evaluation_data = 'Training', seed = 1,
+                                                 repeats = 10L) {
+  result <- chaid_empty_permutation_importance()
+  if (!is.data.frame(data) || nrow(data) == 0 ||
+      !target %in% names(data) || length(predictors) == 0) {
+    return(result)
+  }
+
+  actual <- as.numeric(data[[target]])
+  valid <- is.finite(actual)
+  if (sum(valid) < 2L) {
+    return(result)
+  }
+  evaluation_data_frame <- data[valid, , drop = FALSE]
+  actual <- actual[valid]
+  prepared_data <- tryCatch(
+    prepare_chaid_new_data(evaluation_data_frame, model),
+    error = function(e) NULL
+  )
+  if (is.null(prepared_data)) {
+    return(result)
+  }
+  split_index <- chaid_build_split_index(model)
+  baseline_prediction <- tryCatch(
+    chaid_predict_prepared(model, prepared_data, type = 'value',
+                           split.index = split_index),
+    error = function(e) NULL
+  )
+  if (is.null(baseline_prediction)) {
+    return(result)
+  }
+  baseline_loss <- chaid_rmse_loss(actual, baseline_prediction)
+  if (!is.finite(baseline_loss)) {
+    return(result)
+  }
+
+  if (length(seed) == 1L && is.finite(seed)) {
+    set.seed(seed)
+  } else {
+    set.seed(1L)
+  }
+  repeat_count <- max(1L, as.integer(repeats))
+  split_variables <- unique(unlist(
+    lapply(model$.node_metadata, function(metadata) metadata$split_variable),
+    use.names = FALSE
+  ))
+  evaluation_row_count <- nrow(prepared_data)
+  rows <- lapply(predictors, function(variable) {
+    if (!variable %in% names(evaluation_data_frame)) {
+      return(NULL)
+    }
+    affects_prediction <- variable %in% split_variables &&
+      variable %in% names(prepared_data)
+    drops <- vapply(seq_len(repeat_count), function(iteration) {
+      permutation <- sample.int(evaluation_row_count)
+      if (!affects_prediction) {
+        return(0)
+      }
+      permuted_data <- prepared_data
+      permuted_data[[variable]] <- permuted_data[[variable]][permutation]
+      permuted_prediction <- tryCatch(
+        chaid_predict_prepared(model, permuted_data, type = 'value',
+                               split.index = split_index),
+        error = function(e) NULL
+      )
+      if (is.null(permuted_prediction)) {
+        return(NA_real_)
+      }
+      permuted_loss <- chaid_rmse_loss(actual, permuted_prediction)
+      if (is.finite(permuted_loss)) permuted_loss - baseline_loss else NA_real_
+    }, numeric(1))
+    finite_drops <- drops[is.finite(drops)]
+    if (length(finite_drops) == 0L) {
+      importance <- NA_real_
+      std_error <- NA_real_
+    } else {
+      importance <- mean(finite_drops)
+      std_error <- if (length(finite_drops) > 1L) {
+        stats::sd(finite_drops) / sqrt(length(finite_drops))
+      } else {
+        0
+      }
+    }
+    mapped_variable <- if (!is.null(model$terms_mapping) &&
+                           variable %in% names(model$terms_mapping)) {
+      unname(model$terms_mapping[[variable]])
+    } else {
+      variable
+    }
+    data.frame(
+      variable = mapped_variable,
+      importance = importance,
+      std_error = std_error,
+      metric = 'rmse',
+      evaluation_data = evaluation_data,
+      repeats = as.integer(repeat_count),
+      stringsAsFactors = FALSE
+    )
+  })
+  rows <- Filter(Negate(is.null), rows)
+  if (length(rows) == 0L) {
+    return(result)
+  }
+  result <- dplyr::bind_rows(rows)
+  result$rank <- ifelse(
+    is.finite(result$importance),
+    rank(-result$importance, ties.method = 'min'),
+    NA_integer_
+  )
+  result <- result %>%
+    dplyr::arrange(is.na(rank), rank, variable) %>%
+    dplyr::select(variable, importance, std_error, rank, metric,
+                  evaluation_data, repeats)
+  result
+}
 
 #' Choose predictor columns for CHAID partial dependence, by importance order.
 #'
@@ -818,6 +1012,32 @@ augment.exploratory_chaid <- function(x, data = NULL, newdata = NULL,
   }
 
   all_prediction <- chaid_predict(x, frame, type = "all")
+
+  if (identical(x$target_type, "numeric")) {
+    # tam #38166 spec section 19 (Prediction Data): Predicted Value, Node ID,
+    # and (when the actual target is present in `frame`) Residual = Actual -
+    # Predicted.
+    predicted_value_col <- avoid_conflict(colnames(frame), "predicted_value")
+    node_id_col <- avoid_conflict(colnames(frame), "chaid_node_id")
+    frame[[predicted_value_col]] <- all_prediction[[".pred_value"]]
+    frame[[node_id_col]] <- all_prediction[[".chaid_node_id"]]
+    target_col_in_frame <- if (!is.null(x$orig_target_col) &&
+                                x$orig_target_col %in% names(frame)) {
+      x$orig_target_col
+    } else if (!is.null(x$clean_target_col) &&
+               x$clean_target_col %in% names(frame)) {
+      x$clean_target_col
+    } else {
+      NULL
+    }
+    if (!is.null(target_col_in_frame)) {
+      residual_col <- avoid_conflict(colnames(frame), "residual")
+      frame[[residual_col]] <- as.numeric(frame[[target_col_in_frame]]) -
+        all_prediction[[".pred_value"]]
+    }
+    return(frame)
+  }
+
   predicted_label <- as.character(chaid_predicted_class(
     x, all_prediction, binary_classification_threshold
   ))
@@ -902,6 +1122,51 @@ tidy.exploratory_chaid <- function(x, type = "evaluation", pretty.name = FALSE,
     return(data.frame())
   }
   actual <- x$y
+  # tam #38166: a numeric target has no class to re-threshold/predict -- most
+  # `type`s below are classification-only and stay unreachable for it (the
+  # types CHAID's own report/prediction pipeline actually calls for a numeric
+  # model -- node_summary, rules, category_merges, split_summary,
+  # numeric_intervals, importance, evaluation -- are all target-type-aware).
+  if (identical(x$target_type, "numeric")) {
+    return(chaid_display_node_ids(switch(
+      type,
+      evaluation = {
+        if ("error" %in% class(x)) {
+          return(data.frame(Note = x$message))
+        }
+        ret <- evaluate_regression_(
+          data.frame(.pred = x$predicted_value, .actual = actual),
+          ".pred", ".actual"
+        )
+        # Mirror the pretty-name mapping used elsewhere for regression
+        # evaluation (rpart / xgboost / lightgbm regression `tidy()`).
+        if (pretty.name) {
+          ret <- ret %>%
+            dplyr::rename(
+              `R Squared` = r_squared,
+              RMSE = root_mean_square_error,
+              MAE = mean_absolute_error,
+              MAPE = mean_absolute_percentage_error
+            )
+        }
+        ret
+      },
+      tree_nodes = build_chaid_tree_nodes(x),
+      node_summary = chaid_node_summary(x),
+      rules = chaid_rule_table(x),
+      category_merges = chaid_category_merge_table(x),
+      split_summary = chaid_split_summary(x),
+      category_error_distribution = chaid_category_error_distribution(x),
+      numeric_intervals = chaid_numeric_intervals(x),
+      importance = {
+        if (is.null(x$importance)) chaid_empty_permutation_importance() else x$importance
+      },
+      partial_dependence = handle_partial_dependence(x),
+      {
+        stop(paste0("type ", type, " is not defined for a numeric CHAID target"))
+      }
+    )))
+  }
   # Re-threshold binary labels so Settings → cut point updates F1 / Accuracy etc.
   # (ROC / PR AUC use predicted_prob and are threshold-independent.)
   predicted <- if (identical(x$classification_type, "binary") &&
@@ -1005,6 +1270,7 @@ build_chaid_tree_nodes <- function(x) {
   edges <- x$edges
   root_n <- nodes$n[nodes$node_id == 1L]
   class_levels <- x$class_levels
+  is_reg <- identical(x$target_type, "numeric")
 
   map_name <- function(v) {
     tm <- x$terms_mapping
@@ -1014,7 +1280,7 @@ build_chaid_tree_nodes <- function(x) {
 
   # Positive class first for a 2-class target (SPSS-style ordering).
   ord <- seq_along(class_levels)
-  if (length(class_levels) == 2) {
+  if (!is_reg && length(class_levels) == 2) {
     up <- toupper(class_levels)
     positive_idx <- if (setequal(up, c("FALSE", "TRUE"))) which(up == "TRUE")
                     else if (setequal(up, c("NO", "YES"))) which(up == "YES")
@@ -1024,16 +1290,79 @@ build_chaid_tree_nodes <- function(x) {
     }
   }
 
+  # tam #38166: numeric-target-only. A shared-breaks target histogram per
+  # node, mirroring build_rpart_tree_nodes()'s regression branch -- every
+  # node's counts are on the SAME bins so shapes are comparable across the
+  # tree. Node membership is reconstructed from x$train_node_ids (the leaf/
+  # internal node each training row resolves to) walked up to the root via
+  # `nodes$parent_id`, since CHAID node ids are not a binary heap (no `%/% 2`
+  # shortcut the way rpart's are).
+  dist_by_id <- NULL
+  shared_breaks <- NULL
+  if (is_reg) {
+    yv <- x$y
+    train_ids <- x$train_node_ids
+    if (!is.null(yv) && length(yv) > 0 && !is.null(train_ids) &&
+        length(train_ids) == length(yv)) {
+      yfin <- yv[is.finite(yv)]
+      if (length(yfin) >= 2 && diff(range(yfin)) > 0) {
+        y_min <- min(yfin)
+        y_max <- max(yfin)
+        if (all(yfin == floor(yfin)) && (y_max - y_min) <= 30) {
+          shared_breaks <- seq(y_min - 0.5, y_max + 0.5, by = 1)
+        } else {
+          shared_breaks <- seq(y_min, y_max, length.out = 21)
+        }
+      } else if (length(yfin) >= 1) {
+        shared_breaks <- c(yfin[1] - 0.5, yfin[1] + 0.5)
+      }
+      if (!is.null(shared_breaks)) {
+        nbin <- length(shared_breaks) - 1L
+        parent_of <- stats::setNames(as.character(nodes$parent_id), as.character(nodes$node_id))
+        dist_by_id <- list()
+        for (r in seq_along(yv)) {
+          v <- yv[r]
+          if (!is.finite(v)) next
+          bi <- .bincode(v, shared_breaks, include.lowest = TRUE)
+          if (is.na(bi)) next
+          nd <- train_ids[r]
+          if (is.na(nd)) next
+          repeat {
+            key <- as.character(nd)
+            cc <- dist_by_id[[key]]
+            if (is.null(cc)) cc <- integer(nbin)
+            cc[bi] <- cc[bi] + 1L
+            dist_by_id[[key]] <- cc
+            parent_key <- parent_of[[key]]
+            if (is.null(parent_key) || is.na(parent_key)) break
+            nd <- parent_key
+          }
+        }
+      }
+    }
+  }
+  dist_json_for <- function(id) {
+    if (!is_reg || is.null(shared_breaks)) return(NA_character_)
+    cc <- dist_by_id[[as.character(id)]]
+    if (is.null(cc)) cc <- integer(length(shared_breaks) - 1L)
+    as.character(jsonlite::toJSON(list(breaks = shared_breaks, counts = cc),
+                                  digits = 10, auto_unbox = FALSE))
+  }
+
   rows <- lapply(seq_len(nrow(nodes)), function(i) {
     id <- nodes$node_id[i]
     node_n <- nodes$n[i]
-    distribution <- nodes$class_distribution[[i]]
-    counts <- as.numeric(distribution) * node_n
-    arr <- lapply(ord, function(j) {
-      list(label = class_levels[j], n = counts[j],
-           pct = if (node_n > 0) counts[j] / node_n else 0)
-    })
-    class_json <- as.character(jsonlite::toJSON(arr, auto_unbox = TRUE, digits = NA))
+    if (is_reg) {
+      class_json <- NA_character_
+    } else {
+      distribution <- nodes$class_distribution[[i]]
+      counts <- as.numeric(distribution) * node_n
+      arr <- lapply(ord, function(j) {
+        list(label = class_levels[j], n = counts[j],
+             pct = if (node_n > 0) counts[j] / node_n else 0)
+      })
+      class_json <- as.character(jsonlite::toJSON(arr, auto_unbox = TRUE, digits = NA))
+    }
 
     # Split-test stats belong to nodes that actually split; NA everywhere else
     # (leaves, and nodes whose best candidate failed the alpha_split gate).
@@ -1076,16 +1405,25 @@ build_chaid_tree_nodes <- function(x) {
       cond_column = cond_column,
       cond_operator = if (is.na(cond_column)) NA_character_ else "in",
       cond_value = cond_value,
-      mean_value = NA_real_,
-      sd_value = NA_real_,
-      rmse_value = NA_real_,
-      dist_json = NA_character_,
+      mean_value = if (is_reg) as.numeric(nodes$node_mean[i]) else NA_real_,
+      sd_value = if (is_reg) as.numeric(nodes$node_sd[i]) else NA_real_,
+      # sample SD (n-1 denominator, `node_sd`) -> population SD (n denominator)
+      # so rmse_value reads as the within-node root-mean-squared deviation
+      # from the mean, matching build_rpart_tree_nodes()'s sqrt(dev/n).
+      rmse_value = if (is_reg && node_n > 0 && is.finite(nodes$node_sd[i])) {
+        as.numeric(nodes$node_sd[i]) * sqrt(max(node_n - 1, 0) / node_n)
+      } else {
+        NA_real_
+      },
+      dist_json = dist_json_for(id),
       # CHAID split test at this node (NA for leaves). The interactive tree
       # renderer shows these on the splitting (parent) node, SPSS-style.
       p_value = if (is_split) nodes$p_value[i] else NA_real_,
       adjusted_p_value = if (is_split) nodes$adjusted_p_value[i] else NA_real_,
       split_statistic = if (is_split) nodes$split_statistic[i] else NA_real_,
       split_df = if (is_split) nodes$split_df[i] else NA_real_,
+      split_df1 = if (is_split) nodes$split_df1[i] else NA_real_,
+      split_df2 = if (is_split) nodes$split_df2[i] else NA_real_,
       stringsAsFactors = FALSE
     )
   })
