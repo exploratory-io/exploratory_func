@@ -404,8 +404,19 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
                        max_centers = 10, silhouette_sample_size = 5000,
                        profile_top_n = 10, profile_show_all = FALSE,
                        profile_variable_order = 'effect_size', map_variable_n = 10,
-                       map_sample_size = 2000, seed = 1) {
+                       map_sample_size = 2000, seed = 1, label_col = NULL) {
   selected_cols <- tidyselect::vars_select(names(df), !!!rlang::quos(...))
+  # tam#38157: the column whose values label the dendrogram's leaves. Optional --
+  # without it the leaves fall back to the row number, which is what the widget
+  # has always shown. It takes no part in the clustering.
+  label_col_name <- col_name(substitute(label_col))
+  if (!is.null(label_col_name) && !identical(label_col_name, 'NULL')) {
+    if (!label_col_name %in% names(df)) {
+      stop(paste0('The label column ', label_col_name, ' is not in the data.'), call. = FALSE)
+    }
+  } else {
+    label_col_name <- NULL
+  }
   if (length(selected_cols) == 0L) {
     stop('At least one numeric variable is required for hierarchical clustering.', call. = FALSE)
   }
@@ -480,6 +491,12 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
             call. = FALSE)
     selected_cols <- selected_cols[!unusable]
   }
+  # Taken from `df` AFTER any sampling and sliced by the same `valid` mask as
+  # row_ids below, so a label can never drift onto another leaf. Doing it any
+  # other way fails SILENTLY -- the tree still draws, just with every name on the
+  # wrong row -- which is why the harness pins the alignment against the source
+  # data rather than merely checking that labels appear.
+  source_labels <- if (is.null(label_col_name)) NULL else as.character(df[[label_col_name]])
   source_data <- df[selected_cols]
   source_mat <- as.matrix(source_data)
   valid <- complete.cases(source_data) & rowSums(!is.finite(source_mat)) == 0L
@@ -511,7 +528,8 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
   }
   hc <- fastcluster::hclust(distance_object, method = linkage)
   n <- nrow(mat)
-  nodes <- .hclust_build_nodes(hc, row_ids, row_ids)
+  node_labels <- if (is.null(source_labels)) row_ids else source_labels[valid]
+  nodes <- .hclust_build_nodes(hc, row_ids, node_labels)
   max_interactive_k <- min(max_interactive_k, n)
   cut_data <- .hclust_build_cut_data(hc, nodes, max_interactive_k)
   default_info <- .hclust_cut_info(hc, nodes, centers)

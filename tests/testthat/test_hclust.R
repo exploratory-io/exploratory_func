@@ -199,3 +199,50 @@ test_that("the diagnostic sweep itself still follows the mode", {
   expect_equal(nrow(elb %>% tidy_rowwise(model, type = "silhouette")), 0L)
   expect_gt(nrow(elb %>% tidy_rowwise(model, type = "elbow")), 0L)
 })
+
+test_that("a label column names the leaves, aligned to their own source rows", {
+  df <- hclust_harness_df()
+  df$store <- paste0("store_", seq_len(nrow(df)))
+  # Varies (so it is not rejected as constant) AND holds Inf on three rows, which
+  # is what makes those rows drop out.
+  df$ratio <- seq_len(nrow(df)) / 10
+  df$ratio[c(3, 11, 27)] <- Inf
+
+  # Without a label column the leaves keep showing the row id, as they always have.
+  plain <- df %>% exp_hclust(spend, visits, centers = 3, max_interactive_k = 5)
+  plain_leaves <- plain %>% tidy_rowwise(model, type = "dendrogram_nodes") %>%
+    dplyr::filter(node_type == "leaf")
+  expect_equal(plain_leaves$label, plain_leaves$row_id)
+
+  # With one, every leaf carries ITS OWN row's value. "Labels appear" is not the
+  # assertion worth making: exp_hclust filters rows twice, and a label list that
+  # misses either mask still draws a full tree with every name on the wrong leaf.
+  labelled <- df %>% exp_hclust(spend, visits, centers = 3, max_interactive_k = 5, label_col = store)
+  leaves <- labelled %>% tidy_rowwise(model, type = "dendrogram_nodes") %>%
+    dplyr::filter(node_type == "leaf")
+  expect_equal(leaves$label, df$store[as.integer(leaves$row_id)])
+
+  # ...including when rows are excluded, which is the case a wrong mask breaks.
+  excluded <- df %>% exp_hclust(ratio, visits, centers = 3, max_interactive_k = 5, label_col = store)
+  ex_leaves <- excluded %>% tidy_rowwise(model, type = "dendrogram_nodes") %>%
+    dplyr::filter(node_type == "leaf")
+  expect_equal(nrow(ex_leaves), nrow(df) - 3L)
+  expect_equal(ex_leaves$label, df$store[as.integer(ex_leaves$row_id)])
+})
+
+test_that("the label column takes no part in the clustering", {
+  df <- hclust_harness_df()
+  df$store <- paste0("store_", seq_len(nrow(df)))
+  without <- df %>% exp_hclust(spend, visits, stay, centers = 3, max_interactive_k = 5)
+  with_it <- df %>% exp_hclust(spend, visits, stay, centers = 3, max_interactive_k = 5, label_col = store)
+  expect_equal(without$model[[1]]$hclust$height, with_it$model[[1]]$hclust$height)
+  expect_equal(without$model[[1]]$clustering, with_it$model[[1]]$clustering)
+})
+
+test_that("an unknown label column is rejected by name", {
+  df <- hclust_harness_df()
+  expect_error(
+    df %>% exp_hclust(spend, visits, centers = 2, label_col = no_such_column),
+    "no_such_column"
+  )
+})
