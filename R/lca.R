@@ -91,7 +91,15 @@ exp_lca <- function(df, ...,
     if (max_candidate_nclass < min_nclass) {
       stop("There are not enough distinct complete rows to fit at least 2 latent classes.")
     }
-    candidate_counts <- seq.int(min_nclass, max_candidate_nclass)
+    requested_counts <- seq.int(min_nclass, max_candidate_nclass)
+    # tam#38352: a 1-class fit is always computed as an internal baseline,
+    # regardless of the user-configured explore range (which starts at 2 in
+    # the UI). It is a legitimate LCA reference model -- if it turns out to
+    # have the smallest BIC among converged candidates, that is evidence no
+    # latent class structure beyond a single group is supported by the data,
+    # which the report surfaces explicitly rather than silently picking a
+    # multi-class split anyway.
+    candidate_counts <- sort(unique(c(1L, requested_counts)))
 
     formula <- stats::as.formula(paste0("cbind(", paste(vapply(names(used), lca_quote_name, character(1)), collapse = ", "), ") ~ 1"))
     candidates <- lapply(candidate_counts, function(k) {
@@ -111,8 +119,16 @@ exp_lca <- function(df, ...,
       errors <- vapply(candidates, function(x) paste0(x$nclass, ": ", x$error), character(1))
       stop(paste0("Latent Class Analysis could not fit any requested class count. ", paste(errors, collapse = " | ")))
     }
-    best_index <- which.min(vapply(successful, function(x) x$fit$bic, numeric(1)))
-    selected <- successful[[best_index]]$fit
+    # tam#38352: a non-converged fit is not a candidate for the recommended
+    # model -- its BIC describes a solution the optimizer never actually
+    # settled into. Recommend by BIC only among CONVERGED fits; fall back to
+    # every successful fit only when none converged at all (so the analysis
+    # still returns a result rather than erroring out).
+    converged_candidates <- Filter(function(x) lca_fit_converged(x$fit), successful)
+    selection_pool <- if (length(converged_candidates)) converged_candidates else successful
+    used_unconverged_fallback <- length(converged_candidates) == 0
+    best_index <- which.min(vapply(selection_pool, function(x) x$fit$bic, numeric(1)))
+    selected <- selection_pool[[best_index]]$fit
     normalized <- lca_normalize_class_order(selected)
     selected <- normalized$fit
 
@@ -139,6 +155,7 @@ exp_lca <- function(df, ...,
       excluded_nrow = excluded_nrow,
       min_nclass = min_nclass,
       max_nclass = max_nclass,
+      used_unconverged_fallback = used_unconverged_fallback,
       nrep = nrep,
       maxiter = maxiter,
       feature_top_n = feature_top_n,
@@ -197,6 +214,7 @@ lca_class_selection_table <- function(candidates) {
     }
     fit <- candidate$fit
     max_posterior <- apply(fit$posterior, 1, max)
+    converged <- lca_fit_converged(fit)
     tibble::tibble(
       number_of_classes = candidate$nclass,
       log_likelihood = fit$llik,
@@ -208,8 +226,11 @@ lca_class_selection_table <- function(candidates) {
       # poLCA's eflag records numerical/start errors, not iteration-limit
       # termination. A fit is known to have converged only when it stopped
       # before maxiter and did not encounter such an error.
-      converged = lca_fit_converged(fit),
-      error = NA_character_
+      converged = converged,
+      # tam#38352: a fit that returned successfully but did not converge is
+      # not "no error" -- the Error column previously left it blank, reading
+      # as if nothing was wrong. Report why the optimizer stopped instead.
+      error = if (converged) NA_character_ else lca_stop_reason(fit)
     )
   }))
 }
@@ -219,6 +240,19 @@ lca_fit_converged <- function(fit) {
     !is.null(fit$numiter) &&
     !is.null(fit$maxiter) &&
     isTRUE(fit$numiter < fit$maxiter)
+}
+
+# tam#38352: names the reason a successful (non-erroring) fit still failed
+# lca_fit_converged(), for the class_selection table's Error column. Mirrors
+# lca_fit_converged()'s own two conditions in the same order.
+lca_stop_reason <- function(fit) {
+  if (isTRUE(fit$eflag)) {
+    "Numerical issue during estimation"
+  } else if (!is.null(fit$numiter) && !is.null(fit$maxiter) && isTRUE(fit$numiter >= fit$maxiter)) {
+    "Reached maximum iterations"
+  } else {
+    "Did not converge"
+  }
 }
 
 lca_profile_table <- function(fit, observed, cols) {
@@ -278,11 +312,21 @@ lca_relationship_table <- function(original, used_row_ids, predclass, relationsh
 tidy.lca_exploratory <- function(x, type = "summary", ...) {
   fit <- x$selected_fit
   if (type == "analysis_conditions") {
+    # tam#38352: a 1-class baseline is always fit internally in addition to
+    # the user-configured explore range (which starts at 2 in the UI) -- see
+    # exp_lca()'s candidate_counts. Report that explicitly rather than
+    # letting "Class Counts Compared" under-describe what class_selection
+    # actually shows a row for.
+    class_counts_text <- if (isTRUE(x$min_nclass <= 1)) {
+      paste0(x$min_nclass, " to ", x$max_nclass)
+    } else {
+      paste0("1 (baseline), ", x$min_nclass, " to ", x$max_nclass)
+    }
     return(tibble::tibble(
       Metric = c("Number of Variables", "Variable Names", "Rows Used", "Rows Removed",
                  "Class Counts Compared", "Random Starts", "Maximum Iterations", "Selected Number of Classes"),
       Value = c(length(x$selected_cols), paste(x$selected_cols, collapse = ", "), x$n_used, x$excluded_nrow,
-                paste0(x$min_nclass, " to ", x$max_nclass), x$nrep, x$maxiter, length(fit$P))
+                class_counts_text, x$nrep, x$maxiter, length(fit$P))
     ))
   }
   if (type == "class_selection") return(x$class_selection)

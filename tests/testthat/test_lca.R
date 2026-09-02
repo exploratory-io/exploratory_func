@@ -27,9 +27,13 @@ test_that("exp_lca selects a BIC-minimum categorical model and exposes its repor
 
   expect_s3_class(model, "lca_exploratory")
   selection <- tidy(model, type = "class_selection")
-  expect_equal(selection$number_of_classes, 2:4)
-  expect_equal(nrow(selection), 3)
-  expect_equal(glance(model)$selected_classes, selection$number_of_classes[which.min(selection$bic)])
+  # tam#38352: a 1-class baseline is always fit in addition to the requested
+  # 2:4 explore range.
+  expect_equal(selection$number_of_classes, 1:4)
+  expect_equal(nrow(selection), 4)
+  converged_rows <- selection[selection$converged, , drop = FALSE]
+  expect_equal(glance(model)$selected_classes,
+               converged_rows$number_of_classes[which.min(converged_rows$bic)])
 
   profiles <- tidy(model, type = "profiles")
   expect_true(all(c("variable", "category", "class", "probability", "overall_probability", "difference") %in% names(profiles)))
@@ -67,7 +71,9 @@ test_that("exp_lca respects the requested lower class bound for tiny data", {
   model <- exp_lca(df, a, b, min_nclass = 2, max_nclass = 6,
                    nrep = 1, maxiter = 20)$model[[1]]
 
-  expect_equal(tidy(model, type = "class_selection")$number_of_classes, 2L)
+  # tam#38352: 1-class baseline is always added, so a requested range that
+  # can only fit nclass=2 still reports 2 rows (1 and 2), not 1.
+  expect_equal(tidy(model, type = "class_selection")$number_of_classes, c(1L, 2L))
   assignments <- tidy(model, type = "data")
   probability_columns <- c("Class 1 Probability", "Class 2 Probability")
   expect_true(all(probability_columns %in% names(assignments)))
@@ -85,7 +91,37 @@ test_that("exp_lca does not report convergence when maxiter is reached", {
   model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
                    nrep = 1, maxiter = 1)$model[[1]]
 
-  expect_false(tidy(model, type = "class_selection")$converged)
+  selection <- tidy(model, type = "class_selection")
+  nclass2 <- selection[selection$number_of_classes == 2, , drop = FALSE]
+  expect_false(nclass2$converged)
+  # tam#38352: a successful-but-unconverged fit's Error column now names why,
+  # instead of staying blank as if nothing were wrong.
+  expect_equal(nclass2$error, "Reached maximum iterations")
+})
+
+test_that("exp_lca excludes non-converged fits from the recommended model and always fits a 1-class baseline (tam#38352)", {
+  set.seed(24819)
+  df <- data.frame(
+    a = sample(c("x", "y", "z"), 90, replace = TRUE),
+    b = sample(c("m", "n", "o"), 90, replace = TRUE),
+    c = sample(c("low", "mid", "high"), 90, replace = TRUE)
+  )
+  # A generous iteration/restart budget so every candidate (including the
+  # always-added 1-class baseline) converges normally on this run -- the
+  # invariant under test is that the recommended model is always drawn from
+  # the CONVERGED candidates, which class_selection's own converged column
+  # lets this test check without needing to engineer a non-convergent fit.
+  model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 3,
+                   nrep = 3, maxiter = 1000, seed = 3)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+
+  expect_true(1L %in% selection$number_of_classes)
+  expect_true(all(1:3 %in% selection$number_of_classes))
+
+  recommended <- glance(model)$selected_classes
+  recommended_row <- selection[selection$number_of_classes == recommended, , drop = FALSE]
+  expect_true(nrow(recommended_row) == 1)
+  expect_true(recommended_row$converged)
 })
 
 test_that("exp_lca rejects non-categorical, insufficient, and invalid class selections", {
