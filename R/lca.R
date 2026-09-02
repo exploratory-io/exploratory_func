@@ -229,7 +229,7 @@ lca_profile_table <- function(fit, observed, cols) {
       variable = col,
       category = rep(levels, each = nrow(probabilities)),
       class = rep(seq_len(nrow(probabilities)), times = length(levels)),
-      probability = as.vector(t(probabilities)),
+      probability = as.vector(probabilities),
       overall_probability = rep(prop.table(table(factor(as.character(observed[[col]]), levels = levels))), each = nrow(probabilities))
     )
   })) %>%

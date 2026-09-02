@@ -34,6 +34,11 @@ test_that("exp_lca selects a BIC-minimum categorical model and exposes its repor
   profiles <- tidy(model, type = "profiles")
   expect_true(all(c("variable", "category", "class", "probability", "overall_probability", "difference") %in% names(profiles)))
   expect_true(all(profiles$probability >= 0 & profiles$probability <= 1))
+  # Class-conditional response probabilities are P(category | class, variable),
+  # so within one variable and one class they must sum to 1 across categories.
+  # A variable/category/class melt bug (tam#38349) can leave these off 100%.
+  profile_sums <- as.numeric(tapply(profiles$probability, interaction(profiles$variable, profiles$class, drop = TRUE), sum))
+  expect_equal(profile_sums, rep(1, length(profile_sums)), tolerance = 1e-8)
   expect_equal(nrow(tidy(model, type = "characteristics")), glance(model)$selected_classes * 2)
   expect_true(all(tidy(model, type = "discrimination")$max_minus_min_probability >= 0))
 
