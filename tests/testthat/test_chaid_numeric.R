@@ -285,3 +285,102 @@ test_that('existing categorical/logical CHAID behavior is unchanged (regression 
   expect_equal(logical_model$target_type, 'logical')
   expect_true(!is.null(logical_model$class_levels))
 })
+
+# ---------------------------------------------------------------------------
+# tam #38345: partial dependence for a NUMERIC target.
+#
+# #38166 deferred this -- partial_dependence.exploratory_chaid()'s predict.fun
+# hardcoded predict(type = "prob"), which has no meaning for a numeric target
+# (chaid_predict_prepared() returns a zero-column frame), so build_exp_chaid()
+# set model$partial_dependence <- NULL and the Analytics Report's
+# {{variable_effect}} chart had nothing to draw. exp_rpart's numeric report has
+# always had that chart; this closes the gap.
+# ---------------------------------------------------------------------------
+
+chaid_numeric_pd_fixture <- function(n = 240) {
+  set.seed(38345)
+  # Draw the two predictors INDEPENDENTLY. A rep(..., length.out = n) pair
+  # cycles in lockstep, aliasing them completely -- the tree then splits on one
+  # and the other's partial-dependence curve is flat, which looks exactly like
+  # a broken PD implementation.
+  rank <- factor(sample(c('bronze', 'silver', 'gold'), n, replace = TRUE),
+                 levels = c('bronze', 'silver', 'gold'), ordered = TRUE)
+  channel <- sample(c('web', 'app', 'store'), n, replace = TRUE)
+  base <- c(bronze = 100, silver = 200, gold = 300)[as.character(rank)]
+  bump <- c(web = 0, app = 20, store = -20)[channel]
+  data.frame(
+    amount = as.numeric(base + bump + stats::rnorm(n, sd = 5)),
+    rank = rank,
+    channel = channel,
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that('a numeric target gets partial dependence instead of NULL', {
+  skip_if_not_installed('mmpf')
+  df <- chaid_numeric_pd_fixture()
+  model_df <- df %>% exp_chaid(amount, rank, channel, seed = 1)
+  model <- model_df$model[[1]]
+
+  expect_equal(model$target_type, 'numeric')
+  expect_false(is.null(model$partial_dependence))
+  # The prediction column is named after the TARGET, the way
+  # partial_dependence.rpart() names its own regression output --
+  # handle_partial_dependence() finds it through attr(pd, "target").
+  expect_true('amount' %in% colnames(model$partial_dependence))
+  expect_equal(unname(attr(model$partial_dependence, 'target')), 'amount')
+  expect_setequal(attr(model$partial_dependence, 'vars'), c('rank', 'channel'))
+  # Values are node MEANS on the target's own scale, not probabilities in 0..1.
+  pd_values <- model$partial_dependence[['amount']]
+  expect_true(all(is.finite(pd_values)))
+  expect_gt(max(pd_values), 1)
+})
+
+test_that('numeric partial dependence tracks the real group means', {
+  skip_if_not_installed('mmpf')
+  df <- chaid_numeric_pd_fixture()
+  model_df <- df %>% exp_chaid(amount, rank, channel, seed = 1)
+  pd <- model_df$model[[1]]$partial_dependence
+
+  by_rank <- pd[!is.na(pd$rank), c('rank', 'amount')]
+  ordered_pd <- by_rank[order(by_rank$rank), ]
+  # Independent expectation: the fixture's own group means are strictly
+  # increasing bronze < silver < gold, so the PD curve must be too.
+  actual_means <- tapply(df$amount, df$rank, mean)
+  expect_true(all(diff(as.numeric(actual_means)) > 0))
+  expect_true(all(diff(ordered_pd$amount) > 0))
+})
+
+test_that('pd_with_bin_means gives a numeric target the binned Actual overlay too', {
+  skip_if_not_installed('mmpf')
+  df <- chaid_numeric_pd_fixture()
+  model <- (df %>% exp_chaid(amount, rank, channel, seed = 1,
+                             pd_with_bin_means = TRUE))$model[[1]]
+  expect_false(is.null(model$partial_binning))
+
+  # rf_partial_dependence() is what the report chart actually runs; for a
+  # regression model it must emit both series, the same as exp_rpart's.
+  out <- (df %>% exp_chaid(amount, rank, channel, seed = 1,
+                           pd_with_bin_means = TRUE)) %>% rf_partial_dependence()
+  expect_true(nrow(out) > 0)
+  expect_setequal(unique(as.character(out$y_name)), c('Actual', 'Predicted'))
+  expect_true(all(c('conf_low', 'conf_high', 'bin_sample_size') %in% colnames(out)))
+})
+
+test_that('a categorical target keeps its class-probability partial dependence (regression guard)', {
+  skip_if_not_installed('mmpf')
+  set.seed(38345)
+  n <- 240
+  x <- rep(c('a', 'b', 'c'), length.out = n)
+  y <- ifelse(x == 'a', 'yes', ifelse(x == 'b', 'no', 'yes'))
+  df <- data.frame(target = y, x = x, z = rep(c('p', 'q'), length.out = n),
+                   stringsAsFactors = FALSE)
+  model <- (df %>% exp_chaid(target, x, z, seed = 1))$model[[1]]
+
+  expect_true(model$target_type %in% c('character', 'factor'))
+  expect_false(is.null(model$partial_dependence))
+  # Still keyed by CLASS LEVELS, not by the target column name.
+  expect_equal(attr(model$partial_dependence, 'target'), model$class_levels)
+  expect_true(all(model$class_levels %in% colnames(model$partial_dependence)))
+  expect_false('target' %in% colnames(model$partial_dependence))
+})
