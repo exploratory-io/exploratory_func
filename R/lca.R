@@ -236,6 +236,11 @@ lca_class_selection_table <- function(candidates) {
 }
 
 lca_fit_converged <- function(fit) {
+  # poLCA computes the one-class baseline directly without an EM loop and
+  # reports numiter = 1. It is therefore converged even when maxiter = 1.
+  if (length(fit$P) == 1L) {
+    return(!isTRUE(fit$eflag))
+  }
   !isTRUE(fit$eflag) &&
     !is.null(fit$numiter) &&
     !is.null(fit$maxiter) &&
@@ -317,10 +322,13 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
     # exp_lca()'s candidate_counts. Report that explicitly rather than
     # letting "Class Counts Compared" under-describe what class_selection
     # actually shows a row for.
-    class_counts_text <- if (isTRUE(x$min_nclass <= 1)) {
-      paste0(x$min_nclass, " to ", x$max_nclass)
+    class_counts <- vapply(x$candidates, function(candidate) candidate$nclass, integer(1))
+    class_counts_text <- if (length(class_counts) == 1L) {
+      as.character(class_counts)
+    } else if (class_counts[[1]] == 1L) {
+      paste0("1 (baseline), ", min(class_counts[-1L]), " to ", max(class_counts[-1L]))
     } else {
-      paste0("1 (baseline), ", x$min_nclass, " to ", x$max_nclass)
+      paste0(min(class_counts), " to ", max(class_counts))
     }
     return(tibble::tibble(
       Metric = c("Number of Variables", "Variable Names", "Rows Used", "Rows Removed",

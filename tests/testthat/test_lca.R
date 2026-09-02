@@ -74,6 +74,9 @@ test_that("exp_lca respects the requested lower class bound for tiny data", {
   # tam#38352: 1-class baseline is always added, so a requested range that
   # can only fit nclass=2 still reports 2 rows (1 and 2), not 1.
   expect_equal(tidy(model, type = "class_selection")$number_of_classes, c(1L, 2L))
+  conditions <- tidy(model, type = "analysis_conditions")
+  expect_equal(conditions$Value[conditions$Metric == "Class Counts Compared"],
+               "1 (baseline), 2 to 2")
   assignments <- tidy(model, type = "data")
   probability_columns <- c("Class 1 Probability", "Class 2 Probability")
   expect_true(all(probability_columns %in% names(assignments)))
@@ -97,6 +100,25 @@ test_that("exp_lca does not report convergence when maxiter is reached", {
   # tam#38352: a successful-but-unconverged fit's Error column now names why,
   # instead of staying blank as if nothing were wrong.
   expect_equal(nclass2$error, "Reached maximum iterations")
+})
+
+test_that("exp_lca treats the exact 1-class baseline as converged at maxiter=1", {
+  n <- 180
+  segment <- rep(c("A", "B", "C"), each = n / 3)
+  df <- data.frame(
+    a = ifelse(segment == "A", "p", ifelse(segment == "B", "q", "r")),
+    b = ifelse(segment == "A", "u", ifelse(segment == "B", "v", "w")),
+    c = ifelse(segment == "A", "x", ifelse(segment == "B", "y", "z"))
+  )
+  model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 3,
+                   nrep = 1, maxiter = 1, seed = 1)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+  baseline <- selection[selection$number_of_classes == 1L, , drop = FALSE]
+
+  expect_true(baseline$converged)
+  expect_true(is.na(baseline$error))
+  expect_false(model$used_unconverged_fallback)
+  expect_equal(glance(model)$selected_classes, 1L)
 })
 
 test_that("exp_lca excludes non-converged fits from the recommended model and always fits a 1-class baseline (tam#38352)", {
