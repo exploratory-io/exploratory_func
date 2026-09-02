@@ -248,7 +248,16 @@ exp_chaid <- function(df,
         imp_vars <- chaid_partial_dependence_vars(
           model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
         )
-        model$partial_dependence <- NULL
+        # tam #38345: PD now works for a numeric target too (predict.fun above
+        # switches to type = "value"), so the Analytics Report's
+        # {{variable_effect}} / local_importance_regression chart has data --
+        # the same contract exp_rpart's numeric report already uses. `firm`
+        # importance stays on the RMSE-drop permutation variant regardless,
+        # because calc_firm_from_pd() is written against class probabilities.
+        model$partial_dependence <- partial_dependence.exploratory_chaid(
+          model, clean_target_col, vars = imp_vars, data = df,
+          n = c(pd_grid_resolution, min(nrow(df), pd_sample_size))
+        )
       } else {
         # tam#37466: `firm` derives importance from the partial-dependence curves,
         # so unlike `permutation` it has to see the PD of EVERY predictor before it
@@ -314,7 +323,13 @@ exp_chaid <- function(df,
       }
 
       model$imp_vars <- imp_vars
-      if (isTRUE(pd_with_bin_means) && isTRUE(is_target_logical)) {
+      # tam #38345: a numeric target gets the binned-mean "Actual" overlay too --
+      # calc_partial_binning_data() takes the mean of the target within each
+      # predictor bin, which is exactly the regression reading. Multiclass is
+      # still excluded (handle_partial_dependence()'s partial_binning branch
+      # handles regression and binary only).
+      if (isTRUE(pd_with_bin_means) &&
+          (isTRUE(is_target_logical) || identical(model$target_type, "numeric"))) {
         model$partial_binning <- calc_partial_binning_data(
           df, clean_target_col, imp_vars
         )
@@ -912,10 +927,19 @@ partial_dependence.exploratory_chaid <- function(fit, target,
     return(NULL)
   }
 
+  # tam #38345: a numeric target has no class-probability distribution
+  # (chaid_predict_prepared() returns a zero-column frame for type = "prob"), so
+  # PD predicts the node MEAN instead -- the same numeric-vector contract
+  # partial_dependence.rpart() uses for its own regression case.
+  is.numeric.target <- identical(fit$target_type, "numeric")
+
   # Default S3 predict() returns class labels; PD needs class probabilities with
   # the same column names (TRUE/FALSE or class levels) that handle_partial_dependence
   # expects from rpart/ranger.
   predict.fun <- function(object, newdata) {
+    if (is.numeric.target) {
+      return(as.numeric(predict(object, newdata, type = "value")))
+    }
     prob <- as.data.frame(
       predict(object, newdata, type = "prob"),
       stringsAsFactors = FALSE,
@@ -957,16 +981,26 @@ partial_dependence.exploratory_chaid <- function(fit, target,
       if ("points" %in% names(args)) {
         args$points <- args$points[x]
       }
-      do.call(mmpf::marginalPrediction, args)
+      mp <- do.call(mmpf::marginalPrediction, args)
+      # A vector-returning predict.fun leaves mmpf's own column name on the
+      # prediction; handle_partial_dependence() finds it by attr(pd, "target").
+      if (is.numeric.target) {
+        names(mp)[ncol(mp)] <- target
+      }
+      mp
     }, simplify = FALSE), fill = TRUE)
     data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
   } else {
     pd <- do.call(mmpf::marginalPrediction, args)
+    if (is.numeric.target) {
+      names(pd)[ncol(pd)] <- target
+    }
   }
 
   attr(pd, "class") <- c("pd", "data.frame")
   attr(pd, "interaction") <- isTRUE(interaction)
-  attr(pd, "target") <- if (identical(fit$classification_type, "binary")) {
+  attr(pd, "target") <- if (is.numeric.target ||
+                            identical(fit$classification_type, "binary")) {
     target
   } else {
     fit$class_levels
