@@ -233,6 +233,91 @@ chaid_readable_one_condition <- function(condition) {
   paste0(variable, ' in (', paste(collapsed, collapse = CHAID_GROUP_SEPARATOR), ')')
 }
 
+#' Branch label for the interactive tree chart, in CART's form.
+#'
+#' `build_rpart_tree_nodes()` writes a categorical branch as `X = a, b, c`;
+#' CHAID's report convention is `X in (a + b + c)`. Both feed the SAME
+#' Characteristic Groups table (`dtree_report_characteristic_groups()` joins
+#' `edge_label` with `" AND "`), which therefore printed two formats depending
+#' on the algorithm (tam #38372). The tree chart itself already renders
+#' `a, b, c` from `cond_value`, so the CART form is also what the diagram shows.
+#'
+#' A single member (`X = a`) and a collapsed numeric run (`X <= 6`,
+#' `2 < X <= 5`) already come out CART-shaped from
+#' [chaid_readable_one_condition()] and are delegated to it. A multi-member
+#' group that still contains an interval label — a non-contiguous bin run that
+#' would not collapse — also stays with `in (...)`, because `X = <= 2, (2.8, 5]`
+#' is unreadable.
+#'
+#' @param variable Display (original) column name.
+#' @param categories Character vector of category / bin labels, already ordered
+#'   and interval-collapsed.
+#' @return A single label string.
+chaid_tree_edge_label <- function(variable, categories) {
+  categories <- as.character(categories)
+  in_form <- function() {
+    chaid_readable_one_condition(
+      paste0(variable, ' in {',
+             paste(categories, collapse = CHAID_GROUP_SEPARATOR), '}'))
+  }
+  if (length(categories) <= 1) {
+    return(in_form())
+  }
+  has_interval <- any(vapply(categories,
+                             function(one) !is.null(chaid_parse_interval(one)),
+                             logical(1)))
+  if (has_interval) {
+    return(in_form())
+  }
+  paste0(variable, ' = ', paste(categories, collapse = ', '))
+}
+
+#' Reorder every category group inside composite rule strings.
+#'
+#' A rule is a `" & "`-joined list of `<var> in {a + b}` conditions built in
+#' CHAID's MERGE order. This gives each condition's members the predictor's
+#' declared order (see [chaid_group_level_order()] / [chaid_order_group_parts()]),
+#' so the Node Summary / Rules tabs agree with the tree chart and the Category
+#' Merges table (tam #38372). Variable names are left in whatever name space the
+#' caller passed — apply this BEFORE [chaid_map_display_names_in_text()], while
+#' the names are still CLEAN, since the level lookup is keyed on the clean name.
+#'
+#' @param text Character vector of rule strings.
+#' @param model A fitted `exploratory_chaid` model.
+#' @return `text`, with each condition's members reordered.
+chaid_normalize_condition_groups <- function(text, model) {
+  text <- as.character(text)
+  if (length(text) == 0) {
+    return(text)
+  }
+  level_cache <- new.env(parent = emptyenv())
+  levels_for <- function(variable) {
+    key <- paste0('v', variable)   # avoid clashing with env internals
+    if (!exists(key, envir = level_cache, inherits = FALSE)) {
+      assign(key, list(chaid_group_level_order(model, variable)), envir = level_cache)
+    }
+    get(key, envir = level_cache, inherits = FALSE)[[1]]
+  }
+  map_condition <- function(condition) {
+    m <- regmatches(condition, regexec('^(.*) in \\{(.*)\\}$', condition))[[1]]
+    if (length(m) != 3) {
+      return(condition)
+    }
+    variable <- m[2]
+    parts <- strsplit(m[3], CHAID_GROUP_SEPARATOR, fixed = TRUE)[[1]]
+    parts <- chaid_order_group_parts(parts, levels_for(variable))
+    paste0(variable, ' in {', paste(parts, collapse = CHAID_GROUP_SEPARATOR), '}')
+  }
+  vapply(text, function(rule) {
+    if (is.na(rule)) {
+      return(NA_character_)
+    }
+    conditions <- chaid_split_conditions(rule)
+    paste(vapply(conditions, map_condition, character(1)),
+          collapse = CHAID_CONDITION_SEPARATOR)
+  }, character(1), USE.NAMES = FALSE)
+}
+
 #' Rewrite a CHAID node rule in readable form.
 #'
 #' Drops the leading `Root` term, collapses contiguous numeric bin groups into

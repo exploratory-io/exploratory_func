@@ -261,3 +261,63 @@ test_that('chaid_group_level_order resolves a CLEAN variable name through terms_
   # exactly as chaid_numeric_intervals()/chaid_category_merge_table() do).
   expect_equal(chaid_group_level_order(model, '部署.1'), c('営業', '研究開発', '人事'))
 })
+
+# tam #38372 -----------------------------------------------------------------
+# CHAID records a merged group in MERGE order; CART (build_rpart_tree_nodes())
+# emits its category lists straight out of attr(x, "xlevels"), i.e. always in
+# level order. These two helpers bring the tree chart and the rule tables onto
+# CART's convention.
+
+test_that('chaid_tree_edge_label writes a categorical branch in CART form (tam #38372)', {
+  # Multi-member categorical group -> "col = a, b, c" (build_rpart_tree_nodes'
+  # make_edge_and_cond()), NOT CHAID's report-table "col in (a + b + c)".
+  expect_equal(chaid_tree_edge_label('部署', c('営業', '研究開発', '人事')),
+               '部署 = 営業, 研究開発, 人事')
+  # A single member already reads as an equality in both algorithms.
+  expect_equal(chaid_tree_edge_label('部署', '営業'), '部署 = 営業')
+  # A collapsed numeric run keeps the readable inequality form (tam #37177).
+  expect_equal(chaid_tree_edge_label('給料', '<= 2695.8'), '給料 <= 2695.8')
+  expect_equal(chaid_tree_edge_label('給料', '> 4228.8'), '給料 > 4228.8')
+  expect_equal(chaid_tree_edge_label('給料', '(2695.8, 4228.8]'),
+               '2695.8 < 給料 <= 4228.8')
+  # A multi-member run that still contains an interval (a NON-contiguous bin run
+  # that would not collapse) must not read "給料 = <= 2, (2.8, 5]".
+  expect_equal(chaid_tree_edge_label('給料', c('<= 2', '(2.8, 5]')),
+               '給料 in (<= 2 + (2.8, 5])')
+})
+
+test_that('chaid_normalize_condition_groups reorders every group in a rule (tam #38372)', {
+  model <- list(
+    original_factor_levels = list(部署 = c('営業', '研究開発', '人事')),
+    predictor_info = list(
+      部署 = list(ordered = FALSE, levels = c('研究開発', '人事', '営業')),
+      婚姻ステータス = list(ordered = FALSE, levels = c('離婚', '既婚', '独身')),
+      年齢 = list(ordered = TRUE, levels = c('<= 26', '(26, 29]', '> 29'))
+    )
+  )
+  # Declared factor order.
+  expect_equal(chaid_normalize_condition_groups('部署 in {人事 + 営業}', model),
+               '部署 in {営業 + 人事}')
+  # Every condition of a composite rule is normalized independently, and the
+  # "Root" term is passed through untouched for chaid_readable_condition().
+  expect_equal(
+    chaid_normalize_condition_groups(
+      'Root & 部署 in {人事 + 研究開発 + 営業} & 年齢 in {> 29 + (26, 29]}', model),
+    'Root & 部署 in {営業 + 研究開発 + 人事} & 年齢 in {(26, 29] + > 29}')
+  # A character predictor has no declared order -> alphabetical (same rule the
+  # Category Merges table already applies).
+  expect_equal(
+    chaid_normalize_condition_groups('婚姻ステータス in {独身 + 既婚}', model),
+    '婚姻ステータス in {既婚 + 独身}')
+  # A variable with no level information keeps alphabetical order; a fragment
+  # that is not a group condition is left alone; NA passes through.
+  expect_equal(chaid_normalize_condition_groups('存在しない列 in {b + a}', model),
+               '存在しない列 in {a + b}')
+  expect_equal(chaid_normalize_condition_groups('Root', model), 'Root')
+  expect_true(is.na(chaid_normalize_condition_groups(NA_character_, model)))
+  expect_equal(chaid_normalize_condition_groups(character(0), model), character(0))
+  # Vectorized.
+  expect_equal(
+    chaid_normalize_condition_groups(c('部署 in {人事 + 営業}', 'Root'), model),
+    c('部署 in {営業 + 人事}', 'Root'))
+})

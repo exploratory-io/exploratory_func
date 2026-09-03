@@ -1665,7 +1665,8 @@ chaid_node_summary <- function(model) {
   if (identical(model$target_type, 'numeric')) {
     return(data.frame(
       Node = model$nodes$node_id,
-      Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule, model$terms_mapping)),
+      Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule, model), model$terms_mapping)),
       Rows = model$nodes$n,
       `%` = model$nodes$n / root.n * 100,
       Mean = model$nodes$node_mean,
@@ -1686,7 +1687,8 @@ chaid_node_summary <- function(model) {
     # collapsed to one inequality. The root row reads "All".
     # `rule`/`split_variable` are in CLEAN (fit-time) name space -- map back to
     # the column's real name for display (chaid_map_display_name(_in_text)()).
-    Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule, model$terms_mapping)),
+    Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule, model), model$terms_mapping)),
     Rows = model$nodes$n,
     `%` = model$nodes$n / root.n * 100,
     `Predicted Class` = model$nodes$predicted_class,
@@ -1714,7 +1716,8 @@ chaid_rule_table <- function(model) {
   if (identical(model$target_type, 'numeric')) {
     return(data.frame(
       Node = model$nodes$node_id[terminal],
-      Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule[terminal], model$terms_mapping)),
+      Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule[terminal], model), model$terms_mapping)),
       Prediction = model$nodes$predicted_class[terminal],
       Mean = model$nodes$node_mean[terminal],
       `Std. Dev.` = model$nodes$node_sd[terminal],
@@ -1726,7 +1729,8 @@ chaid_rule_table <- function(model) {
   data.frame(
     Node = model$nodes$node_id[terminal],
     # tam #37177: see chaid_node_summary(). tam#38107: map clean -> original name.
-    Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule[terminal], model$terms_mapping)),
+    Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule[terminal], model), model$terms_mapping)),
     Prediction = model$nodes$predicted_class[terminal],
     Probability = vapply(
       model$nodes$class_distribution[terminal],
