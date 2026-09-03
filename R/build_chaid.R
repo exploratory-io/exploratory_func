@@ -1406,6 +1406,20 @@ build_chaid_tree_nodes <- function(x) {
     if (length(edge_row) == 1) {
       cond_column <- map_name(edges$split_variable[edge_row])
       original_categories <- strsplit(edges$original_categories[edge_row], " \\| ")[[1]]
+      # tam #38372: CHAID records a merged group in MERGE order, so a branch on a
+      # declared factor read "30代, 20代, 40代". CART emits its category lists
+      # straight out of `attr(x, "xlevels")`, i.e. always in level order. Re-order
+      # to the predictor's declared order (chaid_group_level_order() falls back to
+      # ordered/binned-numeric levels, then to alphabetical) BEFORE collapsing --
+      # the merges table has done this since tam #37177, so the tree used to
+      # disagree with it on the very same model. Ordering first also gives
+      # chaid_collapse_intervals() the ascending run it needs to fold.
+      # `edges$split_variable` is the CLEAN (fit-time) name that
+      # chaid_group_level_order() expects; `cond_column` is already mapped back.
+      original_categories <- chaid_order_group_parts(
+        original_categories,
+        chaid_group_level_order(x, edges$split_variable[edge_row])
+      )
       # tam #37177: a branch built from a run of contiguous numeric bins reads
       # as the range it covers ("<= 2317.6, (2317.6, 2695.8]" -> "<= 2695.8").
       # cond_value stays the collapsed bin/category labels so DTreeGenerator's
@@ -1415,10 +1429,7 @@ build_chaid_tree_nodes <- function(x) {
       # "給料 = (2695.8, 4228.8]" -> "2695.8 < 給料 <= 4228.8") so the
       # characteristic-groups Condition column and tree chart match CART.
       display_categories <- chaid_collapse_intervals(original_categories)
-      edge_label <- chaid_readable_one_condition(
-        paste0(cond_column, " in {",
-               paste(display_categories, collapse = CHAID_GROUP_SEPARATOR), "}")
-      )
+      edge_label <- chaid_tree_edge_label(cond_column, display_categories)
       cond_value <- as.character(jsonlite::toJSON(as.character(display_categories)))
     } else {
       cond_column <- NA_character_

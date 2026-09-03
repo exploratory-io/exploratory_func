@@ -789,3 +789,90 @@ test_that("a comma-containing predictor column name survives report tables uncor
     expect_true(all(intervals$Variable %in% c("price", "気に入った, 理由")))
   }
 })
+
+# tam #38372 -----------------------------------------------------------------
+# A declared factor whose CHAID merge order differs from its level order. The
+# probabilities make {20s, 30s, 40s} merge into one branch and {50s, 60s+} into
+# another; which of the three is merged first (and therefore the order CHAID
+# records) is an artifact of the merge loop, so the tree used to read
+# "40s, 30s, 20s".
+make_declared_level_df <- function(n = 1000, seed = 38372) {
+  set.seed(seed)
+  age_levels <- c("20s", "30s", "40s", "50s", "60s+")
+  job_levels <- c("student", "employee", "homemaker", "specialist", "parttime",
+                  "selfemployed", "unemployed", "officer", "executive", "other")
+  df <- data.frame(
+    age = factor(sample(age_levels, n, TRUE, prob = c(.2, .25, .25, .2, .1)),
+                 levels = age_levels),
+    job = factor(sample(job_levels, n, TRUE), levels = job_levels),
+    stringsAsFactors = FALSE
+  )
+  df$renew <- runif(n) < ifelse(df$age %in% c("20s", "30s", "40s"), 0.66, 0.32)
+  attr(df, "level_order") <- list(age = age_levels, job = job_levels)
+  df
+}
+
+test_that("tree_nodes category branches use the declared level order (tam #38372)", {
+  df <- make_declared_level_df()
+  level_order <- attr(df, "level_order")
+  model_df <- suppressWarnings(exp_chaid(df, renew, age, job,
+                                         min_split = 40, min_bucket = 20))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  branches <- nodes[!is.na(nodes$cond_column), ]
+  expect_gt(nrow(branches), 0)
+
+  values_of <- lapply(branches$cond_value, jsonlite::fromJSON)
+  # Guard the guard: a tree whose every branch holds ONE category would make the
+  # ordering assertion below vacuously true.
+  expect_true(any(vapply(values_of, length, integer(1)) > 1))
+
+  for (i in seq_len(nrow(branches))) {
+    values <- values_of[[i]]
+    declared <- level_order[[branches$cond_column[i]]]
+    # Same contract as CART: the members are the declared levels, in declared
+    # order (build_rpart_tree_nodes reads them out of attr(x, "xlevels")).
+    expect_equal(values, declared[declared %in% values])
+    # ...and the branch label is CART's "col = a, b, c", not "col in (a + b)".
+    expect_equal(branches$edge_label[i],
+                 paste0(branches$cond_column[i], " = ",
+                        paste(values, collapse = ", ")))
+  }
+})
+
+test_that("node_summary / rules category groups match the tree's order (tam #38372)", {
+  df <- make_declared_level_df()
+  level_order <- attr(df, "level_order")
+  model_df <- suppressWarnings(exp_chaid(df, renew, age, job,
+                                         min_split = 40, min_bucket = 20))
+
+  # Every "<var> in (a + b)" group in any rendered rule, from every table that
+  # renders one, must be in the same declared order the tree branch uses.
+  expect_groups_ordered <- function(text) {
+    hits <- regmatches(text, gregexpr("[^ &]+ in \\([^)]*\\)", text))
+    for (rule_hits in hits) {
+      for (hit in rule_hits) {
+        m <- regmatches(hit, regexec("^(.*) in \\((.*)\\)$", hit))[[1]]
+        declared <- level_order[[m[2]]]
+        if (is.null(declared)) next
+        members <- strsplit(m[3], " + ", fixed = TRUE)[[1]]
+        expect_equal(members, declared[declared %in% members])
+      }
+    }
+  }
+  node_summary <- model_df %>% tidy_rowwise(model, type = "node_summary")
+  rules <- model_df %>% tidy_rowwise(model, type = "rules")
+  merges <- model_df %>% tidy_rowwise(model, type = "category_merges")
+  expect_gt(sum(grepl(" in \\(", node_summary$Rule)), 0)
+  expect_groups_ordered(node_summary$Rule)
+  expect_groups_ordered(rules$Rule)
+
+  # The original symptom: the Category Merges table has ordered its members
+  # since tam #37177, so the tree and the rules disagreed with it on the very
+  # same model. Every merged group must now appear in the rules verbatim.
+  merged <- merges[["Merged Category"]]
+  merged <- merged[grepl(" + ", merged, fixed = TRUE)]
+  expect_gt(length(merged), 0)
+  for (group in merged) {
+    expect_true(any(grepl(paste0("(", group, ")"), node_summary$Rule, fixed = TRUE)))
+  }
+})
