@@ -321,3 +321,67 @@ test_that('chaid_normalize_condition_groups reorders every group in a rule (tam 
     chaid_normalize_condition_groups(c('部署 in {人事 + 営業}', 'Root'), model),
     c('部署 in {営業 + 人事}', 'Root'))
 })
+
+# tam #38372 (follow-up) ------------------------------------------------------
+# CHAID used to assign node ids in group-CREATION order and leave the
+# left-to-right reordering to the chart, so every report tab's Node column
+# disagreed with the chart's chip numbers. The ordering now happens where the
+# ids are assigned.
+
+test_that('chaid_display_class_order puts the positive class first for a binary target', {
+  expect_equal(chaid_display_class_order(c('FALSE', 'TRUE')), c('TRUE', 'FALSE'))
+  expect_equal(chaid_display_class_order(c('TRUE', 'FALSE')), c('TRUE', 'FALSE'))
+  expect_equal(chaid_display_class_order(c('No', 'Yes')), c('Yes', 'No'))
+  # A 2-class target that is neither logical nor Yes/No keeps its level order.
+  expect_equal(chaid_display_class_order(c('B', 'A')), c('B', 'A'))
+  # 3+ classes always keep their level order.
+  expect_equal(chaid_display_class_order(c('20代', '30代', '40代')), c('20代', '30代', '40代'))
+  expect_equal(chaid_display_class_order(character(0)), character(0))
+})
+
+test_that('chaid_order_children_for_display ranks TRUE first and FALSE last', {
+  edges <- data.frame(parent_id = c(1L, 1L), child_id = c(2L, 3L),
+                      original_categories = c('FALSE', 'TRUE'), stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L, 3L), predicted_class = c('X', 'X', 'X'),
+                      stringsAsFactors = FALSE)
+  # R created the FALSE child first (id 2); TRUE must still come out on the left.
+  expect_equal(chaid_order_children_for_display(c(2L, 3L), edges, nodes, c('X')), c(3L, 2L))
+})
+
+test_that('chaid_order_children_for_display keeps binned-numeric children ascending', {
+  edges <- data.frame(parent_id = rep(1L, 3), child_id = c(2L, 3L, 4L),
+                      original_categories = c('(30, 40]', '> 40', '<= 30'),
+                      stringsAsFactors = FALSE)
+  # Deliberately non-monotone predicted classes: the numeric order must win, or a
+  # numeric axis stops reading low -> high left -> right.
+  nodes <- data.frame(node_id = c(1L, 2L, 3L, 4L),
+                      predicted_class = c('40代', '50代', '20代', '40代'),
+                      stringsAsFactors = FALSE)
+  expect_equal(
+    chaid_order_children_for_display(c(2L, 3L, 4L), edges, nodes,
+                                     c('20代', '30代', '40代', '50代')),
+    c(4L, 2L, 3L))
+})
+
+test_that('chaid_order_children_for_display ranks nominal children by predicted class', {
+  edges <- data.frame(parent_id = c(1L, 1L), child_id = c(2L, 3L),
+                      original_categories = c('その他 | 公務員', '会社員'),
+                      stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L, 3L), predicted_class = c('50代', '50代', '40代'),
+                      stringsAsFactors = FALSE)
+  # The 40代 child was created second (id 3) but must render on the left.
+  expect_equal(
+    chaid_order_children_for_display(c(2L, 3L), edges, nodes,
+                                     c('20代', '30代', '40代', '50代')),
+    c(3L, 2L))
+  # With no class information (numeric target) it falls back to a stable id order.
+  expect_equal(chaid_order_children_for_display(c(2L, 3L), edges, nodes, NULL), c(2L, 3L))
+})
+
+test_that('chaid_order_children_for_display is a no-op for fewer than two children', {
+  edges <- data.frame(parent_id = 1L, child_id = 2L, original_categories = 'A',
+                      stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L), predicted_class = c('A', 'A'), stringsAsFactors = FALSE)
+  expect_equal(chaid_order_children_for_display(2L, edges, nodes, c('A')), 2L)
+  expect_equal(chaid_order_children_for_display(integer(0), edges, nodes, c('A')), integer(0))
+})

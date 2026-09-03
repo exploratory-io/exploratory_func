@@ -191,7 +191,7 @@ chaid_fit <- function(data,
       class_levels = class.levels,
       numeric_target = numeric.target
     )
-    tree <- chaid_renumber_nodes_bfs(tree)
+    tree <- chaid_renumber_nodes_bfs(tree, class_levels = class.levels)
     model$nodes <- tree$nodes
     model$edges <- tree$edges
     model$.node_metadata <- tree$node_metadata
@@ -1249,18 +1249,27 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
 #' ids through chaid_build_split_index.
 #'
 #' @param tree The list returned by grow_chaid_tree.
+#' @param class_levels The fitted target's class levels, or `NULL` for a numeric
+#'   target. Used only to rank siblings by predicted class
+#'   ([chaid_order_children_for_display()]).
 #' @return The same list with node ids renumbered breadth-first.
-chaid_renumber_nodes_bfs <- function(tree) {
+chaid_renumber_nodes_bfs <- function(tree, class_levels = NULL) {
   nodes <- tree$nodes
   if (is.null(nodes) || nrow(nodes) < 2) {
     return(tree)
   }
   edges <- tree$edges
-  # Children in creation order, which is the group order = left to right.
+  # tam #38372: children in the order the CHART draws them, left to right -- NOT
+  # in group-creation order. Creation order is CHAID's category-merge order, so
+  # the ids it produced disagreed with the chart's chip numbers the moment the
+  # chart applied its own TRUE-left / bins-ascending / predicted-class ordering,
+  # desynchronising every report tab's Node column from the diagram.
+  class.order <- if (is.null(class_levels)) NULL else chaid_display_class_order(class_levels)
   children.of <- if (is.null(edges) || nrow(edges) == 0) {
     list()
   } else {
-    split(as.integer(edges$child_id), as.character(edges$parent_id))
+    lapply(split(as.integer(edges$child_id), as.character(edges$parent_id)),
+           function(kids) chaid_order_children_for_display(kids, edges, nodes, class.order))
   }
 
   visit.order <- integer(0)

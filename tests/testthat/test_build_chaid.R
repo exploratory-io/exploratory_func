@@ -876,3 +876,73 @@ test_that("node_summary / rules category groups match the tree's order (tam #383
     expect_true(any(grepl(paste0("(", group, ")"), node_summary$Rule, fixed = TRUE)))
   }
 })
+
+test_that("node ids are assigned in the chart's left-to-right order (tam #38372)", {
+  # A nominal split whose two branches predict DIFFERENT classes: the chart ranks
+  # them by predicted class, so the ids must too or every report tab's Node
+  # column points at the wrong branch.
+  set.seed(38372); n <- 1200
+  jobs <- c("student", "employee", "homemaker", "specialist", "parttime",
+            "selfemployed", "unemployed", "officer", "executive", "other")
+  job <- sample(jobs, n, TRUE)
+  band <- ifelse(runif(n) < ifelse(job %in% c("homemaker", "employee"), 0.15, 0.80), "50s", "40s")
+  df <- data.frame(job = job, renewed = runif(n) < 0.5,
+                   age_band = factor(band, levels = c("20s", "30s", "40s", "50s", "60s+")),
+                   stringsAsFactors = FALSE)
+  model_df <- suppressWarnings(exp_chaid(df, age_band, job, renewed,
+                                         min_split = 20, min_bucket = 10, max_depth = 3))
+  model <- model_df$model[[1]]
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+
+  # The tidy is 0-based, the model 1-based; both must be the SAME ordering.
+  expect_equal(model$nodes$node_id, sort(model$nodes$node_id))
+  expect_equal(nodes$node_id, model$nodes$node_id - 1L)
+
+  # Re-derive the chart's own sibling order from the emitted rows and require the
+  # ids to already be in it -- i.e. DTreeGenerator's reorder is a no-op.
+  class_order <- chaid_display_class_order(model$class_levels)
+  by_parent <- split(nodes$node_id[!is.na(nodes$parent_id)],
+                     nodes$parent_id[!is.na(nodes$parent_id)])
+  expect_gt(length(by_parent), 0)
+  for (kids in by_parent) {
+    expect_equal(kids, sort(kids), info = "children ids must ascend left to right")
+    predicted <- vapply(kids, function(k) as.character(nodes$predicted[nodes$node_id == k]),
+                        character(1))
+    ranks <- match(predicted, class_order)
+    # Within one parent, predicted-class ranks are non-decreasing unless a
+    # TRUE/FALSE or numeric-bin rule took precedence. This fixture's splits are
+    # nominal, so the class rule is the one in force.
+    if (all(!is.na(ranks))) {
+      expect_equal(ranks, sort(ranks),
+                   info = "nominal siblings must be ordered by predicted class")
+    }
+  }
+
+  # The reported symptom, stated directly: the FIRST child of the root is the one
+  # predicting the EARLIER class, not the one CHAID happened to merge first.
+  root_kids <- sort(nodes$node_id[!is.na(nodes$parent_id) & nodes$parent_id == 0])
+  expect_gte(length(root_kids), 2)
+  first_pred <- as.character(nodes$predicted[nodes$node_id == root_kids[1]])
+  last_pred <- as.character(nodes$predicted[nodes$node_id == root_kids[length(root_kids)]])
+  expect_lte(match(first_pred, class_order), match(last_pred, class_order))
+})
+
+test_that("a logical predictor's TRUE branch gets the lower node id (tam #38372)", {
+  set.seed(23); n <- 900
+  renewed <- runif(n) < 0.5
+  df <- data.frame(renewed = renewed, tenure = sample(1:60, n, TRUE), stringsAsFactors = FALSE)
+  df$satisfied <- runif(n) < ifelse(renewed, 0.85, 0.15)
+  model_df <- suppressWarnings(exp_chaid(df, satisfied, renewed, tenure,
+                                         min_split = 20, min_bucket = 10, max_depth = 3))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  logical_edges <- nodes[!is.na(nodes$cond_column) & nodes$cond_column == "renewed", ]
+  expect_gte(nrow(logical_edges), 2)
+  value_of <- function(i) jsonlite::fromJSON(logical_edges$cond_value[i])[[1]]
+  true_id <- logical_edges$node_id[vapply(seq_len(nrow(logical_edges)),
+                                          function(i) identical(value_of(i), "TRUE"), logical(1))]
+  false_id <- logical_edges$node_id[vapply(seq_len(nrow(logical_edges)),
+                                           function(i) identical(value_of(i), "FALSE"), logical(1))]
+  expect_length(true_id, 1)
+  expect_length(false_id, 1)
+  expect_lt(true_id, false_id)
+})

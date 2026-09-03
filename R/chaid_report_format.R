@@ -233,6 +233,124 @@ chaid_readable_one_condition <- function(condition) {
   paste0(variable, ' in (', paste(collapsed, collapse = CHAID_GROUP_SEPARATOR), ')')
 }
 
+#' Display order of a classification target's class labels.
+#'
+#' For a 2-class logical / Yes-No target the POSITIVE class is listed first, so a
+#' FALSE-predicted node still shows its TRUE proportion at the top (SPSS parity).
+#' Every other target keeps its level order. This is the order the tree chart's
+#' class table uses, so it is also the order sibling nodes are ranked by when
+#' nothing else separates them (tam #38372).
+#'
+#' @param class_levels Character vector of the fitted target's class levels.
+#' @return `class_levels`, reordered for display.
+chaid_display_class_order <- function(class_levels) {
+  class_levels <- as.character(class_levels)
+  k <- length(class_levels)
+  if (k != 2) {
+    return(class_levels)
+  }
+  up <- toupper(class_levels)
+  positive.idx <- if (setequal(up, c('FALSE', 'TRUE'))) {
+    which(up == 'TRUE')
+  } else if (setequal(up, c('NO', 'YES'))) {
+    which(up == 'YES')
+  } else {
+    NA_integer_
+  }
+  if (is.na(positive.idx)) {
+    return(class_levels)
+  }
+  class_levels[c(positive.idx, setdiff(seq_len(k), positive.idx))]
+}
+
+#' Order one node's children the way the tree chart draws them, left to right.
+#'
+#' MUST stay in lockstep with `DTreeGenerator._orderChildrenTrueLeft` (tam
+#' `src/js/viz/DTreeGenerator.js`) and its report-side mirror
+#' `dtree_renumber_tree_nodes_true_left` (tam `public/lib/library.r`). Tie-breaks
+#' are applied in this order and the FIRST one that separates a pair wins:
+#'
+#'   1. TRUE/Yes first, FALSE/No last (tam #37252).
+#'   2. A binned-numeric run's lowest bound, ascending, so a numeric axis reads
+#'      low -> high left -> right. This MUST outrank the class tie-break below --
+#'      a non-monotone predictor/target relationship would otherwise scramble the
+#'      bins.
+#'   3. The predicted class, in the target's own display order
+#'      ([chaid_display_class_order()]).
+#'   4. The child's own id, so the result is always deterministic.
+#'
+#' Before tam #38372 CHAID emitted ids in group-CREATION order and left the
+#' reordering to the chart, which desynchronised every report tab's Node column
+#' from the chart's chip numbers. Ordering here instead makes the chart's own
+#' reorder a no-op and every consumer agree.
+#'
+#' @param kids Integer vector of child node ids.
+#' @param edges The tree's edge frame (`parent_id`, `child_id`, `original_categories`).
+#' @param nodes The tree's node frame (`node_id`, `predicted_class`).
+#' @param class_order Target class labels in display order, or `NULL` for a
+#'   numeric target (no class tie-break).
+#' @return `kids`, reordered left to right.
+chaid_order_children_for_display <- function(kids, edges, nodes, class_order = NULL) {
+  kids <- as.integer(kids)
+  if (length(kids) < 2) {
+    return(kids)
+  }
+  values.of <- function(child) {
+    row <- which(edges$child_id == child)
+    if (length(row) != 1) {
+      return(character(0))
+    }
+    raw <- edges$original_categories[row]
+    if (is.na(raw)) {
+      return(character(0))
+    }
+    trimws(strsplit(as.character(raw), ' | ', fixed = TRUE)[[1]])
+  }
+  side.rank <- function(child) {
+    values <- toupper(values.of(child))
+    true.side <- any(values %in% c('TRUE', 'YES'))
+    false.side <- any(values %in% c('FALSE', 'NO'))
+    if (true.side && !false.side) return(0L)
+    if (false.side && !true.side) return(2L)
+    1L
+  }
+  # Lowest numeric bound of a binned-numeric run; NA for a nominal split. Reuses
+  # chaid_parse_interval() rather than adding another bin-label regex.
+  ordered.key <- function(child) {
+    values <- values.of(child)
+    if (length(values) == 0) return(NA_real_)
+    lo <- NA_real_
+    for (label in values) {
+      parsed <- chaid_parse_interval(label)
+      if (is.null(parsed)) return(NA_real_)
+      v <- parsed$lower_value
+      if (!is.finite(v) && v > 0) return(NA_real_)   # defensive; lower is never +Inf
+      if (is.na(lo) || v < lo) lo <- v
+    }
+    lo
+  }
+  class.rank <- function(child) {
+    if (is.null(class_order) || length(class_order) == 0) return(NA_real_)
+    row <- which(nodes$node_id == child)
+    if (length(row) != 1) return(NA_real_)
+    hit <- match(as.character(nodes$predicted_class[row]), as.character(class_order))
+    if (is.na(hit)) NA_real_ else as.numeric(hit)
+  }
+
+  ranks <- vapply(kids, side.rank, integer(1))
+  keys <- vapply(kids, ordered.key, numeric(1))
+  classes <- vapply(kids, class.rank, numeric(1))
+  # A nominal split has no numeric key on ANY child; only then does class order
+  # get a say (matching the JS, which requires both keys to be absent).
+  if (any(!is.na(keys))) {
+    classes <- rep(NA_real_, length(kids))
+  }
+  kids[order(ranks,
+             ifelse(is.na(keys), 0, keys),
+             ifelse(is.na(classes), 0, classes),
+             kids)]
+}
+
 #' Branch label for the interactive tree chart, in CART's form.
 #'
 #' `build_rpart_tree_nodes()` writes a categorical branch as `X = a, b, c`;

@@ -1312,16 +1312,13 @@ build_chaid_tree_nodes <- function(x) {
     if (!is.null(tm) && v %in% names(tm)) unname(tm[v]) else v
   }
 
-  # Positive class first for a 2-class target (SPSS-style ordering).
-  ord <- seq_along(class_levels)
-  if (!is_reg && length(class_levels) == 2) {
-    up <- toupper(class_levels)
-    positive_idx <- if (setequal(up, c("FALSE", "TRUE"))) which(up == "TRUE")
-                    else if (setequal(up, c("NO", "YES"))) which(up == "YES")
-                    else NA_integer_
-    if (!is.na(positive_idx)) {
-      ord <- c(positive_idx, setdiff(seq_along(class_levels), positive_idx))
-    }
+  # Positive class first for a 2-class target (SPSS-style ordering). Shared with
+  # chaid_renumber_nodes_bfs()'s sibling ranking so the class table's order and
+  # the left-to-right node order can never drift apart (tam #38372).
+  ord <- if (is_reg) {
+    seq_along(class_levels)
+  } else {
+    match(chaid_display_class_order(class_levels), class_levels)
   }
 
   # tam #38166: numeric-target-only. A shared-breaks target histogram per
