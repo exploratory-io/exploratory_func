@@ -946,3 +946,26 @@ test_that("a logical predictor's TRUE branch gets the lower node id (tam #38372)
   expect_length(false_id, 1)
   expect_lt(true_id, false_id)
 })
+
+test_that("a logical target's TRUE-heavy branch gets the lower node id (tam #38357)", {
+  # The low numeric range has the lowest condition bound, but the high range has
+  # the much higher TRUE rate. The chart puts TRUE-heavy children on the left,
+  # so CHAID must assign ids in that order before emitting tree_nodes.
+  set.seed(1); n <- 1000
+  x <- rnorm(n)
+  y <- runif(n) < ifelse(x > 0, 0.9, 0.1)
+  model_df <- suppressWarnings(exp_chaid(data.frame(x = x, y = y), y, x,
+                                         min_split = 20, min_bucket = 10, max_depth = 1,
+                                         max_pd_vars = 0, seed = 1))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  root_kids <- nodes$node_id[!is.na(nodes$parent_id) & nodes$parent_id == 0]
+  expect_gte(length(root_kids), 2)
+  true_rate <- function(id) {
+    classes <- jsonlite::fromJSON(nodes$class_json[nodes$node_id == id])
+    hit <- classes$pct[toupper(as.character(classes$label)) %in% c('TRUE', 'YES')]
+    if (length(hit) == 0) 0 else as.numeric(hit[1])
+  }
+  rates <- vapply(root_kids, true_rate, numeric(1))
+  expect_gt(max(rates) - min(rates), 0.5)
+  expect_equal(rates, sort(rates, decreasing = TRUE))
+})

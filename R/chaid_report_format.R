@@ -267,8 +267,11 @@ chaid_display_class_order <- function(class_levels) {
 #'
 #' MUST stay in lockstep with `DTreeGenerator._orderChildrenTrueLeft` (tam
 #' `src/js/viz/DTreeGenerator.js`) and its report-side mirror
-#' `dtree_renumber_tree_nodes_true_left` (tam `public/lib/library.r`). Tie-breaks
-#' are applied in this order and the FIRST one that separates a pair wins:
+#' `dtree_renumber_tree_nodes_true_left` (tam `public/lib/library.r`). For a
+#' logical target (TRUE/FALSE or Yes/No), the child TRUE rate is the primary key,
+#' followed by the condition side rank and child id (tam #38357). For every other
+#' target, tie-breaks are applied in this order and the FIRST one that separates a
+#' pair wins:
 #'
 #'   1. TRUE/Yes first, FALSE/No last (tam #37252).
 #'   2. A binned-numeric run's lowest bound, ascending, so a numeric axis reads
@@ -286,7 +289,8 @@ chaid_display_class_order <- function(class_levels) {
 #'
 #' @param kids Integer vector of child node ids.
 #' @param edges The tree's edge frame (`parent_id`, `child_id`, `original_categories`).
-#' @param nodes The tree's node frame (`node_id`, `predicted_class`).
+#' @param nodes The tree's node frame (`node_id`, `predicted_class`,
+#'   `class_distribution`).
 #' @param class_order Target class labels in display order, or `NULL` for a
 #'   numeric target (no class tie-break).
 #' @return `kids`, reordered left to right.
@@ -336,8 +340,29 @@ chaid_order_children_for_display <- function(kids, edges, nodes, class_order = N
     hit <- match(as.character(nodes$predicted_class[row]), as.character(class_order))
     if (is.na(hit)) NA_real_ else as.numeric(hit)
   }
+  class.labels <- toupper(as.character(class_order))
+  is.logical.target <- length(class.labels) == 2 &&
+    (setequal(class.labels, c('FALSE', 'TRUE')) ||
+       setequal(class.labels, c('NO', 'YES')))
+  true.rate <- function(child) {
+    if (!is.logical.target || !('class_distribution' %in% names(nodes))) return(0)
+    row <- which(nodes$node_id == child)
+    if (length(row) != 1) return(0)
+    distribution <- nodes$class_distribution[[row]]
+    if (is.null(distribution) || length(distribution) == 0) return(0)
+    hit <- which(toupper(names(distribution)) %in% c('TRUE', 'YES'))
+    if (length(hit) == 0) return(0)
+    rate <- suppressWarnings(as.numeric(distribution[hit[1]]))
+    if (is.na(rate) || !is.finite(rate)) 0 else rate
+  }
 
   ranks <- vapply(kids, side.rank, integer(1))
+  if (is.logical.target) {
+    # Match DTreeGenerator._orderChildrenTrueLeft: a logical target's more
+    # TRUE-heavy branch is always leftmost; condition rank only breaks a tie.
+    rates <- -vapply(kids, true.rate, numeric(1))
+    return(kids[order(rates, ranks, kids)])
+  }
   keys <- vapply(kids, ordered.key, numeric(1))
   classes <- vapply(kids, class.rank, numeric(1))
   # A nominal split has no numeric key on ANY child; only then does class order

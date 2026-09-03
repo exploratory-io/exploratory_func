@@ -378,6 +378,23 @@ test_that('chaid_order_children_for_display ranks nominal children by predicted 
   expect_equal(chaid_order_children_for_display(c(2L, 3L), edges, nodes, NULL), c(2L, 3L))
 })
 
+test_that('chaid_order_children_for_display ranks a logical target by TRUE rate first', {
+  edges <- data.frame(parent_id = c(1L, 1L), child_id = c(2L, 3L),
+                      original_categories = c('<= 0', '> 0'), stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L, 3L), predicted_class = c('TRUE', 'FALSE', 'TRUE'),
+                      stringsAsFactors = FALSE)
+  nodes$class_distribution <- list(
+    c('TRUE' = 0.5, 'FALSE' = 0.5),
+    c('TRUE' = 0.1, 'FALSE' = 0.9),
+    c('TRUE' = 0.9, 'FALSE' = 0.1)
+  )
+  # The numeric condition would put <= 0 first, but tam's logical-tree chart
+  # puts the more TRUE-heavy > 0 child on the left.
+  expect_equal(
+    chaid_order_children_for_display(c(2L, 3L), edges, nodes, c('TRUE', 'FALSE')),
+    c(3L, 2L))
+})
+
 test_that('chaid_order_children_for_display is a no-op for fewer than two children', {
   edges <- data.frame(parent_id = 1L, child_id = 2L, original_categories = 'A',
                       stringsAsFactors = FALSE)
