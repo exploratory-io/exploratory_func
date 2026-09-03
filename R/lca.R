@@ -208,6 +208,7 @@ lca_class_selection_table <- function(candidates) {
     if (is.null(candidate$fit)) {
       return(tibble::tibble(
         number_of_classes = candidate$nclass, log_likelihood = NA_real_, aic = NA_real_, bic = NA_real_,
+        entropy = NA_real_,
         minimum_class_share = NA_real_, mean_maximum_membership_probability = NA_real_,
         pct_low_confidence = NA_real_, converged = FALSE, error = candidate$error
       ))
@@ -220,6 +221,7 @@ lca_class_selection_table <- function(candidates) {
       log_likelihood = fit$llik,
       aic = fit$aic,
       bic = fit$bic,
+      entropy = lca_entropy(fit),
       minimum_class_share = min(fit$P),
       mean_maximum_membership_probability = mean(max_posterior),
       pct_low_confidence = mean(max_posterior < 0.6),
@@ -233,6 +235,34 @@ lca_class_selection_table <- function(candidates) {
       error = if (converged) NA_character_ else lca_stop_reason(fit)
     )
   }))
+}
+
+# tam#38383: normalized entropy (the "entropy R-squared" / relative entropy
+# criterion, Ramaswamy et al. 1993) -- how cleanly the posterior assigns rows
+# to classes, on 0..1 where 1 means every row belongs to exactly one class.
+#
+#   E = 1 - ( -sum_i sum_k p_ik * log(p_ik) ) / (n * log(K))
+#
+# It is a SEPARATION measure, not a fit criterion: it says nothing about
+# whether K classes are warranted, so it must never be used on its own to pick
+# the class count (the report's own explanation says the same).
+#
+# Two guards on the arithmetic:
+#  - 0 * log(0) is 0 in the limit but NaN in floating point, so the zero
+#    posteriors are dropped rather than multiplied.
+#  - log(K) is 0 for the 1-class baseline, which would divide by zero. Entropy
+#    is undefined for a single class (there is nothing to separate), so that
+#    row reports NA rather than a garbage value or a spurious 1.
+lca_entropy <- function(fit) {
+  posterior <- fit$posterior
+  if (is.null(posterior) || length(posterior) == 0) return(NA_real_)
+  posterior <- as.matrix(posterior)
+  nclass <- ncol(posterior)
+  nobs <- nrow(posterior)
+  if (is.na(nclass) || nclass < 2L || nobs < 1L) return(NA_real_)
+  p <- posterior[is.finite(posterior) & posterior > 0]
+  if (length(p) == 0) return(NA_real_)
+  1 - (-sum(p * log(p))) / (nobs * log(nclass))
 }
 
 lca_fit_converged <- function(fit) {
