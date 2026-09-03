@@ -153,3 +153,59 @@ test_that("exp_lca rejects non-categorical, insufficient, and invalid class sele
   expect_error(exp_lca(df, a, b, min_nclass = 4, max_nclass = 2), "Class counts")
   expect_error(exp_lca(df, a, b, relationship_column = a), "must be different")
 })
+
+test_that("exp_lca reports normalized entropy per candidate class count", {
+  set.seed(11)
+  n <- 400
+  cls <- sample(1:2, n, replace = TRUE)
+  df <- data.frame(
+    a = ifelse(cls == 1, sample(c("x", "y"), n, TRUE, c(.9, .1)), sample(c("x", "y"), n, TRUE, c(.15, .85))),
+    b = ifelse(cls == 1, sample(c("m", "n"), n, TRUE, c(.85, .15)), sample(c("m", "n"), n, TRUE, c(.2, .8))),
+    c = ifelse(cls == 1, sample(c("lo", "hi"), n, TRUE, c(.8, .2)), sample(c("lo", "hi"), n, TRUE, c(.25, .75))),
+    stringsAsFactors = FALSE
+  )
+  model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 3,
+                   nrep = 3, maxiter = 500, seed = 1)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+
+  expect_true("entropy" %in% names(selection))
+  # tam#38383: entropy is undefined for the always-added 1-class baseline --
+  # log(K) is 0 there, and there is nothing to separate. It must be NA rather
+  # than a divide-by-zero artifact or a spurious 1.
+  expect_true(is.na(selection$entropy[selection$number_of_classes == 1]))
+
+  multi <- selection[selection$number_of_classes >= 2, , drop = FALSE]
+  expect_false(any(is.na(multi$entropy)))
+  expect_true(all(multi$entropy >= 0 & multi$entropy <= 1))
+
+  # Independent recomputation straight from the candidate posteriors, so this
+  # pins the FORMULA, not just the column's presence.
+  for (candidate in model$candidates) {
+    if (is.null(candidate$fit) || candidate$nclass < 2) next
+    p <- as.matrix(candidate$fit$posterior)
+    nz <- p[p > 0]
+    expected <- 1 - (-sum(nz * log(nz))) / (nrow(p) * log(ncol(p)))
+    expect_equal(selection$entropy[selection$number_of_classes == candidate$nclass],
+                 expected, tolerance = 1e-10)
+  }
+
+  # A well-separated 2-class fixture must not look like noise.
+  expect_gt(selection$entropy[selection$number_of_classes == 2], 0.5)
+})
+
+test_that("lca_entropy returns 1 for a perfectly separating posterior", {
+  # Hard 0/1 assignments carry no uncertainty, so the entropy term is 0 and the
+  # normalized value is exactly 1 -- the definitional upper bound. This also
+  # exercises the 0*log(0) guard: half the matrix is zeros, which is NaN if the
+  # zeros are multiplied instead of dropped.
+  perfect <- matrix(c(1, 0, 0, 1, 1, 0, 0, 1), ncol = 2, byrow = TRUE)
+  expect_equal(exploratory:::lca_entropy(list(posterior = perfect)), 1)
+
+  # Maximum ambiguity: every row equally likely in either class -> entropy 0.
+  ambiguous <- matrix(0.5, nrow = 8, ncol = 2)
+  expect_equal(exploratory:::lca_entropy(list(posterior = ambiguous)), 0)
+
+  # Degenerate shapes report NA rather than erroring or dividing by zero.
+  expect_true(is.na(exploratory:::lca_entropy(list(posterior = matrix(1, nrow = 4, ncol = 1)))))
+  expect_true(is.na(exploratory:::lca_entropy(list(posterior = NULL))))
+})
