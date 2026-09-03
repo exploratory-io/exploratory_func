@@ -45,7 +45,8 @@ Imports:
     pwr,
     readr,
     MASS,
-    ordinal
+    ordinal,
+    fastcluster
 Suggests:
     polycor,
     poLCA,
