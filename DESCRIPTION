@@ -42,6 +42,7 @@ Imports:
     textshape,
     V8,
     cluster,
+    fastcluster,
     pwr,
     readr,
     MASS,
