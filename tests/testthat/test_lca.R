@@ -199,13 +199,13 @@ test_that("lca_entropy returns 1 for a perfectly separating posterior", {
   # exercises the 0*log(0) guard: half the matrix is zeros, which is NaN if the
   # zeros are multiplied instead of dropped.
   perfect <- matrix(c(1, 0, 0, 1, 1, 0, 0, 1), ncol = 2, byrow = TRUE)
-  expect_equal(lca_entropy(list(posterior = perfect)), 1)
+  expect_equal(exploratory:::lca_entropy(list(posterior = perfect)), 1)
 
   # Maximum ambiguity: every row equally likely in either class -> entropy 0.
   ambiguous <- matrix(0.5, nrow = 8, ncol = 2)
-  expect_equal(lca_entropy(list(posterior = ambiguous)), 0)
+  expect_equal(exploratory:::lca_entropy(list(posterior = ambiguous)), 0)
 
   # Degenerate shapes report NA rather than erroring or dividing by zero.
-  expect_true(is.na(lca_entropy(list(posterior = matrix(1, nrow = 4, ncol = 1)))))
-  expect_true(is.na(lca_entropy(list(posterior = NULL))))
+  expect_true(is.na(exploratory:::lca_entropy(list(posterior = matrix(1, nrow = 4, ncol = 1)))))
+  expect_true(is.na(exploratory:::lca_entropy(list(posterior = NULL))))
 })
