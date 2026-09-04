@@ -15,6 +15,11 @@
 #'   composition. It is not used as an indicator.
 #' @param feature_top_n Number of top characteristic categories retained per
 #'   class for the report.
+#' @param max_nrow Optional cap on the number of rows used to fit the model. When
+#'   set and the (group's) data has more rows, a random sample of this size is
+#'   used for fitting AND for the row-level Output Data table (tam#38399), the
+#'   same "Sample Data" behavior K-Means/K-Modes/K-Medoids already have. NULL
+#'   means use every row.
 #' @export
 exp_lca <- function(df, ...,
                     min_nclass = 2,
@@ -23,7 +28,8 @@ exp_lca <- function(df, ...,
                     maxiter = 5000,
                     seed = 1,
                     relationship_column = NULL,
-                    feature_top_n = 10) {
+                    feature_top_n = 10,
+                    max_nrow = NULL) {
   if (!requireNamespace("poLCA", quietly = TRUE)) {
     stop("Latent Class Analysis requires the poLCA package.")
   }
@@ -74,6 +80,16 @@ exp_lca <- function(df, ...,
 
   each_func <- function(group_df) {
     group_df <- dplyr::ungroup(group_df)
+    # tam#38399: cap the data BEFORE fitting, same "Sample Data" behavior as
+    # exp_kmeans/exp_kmodes/exp_kmedoids -- the Output Data table (tidy(..., type="data"))
+    # is built from this same (possibly sampled) data, so max_nrow is exactly what
+    # caps how much data that table shows.
+    if (!is.null(seed)) set.seed(seed)
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(group_df) > max_nrow) {
+      sampled_nrow <- max_nrow
+      group_df <- group_df %>% sample_rows(max_nrow)
+    }
     original <- group_df %>% dplyr::mutate(.lca_row_id = dplyr::row_number())
     indicators <- lca_encode_indicators(original, selected_cols)
     complete_rows <- stats::complete.cases(indicators)
@@ -165,6 +181,7 @@ exp_lca <- function(df, ...,
       discrimination = discrimination,
       row_assignments = row_assignments,
       relationship = relationship,
+      sampled_nrow = sampled_nrow,
       grouped_cols = grouped_cols
     )
     class(model) <- c("lca_exploratory", class(model))
