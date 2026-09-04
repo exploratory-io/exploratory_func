@@ -322,6 +322,10 @@ lca_fit_adaptive <- function(formula, used, k, nrep, maxiter, seed) {
       error = function(e) e
     )
     if (inherits(fit, "error")) {
+      # Escalation is a best-effort reliability check. If an earlier schedule
+      # entry produced a usable fit, do not discard it just because an
+      # optional larger run failed.
+      if (!is.null(last)) return(last)
       return(list(fit = fit, random_starts = starts, best_reproductions = NA_integer_))
     }
     reproductions <- lca_best_reproduction_count(fit)
