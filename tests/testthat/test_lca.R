@@ -230,6 +230,32 @@ test_that("lca_best_reproduction_count counts starts that reached the best solut
   expect_true(is.na(lca_best_reproduction_count(list(attempts = c(NA_real_, NaN)))))
 })
 
+test_that("lca_fit_adaptive keeps an earlier fit when an escalation errors", {
+  poLCA_namespace <- asNamespace("poLCA")
+  original_poLCA <- get("poLCA", envir = poLCA_namespace)
+  on.exit(assignInNamespace("poLCA", original_poLCA, ns = "poLCA"), add = TRUE)
+
+  calls <- integer()
+  first_fit <- list(attempts = -100)
+  fake_poLCA <- function(..., nrep) {
+    calls <<- c(calls, nrep)
+    if (length(calls) == 1L) return(first_fit)
+    stop("simulated escalation failure")
+  }
+  assignInNamespace("poLCA", fake_poLCA, ns = "poLCA")
+
+  result <- lca_fit_adaptive(
+    stats::as.formula("cbind(a, b) ~ 1"),
+    data.frame(a = 1L, b = 1L),
+    k = 2L, nrep = 20L, maxiter = 10L, seed = 1L
+  )
+
+  expect_equal(calls, c(20L, 50L))
+  expect_identical(result$fit, first_fit)
+  expect_equal(result$random_starts, 20L)
+  expect_equal(result$best_reproductions, 1L)
+})
+
 test_that("exp_lca escalates random starts only until the best solution is reproduced", {
   # Noise data with several class counts: a rough landscape, so some candidates need
   # more starts than others. Asserting the INVARIANT rather than exact counts keeps
