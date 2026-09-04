@@ -247,7 +247,7 @@ test_that("lca_fit_adaptive keeps an earlier fit when an escalation errors", {
   result <- lca_fit_adaptive(
     stats::as.formula("cbind(a, b) ~ 1"),
     data.frame(a = 1L, b = 1L),
-    k = 2L, nrep = 20L, maxiter = 10L, seed = 1L
+    k = 2L, nrep = 20L, max_nrep = 50L, maxiter = 10L, seed = 1L
   )
 
   expect_equal(calls, c(20L, 50L))
@@ -275,18 +275,22 @@ test_that("exp_lca escalates random starts only until the best solution is repro
 
   expect_true(all(c("random_starts", "best_solution_reproductions") %in% names(selection)))
 
+  # The ladder this run actually uses, derived through the same rule the fitting uses
+  # rather than restated here -- restating it is how the two drift apart (tam#38420).
+  schedule <- lca_adaptive_schedule(20L, formals(exp_lca)$max_nrep)
+
   multi <- selection[selection$number_of_classes >= 2, , drop = FALSE]
   # Every multi-class candidate either reproduced its best solution enough times, or
   # exhausted the schedule trying. Anything else means escalation stopped early.
   expect_true(all(
     multi$best_solution_reproductions >= LCA_MIN_BEST_REPRODUCTIONS |
-      multi$random_starts == max(LCA_ADAPTIVE_START_SCHEDULE)
+      multi$random_starts == max(schedule)
   ))
   # ...and it never escalates when it did not have to.
   settled_at_start <- multi[multi$random_starts == 20, , drop = FALSE]
   expect_true(all(settled_at_start$best_solution_reproductions >= LCA_MIN_BEST_REPRODUCTIONS))
   # Starts only ever come from the schedule.
-  expect_true(all(multi$random_starts %in% c(20L, LCA_ADAPTIVE_START_SCHEDULE)))
+  expect_true(all(multi$random_starts %in% schedule))
   # A reproduction count can never exceed the starts it was drawn from.
   expect_true(all(multi$best_solution_reproductions <= multi$random_starts))
 
@@ -310,6 +314,114 @@ test_that("exp_lca does not escalate past a user-configured nrep that already ex
   selection <- tidy(model, type = "class_selection")
   # The user's own setting is a floor, never something the schedule walks back down to.
   expect_true(all(selection$random_starts == 120L))
+})
+
+test_that("lca_adaptive_schedule builds the escalation ladder from nrep and max_nrep (tam#38420)", {
+  # The ceiling is a user setting, so every shape of it is pinned here rather than
+  # inferred from a fitted model -- this is the whole rule, testable without fitting.
+  expect_equal(lca_adaptive_schedule(20L, 100L), c(20L, 50L, 100L))  # both tiers
+  expect_equal(lca_adaptive_schedule(20L, 50L), c(20L, 50L))         # the default ceiling
+  expect_equal(lca_adaptive_schedule(20L, 70L), c(20L, 50L, 70L))    # ceiling between tiers
+  expect_equal(lca_adaptive_schedule(20L, 200L), c(20L, 50L, 100L, 200L)) # past every tier
+
+  # At or below nrep means "do not escalate" -- nrep stays a floor either way.
+  expect_equal(lca_adaptive_schedule(20L, 20L), 20L)
+  expect_equal(lca_adaptive_schedule(20L, 5L), 20L)
+  expect_equal(lca_adaptive_schedule(120L, 50L), 120L)
+
+  # Degenerate ceilings degrade to "no escalation" rather than erroring, which is why
+  # max_nrep needs no stop() validation of its own.
+  expect_equal(lca_adaptive_schedule(20L, NULL), 20L)
+  expect_equal(lca_adaptive_schedule(20L, NA_integer_), 20L)
+
+  # A tier equal to the ceiling is not repeated.
+  expect_equal(lca_adaptive_schedule(10L, 50L), c(10L, 50L))
+})
+
+test_that("exp_lca max_nrep reaches the fit and can switch escalation off (tam#38420)", {
+  set.seed(5)
+  n <- 300
+  df <- data.frame(
+    a = sample(c("x", "y", "z"), n, replace = TRUE),
+    b = sample(c("m", "n", "o"), n, replace = TRUE),
+    c = sample(c("lo", "hi", "mid"), n, replace = TRUE),
+    d = sample(c("p", "q"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  # Same noise data the escalation test uses, so candidates genuinely WANT to escalate.
+  # With the ceiling at nrep none of them may, which is only observable end to end --
+  # a schedule unit test cannot show the value actually threading through to poLCA.
+  model <- exp_lca(df, a, b, c, d, min_nclass = 2, max_nclass = 4,
+                   nrep = 20, max_nrep = 20, maxiter = 1000, seed = 1)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+  expect_true(all(selection$random_starts == 20L))
+})
+
+test_that("exp_lca reports the escalation ceiling actually in force (tam#38420)", {
+  df <- data.frame(
+    a = rep(c("x", "y"), 40),
+    b = rep(c("m", "n", "m", "n"), 20),
+    c = rep(c("lo", "hi", "hi", "lo"), 20),
+    stringsAsFactors = FALSE
+  )
+  conditions_for <- function(max_nrep) {
+    model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                     nrep = 2, max_nrep = max_nrep, maxiter = 100, seed = 1)$model[[1]]
+    cond <- tidy(model, type = "analysis_conditions")
+    cond$Value[cond$Metric == "Maximum Random Starts"]
+  }
+  expect_equal(conditions_for(50), "50")
+  # A ceiling at or below nrep never escalates, so reporting it raw would claim a search
+  # depth that never happens -- the row has to read the starting count instead.
+  expect_equal(conditions_for(2), "2")
+})
+
+test_that("exp_lca samples down to max_nrow and records that it did (tam#38420)", {
+  set.seed(11)
+  n <- 200
+  df <- data.frame(
+    a = sample(c("x", "y"), n, replace = TRUE),
+    b = sample(c("m", "n"), n, replace = TRUE),
+    c = sample(c("lo", "hi"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  sampled <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                     nrep = 2, maxiter = 100, seed = 1, max_nrow = 50)$model[[1]]
+  expect_equal(sampled$n_used, 50)
+  expect_equal(sampled$sampled_nrow, 50)
+
+  # At or under the cap the data is untouched, and sampled_nrow stays NULL so a
+  # consumer can tell "not sampled" from "sampled to exactly this size".
+  untouched <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                       nrep = 2, maxiter = 100, seed = 1, max_nrow = 5000)$model[[1]]
+  expect_equal(untouched$n_used, n)
+  expect_null(untouched$sampled_nrow)
+
+  # Default is no cap at all, so an existing direct R caller keeps every row.
+  uncapped <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                      nrep = 2, maxiter = 100, seed = 1)$model[[1]]
+  expect_equal(uncapped$n_used, n)
+  expect_null(uncapped$sampled_nrow)
+})
+
+test_that("exp_lca samples correctly with spaces, multibyte, and symbols in column names", {
+  set.seed(13)
+  n <- 120
+  df <- data.frame(
+    a = sample(c("x", "y"), n, replace = TRUE),
+    b = sample(c("m", "n"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  # sample_rows() nests/unnests the frame and lca_quote_name() backtick-quotes it into a
+  # formula; a name that survives one but not the other would only fail with both on.
+  names(df) <- c("航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表", "b")
+  model <- exp_lca(df, `航空 会社 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`, b,
+                   min_nclass = 2, max_nclass = 2,
+                   nrep = 2, maxiter = 100, seed = 1, max_nrow = 40)$model[[1]]
+  expect_equal(model$n_used, 40)
+  expect_equal(model$sampled_nrow, 40)
+  profiles <- tidy(model, type = "profiles")
+  expect_true("航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表" %in% profiles$variable)
 })
 
 test_that("lca_indicator_levels honours a factor's declared order, not the text order", {

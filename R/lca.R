@@ -8,22 +8,29 @@
 #' @param ... Categorical indicator columns.
 #' @param min_nclass Smallest class count to evaluate.
 #' @param max_nclass Largest class count to evaluate.
-#' @param nrep Number of random starts for each candidate model.
+#' @param nrep Number of random starts each candidate model begins with.
+#' @param max_nrep Largest number of random starts a candidate may escalate to
+#'   when its best solution is not reproduced. Anything at or below \code{nrep}
+#'   turns escalation off. See \code{lca_adaptive_schedule()}.
 #' @param maxiter Maximum EM iterations per random start.
 #' @param seed Random seed.
 #' @param relationship_column Optional categorical column for class-by-category
 #'   composition. It is not used as an indicator.
 #' @param feature_top_n Number of top characteristic categories retained per
 #'   class for the report.
+#' @param max_nrow Maximum number of rows to fit on. Larger inputs are randomly
+#'   sampled down to this many rows. \code{NULL} uses every row.
 #' @export
 exp_lca <- function(df, ...,
                     min_nclass = 2,
                     max_nclass = 6,
                     nrep = 20,
+                    max_nrep = 50,
                     maxiter = 5000,
                     seed = 1,
                     relationship_column = NULL,
-                    feature_top_n = 10) {
+                    feature_top_n = 10,
+                    max_nrow = NULL) {
   if (!requireNamespace("poLCA", quietly = TRUE)) {
     stop("Latent Class Analysis requires the poLCA package.")
   }
@@ -55,6 +62,12 @@ exp_lca <- function(df, ...,
   min_nclass <- as.integer(min_nclass)
   max_nclass <- as.integer(max_nclass)
   nrep <- as.integer(nrep)
+  # max_nrep needs no stop() validation of its own: lca_adaptive_schedule() treats
+  # NULL / NA / anything at or below nrep as "do not escalate", so every out-of-range
+  # value degrades to a valid, cheaper schedule instead of an error.
+  if (!is.null(max_nrep)) {
+    max_nrep <- as.integer(max_nrep)
+  }
   maxiter <- as.integer(maxiter)
   feature_top_n <- as.integer(feature_top_n)
   if (is.na(min_nclass) || min_nclass < 2 || is.na(max_nclass) || max_nclass < min_nclass) {
@@ -72,8 +85,20 @@ exp_lca <- function(df, ...,
                 paste(unsupported, collapse = ", "), "."))
   }
 
+  # Seeds the max_nrow sample draw so a sampled run is reproducible. The fits
+  # themselves re-seed per candidate (set.seed(seed + k) in lca_fit_adaptive), so
+  # this does not change any model that was already being fit on every row.
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
   each_func <- function(group_df) {
     group_df <- dplyr::ungroup(group_df)
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(group_df) > max_nrow) {
+      sampled_nrow <- max_nrow
+      group_df <- group_df %>% sample_rows(max_nrow)
+    }
     original <- group_df %>% dplyr::mutate(.lca_row_id = dplyr::row_number())
     indicators <- lca_encode_indicators(original, selected_cols)
     complete_rows <- stats::complete.cases(indicators)
@@ -103,7 +128,8 @@ exp_lca <- function(df, ...,
 
     formula <- stats::as.formula(paste0("cbind(", paste(vapply(names(used), lca_quote_name, character(1)), collapse = ", "), ") ~ 1"))
     candidates <- lapply(candidate_counts, function(k) {
-      attempt <- lca_fit_adaptive(formula, used, k, nrep, maxiter, seed)
+      attempt <- lca_fit_adaptive(formula, used, k = k, nrep = nrep, max_nrep = max_nrep,
+                                  maxiter = maxiter, seed = seed)
       if (inherits(attempt$fit, "error")) {
         return(list(nclass = k, fit = NULL, error = conditionMessage(attempt$fit),
                     random_starts = attempt$random_starts, best_reproductions = NA_integer_))
@@ -151,10 +177,12 @@ exp_lca <- function(df, ...,
       df_original = original,
       n_used = nrow(used),
       excluded_nrow = excluded_nrow,
+      sampled_nrow = sampled_nrow,
       min_nclass = min_nclass,
       max_nclass = max_nclass,
       used_unconverged_fallback = used_unconverged_fallback,
       nrep = nrep,
+      max_nrep = max_nrep,
       maxiter = maxiter,
       feature_top_n = feature_top_n,
       selected_fit = selected,
@@ -304,14 +332,39 @@ lca_best_reproduction_count <- function(fit) {
 #
 # The 1-class baseline is exempt. poLCA solves it directly with no EM loop (numiter = 1),
 # so every start is identical and escalating would burn time to re-derive the same number.
+#
+# tam#38420: the CEILING is the user's call, not a constant. Escalation is targeted at
+# exactly the expensive candidates -- it fires when a candidate's best solution was hit
+# by only one start, which is what a multimodal likelihood surface looks like, and that
+# is driven by high class counts and many indicator variables. So the candidates that
+# escalate are also the slowest ones to fit, and on wide data (75 indicators was the
+# reported case) the two multiply. Reaching the top tier guarantees nothing either --
+# the loop just runs out of tiers and returns whatever it has. Exposing the ceiling as
+# max_nrep lets the speed/stability tradeoff be made per analysis; the intermediate
+# tiers below stay internal.
 LCA_ADAPTIVE_START_SCHEDULE <- c(50L, 100L)
 LCA_MIN_BEST_REPRODUCTIONS <- 2L
 
-lca_fit_adaptive <- function(formula, used, k, nrep, maxiter, seed) {
-  schedule <- as.integer(nrep)
-  if (k > 1L) {
-    schedule <- c(schedule, LCA_ADAPTIVE_START_SCHEDULE[LCA_ADAPTIVE_START_SCHEDULE > nrep])
+# The escalation ladder for one candidate: start at nrep, walk the internal tiers that
+# fall strictly between nrep and max_nrep, and finish at max_nrep itself. Kept separate
+# from the fitting so the rule can be tested without fitting anything.
+#
+# max_nrep at or below nrep (and NULL / NA) means "do not escalate" -- nrep is always a
+# floor the schedule never walks back down to, so a user who asks for more starts than
+# the ceiling still gets the starts they asked for.
+lca_adaptive_schedule <- function(nrep, max_nrep) {
+  nrep <- as.integer(nrep)
+  if (is.null(max_nrep) || length(max_nrep) != 1L || is.na(max_nrep) || max_nrep <= nrep) {
+    return(nrep)
   }
+  max_nrep <- as.integer(max_nrep)
+  tiers <- LCA_ADAPTIVE_START_SCHEDULE[LCA_ADAPTIVE_START_SCHEDULE > nrep &
+                                         LCA_ADAPTIVE_START_SCHEDULE < max_nrep]
+  as.integer(sort(unique(c(nrep, tiers, max_nrep))))
+}
+
+lca_fit_adaptive <- function(formula, used, k, nrep, max_nrep, maxiter, seed) {
+  schedule <- if (k > 1L) lca_adaptive_schedule(nrep, max_nrep) else as.integer(nrep)
   last <- NULL
   for (i in seq_along(schedule)) {
     starts <- schedule[[i]]
@@ -460,11 +513,19 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
     } else {
       paste0(min(class_counts), " to ", max(class_counts))
     }
+    # tam#38420: the ceiling a candidate may escalate to is now a setting (max_nrep), so
+    # the table reports it next to the starting count. Derived through the same
+    # lca_adaptive_schedule() the fitting uses rather than printing max_nrep raw -- a
+    # ceiling at or below nrep means no escalation, and printing it as-is would claim a
+    # search depth that never happens. Reporting a configured number as if it were the
+    # one in force is the exact bug tam#38380 fixed for the starting count.
+    effective_max_nrep <- max(lca_adaptive_schedule(x$nrep, x$max_nrep))
     return(tibble::tibble(
       Metric = c("Number of Variables", "Variable Names", "Rows Used", "Rows Removed",
-                 "Class Counts Compared", "Random Starts", "Maximum Iterations", "Selected Number of Classes"),
+                 "Class Counts Compared", "Random Starts", "Maximum Random Starts",
+                 "Maximum Iterations", "Selected Number of Classes"),
       Value = c(length(x$selected_cols), paste(x$selected_cols, collapse = ", "), x$n_used, x$excluded_nrow,
-                class_counts_text, x$nrep, x$maxiter, length(fit$P))
+                class_counts_text, x$nrep, effective_max_nrep, x$maxiter, length(fit$P))
     ))
   }
   if (type == "class_selection") return(x$class_selection)
