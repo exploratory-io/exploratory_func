@@ -103,16 +103,14 @@ exp_lca <- function(df, ...,
 
     formula <- stats::as.formula(paste0("cbind(", paste(vapply(names(used), lca_quote_name, character(1)), collapse = ", "), ") ~ 1"))
     candidates <- lapply(candidate_counts, function(k) {
-      if (!is.null(seed)) set.seed(seed + k)
-      fit <- tryCatch(
-        poLCA::poLCA(formula, data = used, nclass = k, nrep = nrep, maxiter = maxiter,
-                     verbose = FALSE, calc.se = FALSE),
-        error = function(e) e
-      )
-      if (inherits(fit, "error")) {
-        return(list(nclass = k, fit = NULL, error = conditionMessage(fit)))
+      attempt <- lca_fit_adaptive(formula, used, k, nrep, maxiter, seed)
+      if (inherits(attempt$fit, "error")) {
+        return(list(nclass = k, fit = NULL, error = conditionMessage(attempt$fit),
+                    random_starts = attempt$random_starts, best_reproductions = NA_integer_))
       }
-      list(nclass = k, fit = fit, error = NULL)
+      list(nclass = k, fit = attempt$fit, error = NULL,
+           random_starts = attempt$random_starts,
+           best_reproductions = attempt$best_reproductions)
     })
     successful <- Filter(function(x) !is.null(x$fit), candidates)
     if (!length(successful)) {
@@ -210,7 +208,9 @@ lca_class_selection_table <- function(candidates) {
         number_of_classes = candidate$nclass, log_likelihood = NA_real_, aic = NA_real_, bic = NA_real_,
         entropy = NA_real_,
         minimum_class_share = NA_real_, mean_maximum_membership_probability = NA_real_,
-        pct_low_confidence = NA_real_, converged = FALSE, error = candidate$error
+        pct_low_confidence = NA_real_,
+        random_starts = NA_integer_, best_solution_reproductions = NA_integer_,
+        converged = FALSE, error = candidate$error
       ))
     }
     fit <- candidate$fit
@@ -225,6 +225,11 @@ lca_class_selection_table <- function(candidates) {
       minimum_class_share = min(fit$P),
       mean_maximum_membership_probability = mean(max_posterior),
       pct_low_confidence = mean(max_posterior < 0.6),
+      # tam#38380: the number of random starts this candidate actually used (it escalates
+      # on its own when the best solution is not reproduced) and how many of those starts
+      # reached it. Read together: 2 of 50 is a much weaker result than 2 of 2.
+      random_starts = if (is.null(candidate$random_starts)) NA_integer_ else as.integer(candidate$random_starts),
+      best_solution_reproductions = if (is.null(candidate$best_reproductions)) NA_integer_ else as.integer(candidate$best_reproductions),
       # poLCA's eflag records numerical/start errors, not iteration-limit
       # termination. A fit is known to have converged only when it stopped
       # before maxiter and did not encounter such an error.
@@ -235,6 +240,71 @@ lca_class_selection_table <- function(candidates) {
       error = if (converged) NA_character_ else lca_stop_reason(fit)
     )
   }))
+}
+
+# tam#38380: how many of poLCA's random starts landed on the BEST solution.
+#
+# poLCA runs `nrep` independent random starts internally and returns only the winner,
+# but it also records every start's log-likelihood in fit$attempts. Local optima are the
+# main practical hazard in LCA, so "the best solution was reached N of M times" is the
+# diagnostic that tells a user whether to trust the reported model at all -- a best
+# log-likelihood hit exactly once is a warning sign, not a result.
+#
+# Tolerance: EM runs that converge to the SAME optimum agree to many digits, while
+# genuinely different optima are far apart (fractions of a log-likelihood unit at least).
+# A relative tolerance keeps that separation at any data scale -- an absolute epsilon that
+# works for llik = -700 is far too strict at llik = -70000.
+LCA_REPRODUCTION_RELATIVE_TOLERANCE <- 1e-6
+
+lca_best_reproduction_count <- function(fit) {
+  attempts <- fit$attempts
+  if (is.null(attempts) || !length(attempts)) return(NA_integer_)
+  attempts <- attempts[is.finite(attempts)]
+  if (!length(attempts)) return(NA_integer_)
+  best <- max(attempts)
+  tol <- LCA_REPRODUCTION_RELATIVE_TOLERANCE * max(1, abs(best))
+  sum(abs(attempts - best) <= tol)
+}
+
+# tam#38380: adaptive random starts. Rather than making everyone pay for 100 starts on
+# every candidate, start at the configured nrep and escalate only when the best solution
+# was not reproduced enough times to trust it. Escalation is per class count, because each
+# candidate has its own optimization landscape -- a 2-class model can be trivially stable
+# while a 6-class one is not.
+#
+# The escalated run REPLACES the previous one rather than pooling with it: pooling would
+# report a reproduction count drawn from a different number of starts than the one shown
+# next to it, which is exactly the ratio the user is being asked to judge.
+#
+# The 1-class baseline is exempt. poLCA solves it directly with no EM loop (numiter = 1),
+# so every start is identical and escalating would burn time to re-derive the same number.
+LCA_ADAPTIVE_START_SCHEDULE <- c(50L, 100L)
+LCA_MIN_BEST_REPRODUCTIONS <- 2L
+
+lca_fit_adaptive <- function(formula, used, k, nrep, maxiter, seed) {
+  schedule <- as.integer(nrep)
+  if (k > 1L) {
+    schedule <- c(schedule, LCA_ADAPTIVE_START_SCHEDULE[LCA_ADAPTIVE_START_SCHEDULE > nrep])
+  }
+  last <- NULL
+  for (i in seq_along(schedule)) {
+    starts <- schedule[[i]]
+    if (!is.null(seed)) set.seed(seed + k)
+    fit <- tryCatch(
+      poLCA::poLCA(formula, data = used, nclass = k, nrep = starts, maxiter = maxiter,
+                   verbose = FALSE, calc.se = FALSE),
+      error = function(e) e
+    )
+    if (inherits(fit, "error")) {
+      return(list(fit = fit, random_starts = starts, best_reproductions = NA_integer_))
+    }
+    reproductions <- lca_best_reproduction_count(fit)
+    last <- list(fit = fit, random_starts = starts, best_reproductions = reproductions)
+    if (is.na(reproductions) || reproductions >= LCA_MIN_BEST_REPRODUCTIONS) {
+      return(last)
+    }
+  }
+  last
 }
 
 # tam#38383: normalized entropy (the "entropy R-squared" / relative entropy

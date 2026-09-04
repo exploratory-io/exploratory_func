@@ -209,3 +209,79 @@ test_that("lca_entropy returns 1 for a perfectly separating posterior", {
   expect_true(is.na(exploratory:::lca_entropy(list(posterior = matrix(1, nrow = 4, ncol = 1)))))
   expect_true(is.na(exploratory:::lca_entropy(list(posterior = NULL))))
 })
+
+test_that("lca_best_reproduction_count counts starts that reached the best solution", {
+  # Pins the FORMULA and the tolerance, not just the column's presence.
+  expect_equal(lca_best_reproduction_count(list(attempts = c(-100, -100, -100))), 3L)
+  expect_equal(lca_best_reproduction_count(list(attempts = c(-100, -105, -110))), 1L)
+  expect_equal(lca_best_reproduction_count(list(attempts = c(-100, -100, -105))), 2L)
+
+  # Same optimum reached with tiny numerical drift still counts as reproduced; a
+  # genuinely different optimum does not. The tolerance is RELATIVE, so this has to
+  # hold at any data scale -- an absolute epsilon tuned for llik = -100 breaks at -100000.
+  tol_ok <- 1e-9
+  expect_equal(lca_best_reproduction_count(list(attempts = c(-100, -100 - tol_ok))), 2L)
+  expect_equal(lca_best_reproduction_count(list(attempts = c(-100000, -100000 * (1 + 1e-9)))), 2L)
+  expect_equal(lca_best_reproduction_count(list(attempts = c(-100, -100.5))), 1L)
+
+  # Degenerate inputs report NA rather than erroring or inventing a count.
+  expect_true(is.na(lca_best_reproduction_count(list(attempts = NULL))))
+  expect_true(is.na(lca_best_reproduction_count(list(attempts = numeric(0)))))
+  expect_true(is.na(lca_best_reproduction_count(list(attempts = c(NA_real_, NaN)))))
+})
+
+test_that("exp_lca escalates random starts only until the best solution is reproduced", {
+  # Noise data with several class counts: a rough landscape, so some candidates need
+  # more starts than others. Asserting the INVARIANT rather than exact counts keeps
+  # this from breaking on an unrelated poLCA numerical change.
+  set.seed(5)
+  n <- 300
+  df <- data.frame(
+    a = sample(c("x", "y", "z"), n, replace = TRUE),
+    b = sample(c("m", "n", "o"), n, replace = TRUE),
+    c = sample(c("lo", "hi", "mid"), n, replace = TRUE),
+    d = sample(c("p", "q"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model <- exp_lca(df, a, b, c, d, min_nclass = 2, max_nclass = 5,
+                   nrep = 20, maxiter = 1000, seed = 1)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+
+  expect_true(all(c("random_starts", "best_solution_reproductions") %in% names(selection)))
+
+  multi <- selection[selection$number_of_classes >= 2, , drop = FALSE]
+  # Every multi-class candidate either reproduced its best solution enough times, or
+  # exhausted the schedule trying. Anything else means escalation stopped early.
+  expect_true(all(
+    multi$best_solution_reproductions >= LCA_MIN_BEST_REPRODUCTIONS |
+      multi$random_starts == max(LCA_ADAPTIVE_START_SCHEDULE)
+  ))
+  # ...and it never escalates when it did not have to.
+  settled_at_start <- multi[multi$random_starts == 20, , drop = FALSE]
+  expect_true(all(settled_at_start$best_solution_reproductions >= LCA_MIN_BEST_REPRODUCTIONS))
+  # Starts only ever come from the schedule.
+  expect_true(all(multi$random_starts %in% c(20L, LCA_ADAPTIVE_START_SCHEDULE)))
+  # A reproduction count can never exceed the starts it was drawn from.
+  expect_true(all(multi$best_solution_reproductions <= multi$random_starts))
+
+  # The 1-class baseline is exempt: poLCA solves it directly with no EM loop, so there
+  # is no local optimum to reproduce and escalating would only burn time.
+  baseline <- selection[selection$number_of_classes == 1, , drop = FALSE]
+  expect_equal(baseline$random_starts, 20L)
+})
+
+test_that("exp_lca does not escalate past a user-configured nrep that already exceeds the schedule", {
+  set.seed(9)
+  n <- 200
+  df <- data.frame(
+    a = sample(c("x", "y"), n, replace = TRUE),
+    b = sample(c("m", "n"), n, replace = TRUE),
+    c = sample(c("lo", "hi"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                   nrep = 120, maxiter = 300, seed = 1)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+  # The user's own setting is a floor, never something the schedule walks back down to.
+  expect_true(all(selection$random_starts == 120L))
+})
