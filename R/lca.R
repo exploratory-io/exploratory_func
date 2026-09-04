@@ -177,10 +177,36 @@ lca_quote_name <- function(name) {
   paste0("`", gsub("`", "\\\\`", name, fixed = TRUE), "`")
 }
 
+# tam#38381 follow-up: the category order an indicator is presented in.
+#
+# A FACTOR carries a declared level order, and for an ordered factor that order is the
+# whole point of the type -- 6ヶ月未満 < 1年未満 < 1年 - 3年 < 3年以上 is meaningful in a
+# way its alphabetical order is not. Sorting the labels as text throws that away and the
+# report then lists categories in an order the user never chose.
+#
+# Only levels actually present are kept: poLCA needs every category to have observations,
+# and a declared-but-unused level would create an empty category. Any value somehow absent
+# from the declared levels is appended in text order rather than dropped.
+#
+# Character and logical indicators have no declared order, so they keep the text sort
+# (which is also the natural one for logical: FALSE, TRUE).
+#
+# SHARED so the encoding and the report agree by construction. These were two separate
+# copies of the same sort, which is exactly how the two drift apart.
+lca_indicator_levels <- function(x) {
+  present <- unique(as.character(x[!is.na(x)]))
+  if (is.factor(x)) {
+    declared <- levels(x)
+    kept <- declared[declared %in% present]
+    return(c(kept, sort(setdiff(present, kept), method = "radix")))
+  }
+  sort(present, method = "radix")
+}
+
 lca_encode_indicators <- function(df, cols) {
   out <- lapply(cols, function(col) {
     x <- df[[col]]
-    levels <- sort(unique(as.character(x[!is.na(x)])), method = "radix")
+    levels <- lca_indicator_levels(x)
     as.integer(match(as.character(x), levels))
   })
   out <- as.data.frame(out, check.names = FALSE)
@@ -362,11 +388,11 @@ lca_stop_reason <- function(fit) {
 
 lca_profile_table <- function(fit, observed, cols) {
   dplyr::bind_rows(lapply(cols, function(col) {
-    levels <- sort(unique(as.character(observed[[col]])), method = "radix")
+    levels <- lca_indicator_levels(observed[[col]])
     probabilities <- fit$probs[[col]]
     tibble::tibble(
       variable = col,
-      category = rep(levels, each = nrow(probabilities)),
+      category = factor(rep(levels, each = nrow(probabilities)), levels = levels),
       class = rep(seq_len(nrow(probabilities)), times = length(levels)),
       probability = as.vector(probabilities),
       overall_probability = rep(prop.table(table(factor(as.character(observed[[col]]), levels = levels))), each = nrow(probabilities))

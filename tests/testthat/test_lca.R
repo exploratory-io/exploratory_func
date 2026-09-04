@@ -285,3 +285,50 @@ test_that("exp_lca does not escalate past a user-configured nrep that already ex
   # The user's own setting is a floor, never something the schedule walks back down to.
   expect_true(all(selection$random_starts == 120L))
 })
+
+test_that("lca_indicator_levels honours a factor's declared order, not the text order", {
+  # Chosen so the declared order and the alphabetical order genuinely disagree --
+  # a fixture where they coincide cannot tell the two rules apart.
+  lv <- c("6ヶ月未満", "1年未満", "1年 - 3年", "3年以上")
+  f <- factor(sample(lv, 50, replace = TRUE), levels = lv)
+  expect_equal(lca_indicator_levels(f), lv)
+  expect_false(identical(lca_indicator_levels(f),
+                         sort(unique(as.character(f)), method = "radix")))
+
+  # A declared level with no rows is dropped: poLCA needs every category to have
+  # observations, and an empty one would be a category that cannot be estimated.
+  partial <- factor(c("b", "c"), levels = c("a", "b", "c"))
+  expect_equal(lca_indicator_levels(partial), c("b", "c"))
+
+  # Character and logical have no declared order, so they keep the text sort.
+  expect_equal(lca_indicator_levels(c("delta", "alpha", "charlie")),
+               c("alpha", "charlie", "delta"))
+  expect_equal(lca_indicator_levels(c(TRUE, FALSE, TRUE)), c("FALSE", "TRUE"))
+})
+
+test_that("exp_lca reports factor categories in their declared order", {
+  set.seed(2)
+  n <- 400
+  lv <- c("6ヶ月未満", "1年未満", "1年 - 3年", "3年以上")
+  cls <- sample(1:2, n, replace = TRUE)
+  df <- data.frame(
+    tenure = factor(ifelse(cls == 1,
+                           sample(lv, n, TRUE, c(.5, .3, .15, .05)),
+                           sample(lv, n, TRUE, c(.05, .15, .3, .5))), levels = lv),
+    b = ifelse(cls == 1, sample(c("m", "n"), n, TRUE, c(.8, .2)), sample(c("m", "n"), n, TRUE, c(.2, .8))),
+    c = ifelse(cls == 1, sample(c("lo", "hi"), n, TRUE, c(.75, .25)), sample(c("lo", "hi"), n, TRUE, c(.3, .7))),
+    stringsAsFactors = FALSE
+  )
+  model <- exp_lca(df, tenure, b, c, min_nclass = 2, max_nclass = 2,
+                   nrep = 5, maxiter = 300, seed = 1)$model[[1]]
+  profiles <- tidy(model, type = "profiles")
+  tenure_rows <- profiles[profiles$variable == "tenure", , drop = FALSE]
+
+  # category must come back as a FACTOR carrying the order. As a plain character column
+  # the report's pivot re-sorts it alphabetically and the declared order is lost again
+  # at render time, so the R-side fix alone would not be visible to the user.
+  expect_true(is.factor(profiles$category))
+  observed_order <- as.character(unique(tenure_rows$category[order(tenure_rows$class,
+                                                                  as.integer(tenure_rows$category))]))
+  expect_equal(observed_order[seq_along(lv)], lv)
+})
