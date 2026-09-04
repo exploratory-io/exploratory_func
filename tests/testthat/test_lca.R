@@ -358,3 +358,45 @@ test_that("exp_lca reports factor categories in their declared order", {
                                                                   as.integer(tenure_rows$category))]))
   expect_equal(observed_order[seq_along(lv)], lv)
 })
+
+test_that("exp_lca's max_nrow (tam#38399) caps fitting and the Output Data row count, sampled_nrow set only when it actually samples", {
+  set.seed(38399)
+  n <- 80
+  df <- data.frame(
+    a = sample(c("x", "y", "z"), n, replace = TRUE),
+    b = sample(c("m", "n", "o"), n, replace = TRUE)
+  )
+
+  not_sampled <- exp_lca(df, a, b, min_nclass = 2, max_nclass = 2,
+                         nrep = 1, maxiter = 50, seed = 1, max_nrow = 1000)$model[[1]]
+  expect_null(not_sampled$sampled_nrow)
+  expect_equal(nrow(tidy(not_sampled, type = "data")), n)
+
+  sampled <- exp_lca(df, a, b, min_nclass = 2, max_nclass = 2,
+                     nrep = 1, maxiter = 50, seed = 1, max_nrow = 20)$model[[1]]
+  expect_equal(sampled$sampled_nrow, 20)
+  # tam#38399: the Output Data table (tidy(..., type="data")) is built from the SAME
+  # sampled data used to fit -- capping max_nrow must cap what that table shows too,
+  # not just what the model was trained on.
+  expect_equal(nrow(tidy(sampled, type = "data")), 20)
+})
+
+test_that("exp_lca's max_nrow sampling works with a column name using every stress-test character", {
+  # Repo convention (workflow.md #7): verify complex user-supplied identifiers,
+  # not just plain ASCII names -- even though sample_rows() itself never touches
+  # column names, the whole pipeline (encode/quote/select) runs on the sampled data.
+  set.seed(38399)
+  n <- 60
+  stress_name <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  df <- data.frame(check.names = FALSE, stringsAsFactors = FALSE)
+  df[[stress_name]] <- sample(c("x", "y", "z"), n, replace = TRUE)
+  df[["b"]] <- sample(c("m", "n"), n, replace = TRUE)
+
+  model <- exp_lca(df, `航空 会社 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`, b,
+                   min_nclass = 2, max_nclass = 2,
+                   nrep = 1, maxiter = 50, seed = 1, max_nrow = 15)$model[[1]]
+  expect_equal(model$sampled_nrow, 15)
+  assignments <- tidy(model, type = "data")
+  expect_equal(nrow(assignments), 15)
+  expect_true(stress_name %in% names(assignments))
+})
