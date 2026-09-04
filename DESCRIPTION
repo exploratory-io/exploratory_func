@@ -45,7 +45,9 @@ Imports:
     pwr,
     readr,
     MASS,
-    ordinal
+    ordinal,
+    emmeans,
+    car
 Suggests:
     polycor,
     poLCA,
