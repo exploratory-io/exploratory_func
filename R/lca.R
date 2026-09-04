@@ -94,6 +94,7 @@ exp_lca <- function(df, ...,
 
   each_func <- function(group_df) {
     group_df <- dplyr::ungroup(group_df)
+    input_nrow <- nrow(group_df)
     sampled_nrow <- NULL
     if (!is.null(max_nrow) && nrow(group_df) > max_nrow) {
       sampled_nrow <- max_nrow
@@ -177,6 +178,7 @@ exp_lca <- function(df, ...,
       df_original = original,
       n_used = nrow(used),
       excluded_nrow = excluded_nrow,
+      input_nrow = input_nrow,
       sampled_nrow = sampled_nrow,
       min_nclass = min_nclass,
       max_nclass = max_nclass,
@@ -310,8 +312,7 @@ lca_class_selection_table <- function(candidates) {
 # works for llik = -700 is far too strict at llik = -70000.
 LCA_REPRODUCTION_RELATIVE_TOLERANCE <- 1e-6
 
-lca_best_reproduction_count <- function(fit) {
-  attempts <- fit$attempts
+lca_attempt_reproduction_count <- function(attempts) {
   if (is.null(attempts) || !length(attempts)) return(NA_integer_)
   attempts <- attempts[is.finite(attempts)]
   if (!length(attempts)) return(NA_integer_)
@@ -320,15 +321,28 @@ lca_best_reproduction_count <- function(fit) {
   sum(abs(attempts - best) <= tol)
 }
 
+lca_best_reproduction_count <- function(fit) {
+  lca_attempt_reproduction_count(fit$attempts)
+}
+
+lca_best_attempt <- function(fit) {
+  attempts <- fit$attempts
+  if (is.null(attempts) || !length(attempts)) return(NA_real_)
+  attempts <- attempts[is.finite(attempts)]
+  if (!length(attempts)) return(NA_real_)
+  max(attempts)
+}
+
 # tam#38380: adaptive random starts. Rather than making everyone pay for 100 starts on
 # every candidate, start at the configured nrep and escalate only when the best solution
 # was not reproduced enough times to trust it. Escalation is per class count, because each
 # candidate has its own optimization landscape -- a 2-class model can be trivially stable
 # while a 6-class one is not.
 #
-# The escalated run REPLACES the previous one rather than pooling with it: pooling would
-# report a reproduction count drawn from a different number of starts than the one shown
-# next to it, which is exactly the ratio the user is being asked to judge.
+# An escalated run adds only the starts missing from the current tier. poLCA returns the
+# per-start likelihoods, so those batches can be pooled for the reproduction diagnostic
+# while retaining the fit associated with the best likelihood. This avoids rerunning the
+# earlier starts: a 20 -> 50 -> 100 schedule performs 100 starts, rather than 170.
 #
 # The 1-class baseline is exempt. poLCA solves it directly with no EM loop (numiter = 1),
 # so every start is identical and escalating would burn time to re-derive the same number.
@@ -366,11 +380,18 @@ lca_adaptive_schedule <- function(nrep, max_nrep) {
 lca_fit_adaptive <- function(formula, used, k, nrep, max_nrep, maxiter, seed) {
   schedule <- if (k > 1L) lca_adaptive_schedule(nrep, max_nrep) else as.integer(nrep)
   last <- NULL
+  all_attempts <- numeric()
+  completed_starts <- 0L
+  best_fit <- NULL
+  best_attempt <- NA_real_
   for (i in seq_along(schedule)) {
-    starts <- schedule[[i]]
-    if (!is.null(seed)) set.seed(seed + k)
+    target_starts <- schedule[[i]]
+    batch_starts <- target_starts - completed_starts
+    # The first batch retains the established seed. Each later batch uses a distinct,
+    # deterministic stream so it contributes new random starts instead of repeating it.
+    if (!is.null(seed)) set.seed(seed + k + i - 1L)
     fit <- tryCatch(
-      poLCA::poLCA(formula, data = used, nclass = k, nrep = starts, maxiter = maxiter,
+      poLCA::poLCA(formula, data = used, nclass = k, nrep = batch_starts, maxiter = maxiter,
                    verbose = FALSE, calc.se = FALSE),
       error = function(e) e
     )
@@ -379,10 +400,18 @@ lca_fit_adaptive <- function(formula, used, k, nrep, max_nrep, maxiter, seed) {
       # entry produced a usable fit, do not discard it just because an
       # optional larger run failed.
       if (!is.null(last)) return(last)
-      return(list(fit = fit, random_starts = starts, best_reproductions = NA_integer_))
+      return(list(fit = fit, random_starts = batch_starts, best_reproductions = NA_integer_))
     }
-    reproductions <- lca_best_reproduction_count(fit)
-    last <- list(fit = fit, random_starts = starts, best_reproductions = reproductions)
+    completed_starts <- target_starts
+    all_attempts <- c(all_attempts, fit$attempts)
+    batch_best_attempt <- lca_best_attempt(fit)
+    if (is.null(best_fit) || (!is.na(batch_best_attempt) &&
+                              (is.na(best_attempt) || batch_best_attempt > best_attempt))) {
+      best_fit <- fit
+      best_attempt <- batch_best_attempt
+    }
+    reproductions <- lca_attempt_reproduction_count(all_attempts)
+    last <- list(fit = best_fit, random_starts = completed_starts, best_reproductions = reproductions)
     if (is.na(reproductions) || reproductions >= LCA_MIN_BEST_REPRODUCTIONS) {
       return(last)
     }
@@ -520,13 +549,22 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
     # search depth that never happens. Reporting a configured number as if it were the
     # one in force is the exact bug tam#38380 fixed for the starting count.
     effective_max_nrep <- max(lca_adaptive_schedule(x$nrep, x$max_nrep))
-    return(tibble::tibble(
+    # max_nrow makes the result approximate. Report both the source count and the
+    # fitting sample so "Rows Used" is never mistaken for the input data size.
+    input_nrow <- if (is.null(x$input_nrow)) x$n_used + x$excluded_nrow else x$input_nrow
+    sampling_metrics <- if (is.null(x$sampled_nrow)) {
+      tibble::tibble(Metric = character(), Value = character())
+    } else {
+      tibble::tibble(Metric = c("Input Rows", "Rows Sampled for Fitting"),
+                     Value = as.character(c(input_nrow, x$sampled_nrow)))
+    }
+    return(dplyr::bind_rows(sampling_metrics, tibble::tibble(
       Metric = c("Number of Variables", "Variable Names", "Rows Used", "Rows Removed",
                  "Class Counts Compared", "Random Starts", "Maximum Random Starts",
                  "Maximum Iterations", "Selected Number of Classes"),
       Value = c(length(x$selected_cols), paste(x$selected_cols, collapse = ", "), x$n_used, x$excluded_nrow,
                 class_counts_text, x$nrep, effective_max_nrep, x$maxiter, length(fit$P))
-    ))
+    )))
   }
   if (type == "class_selection") return(x$class_selection)
   if (type == "summary") {
@@ -559,11 +597,14 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
 #' One-row overview of a latent class analysis model.
 #' @export
 glance.lca_exploratory <- function(x, ...) {
+  input_nrow <- if (is.null(x$input_nrow)) x$n_used + x$excluded_nrow else x$input_nrow
   tibble::tibble(
     selected_classes = length(x$selected_fit$P),
     bic = x$selected_fit$bic,
     aic = x$selected_fit$aic,
     log_likelihood = x$selected_fit$llik,
+    input_nrow = input_nrow,
+    sampled_nrow = if (is.null(x$sampled_nrow)) NA_integer_ else x$sampled_nrow,
     n_used = x$n_used,
     excluded_nrow = x$excluded_nrow
   )

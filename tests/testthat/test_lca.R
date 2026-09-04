@@ -250,9 +250,67 @@ test_that("lca_fit_adaptive keeps an earlier fit when an escalation errors", {
     k = 2L, nrep = 20L, max_nrep = 50L, maxiter = 10L, seed = 1L
   )
 
-  expect_equal(calls, c(20L, 50L))
+  expect_equal(calls, c(20L, 30L))
   expect_identical(result$fit, first_fit)
   expect_equal(result$random_starts, 20L)
+  expect_equal(result$best_reproductions, 1L)
+})
+
+test_that("lca_fit_adaptive pools incremental batches and retains the global best fit", {
+  poLCA_namespace <- asNamespace("poLCA")
+  original_poLCA <- get("poLCA", envir = poLCA_namespace)
+  on.exit(assignInNamespace("poLCA", original_poLCA, ns = "poLCA"), add = TRUE)
+
+  calls <- integer()
+  first_fit <- list(attempts = c(-100, -105), marker = "first")
+  second_fit <- list(attempts = c(-100, -104), marker = "second")
+  fake_poLCA <- function(..., nrep) {
+    calls <<- c(calls, nrep)
+    if (length(calls) == 1L) first_fit else second_fit
+  }
+  assignInNamespace("poLCA", fake_poLCA, ns = "poLCA")
+
+  result <- lca_fit_adaptive(
+    stats::as.formula("cbind(a, b) ~ 1"),
+    data.frame(a = 1L, b = 1L),
+    k = 2L, nrep = 20L, max_nrep = 50L, maxiter = 10L, seed = 1L
+  )
+
+  # The second tier adds 30 starts rather than repeating the original 20. The
+  # two -100 attempts reproduce the global optimum, so no further tier is needed.
+  expect_equal(calls, c(20L, 30L))
+  expect_identical(result$fit, first_fit)
+  expect_equal(result$random_starts, 50L)
+  expect_equal(result$best_reproductions, 2L)
+})
+
+test_that("lca_fit_adaptive uses only the increment at every escalation tier", {
+  poLCA_namespace <- asNamespace("poLCA")
+  original_poLCA <- get("poLCA", envir = poLCA_namespace)
+  on.exit(assignInNamespace("poLCA", original_poLCA, ns = "poLCA"), add = TRUE)
+
+  calls <- integer()
+  fits <- list(
+    list(attempts = -100, marker = "first"),
+    list(attempts = -99, marker = "second"),
+    list(attempts = -98, marker = "third")
+  )
+  fake_poLCA <- function(..., nrep) {
+    calls <<- c(calls, nrep)
+    fits[[length(calls)]]
+  }
+  assignInNamespace("poLCA", fake_poLCA, ns = "poLCA")
+
+  result <- lca_fit_adaptive(
+    stats::as.formula("cbind(a, b) ~ 1"),
+    data.frame(a = 1L, b = 1L),
+    k = 2L, nrep = 20L, max_nrep = 100L, maxiter = 10L, seed = 1L
+  )
+
+  # 20 -> 50 -> 100 is performed as 20 + 30 + 50 starts, not 20 + 50 + 100.
+  expect_equal(calls, c(20L, 30L, 50L))
+  expect_identical(result$fit, fits[[3]])
+  expect_equal(result$random_starts, 100L)
   expect_equal(result$best_reproductions, 1L)
 })
 
@@ -389,6 +447,13 @@ test_that("exp_lca samples down to max_nrow and records that it did (tam#38420)"
                      nrep = 2, maxiter = 100, seed = 1, max_nrow = 50)$model[[1]]
   expect_equal(sampled$n_used, 50)
   expect_equal(sampled$sampled_nrow, 50)
+  expect_equal(sampled$input_nrow, n)
+  sampled_conditions <- tidy(sampled, type = "analysis_conditions")
+  expect_equal(sampled_conditions$Value[sampled_conditions$Metric == "Input Rows"], "200")
+  expect_equal(sampled_conditions$Value[sampled_conditions$Metric == "Rows Sampled for Fitting"], "50")
+  sampled_glance <- glance(sampled)
+  expect_equal(sampled_glance$input_nrow, n)
+  expect_equal(sampled_glance$sampled_nrow, 50)
 
   # At or under the cap the data is untouched, and sampled_nrow stays NULL so a
   # consumer can tell "not sampled" from "sampled to exactly this size".
@@ -396,6 +461,8 @@ test_that("exp_lca samples down to max_nrow and records that it did (tam#38420)"
                        nrep = 2, maxiter = 100, seed = 1, max_nrow = 5000)$model[[1]]
   expect_equal(untouched$n_used, n)
   expect_null(untouched$sampled_nrow)
+  expect_false("Input Rows" %in% tidy(untouched, type = "analysis_conditions")$Metric)
+  expect_true(is.na(glance(untouched)$sampled_nrow))
 
   # Default is no cap at all, so an existing direct R caller keeps every row.
   uncapped <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
