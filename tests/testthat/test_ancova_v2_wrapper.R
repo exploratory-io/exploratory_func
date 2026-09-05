@@ -64,6 +64,32 @@ test_that("exp_ancova groups like exp_anova does", {
   expect_equal(dplyr::n_distinct(tidied$region), 2)
 })
 
+test_that("group-specific ANCOVA errors stay local to repeat-by groups", {
+  set.seed(17)
+  df <- expand.grid(region = c("good", "bad"),
+                    group = c("A", "B", "C"),
+                    id = seq_len(10))
+  df$y <- rnorm(nrow(df))
+  df$X1 <- rnorm(nrow(df))
+  df$X1[df$region == "bad"] <- 1
+
+  ret <- df %>% dplyr::group_by(region) %>%
+    exp_ancova(y, group, covariates = "X1")
+
+  expect_equal(nrow(ret), 2)
+  expect_true(all(vapply(ret$model, function(x) {
+    inherits(x, "ancova_v2_exploratory")
+  }, logical(1))))
+  bad <- ret$model[[which(ret$region == "bad")]]
+  expect_true(inherits(bad, "error"))
+  expect_match(bad$message, "constant")
+
+  tidied <- tidy_rowwise(ret, model, type = "model")
+  expect_true("Note" %in% colnames(tidied))
+  expect_true(any(grepl("constant", tidied$Note, fixed = TRUE), na.rm = TRUE))
+  expect_true(any(tidied$Variable == "group", na.rm = TRUE))
+})
+
 test_that("type='model' matches V1's ANCOVA table columns", {
   df <- make_wrapper_data()
   v1 <- tidy_rowwise(fit_v1(df), model, type = "model")
@@ -125,6 +151,29 @@ test_that("type='pairs' matches V1's columns and honors pairs_adjust", {
   expect_true(any(v2$`P Value` > none$`P Value` * 1.5))
   # ... while the point estimates are the same contrasts either way.
   expect_equal(none$`Adjusted Difference`, v2$`Adjusted Difference`, tolerance = 1e-10)
+})
+
+test_that("type='pairs' preserves factor levels containing the contrast separator", {
+  set.seed(18)
+  group_levels <- c("Q1 - Q2", "A - B", "Z")
+  df <- data.frame(
+    y = rnorm(150),
+    group = factor(rep(group_levels, each = 50), levels = group_levels),
+    X1 = rnorm(150),
+    X2 = rnorm(150)
+  )
+
+  pairs <- tidy_rowwise(
+    exp_ancova(df, y, group, covariates = c("X1", "X2")),
+    model, type = "pairs"
+  )
+  actual <- paste(as.character(pairs$`Group 1`),
+                  as.character(pairs$`Group 2`), sep = " :: ")
+  expect_setequal(actual, c(
+    "Q1 - Q2 :: A - B",
+    "Q1 - Q2 :: Z",
+    "A - B :: Z"
+  ))
 })
 
 test_that("type='prob_dist' matches V1's columns", {

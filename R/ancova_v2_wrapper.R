@@ -26,8 +26,9 @@
 #' @noRd
 ancova_v2_each <- function(df, var1_col, var2_col, covariates, test_sig_level,
                            outlier_filter_type, outlier_filter_threshold,
-                           common_var2_order) {
-  df <- df %>% dplyr::select(c(var1_col, var2_col, covariates))
+                           common_var2_order, grouped_cols) {
+  tryCatch({
+    df <- df %>% dplyr::select(dplyr::all_of(c(var1_col, var2_col, covariates)))
 
   # Only the target column is NA-filtered here, exactly as exp_anova does.
   # run_ancova_v2() then applies ITS complete-case rule across target, factor
@@ -84,6 +85,17 @@ ancova_v2_each <- function(df, var1_col, var2_col, covariates, test_sig_level,
   model$result$internals <- NULL
   class(model) <- c("ancova_v2_exploratory", class(model))
   model
+  }, error = function(e) {
+    if (length(grouped_cols) > 0 && !grepl("EXP-ANA", e$message, fixed = TRUE)) {
+      # Repeat-by analyses must keep errors local to the affected group, just
+      # like exp_anova(). tidy.ancova_v2_exploratory() renders this object as a
+      # Note row while the other groups remain available to the report.
+      class(e) <- c("ancova_v2_exploratory", class(e))
+      e
+    } else {
+      stop(e)
+    }
+  })
 }
 
 #' ANCOVA Calculation V2 for the Analytics View.
@@ -126,6 +138,8 @@ exp_ancova <- function(df, var1, var2, covariates = NULL, func2 = NULL,
   if (length(var2_col) != 1) {
     stop("ANCOVA supports exactly one explanatory variable.")
   }
+
+  grouped_cols <- grouped_by(df)
 
   covariates <- covariates[!is.na(covariates) & nzchar(covariates)]
   if (length(covariates) == 0) {
@@ -178,7 +192,7 @@ exp_ancova <- function(df, var1, var2, covariates = NULL, func2 = NULL,
   do_on_each_group(df, ancova_v2_each,
                    params = quote(list(var1_col, var2_col, covariates, test_sig_level,
                                        outlier_filter_type, outlier_filter_threshold,
-                                       common_var2_order)),
+                                       common_var2_order, grouped_cols)),
                    name = "model", with_unnest = FALSE)
 }
 

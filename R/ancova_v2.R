@@ -536,11 +536,30 @@ ancova_split_pair_label <- function(label, levels) {
   if (positions[1] == -1) {
     return(c(NA_character_, NA_character_))
   }
+
+  # emmeans wraps a level in parentheses when the level itself contains the
+  # contrast separator, e.g. `(Q1 - Q2) - (A - B)`. Match the decorated text
+  # back to the raw factor levels before falling back to a positional split.
+  unwrap_level <- function(part) {
+    if (part %in% levels) {
+      return(part)
+    }
+    if (nchar(part) >= 2 && startsWith(part, "(") && endsWith(part, ")")) {
+      unwrapped <- substr(part, 2, nchar(part) - 1)
+      if (unwrapped %in% levels) {
+        return(unwrapped)
+      }
+    }
+    NA_character_
+  }
+
   for (pos in positions) {
     lhs <- substr(label, 1, pos - 1)
     rhs <- substr(label, pos + 3, nchar(label))
-    if (lhs %in% levels && rhs %in% levels) {
-      return(c(lhs, rhs))
+    lhs_level <- unwrap_level(lhs)
+    rhs_level <- unwrap_level(rhs)
+    if (!is.na(lhs_level) && !is.na(rhs_level)) {
+      return(c(lhs_level, rhs_level))
     }
   }
   # Fall back to the first split point if no exact match was found (should
