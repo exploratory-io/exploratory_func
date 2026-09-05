@@ -80,6 +80,17 @@ test_that("run_ancova_v2 returns the full result shape on a basic 2-covariate ca
   expect_equal(unlist(res$analysis_sample$factor_levels), c("A", "B", "C"))
   expect_equal(nrow(res$covariate_summary), 2)
   expect_true(all(res$covariate_summary$centered_reference_value == 0))
+  # reference_value is the SAME reference point on the covariate's raw scale
+  # (tam#38389 Q-7): charts drawing a grand-mean line on a raw x axis read it.
+  expect_equal(res$covariate_summary$reference_value, res$covariate_summary$mean)
+  expect_equal(res$covariate_summary$reference_value[[1]],
+               mean(df$X1), tolerance = 1e-10)
+  expect_equal(res$covariate_summary$reference_value[[2]],
+               mean(df$X2), tolerance = 1e-10)
+  # ... and it must agree with the reference point the adjusted means were
+  # actually computed at, so a chart line and the reported means cannot drift.
+  expect_equal(unname(unlist(res$adjusted_means$reference_covariates)),
+               res$covariate_summary$reference_value, tolerance = 1e-10)
   expect_true(is.list(res$slope_homogeneity))
   expect_true(is.list(res$model_selection))
   expect_equal(res$metadata$alpha, 0.05)
@@ -107,7 +118,7 @@ test_that("Test A: parallel slopes across all covariates -> homogeneous, final_m
   expect_equal(res$analysis_status, "ok")
   expect_true(res$slope_homogeneity$estimable)
   expect_false(isTRUE(res$slope_homogeneity$global_test$significant))
-  expect_equal(res$slope_homogeneity$status, "homogeneous")
+  expect_equal(res$slope_homogeneity$status, "not_detected")
   expect_equal(res$model_selection$final_model_type, "additive")
   expect_true(res$model_selection$standard_ancova_valid)
   expect_true(!is.null(res$ancova_table))
