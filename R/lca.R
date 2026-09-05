@@ -8,22 +8,29 @@
 #' @param ... Categorical indicator columns.
 #' @param min_nclass Smallest class count to evaluate.
 #' @param max_nclass Largest class count to evaluate.
-#' @param nrep Number of random starts for each candidate model.
+#' @param nrep Number of random starts each candidate model begins with.
+#' @param max_nrep Largest number of random starts a candidate may escalate to
+#'   when its best solution is not reproduced. Anything at or below \code{nrep}
+#'   turns escalation off. See \code{lca_adaptive_schedule()}.
 #' @param maxiter Maximum EM iterations per random start.
 #' @param seed Random seed.
 #' @param relationship_column Optional categorical column for class-by-category
 #'   composition. It is not used as an indicator.
 #' @param feature_top_n Number of top characteristic categories retained per
 #'   class for the report.
+#' @param max_nrow Maximum number of rows to fit on. Larger inputs are randomly
+#'   sampled down to this many rows. \code{NULL} uses every row.
 #' @export
 exp_lca <- function(df, ...,
                     min_nclass = 2,
                     max_nclass = 6,
                     nrep = 20,
+                    max_nrep = 50,
                     maxiter = 5000,
                     seed = 1,
                     relationship_column = NULL,
-                    feature_top_n = 10) {
+                    feature_top_n = 10,
+                    max_nrow = NULL) {
   if (!requireNamespace("poLCA", quietly = TRUE)) {
     stop("Latent Class Analysis requires the poLCA package.")
   }
@@ -55,6 +62,12 @@ exp_lca <- function(df, ...,
   min_nclass <- as.integer(min_nclass)
   max_nclass <- as.integer(max_nclass)
   nrep <- as.integer(nrep)
+  # max_nrep needs no stop() validation of its own: lca_adaptive_schedule() treats
+  # NULL / NA / anything at or below nrep as "do not escalate", so every out-of-range
+  # value degrades to a valid, cheaper schedule instead of an error.
+  if (!is.null(max_nrep)) {
+    max_nrep <- as.integer(max_nrep)
+  }
   maxiter <- as.integer(maxiter)
   feature_top_n <- as.integer(feature_top_n)
   if (is.na(min_nclass) || min_nclass < 2 || is.na(max_nclass) || max_nclass < min_nclass) {
@@ -72,8 +85,21 @@ exp_lca <- function(df, ...,
                 paste(unsupported, collapse = ", "), "."))
   }
 
+  # Seeds the max_nrow sample draw so a sampled run is reproducible. The fits
+  # themselves re-seed per candidate (set.seed(seed + k) in lca_fit_adaptive), so
+  # this does not change any model that was already being fit on every row.
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
   each_func <- function(group_df) {
     group_df <- dplyr::ungroup(group_df)
+    input_nrow <- nrow(group_df)
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(group_df) > max_nrow) {
+      sampled_nrow <- max_nrow
+      group_df <- group_df %>% sample_rows(max_nrow)
+    }
     original <- group_df %>% dplyr::mutate(.lca_row_id = dplyr::row_number())
     indicators <- lca_encode_indicators(original, selected_cols)
     complete_rows <- stats::complete.cases(indicators)
@@ -103,14 +129,17 @@ exp_lca <- function(df, ...,
 
     formula <- stats::as.formula(paste0("cbind(", paste(vapply(names(used), lca_quote_name, character(1)), collapse = ", "), ") ~ 1"))
     candidates <- lapply(candidate_counts, function(k) {
-      attempt <- lca_fit_adaptive(formula, used, k, nrep, maxiter, seed)
+      attempt <- lca_fit_adaptive(formula, used, k = k, nrep = nrep, max_nrep = max_nrep,
+                                  maxiter = maxiter, seed = seed)
       if (inherits(attempt$fit, "error")) {
         return(list(nclass = k, fit = NULL, error = conditionMessage(attempt$fit),
-                    random_starts = attempt$random_starts, best_reproductions = NA_integer_))
+                    random_starts = attempt$random_starts, best_reproductions = NA_integer_,
+                    max_starts_reached = attempt$max_starts_reached))
       }
       list(nclass = k, fit = attempt$fit, error = NULL,
            random_starts = attempt$random_starts,
-           best_reproductions = attempt$best_reproductions)
+           best_reproductions = attempt$best_reproductions,
+           max_starts_reached = attempt$max_starts_reached)
     })
     successful <- Filter(function(x) !is.null(x$fit), candidates)
     if (!length(successful)) {
@@ -123,7 +152,14 @@ exp_lca <- function(df, ...,
     # every successful fit only when none converged at all (so the analysis
     # still returns a result rather than erroring out).
     converged_candidates <- Filter(function(x) lca_fit_converged(x$fit), successful)
-    selection_pool <- if (length(converged_candidates)) converged_candidates else successful
+    selection_source <- if (length(converged_candidates)) converged_candidates else successful
+    # An unstable optimum is explicitly not eligible for recommendation. A missing
+    # stability verdict (the baseline, or an incomplete optional escalation) is retained;
+    # it is not evidence that the fit is unstable.
+    selection_pool <- Filter(lca_candidate_is_selection_eligible, selection_source)
+    if (!length(selection_pool)) {
+      stop("Latent Class Analysis found no converged model eligible for recommendation after excluding unstable solutions.")
+    }
     used_unconverged_fallback <- length(converged_candidates) == 0
     best_index <- which.min(vapply(selection_pool, function(x) x$fit$bic, numeric(1)))
     selected <- selection_pool[[best_index]]$fit
@@ -143,6 +179,9 @@ exp_lca <- function(df, ...,
       dplyr::filter(rank <= feature_top_n) %>%
       dplyr::ungroup()
     row_assignments <- lca_assignment_table(original, used_row_ids, selected)
+    class_distribution <- lca_class_distribution_table(original, selected_cols, used_row_ids,
+                                                       selected$predclass, length(selected$P))
+    variable_discrimination <- calculate_lca_variable_discrimination(profiles)
     relationship <- lca_relationship_table(original, used_row_ids, selected$predclass, relationship_col)
 
     model <- list(
@@ -151,10 +190,13 @@ exp_lca <- function(df, ...,
       df_original = original,
       n_used = nrow(used),
       excluded_nrow = excluded_nrow,
+      input_nrow = input_nrow,
+      sampled_nrow = sampled_nrow,
       min_nclass = min_nclass,
       max_nclass = max_nclass,
       used_unconverged_fallback = used_unconverged_fallback,
       nrep = nrep,
+      max_nrep = max_nrep,
       maxiter = maxiter,
       feature_top_n = feature_top_n,
       selected_fit = selected,
@@ -163,6 +205,8 @@ exp_lca <- function(df, ...,
       profiles = profiles,
       characteristics = characteristics,
       discrimination = discrimination,
+      variable_discrimination = variable_discrimination,
+      class_distribution = class_distribution,
       row_assignments = row_assignments,
       relationship = relationship,
       grouped_cols = grouped_cols
@@ -236,12 +280,22 @@ lca_class_selection_table <- function(candidates) {
         minimum_class_share = NA_real_, mean_maximum_membership_probability = NA_real_,
         pct_low_confidence = NA_real_,
         random_starts = NA_integer_, best_solution_reproductions = NA_integer_,
+        reproduction_rate = NA_real_, solution_stability = NA_character_,
         converged = FALSE, error = candidate$error
       ))
     }
     fit <- candidate$fit
     max_posterior <- apply(fit$posterior, 1, max)
     converged <- lca_fit_converged(fit)
+    # tam#38417: with a single class every row belongs to it with probability 1 by
+    # construction, so "mean maximum membership probability = 100%" and "0% below 60%
+    # confidence" are not measurements of anything -- they are restatements of the class
+    # count. Reported blank so the column reads as a comparison across the candidates
+    # that actually have something to separate. minimum_class_share is left at its 100%:
+    # that one IS the size of the only class, which is a fact about the model.
+    is_baseline <- candidate$nclass <= 1L
+    random_starts <- if (is.null(candidate$random_starts)) NA_integer_ else as.integer(candidate$random_starts)
+    best_reproductions <- if (is.null(candidate$best_reproductions)) NA_integer_ else as.integer(candidate$best_reproductions)
     tibble::tibble(
       number_of_classes = candidate$nclass,
       log_likelihood = fit$llik,
@@ -249,13 +303,20 @@ lca_class_selection_table <- function(candidates) {
       bic = fit$bic,
       entropy = lca_entropy(fit),
       minimum_class_share = min(fit$P),
-      mean_maximum_membership_probability = mean(max_posterior),
-      pct_low_confidence = mean(max_posterior < 0.6),
+      mean_maximum_membership_probability = if (is_baseline) NA_real_ else mean(max_posterior),
+      pct_low_confidence = if (is_baseline) NA_real_ else mean(max_posterior < 0.6),
       # tam#38380: the number of random starts this candidate actually used (it escalates
       # on its own when the best solution is not reproduced) and how many of those starts
       # reached it. Read together: 2 of 50 is a much weaker result than 2 of 2.
-      random_starts = if (is.null(candidate$random_starts)) NA_integer_ else as.integer(candidate$random_starts),
-      best_solution_reproductions = if (is.null(candidate$best_reproductions)) NA_integer_ else as.integer(candidate$best_reproductions),
+      random_starts = random_starts,
+      best_solution_reproductions = best_reproductions,
+      # tam#38417: how OFTEN the best solution was reached, as a share of the starts that
+      # were actually run. The raw reproduction count alone is not comparable across rows
+      # once the adaptive schedule escalates a candidate to 50 or 100 starts -- 2 of 2 and
+      # 2 of 100 are very different results printed as the same number.
+      reproduction_rate = lca_reproduction_rate(best_reproductions, random_starts),
+      solution_stability = lca_solution_stability(best_reproductions, random_starts,
+                                                   candidate$max_starts_reached),
       # poLCA's eflag records numerical/start errors, not iteration-limit
       # termination. A fit is known to have converged only when it stopped
       # before maxiter and did not encounter such an error.
@@ -282,8 +343,7 @@ lca_class_selection_table <- function(candidates) {
 # works for llik = -700 is far too strict at llik = -70000.
 LCA_REPRODUCTION_RELATIVE_TOLERANCE <- 1e-6
 
-lca_best_reproduction_count <- function(fit) {
-  attempts <- fit$attempts
+lca_attempt_reproduction_count <- function(attempts) {
   if (is.null(attempts) || !length(attempts)) return(NA_integer_)
   attempts <- attempts[is.finite(attempts)]
   if (!length(attempts)) return(NA_integer_)
@@ -292,32 +352,92 @@ lca_best_reproduction_count <- function(fit) {
   sum(abs(attempts - best) <= tol)
 }
 
+lca_best_reproduction_count <- function(fit) {
+  lca_attempt_reproduction_count(fit$attempts)
+}
+
+lca_best_attempt <- function(fit) {
+  attempts <- fit$attempts
+  if (is.null(attempts) || !length(attempts)) return(NA_real_)
+  attempts <- attempts[is.finite(attempts)]
+  if (!length(attempts)) return(NA_real_)
+  max(attempts)
+}
+
 # tam#38380: adaptive random starts. Rather than making everyone pay for 100 starts on
 # every candidate, start at the configured nrep and escalate only when the best solution
 # was not reproduced enough times to trust it. Escalation is per class count, because each
 # candidate has its own optimization landscape -- a 2-class model can be trivially stable
 # while a 6-class one is not.
 #
-# The escalated run REPLACES the previous one rather than pooling with it: pooling would
-# report a reproduction count drawn from a different number of starts than the one shown
-# next to it, which is exactly the ratio the user is being asked to judge.
+# An escalated run adds only the starts missing from the current tier. poLCA returns the
+# per-start likelihoods, so those batches can be pooled for the reproduction diagnostic
+# while retaining the fit associated with the best likelihood. This avoids rerunning the
+# earlier starts: a 20 -> 50 -> 100 schedule performs 100 starts, rather than 170.
 #
 # The 1-class baseline is exempt. poLCA solves it directly with no EM loop (numiter = 1),
 # so every start is identical and escalating would burn time to re-derive the same number.
+#
+# tam#38420: the CEILING is the user's call, not a constant. Escalation is targeted at
+# exactly the expensive candidates -- it fires when a candidate's best solution was hit
+# by only one start, which is what a multimodal likelihood surface looks like, and that
+# is driven by high class counts and many indicator variables. So the candidates that
+# escalate are also the slowest ones to fit, and on wide data (75 indicators was the
+# reported case) the two multiply. Reaching the top tier guarantees nothing either --
+# the loop just runs out of tiers and returns whatever it has. Exposing the ceiling as
+# max_nrep lets the speed/stability tradeoff be made per analysis; the intermediate
+# tiers below stay internal.
 LCA_ADAPTIVE_START_SCHEDULE <- c(50L, 100L)
 LCA_MIN_BEST_REPRODUCTIONS <- 2L
 
-lca_fit_adaptive <- function(formula, used, k, nrep, maxiter, seed) {
-  schedule <- as.integer(nrep)
-  if (k > 1L) {
-    schedule <- c(schedule, LCA_ADAPTIVE_START_SCHEDULE[LCA_ADAPTIVE_START_SCHEDULE > nrep])
+# The escalation ladder for one candidate: start at nrep, walk the internal tiers that
+# fall strictly between nrep and max_nrep, and finish at max_nrep itself. Kept separate
+# from the fitting so the rule can be tested without fitting anything.
+#
+# max_nrep at or below nrep (and NULL / NA) means "do not escalate" -- nrep is always a
+# floor the schedule never walks back down to, so a user who asks for more starts than
+# the ceiling still gets the starts they asked for.
+lca_adaptive_schedule <- function(nrep, max_nrep) {
+  nrep <- as.integer(nrep)
+  if (is.null(max_nrep) || length(max_nrep) != 1L || is.na(max_nrep) || max_nrep <= nrep) {
+    return(nrep)
   }
-  last <- NULL
-  for (i in seq_along(schedule)) {
-    starts <- schedule[[i]]
+  max_nrep <- as.integer(max_nrep)
+  tiers <- LCA_ADAPTIVE_START_SCHEDULE[LCA_ADAPTIVE_START_SCHEDULE > nrep &
+                                         LCA_ADAPTIVE_START_SCHEDULE < max_nrep]
+  as.integer(sort(unique(c(nrep, tiers, max_nrep))))
+}
+
+lca_fit_adaptive <- function(formula, used, k, nrep, max_nrep, maxiter, seed) {
+  # tam#38417: the 1-class baseline does not search a class assignment at all, so there
+  # are no local optima for extra starts to escape -- poLCA solves it directly. Run it
+  # ONCE and report no random-start count, rather than paying for nrep identical fits and
+  # then printing a number that reads as a reliability diagnostic beside the multi-class
+  # rows, where it means something entirely different.
+  if (k <= 1L) {
     if (!is.null(seed)) set.seed(seed + k)
     fit <- tryCatch(
-      poLCA::poLCA(formula, data = used, nclass = k, nrep = starts, maxiter = maxiter,
+      poLCA::poLCA(formula, data = used, nclass = k, nrep = 1L, maxiter = maxiter,
+                   verbose = FALSE, calc.se = FALSE),
+      error = function(e) e
+    )
+    return(list(fit = fit, random_starts = NA_integer_, best_reproductions = NA_integer_,
+                max_starts_reached = NA))
+  }
+  schedule <- lca_adaptive_schedule(nrep, max_nrep)
+  last <- NULL
+  all_attempts <- numeric()
+  completed_starts <- 0L
+  best_fit <- NULL
+  best_attempt <- NA_real_
+  for (i in seq_along(schedule)) {
+    target_starts <- schedule[[i]]
+    batch_starts <- target_starts - completed_starts
+    # The first batch retains the established seed. Each later batch uses a distinct,
+    # deterministic stream so it contributes new random starts instead of repeating it.
+    if (!is.null(seed)) set.seed(seed + k + i - 1L)
+    fit <- tryCatch(
+      poLCA::poLCA(formula, data = used, nclass = k, nrep = batch_starts, maxiter = maxiter,
                    verbose = FALSE, calc.se = FALSE),
       error = function(e) e
     )
@@ -326,15 +446,67 @@ lca_fit_adaptive <- function(formula, used, k, nrep, maxiter, seed) {
       # entry produced a usable fit, do not discard it just because an
       # optional larger run failed.
       if (!is.null(last)) return(last)
-      return(list(fit = fit, random_starts = starts, best_reproductions = NA_integer_))
+      return(list(fit = fit, random_starts = batch_starts, best_reproductions = NA_integer_,
+                  max_starts_reached = FALSE))
     }
-    reproductions <- lca_best_reproduction_count(fit)
-    last <- list(fit = fit, random_starts = starts, best_reproductions = reproductions)
+    completed_starts <- target_starts
+    all_attempts <- c(all_attempts, fit$attempts)
+    batch_best_attempt <- lca_best_attempt(fit)
+    if (is.null(best_fit) || (!is.na(batch_best_attempt) &&
+                              (is.na(best_attempt) || batch_best_attempt > best_attempt))) {
+      best_fit <- fit
+      best_attempt <- batch_best_attempt
+    }
+    reproductions <- lca_attempt_reproduction_count(all_attempts)
+    last <- list(fit = best_fit, random_starts = completed_starts, best_reproductions = reproductions,
+                 max_starts_reached = completed_starts >= max(schedule))
     if (is.na(reproductions) || reproductions >= LCA_MIN_BEST_REPRODUCTIONS) {
       return(last)
     }
   }
   last
+}
+
+# tam#38417: reproduction rate and the stability verdict derived from it.
+#
+# The rule table comes from the issue and is deliberately a JOINT condition on the count
+# and the rate, not either alone:
+#
+#   Stable    best solution reached 5+ times AND rate >= 10%
+#   Caution   reached 2-4 times, OR 5+ times but with rate < 10%
+#   Unstable  reached at most once, even after the schedule escalated to 100 starts
+#
+# The count alone would call "2 of 2" and "2 of 100" the same; the rate alone would call
+# "1 of 1" (100%) the most stable result in the table when it is the least informative.
+LCA_STABLE_MIN_REPRODUCTIONS <- 5L
+LCA_STABLE_MIN_RATE <- 0.10
+
+lca_reproduction_rate <- function(reproductions, starts) {
+  if (is.null(reproductions) || is.null(starts)) return(NA_real_)
+  if (is.na(reproductions) || is.na(starts) || starts <= 0L) return(NA_real_)
+  as.numeric(reproductions) / as.numeric(starts)
+}
+
+lca_solution_stability <- function(reproductions, starts, max_starts_reached = NULL) {
+  rate <- lca_reproduction_rate(reproductions, starts)
+  if (is.na(rate) || is.na(reproductions)) return(NA_character_)
+  if (reproductions <= 1L) {
+    # "Unstable" requires exhausting the configured schedule. If an optional
+    # escalation failed, there is not enough evidence to make that claim.
+    if (is.null(max_starts_reached)) {
+      max_starts_reached <- starts >= max(LCA_ADAPTIVE_START_SCHEDULE)
+    }
+    return(if (isTRUE(max_starts_reached)) "Unstable" else NA_character_)
+  }
+  if (reproductions >= LCA_STABLE_MIN_REPRODUCTIONS && rate >= LCA_STABLE_MIN_RATE) return("Stable")
+  "Caution"
+}
+
+lca_candidate_is_selection_eligible <- function(candidate) {
+  stability <- lca_solution_stability(candidate$best_reproductions,
+                                       candidate$random_starts,
+                                       candidate$max_starts_reached)
+  is.na(stability) || stability != "Unstable"
 }
 
 # tam#38383: normalized entropy (the "entropy R-squared" / relative entropy
@@ -391,22 +563,170 @@ lca_stop_reason <- function(fit) {
 }
 
 lca_profile_table <- function(fit, observed, cols) {
+  # tam#38417: the report compares a class-conditional probability against an overall one,
+  # so both sides have to come from the same model or the difference is not a quantity the
+  # model ever asserted. The observed share (prop.table over the complete cases) answers a
+  # different question -- what the sample did -- and mixing it with P(Y=r|C=c) produced
+  # differences that do not reconcile with the fitted probabilities at all.
+  #
+  #   model_overall_probability: P(Y=r) = sum_c P(C=c) * P(Y=r|C=c)
+  #
+  # overall_probability (the observed share) is retained so nothing downstream that reads
+  # it silently changes shape, and so the two can be compared when diagnosing model fit.
+  class_shares <- fit$P
   dplyr::bind_rows(lapply(cols, function(col) {
     levels <- lca_indicator_levels(observed[[col]])
     probabilities <- fit$probs[[col]]
+    # probabilities is class x category; the model-implied marginal is the class-share
+    # weighted column mean, recycled back across the classes for the long layout.
+    model_overall <- as.vector(class_shares %*% probabilities)
     tibble::tibble(
       variable = col,
       category = factor(rep(levels, each = nrow(probabilities)), levels = levels),
       class = rep(seq_len(nrow(probabilities)), times = length(levels)),
       probability = as.vector(probabilities),
-      overall_probability = rep(prop.table(table(factor(as.character(observed[[col]]), levels = levels))), each = nrow(probabilities))
+      overall_probability = rep(prop.table(table(factor(as.character(observed[[col]]), levels = levels))), each = nrow(probabilities)),
+      model_overall_probability = rep(model_overall, each = nrow(probabilities))
     )
   })) %>%
     dplyr::mutate(
-      difference = probability - overall_probability,
+      difference = probability - model_overall_probability,
+      observed_difference = probability - overall_probability,
       abs_difference = abs(difference),
       class = factor(paste("Class", class), levels = paste("Class", seq_along(fit$P)))
     )
+}
+
+#' Discrimination power of each indicator variable in a latent class model.
+#'
+#' Scores how differently each variable's response distribution behaves ACROSS the latent
+#' classes, on 0..1, as the mean Total Variation Distance over every class pair:
+#'
+#'   D_j(c1, c2) = 0.5 * sum_r | P(Y_j = r | C = c1) - P(Y_j = r | C = c2) |
+#'   D_j         = mean over all c1 < c2
+#'
+#' The measure is deliberately NOT a significance test, a predictive importance, or a
+#' selection criterion -- it is a distance between the model's own estimated conditional
+#' response probabilities. Consequences worth stating, because each one is a property the
+#' report relies on (tam#38418):
+#'
+#'  - Range is 0..1 regardless of how many categories the variable has, so a 2-category
+#'    variable and a 10-category one are directly comparable. (A raw sum of absolute
+#'    differences would not be: it grows with the number of categories.)
+#'  - Invariant to class LABELS and to class ORDER, because every unordered pair is
+#'    visited exactly once and the distance is symmetric.
+#'  - Invariant to category ORDER, because the sum runs over the whole category set.
+#'  - Class pairs are averaged with EQUAL weight; class sizes are deliberately not used.
+#'    The question is how different the response patterns are, not how many rows sit in
+#'    each pattern -- that is what the class-size columns elsewhere in the report answer.
+#'
+#' @param probabilities Long data frame of class-conditional response probabilities.
+#' @param variable_col,category_col,class_col,probability_col Column names.
+#' @param tolerance Allowed deviation from 1 when checking each variable x class sum.
+#' @export
+calculate_lca_variable_discrimination <- function(probabilities,
+                                                  variable_col = "variable",
+                                                  category_col = "category",
+                                                  class_col = "class",
+                                                  probability_col = "probability",
+                                                  tolerance = 1e-6) {
+  df <- as.data.frame(probabilities, stringsAsFactors = FALSE)
+  required <- c(variable_col, category_col, class_col, probability_col)
+  missing_cols <- setdiff(required, names(df))
+  if (length(missing_cols)) {
+    stop(paste0("Variable discrimination input is missing column(s): ", paste(missing_cols, collapse = ", "), "."))
+  }
+  values <- df[[probability_col]]
+  if (!is.numeric(values) || any(!is.finite(values))) {
+    stop("Conditional response probabilities must be finite numbers. NA, NaN and Inf are not allowed.")
+  }
+  # Zero is legitimate -- a class can genuinely never give an answer -- so only values
+  # outside [0, 1] are rejected.
+  if (any(values < 0 | values > 1)) {
+    stop("Conditional response probabilities must be between 0 and 1.")
+  }
+
+  variables <- unique(as.character(df[[variable_col]]))
+  categories <- as.character(df[[category_col]])
+  classes <- as.character(df[[class_col]])
+
+  pair_rows <- list()
+  scores <- vector("list", length(variables))
+  for (i in seq_along(variables)) {
+    variable_name <- variables[[i]]
+    keep <- as.character(df[[variable_col]]) == variable_name
+    v_categories <- categories[keep]
+    v_classes <- classes[keep]
+    v_values <- values[keep]
+
+    class_levels <- unique(v_classes)
+    # Every class must carry the SAME category set. Filling a missing category with 0
+    # would silently turn a data-shaping bug (a category/class misalignment upstream --
+    # the exact failure this check exists to catch) into a plausible-looking score.
+    per_class <- lapply(class_levels, function(cl) {
+      idx <- v_classes == cl
+      stats::setNames(v_values[idx], v_categories[idx])
+    })
+    category_sets <- lapply(per_class, function(x) sort(names(x)))
+    if (length(category_sets) > 1 && !all(vapply(category_sets[-1], function(x) identical(x, category_sets[[1]]), logical(1)))) {
+      stop(paste0("Category mismatch detected for variable: ", variable_name))
+    }
+    if (any(vapply(per_class, function(x) any(duplicated(names(x))), logical(1)))) {
+      stop(paste0("Duplicated categories detected for variable: ", variable_name))
+    }
+    bad <- vapply(per_class, function(x) abs(sum(x) - 1) > tolerance, logical(1))
+    if (any(bad)) {
+      stop(paste0("Conditional response probabilities do not sum to 1 for variable: ", variable_name,
+                  ", class: ", paste(class_levels[bad], collapse = ", "), "."))
+    }
+
+    if (length(class_levels) < 2L) {
+      # A single class has nothing to be distinguished FROM. NA, never 0: 0 already means
+      # "several classes whose response distributions are identical", which is a real and
+      # very different finding.
+      scores[[i]] <- tibble::tibble(
+        variable = variable_name, discrimination_score = NA_real_,
+        max_pairwise_score = NA_real_, min_pairwise_score = NA_real_,
+        number_of_class_pairs = 0L
+      )
+      next
+    }
+
+    pairs <- utils::combn(seq_along(class_levels), 2, simplify = FALSE)
+    pair_scores <- vapply(pairs, function(pair) {
+      p1 <- per_class[[pair[[1]]]]
+      p2 <- per_class[[pair[[2]]]][names(p1)]
+      0.5 * sum(abs(p1 - p2))
+    }, numeric(1))
+    pair_rows[[length(pair_rows) + 1L]] <- tibble::tibble(
+      variable = variable_name,
+      class_1 = class_levels[vapply(pairs, function(pair) pair[[1]], integer(1))],
+      class_2 = class_levels[vapply(pairs, function(pair) pair[[2]], integer(1))],
+      pairwise_discrimination = pair_scores
+    )
+    scores[[i]] <- tibble::tibble(
+      variable = variable_name,
+      discrimination_score = mean(pair_scores),
+      max_pairwise_score = max(pair_scores),
+      min_pairwise_score = min(pair_scores),
+      number_of_class_pairs = length(pair_scores)
+    )
+  }
+
+  result <- dplyr::bind_rows(scores)
+  # Ties keep the original variable-selection order so the chart's bar order is stable
+  # across runs rather than depending on whatever order the sort happened to produce.
+  result$.selection_order <- seq_len(nrow(result))
+  result <- result[order(-result$discrimination_score, result$.selection_order), , drop = FALSE]
+  # Rank is computed AFTER the sort, so tied scores share a rank and the row order the
+  # chart draws is the row order the ranks describe.
+  result$rank <- rank(-result$discrimination_score, na.last = "keep", ties.method = "min")
+  result$.selection_order <- NULL
+  result <- tibble::as_tibble(result)
+  attr(result, "pairwise") <- if (length(pair_rows)) dplyr::bind_rows(pair_rows) else
+    tibble::tibble(variable = character(), class_1 = character(), class_2 = character(),
+                   pairwise_discrimination = numeric())
+  result
 }
 
 lca_assignment_table <- function(original, used_row_ids, fit) {
@@ -425,6 +745,39 @@ lca_assignment_table <- function(original, used_row_ids, fit) {
     dplyr::left_join(assigned, by = ".lca_row_id") %>%
     dplyr::mutate(`Is Excluded` = dplyr::coalesce(`Is Excluded`, TRUE)) %>%
     dplyr::select(-.lca_row_id)
+}
+
+# tam#38419: how the assigned classes are distributed WITHIN each answer category, for
+# every indicator variable at once. The report renders it as a 100% stacked bar faceted by
+# variable, so what matters here is the count per (variable, category, class) cell -- the
+# ratio is a chart-side window function, not something to precompute (see the spec loop's
+# "Ratio + Total: window function, never a static R column" rule).
+#
+# Rows EXCLUDED from the estimation are kept, with class NA. They are a real part of the
+# picture: an answer category answered only by rows that were dropped for missingness
+# elsewhere shows up as a full-height (NA) band rather than silently disappearing, which
+# is what the spec's reference chart shows.
+#
+# tidyr::complete() fills unobserved (category, class) combinations with 0 so a missing
+# cell is drawn as absent rather than collapsing the stack.
+lca_class_distribution_table <- function(original, cols, used_row_ids, predclass, nclass) {
+  class_levels <- paste("Class", seq_len(nclass))
+  assigned <- tibble::tibble(.lca_row_id = used_row_ids, class = paste("Class", predclass))
+  base <- original %>%
+    dplyr::select(dplyr::all_of(c(".lca_row_id", cols))) %>%
+    dplyr::left_join(assigned, by = ".lca_row_id")
+  dplyr::bind_rows(lapply(cols, function(col) {
+    levels <- lca_indicator_levels(original[[col]])
+    counted <- base %>%
+      dplyr::transmute(
+        category = factor(as.character(.data[[col]]), levels = levels),
+        class = factor(class, levels = class_levels)
+      ) %>%
+      dplyr::count(category, class, name = "rows")
+    tidyr::complete(counted, category, class, fill = list(rows = 0L)) %>%
+      dplyr::mutate(variable = col) %>%
+      dplyr::select(variable, category, class, rows)
+  }))
 }
 
 lca_relationship_table <- function(original, used_row_ids, predclass, relationship_col) {
@@ -460,12 +813,29 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
     } else {
       paste0(min(class_counts), " to ", max(class_counts))
     }
-    return(tibble::tibble(
+    # tam#38420: the ceiling a candidate may escalate to is now a setting (max_nrep), so
+    # the table reports it next to the starting count. Derived through the same
+    # lca_adaptive_schedule() the fitting uses rather than printing max_nrep raw -- a
+    # ceiling at or below nrep means no escalation, and printing it as-is would claim a
+    # search depth that never happens. Reporting a configured number as if it were the
+    # one in force is the exact bug tam#38380 fixed for the starting count.
+    effective_max_nrep <- max(lca_adaptive_schedule(x$nrep, x$max_nrep))
+    # max_nrow makes the result approximate. Report both the source count and the
+    # fitting sample so "Rows Used" is never mistaken for the input data size.
+    input_nrow <- if (is.null(x$input_nrow)) x$n_used + x$excluded_nrow else x$input_nrow
+    sampling_metrics <- if (is.null(x$sampled_nrow)) {
+      tibble::tibble(Metric = character(), Value = character())
+    } else {
+      tibble::tibble(Metric = c("Input Rows", "Rows Sampled for Fitting"),
+                     Value = as.character(c(input_nrow, x$sampled_nrow)))
+    }
+    return(dplyr::bind_rows(sampling_metrics, tibble::tibble(
       Metric = c("Number of Variables", "Variable Names", "Rows Used", "Rows Removed",
-                 "Class Counts Compared", "Random Starts", "Maximum Iterations", "Selected Number of Classes"),
+                 "Class Counts Compared", "Random Starts", "Maximum Random Starts",
+                 "Maximum Iterations", "Selected Number of Classes"),
       Value = c(length(x$selected_cols), paste(x$selected_cols, collapse = ", "), x$n_used, x$excluded_nrow,
-                class_counts_text, x$nrep, x$maxiter, length(fit$P))
-    ))
+                class_counts_text, x$nrep, effective_max_nrep, x$maxiter, length(fit$P))
+    )))
   }
   if (type == "class_selection") return(x$class_selection)
   if (type == "summary") {
@@ -483,6 +853,17 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
   if (type == "profiles") return(x$profiles)
   if (type == "characteristics") return(x$characteristics)
   if (type == "discrimination") return(x$discrimination)
+  # tam#38418: per-VARIABLE discrimination (mean pairwise TVD). Distinct from the
+  # "discrimination" type above, which is per variable AND category (max - min response
+  # probability) and feeds the "Class-Characterizing Categories" chart.
+  if (type == "variable_discrimination") return(x$variable_discrimination)
+  if (type == "variable_discrimination_pairs") {
+    pairs <- attr(x$variable_discrimination, "pairwise")
+    return(if (is.null(pairs)) tibble::tibble(variable = character(), class_1 = character(),
+                                              class_2 = character(),
+                                              pairwise_discrimination = numeric()) else pairs)
+  }
+  if (type == "class_distribution") return(x$class_distribution)
   if (type == "assignment_confidence") {
     return(x$row_assignments %>%
       dplyr::filter(!`Is Excluded`) %>%
@@ -498,11 +879,14 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
 #' One-row overview of a latent class analysis model.
 #' @export
 glance.lca_exploratory <- function(x, ...) {
+  input_nrow <- if (is.null(x$input_nrow)) x$n_used + x$excluded_nrow else x$input_nrow
   tibble::tibble(
     selected_classes = length(x$selected_fit$P),
     bic = x$selected_fit$bic,
     aic = x$selected_fit$aic,
     log_likelihood = x$selected_fit$llik,
+    input_nrow = input_nrow,
+    sampled_nrow = if (is.null(x$sampled_nrow)) NA_integer_ else x$sampled_nrow,
     n_used = x$n_used,
     excluded_nrow = x$excluded_nrow
   )

@@ -247,12 +247,70 @@ test_that("lca_fit_adaptive keeps an earlier fit when an escalation errors", {
   result <- lca_fit_adaptive(
     stats::as.formula("cbind(a, b) ~ 1"),
     data.frame(a = 1L, b = 1L),
-    k = 2L, nrep = 20L, maxiter = 10L, seed = 1L
+    k = 2L, nrep = 20L, max_nrep = 50L, maxiter = 10L, seed = 1L
   )
 
-  expect_equal(calls, c(20L, 50L))
+  expect_equal(calls, c(20L, 30L))
   expect_identical(result$fit, first_fit)
   expect_equal(result$random_starts, 20L)
+  expect_equal(result$best_reproductions, 1L)
+})
+
+test_that("lca_fit_adaptive pools incremental batches and retains the global best fit", {
+  poLCA_namespace <- asNamespace("poLCA")
+  original_poLCA <- get("poLCA", envir = poLCA_namespace)
+  on.exit(assignInNamespace("poLCA", original_poLCA, ns = "poLCA"), add = TRUE)
+
+  calls <- integer()
+  first_fit <- list(attempts = c(-100, -105), marker = "first")
+  second_fit <- list(attempts = c(-100, -104), marker = "second")
+  fake_poLCA <- function(..., nrep) {
+    calls <<- c(calls, nrep)
+    if (length(calls) == 1L) first_fit else second_fit
+  }
+  assignInNamespace("poLCA", fake_poLCA, ns = "poLCA")
+
+  result <- lca_fit_adaptive(
+    stats::as.formula("cbind(a, b) ~ 1"),
+    data.frame(a = 1L, b = 1L),
+    k = 2L, nrep = 20L, max_nrep = 50L, maxiter = 10L, seed = 1L
+  )
+
+  # The second tier adds 30 starts rather than repeating the original 20. The
+  # two -100 attempts reproduce the global optimum, so no further tier is needed.
+  expect_equal(calls, c(20L, 30L))
+  expect_identical(result$fit, first_fit)
+  expect_equal(result$random_starts, 50L)
+  expect_equal(result$best_reproductions, 2L)
+})
+
+test_that("lca_fit_adaptive uses only the increment at every escalation tier", {
+  poLCA_namespace <- asNamespace("poLCA")
+  original_poLCA <- get("poLCA", envir = poLCA_namespace)
+  on.exit(assignInNamespace("poLCA", original_poLCA, ns = "poLCA"), add = TRUE)
+
+  calls <- integer()
+  fits <- list(
+    list(attempts = -100, marker = "first"),
+    list(attempts = -99, marker = "second"),
+    list(attempts = -98, marker = "third")
+  )
+  fake_poLCA <- function(..., nrep) {
+    calls <<- c(calls, nrep)
+    fits[[length(calls)]]
+  }
+  assignInNamespace("poLCA", fake_poLCA, ns = "poLCA")
+
+  result <- lca_fit_adaptive(
+    stats::as.formula("cbind(a, b) ~ 1"),
+    data.frame(a = 1L, b = 1L),
+    k = 2L, nrep = 20L, max_nrep = 100L, maxiter = 10L, seed = 1L
+  )
+
+  # 20 -> 50 -> 100 is performed as 20 + 30 + 50 starts, not 20 + 50 + 100.
+  expect_equal(calls, c(20L, 30L, 50L))
+  expect_identical(result$fit, fits[[3]])
+  expect_equal(result$random_starts, 100L)
   expect_equal(result$best_reproductions, 1L)
 })
 
@@ -275,25 +333,31 @@ test_that("exp_lca escalates random starts only until the best solution is repro
 
   expect_true(all(c("random_starts", "best_solution_reproductions") %in% names(selection)))
 
+  # The ladder this run actually uses, derived through the same rule the fitting uses
+  # rather than restated here -- restating it is how the two drift apart (tam#38420).
+  schedule <- lca_adaptive_schedule(20L, formals(exp_lca)$max_nrep)
+
   multi <- selection[selection$number_of_classes >= 2, , drop = FALSE]
   # Every multi-class candidate either reproduced its best solution enough times, or
   # exhausted the schedule trying. Anything else means escalation stopped early.
   expect_true(all(
     multi$best_solution_reproductions >= LCA_MIN_BEST_REPRODUCTIONS |
-      multi$random_starts == max(LCA_ADAPTIVE_START_SCHEDULE)
+      multi$random_starts == max(schedule)
   ))
   # ...and it never escalates when it did not have to.
   settled_at_start <- multi[multi$random_starts == 20, , drop = FALSE]
   expect_true(all(settled_at_start$best_solution_reproductions >= LCA_MIN_BEST_REPRODUCTIONS))
   # Starts only ever come from the schedule.
-  expect_true(all(multi$random_starts %in% c(20L, LCA_ADAPTIVE_START_SCHEDULE)))
+  expect_true(all(multi$random_starts %in% schedule))
   # A reproduction count can never exceed the starts it was drawn from.
   expect_true(all(multi$best_solution_reproductions <= multi$random_starts))
 
   # The 1-class baseline is exempt: poLCA solves it directly with no EM loop, so there
-  # is no local optimum to reproduce and escalating would only burn time.
+  # is no local optimum to reproduce and escalating would only burn time. tam#38417 goes
+  # further and runs no random starts there at all, so the column is blank rather than
+  # echoing the configured nrep as if it had been used.
   baseline <- selection[selection$number_of_classes == 1, , drop = FALSE]
-  expect_equal(baseline$random_starts, 20L)
+  expect_true(is.na(baseline$random_starts))
 })
 
 test_that("exp_lca does not escalate past a user-configured nrep that already exceeds the schedule", {
@@ -308,8 +372,130 @@ test_that("exp_lca does not escalate past a user-configured nrep that already ex
   model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
                    nrep = 120, maxiter = 300, seed = 1)$model[[1]]
   selection <- tidy(model, type = "class_selection")
-  # The user's own setting is a floor, never something the schedule walks back down to.
-  expect_true(all(selection$random_starts == 120L))
+  # The user's own setting is a floor, never something the schedule walks back down to --
+  # for the candidates that actually run random starts. The 1-class baseline runs none
+  # (tam#38417) and reports NA.
+  multi <- selection[selection$number_of_classes > 1, , drop = FALSE]
+  expect_true(all(multi$random_starts == 120L))
+  expect_true(all(is.na(selection$random_starts[selection$number_of_classes == 1])))
+})
+
+test_that("lca_adaptive_schedule builds the escalation ladder from nrep and max_nrep (tam#38420)", {
+  # The ceiling is a user setting, so every shape of it is pinned here rather than
+  # inferred from a fitted model -- this is the whole rule, testable without fitting.
+  expect_equal(lca_adaptive_schedule(20L, 100L), c(20L, 50L, 100L))  # both tiers
+  expect_equal(lca_adaptive_schedule(20L, 50L), c(20L, 50L))         # the default ceiling
+  expect_equal(lca_adaptive_schedule(20L, 70L), c(20L, 50L, 70L))    # ceiling between tiers
+  expect_equal(lca_adaptive_schedule(20L, 200L), c(20L, 50L, 100L, 200L)) # past every tier
+
+  # At or below nrep means "do not escalate" -- nrep stays a floor either way.
+  expect_equal(lca_adaptive_schedule(20L, 20L), 20L)
+  expect_equal(lca_adaptive_schedule(20L, 5L), 20L)
+  expect_equal(lca_adaptive_schedule(120L, 50L), 120L)
+
+  # Degenerate ceilings degrade to "no escalation" rather than erroring, which is why
+  # max_nrep needs no stop() validation of its own.
+  expect_equal(lca_adaptive_schedule(20L, NULL), 20L)
+  expect_equal(lca_adaptive_schedule(20L, NA_integer_), 20L)
+
+  # A tier equal to the ceiling is not repeated.
+  expect_equal(lca_adaptive_schedule(10L, 50L), c(10L, 50L))
+})
+
+test_that("exp_lca max_nrep reaches the fit and can switch escalation off (tam#38420)", {
+  set.seed(5)
+  n <- 300
+  df <- data.frame(
+    a = sample(c("x", "y", "z"), n, replace = TRUE),
+    b = sample(c("m", "n", "o"), n, replace = TRUE),
+    c = sample(c("lo", "hi", "mid"), n, replace = TRUE),
+    d = sample(c("p", "q"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  # Same noise data the escalation test uses, so candidates genuinely WANT to escalate.
+  # With the ceiling at nrep none of them may, which is only observable end to end --
+  # a schedule unit test cannot show the value actually threading through to poLCA.
+  model <- exp_lca(df, a, b, c, d, min_nclass = 2, max_nclass = 4,
+                   nrep = 20, max_nrep = 20, maxiter = 1000, seed = 1)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+  expect_true(all(selection$random_starts[selection$number_of_classes > 1] == 20L))
+  expect_true(is.na(selection$random_starts[selection$number_of_classes == 1]))
+})
+
+test_that("exp_lca reports the escalation ceiling actually in force (tam#38420)", {
+  df <- data.frame(
+    a = rep(c("x", "y"), 40),
+    b = rep(c("m", "n", "m", "n"), 20),
+    c = rep(c("lo", "hi", "hi", "lo"), 20),
+    stringsAsFactors = FALSE
+  )
+  conditions_for <- function(max_nrep) {
+    model <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                     nrep = 2, max_nrep = max_nrep, maxiter = 100, seed = 1)$model[[1]]
+    cond <- tidy(model, type = "analysis_conditions")
+    cond$Value[cond$Metric == "Maximum Random Starts"]
+  }
+  expect_equal(conditions_for(50), "50")
+  # A ceiling at or below nrep never escalates, so reporting it raw would claim a search
+  # depth that never happens -- the row has to read the starting count instead.
+  expect_equal(conditions_for(2), "2")
+})
+
+test_that("exp_lca samples down to max_nrow and records that it did (tam#38420)", {
+  set.seed(11)
+  n <- 200
+  df <- data.frame(
+    a = sample(c("x", "y"), n, replace = TRUE),
+    b = sample(c("m", "n"), n, replace = TRUE),
+    c = sample(c("lo", "hi"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  sampled <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                     nrep = 2, maxiter = 100, seed = 1, max_nrow = 50)$model[[1]]
+  expect_equal(sampled$n_used, 50)
+  expect_equal(sampled$sampled_nrow, 50)
+  expect_equal(sampled$input_nrow, n)
+  sampled_conditions <- tidy(sampled, type = "analysis_conditions")
+  expect_equal(sampled_conditions$Value[sampled_conditions$Metric == "Input Rows"], "200")
+  expect_equal(sampled_conditions$Value[sampled_conditions$Metric == "Rows Sampled for Fitting"], "50")
+  sampled_glance <- glance(sampled)
+  expect_equal(sampled_glance$input_nrow, n)
+  expect_equal(sampled_glance$sampled_nrow, 50)
+
+  # At or under the cap the data is untouched, and sampled_nrow stays NULL so a
+  # consumer can tell "not sampled" from "sampled to exactly this size".
+  untouched <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                       nrep = 2, maxiter = 100, seed = 1, max_nrow = 5000)$model[[1]]
+  expect_equal(untouched$n_used, n)
+  expect_null(untouched$sampled_nrow)
+  expect_false("Input Rows" %in% tidy(untouched, type = "analysis_conditions")$Metric)
+  expect_true(is.na(glance(untouched)$sampled_nrow))
+
+  # Default is no cap at all, so an existing direct R caller keeps every row.
+  uncapped <- exp_lca(df, a, b, c, min_nclass = 2, max_nclass = 2,
+                      nrep = 2, maxiter = 100, seed = 1)$model[[1]]
+  expect_equal(uncapped$n_used, n)
+  expect_null(uncapped$sampled_nrow)
+})
+
+test_that("exp_lca samples correctly with spaces, multibyte, and symbols in column names", {
+  set.seed(13)
+  n <- 120
+  df <- data.frame(
+    a = sample(c("x", "y"), n, replace = TRUE),
+    b = sample(c("m", "n"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  # sample_rows() nests/unnests the frame and lca_quote_name() backtick-quotes it into a
+  # formula; a name that survives one but not the other would only fail with both on.
+  names(df) <- c("航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表", "b")
+  model <- exp_lca(df, `航空 会社 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`, b,
+                   min_nclass = 2, max_nclass = 2,
+                   nrep = 2, maxiter = 100, seed = 1, max_nrow = 40)$model[[1]]
+  expect_equal(model$n_used, 40)
+  expect_equal(model$sampled_nrow, 40)
+  profiles <- tidy(model, type = "profiles")
+  expect_true("航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表" %in% profiles$variable)
 })
 
 test_that("lca_indicator_levels honours a factor's declared order, not the text order", {
@@ -357,4 +543,266 @@ test_that("exp_lca reports factor categories in their declared order", {
   observed_order <- as.character(unique(tenure_rows$category[order(tenure_rows$class,
                                                                   as.integer(tenure_rows$category))]))
   expect_equal(observed_order[seq_along(lv)], lv)
+})
+
+# ---------------------------------------------------------------------------
+# tam#38418 -- variable discrimination (mean pairwise Total Variation Distance)
+# ---------------------------------------------------------------------------
+
+lca_disc_input <- function(...) {
+  # Each argument is a named class vector; names are the categories.
+  classes <- list(...)
+  dplyr::bind_rows(lapply(names(classes), function(cl) {
+    probs <- classes[[cl]]
+    tibble::tibble(variable = "v", category = names(probs), class = cl, probability = as.numeric(probs))
+  }))
+}
+
+test_that("calculate_lca_variable_discrimination scores identical distributions as 0 (spec Test 1)", {
+  input <- lca_disc_input(
+    `Class 1` = c(a = 0.2, b = 0.3, c = 0.5),
+    `Class 2` = c(a = 0.2, b = 0.3, c = 0.5)
+  )
+  result <- calculate_lca_variable_discrimination(input)
+  expect_equal(result$discrimination_score, 0)
+  expect_equal(result$number_of_class_pairs, 1L)
+})
+
+test_that("calculate_lca_variable_discrimination scores complete separation as 1 (spec Test 2)", {
+  input <- lca_disc_input(`Class 1` = c(a = 1, b = 0), `Class 2` = c(a = 0, b = 1))
+  expect_equal(calculate_lca_variable_discrimination(input)$discrimination_score, 1)
+})
+
+test_that("calculate_lca_variable_discrimination matches the hand-computed 2-class TVD (spec Test 3)", {
+  input <- lca_disc_input(`Class 1` = c(a = 0.8, b = 0.2), `Class 2` = c(a = 0.3, b = 0.7))
+  expect_equal(calculate_lca_variable_discrimination(input)$discrimination_score, 0.5)
+})
+
+test_that("calculate_lca_variable_discrimination averages every class pair equally (spec Test 4)", {
+  input <- lca_disc_input(
+    `Class 1` = c(a = 0.8, b = 0.2),
+    `Class 2` = c(a = 0.3, b = 0.7),
+    `Class 3` = c(a = 0.5, b = 0.5)
+  )
+  result <- calculate_lca_variable_discrimination(input)
+  # pairs are 0.5, 0.3, 0.2 -> mean 1/3, max 0.5, min 0.2
+  expect_equal(result$discrimination_score, (0.5 + 0.3 + 0.2) / 3)
+  expect_equal(result$max_pairwise_score, 0.5)
+  expect_equal(result$min_pairwise_score, 0.2)
+  expect_equal(result$number_of_class_pairs, 3L)
+  pairs <- attr(result, "pairwise")
+  expect_equal(nrow(pairs), 3)
+  expect_equal(sort(pairs$pairwise_discrimination), c(0.2, 0.3, 0.5))
+})
+
+test_that("calculate_lca_variable_discrimination keeps 0..1 across differing category counts (spec Test 5)", {
+  input <- dplyr::bind_rows(
+    lca_disc_input(`Class 1` = c(a = 1, b = 0), `Class 2` = c(a = 0, b = 1)),
+    lca_disc_input(`Class 1` = c(a = 1, b = 0, c = 0), `Class 2` = c(a = 0, b = 0, c = 1)) %>%
+      dplyr::mutate(variable = "v3"),
+    lca_disc_input(
+      `Class 1` = c(a = 0.2, b = 0.2, c = 0.2, d = 0.2, e = 0.2),
+      `Class 2` = c(a = 0.2, b = 0.2, c = 0.2, d = 0.2, e = 0.2)
+    ) %>% dplyr::mutate(variable = "v5")
+  )
+  result <- calculate_lca_variable_discrimination(input)
+  expect_true(all(result$discrimination_score >= 0 & result$discrimination_score <= 1))
+  expect_equal(result$discrimination_score[result$variable == "v"], 1)
+  expect_equal(result$discrimination_score[result$variable == "v3"], 1)
+  expect_equal(result$discrimination_score[result$variable == "v5"], 0)
+})
+
+test_that("calculate_lca_variable_discrimination rejects probabilities that do not sum to 1 (spec Test 6)", {
+  input <- lca_disc_input(
+    `Class 1` = c(a = 0.3, b = 0.4, c = 0.4),
+    `Class 2` = c(a = 0.3, b = 0.3, c = 0.4)
+  )
+  expect_error(calculate_lca_variable_discrimination(input), "do not sum to 1")
+})
+
+test_that("calculate_lca_variable_discrimination rejects a category set mismatch (spec Test 7)", {
+  input <- dplyr::bind_rows(
+    tibble::tibble(variable = "v", category = c("a", "b", "c"), class = "Class 1", probability = c(0.2, 0.3, 0.5)),
+    tibble::tibble(variable = "v", category = c("a", "c"), class = "Class 2", probability = c(0.4, 0.6))
+  )
+  expect_error(calculate_lca_variable_discrimination(input), "Category mismatch")
+})
+
+test_that("calculate_lca_variable_discrimination is invariant to class labels (spec Test 8)", {
+  base <- lca_disc_input(`Class 1` = c(a = 0.8, b = 0.2), `Class 2` = c(a = 0.3, b = 0.7))
+  renamed <- lca_disc_input(`Class A` = c(a = 0.8, b = 0.2), `Class B` = c(a = 0.3, b = 0.7))
+  expect_equal(calculate_lca_variable_discrimination(base)$discrimination_score,
+               calculate_lca_variable_discrimination(renamed)$discrimination_score)
+})
+
+test_that("calculate_lca_variable_discrimination is invariant to class and category order (spec Test 9)", {
+  base <- lca_disc_input(
+    `Class 1` = c(a = 0.8, b = 0.2),
+    `Class 2` = c(a = 0.3, b = 0.7),
+    `Class 3` = c(a = 0.5, b = 0.5)
+  )
+  shuffled <- base[rev(seq_len(nrow(base))), , drop = FALSE]
+  expect_equal(calculate_lca_variable_discrimination(base)$discrimination_score,
+               calculate_lca_variable_discrimination(shuffled)$discrimination_score)
+})
+
+test_that("calculate_lca_variable_discrimination returns NA, not 0, for a single class (spec section 18)", {
+  input <- lca_disc_input(`Class 1` = c(a = 0.2, b = 0.8))
+  result <- calculate_lca_variable_discrimination(input)
+  expect_true(is.na(result$discrimination_score))
+  expect_equal(result$number_of_class_pairs, 0L)
+})
+
+test_that("calculate_lca_variable_discrimination rejects out-of-range and non-finite probabilities (spec section 17)", {
+  zero_ok <- lca_disc_input(`Class 1` = c(a = 0, b = 1), `Class 2` = c(a = 1, b = 0))
+  expect_equal(calculate_lca_variable_discrimination(zero_ok)$discrimination_score, 1)
+
+  negative <- lca_disc_input(`Class 1` = c(a = -0.1, b = 1.1), `Class 2` = c(a = 0.5, b = 0.5))
+  expect_error(calculate_lca_variable_discrimination(negative), "between 0 and 1")
+
+  missing <- lca_disc_input(`Class 1` = c(a = NA, b = 1), `Class 2` = c(a = 0.5, b = 0.5))
+  expect_error(calculate_lca_variable_discrimination(missing), "finite numbers")
+})
+
+test_that("calculate_lca_variable_discrimination ranks by descending score, keeping selection order on ties", {
+  input <- dplyr::bind_rows(
+    lca_disc_input(`Class 1` = c(a = 0.8, b = 0.2), `Class 2` = c(a = 0.3, b = 0.7)),
+    lca_disc_input(`Class 1` = c(a = 1, b = 0), `Class 2` = c(a = 0, b = 1)) %>% dplyr::mutate(variable = "strong"),
+    lca_disc_input(`Class 1` = c(a = 0.8, b = 0.2), `Class 2` = c(a = 0.3, b = 0.7)) %>% dplyr::mutate(variable = "tie")
+  )
+  result <- calculate_lca_variable_discrimination(input)
+  expect_equal(result$variable, c("strong", "v", "tie"))
+  expect_equal(result$rank, c(1, 2, 2))
+})
+
+# ---------------------------------------------------------------------------
+# tam#38417 -- reproduction rate, stability verdict, model-based overall share
+# ---------------------------------------------------------------------------
+
+test_that("lca_solution_stability follows the issue's rule table", {
+  expect_equal(lca_solution_stability(14L, 20L), "Stable")     # 5+ and 70%
+  expect_equal(lca_solution_stability(5L, 50L), "Stable")      # exactly 5 and exactly 10%
+  expect_equal(lca_solution_stability(5L, 100L), "Caution")    # 5+ but 5% < 10%
+  expect_equal(lca_solution_stability(4L, 20L), "Caution")
+  expect_equal(lca_solution_stability(2L, 20L), "Caution")
+  expect_equal(lca_solution_stability(1L, 100L), "Unstable")
+  expect_equal(lca_solution_stability(0L, 100L), "Unstable")
+  expect_true(is.na(lca_solution_stability(NA_integer_, 20L)))
+  expect_true(is.na(lca_solution_stability(3L, NA_integer_)))
+  # A failed optional escalation has not exhausted the configured schedule, so a
+  # single reproduction is not enough evidence to call the solution unstable.
+  expect_true(is.na(lca_solution_stability(1L, 20L, max_starts_reached = FALSE)))
+  expect_false(lca_candidate_is_selection_eligible(list(
+    best_reproductions = 1L, random_starts = 100L, max_starts_reached = TRUE
+  )))
+  expect_true(lca_candidate_is_selection_eligible(list(
+    best_reproductions = 1L, random_starts = 20L, max_starts_reached = FALSE
+  )))
+})
+
+test_that("lca_reproduction_rate divides by the starts that were actually run", {
+  expect_equal(lca_reproduction_rate(14L, 20L), 0.7)
+  expect_true(is.na(lca_reproduction_rate(2L, 0L)))
+  expect_true(is.na(lca_reproduction_rate(NA_integer_, 20L)))
+})
+
+test_that("exp_lca reports no random starts for the 1-class baseline and blanks its separation columns (tam#38417)", {
+  set.seed(4210)
+  n <- 120
+  segment <- rep(c("A", "B"), each = n / 2)
+  df <- data.frame(
+    v1 = ifelse(segment == "A", "yes", "no"),
+    v2 = ifelse(segment == "A", "high", "low"),
+    v3 = ifelse(segment == "A", "x", "y"),
+    stringsAsFactors = FALSE
+  )
+  df$v3[sample(seq_len(n), 20)] <- sample(c("x", "y"), 20, replace = TRUE)
+
+  model <- exp_lca(df, v1, v2, v3, min_nclass = 2, max_nclass = 2, nrep = 3,
+                   maxiter = 200, seed = 1)$model[[1]]
+  selection <- tidy(model, type = "class_selection")
+  baseline <- selection[selection$number_of_classes == 1, ]
+
+  expect_true(is.na(baseline$random_starts))
+  expect_true(is.na(baseline$best_solution_reproductions))
+  expect_true(is.na(baseline$reproduction_rate))
+  expect_true(is.na(baseline$solution_stability))
+  # The two columns the spec's screenshot boxes...
+  expect_true(is.na(baseline$mean_maximum_membership_probability))
+  expect_true(is.na(baseline$pct_low_confidence))
+  # ...and the one it deliberately leaves alone.
+  expect_equal(baseline$minimum_class_share, 1)
+
+  multi <- selection[selection$number_of_classes == 2, ]
+  expect_false(is.na(multi$random_starts))
+  expect_equal(multi$reproduction_rate,
+               multi$best_solution_reproductions / multi$random_starts)
+  expect_true(multi$solution_stability %in% c("Stable", "Caution", "Unstable"))
+})
+
+test_that("exp_lca reports a model-based overall share and re-bases the difference on it (tam#38417)", {
+  set.seed(991)
+  n <- 150
+  segment <- rep(c("A", "B", "C"), each = n / 3)
+  df <- data.frame(
+    v1 = ifelse(segment == "A", "yes", ifelse(segment == "B", "no", "maybe")),
+    v2 = ifelse(segment == "A", "high", ifelse(segment == "B", "low", "mid")),
+    v3 = ifelse(segment == "A", "x", ifelse(segment == "B", "y", "z")),
+    stringsAsFactors = FALSE
+  )
+  df$v3[sample(seq_len(n), 18)] <- sample(c("x", "y", "z"), 18, replace = TRUE)
+
+  model <- exp_lca(df, v1, v2, v3, min_nclass = 2, max_nclass = 3, nrep = 3,
+                   maxiter = 300, seed = 5)$model[[1]]
+  profiles <- tidy(model, type = "profiles")
+  expect_true(all(c("model_overall_probability", "observed_difference") %in% names(profiles)))
+
+  # The model-implied marginal is a probability distribution over each variable's
+  # categories, so it sums to 1 per variable (each class contributes the same value).
+  per_variable <- profiles %>%
+    dplyr::filter(class == levels(profiles$class)[[1]]) %>%
+    dplyr::group_by(variable) %>%
+    dplyr::summarise(total = sum(model_overall_probability), .groups = "drop")
+  expect_true(all(abs(per_variable$total - 1) < 1e-8))
+
+  expect_equal(profiles$difference, profiles$probability - profiles$model_overall_probability)
+  expect_equal(profiles$observed_difference, profiles$probability - profiles$overall_probability)
+})
+
+test_that("exp_lca exposes per-variable discrimination and a class distribution table", {
+  set.seed(773)
+  n <- 150
+  segment <- rep(c("A", "B", "C"), each = n / 3)
+  df <- data.frame(
+    v1 = ifelse(segment == "A", "yes", ifelse(segment == "B", "no", "maybe")),
+    v2 = ifelse(segment == "A", "high", ifelse(segment == "B", "low", "mid")),
+    v3 = ifelse(segment == "A", "x", ifelse(segment == "B", "y", "z")),
+    stringsAsFactors = FALSE
+  )
+  df$v3[sample(seq_len(n), 18)] <- sample(c("x", "y", "z"), 18, replace = TRUE)
+  df$v1[seq(3, n, by = 25)] <- NA
+
+  model <- exp_lca(df, v1, v2, v3, min_nclass = 2, max_nclass = 3, nrep = 3,
+                   maxiter = 300, seed = 5)$model[[1]]
+
+  discrimination <- tidy(model, type = "variable_discrimination")
+  expect_equal(sort(discrimination$variable), c("v1", "v2", "v3"))
+  expect_true(all(discrimination$discrimination_score >= 0 & discrimination$discrimination_score <= 1))
+  expect_equal(discrimination$discrimination_score, sort(discrimination$discrimination_score, decreasing = TRUE))
+  expect_equal(discrimination$rank, rank(-discrimination$discrimination_score, ties.method = "min"))
+  expect_equal(discrimination$rank[[1]], 1)
+
+  pairs <- tidy(model, type = "variable_discrimination_pairs")
+  nclass <- length(model$selected_fit$P)
+  expect_equal(nrow(pairs), 3 * choose(nclass, 2))
+
+  distribution <- tidy(model, type = "class_distribution")
+  expect_equal(names(distribution), c("variable", "category", "class", "rows"))
+  # Every (variable, category, class) cell exists, including the NA class carrying the
+  # rows excluded from the estimation, and every original row is accounted for exactly
+  # once per variable.
+  expect_true(any(is.na(distribution$class)))
+  per_variable <- distribution %>% dplyr::group_by(variable) %>%
+    dplyr::summarise(total = sum(rows), .groups = "drop")
+  expect_true(all(per_variable$total == nrow(df)))
 })
