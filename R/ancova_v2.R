@@ -601,7 +601,7 @@ compute_ancova_adjusted_means <- function(model, safe_factor, safe_xc,
 #' above (never a fresh emmeans() call).
 #' @noRd
 compute_ancova_pairwise <- function(emm, factor_levels, confidence_level, source_model) {
-  pw <- emmeans::pairs(emm, adjust = "tukey")
+  pw <- emmeans::contrast(emm, method = "pairwise", adjust = "tukey")
   ancova_tidy_pairs(pw, factor_levels, confidence_level,
                      estimate_col_out = "adjusted_difference", source_model = source_model)
 }
@@ -638,7 +638,7 @@ compute_ancova_slopes <- function(model_interaction, safe_factor, safe_xc,
       source_model = "interaction"
     )
 
-    pw <- emmeans::pairs(trend_emm, adjust = "tukey")
+    pw <- emmeans::contrast(trend_emm, method = "pairwise", adjust = "tukey")
     slope_comparisons <- ancova_tidy_pairs(
       pw, factor_levels, confidence_level, estimate_col_out = "slope_difference",
       extra_cols = list(covariate = covariate_names[j]), source_model = "interaction"
