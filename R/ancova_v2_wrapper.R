@@ -450,12 +450,145 @@ ancova_v2_shapiro_table <- function(x, shapiro_seed) {
                                           "Normality assumption is valid."))
 }
 
+# ------------------------------------------------------------
+# Phase 2 diagnostic surfaces (tam#38389)
+# ------------------------------------------------------------
+
+#' Relationship data for one chart, long-form.
+#'
+#' Points and lines share a table because they share a chart: one row kind
+#' carries the observations, the other the fitted line and its band, and the
+#' renderer separates them on `Row Kind`. Emitting two tables instead would
+#' need two charts that cannot be overlaid.
+#' @noRd
+ancova_v2_relationship_table <- function(x, covariate = NULL) {
+  rels <- x$result$diagnostics$relationships
+  if (is.null(rels) || length(rels) == 0) return(tibble::tibble())
+  if (!is.null(covariate) && nzchar(covariate)) {
+    rels <- Filter(function(r) identical(r$covariate, covariate), rels)
+  }
+  purrr::map_dfr(rels, function(r) {
+    if (!isTRUE(r$available)) return(tibble::tibble())
+    slope_by_level <- stats::setNames(
+      if (nrow(r$slopes) > 0) r$slopes$slope else numeric(0),
+      if (nrow(r$slopes) > 0) as.character(r$slopes$group) else character(0))
+
+    pts <- if (nrow(r$points) > 0) tibble::tibble(
+      `Covariate` = r$covariate,
+      `Group` = r$points$factor_level,
+      `Row Kind` = "point",
+      `X` = r$points$display_x,
+      `Covariate Value` = r$points$x,
+      `Observed` = r$points$adjusted_y,
+      `Raw Outcome` = r$points$raw_y,
+      `Predicted` = NA_real_,
+      `Conf Low` = NA_real_,
+      `Conf High` = NA_real_,
+      `Slope` = unname(slope_by_level[r$points$factor_level]),
+      `Reference Value` = r$reference_value
+    ) else tibble::tibble()
+
+    lns <- tibble::tibble(
+      `Covariate` = r$covariate,
+      `Group` = r$lines$factor_level,
+      `Row Kind` = "line",
+      `X` = r$lines$x,
+      `Covariate Value` = r$lines$x,
+      `Observed` = NA_real_,
+      `Raw Outcome` = NA_real_,
+      `Predicted` = r$lines$predicted_y,
+      `Conf Low` = r$lines$ci_lower,
+      `Conf High` = r$lines$ci_upper,
+      `Slope` = unname(slope_by_level[r$lines$factor_level]),
+      `Reference Value` = r$reference_value
+    )
+    dplyr::bind_rows(pts, lns)
+  })
+}
+
+#' @noRd
+ancova_v2_residual_fitted_table <- function(x) {
+  d <- x$result$diagnostics$residuals
+  if (is.null(d) || !isTRUE(d$available)) return(tibble::tibble())
+  rvf <- d$residual_vs_fitted
+  pts <- tibble::tibble(
+    `Row Kind` = "point",
+    `Fitted Value` = rvf$points$fitted,
+    `Standardized Residual` = rvf$points$standardized_residual,
+    `Residual` = rvf$points$residual,
+    `Group` = rvf$points$factor_level
+  )
+  sm <- if (nrow(rvf$smoother) > 0) tibble::tibble(
+    `Row Kind` = "smoother",
+    `Fitted Value` = rvf$smoother$fitted,
+    `Standardized Residual` = rvf$smoother$smoothed_residual,
+    `Residual` = NA_real_,
+    `Group` = NA_character_
+  ) else tibble::tibble()
+  dplyr::bind_rows(pts, sm)
+}
+
+#' @noRd
+ancova_v2_qq_table <- function(x) {
+  d <- x$result$diagnostics$residuals
+  if (is.null(d) || !isTRUE(d$available)) return(tibble::tibble())
+  qq <- d$qq
+  if (nrow(qq$points) == 0) return(tibble::tibble())
+  ref <- qq$reference_line
+  tibble::tibble(
+    `Theoretical Quantile` = qq$points$theoretical,
+    `Standardized Residual` = qq$points$observed,
+    # The reference line as a per-row column, so the chart can draw it as a
+    # second series without a second query.
+    `Reference` = ref$intercept + ref$slope * qq$points$theoretical
+  )
+}
+
+#' Global slope-homogeneity test, one row (sections 5-7).
+#' @noRd
+ancova_v2_slope_homogeneity_table <- function(x) {
+  sh <- x$result$slope_homogeneity
+  if (is.null(sh)) return(tibble::tibble())
+  g <- sh$global_test
+  tibble::tibble(
+    `DF 1` = g$df1,
+    `DF 2` = g$df2,
+    `F Value` = g$F,
+    `P Value` = g$p_value,
+    `Status` = sh$status
+  )
+}
+
+#' Per-covariate interaction tests. Deliberately EMPTY with one covariate:
+#' the global test and the single covariate's test are the same hypothesis, so
+#' a one-row table restating it would be noise (section 10). A zero-row table
+#' renders as nothing at all, which is the intended "hidden".
+#' @noRd
+ancova_v2_slope_covariate_tests_table <- function(x) {
+  sh <- x$result$slope_homogeneity
+  if (is.null(sh) || is.null(sh$covariate_tests) || nrow(sh$covariate_tests) == 0) {
+    return(tibble::tibble())
+  }
+  if (length(x$covariates) < 2) return(tibble::tibble())
+  ct <- sh$covariate_tests
+  tibble::tibble(
+    `Covariate` = ct$covariate,
+    `DF 1` = ct$df1,
+    `DF 2` = ct$df2,
+    `F Value` = ct$F,
+    `P Value` = ct$p_raw,
+    `Adjusted P Value` = ct$p_holm
+  )
+}
+
 #' Tidy an ANCOVA V2 model for the Analytics View.
 #'
 #' Supported types: "model" (ANCOVA table), "emmeans" (adjusted + unadjusted
 #' means), "pairs", "prob_dist", "levene", "shapiro", and "data" (the analysis
-#' rows). Any unrecognized type returns the data, matching
-#' tidy.anova_exploratory()'s own catch-all.
+#' rows), plus the Phase 2 diagnostics (tam#38389): "slope_homogeneity",
+#' "slope_covariate_tests", "relationship", "residual_fitted" and "qq". Any
+#' unrecognized type returns the data, matching tidy.anova_exploratory()'s own
+#' catch-all.
 #'
 #' @param x An `ancova_v2_exploratory` model.
 #' @param type Which report surface to return.
@@ -465,12 +598,16 @@ ancova_v2_shapiro_table <- function(x, shapiro_seed) {
 #' @param levene_test_center "mean" or "median".
 #' @param shapiro_seed Seed used when residuals are subsampled to 5000.
 #' @param sort_factor_levels Order group levels by descending unadjusted mean.
+#' @param covariate For `type="relationship"`, limit the result to one
+#'   covariate. NULL returns every covariate, which is what a Repeat By facet
+#'   needs.
 #' @export
 tidy.ancova_v2_exploratory <- function(x, type = "model", conf_level = 0.95,
                                        pairs_adjust = "none",
                                        levene_test_center = "median",
                                        shapiro_seed = 1,
-                                       sort_factor_levels = FALSE) {
+                                       sort_factor_levels = FALSE,
+                                       covariate = NULL) {
   if ("error" %in% class(x)) {
     message <- if (is.null(x$message) || x$message == "") as.character(x) else x$message
     if (type %in% c("model", "between", "within")) {
@@ -496,6 +633,21 @@ tidy.ancova_v2_exploratory <- function(x, type = "model", conf_level = 0.95,
   }
   else if (type == "shapiro") {
     ancova_v2_shapiro_table(x, shapiro_seed)
+  }
+  else if (type == "slope_homogeneity") {
+    ancova_v2_slope_homogeneity_table(x)
+  }
+  else if (type == "slope_covariate_tests") {
+    ancova_v2_slope_covariate_tests_table(x)
+  }
+  else if (type == "relationship") {
+    ancova_v2_relationship_table(x, covariate)
+  }
+  else if (type == "residual_fitted") {
+    ancova_v2_residual_fitted_table(x)
+  }
+  else if (type == "qq") {
+    ancova_v2_qq_table(x)
   }
   else { # type == "data"
     ret <- x$dataframe

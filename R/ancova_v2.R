@@ -803,8 +803,10 @@ assemble_ancova_result <- function(prep, covariate_summary, homogeneity,
 #'   `predict()` / `rstandard()` off the SAME fits the reported statistics
 #'   came from instead of refitting a second, possibly divergent model.
 #' @return A nested R list mirroring the "ancova_result" shape from the
-#'   tam#38385 spec. On failure, a short list with
-#'   `analysis_status = "error"` and an `error_code`.
+#'   tam#38385 spec, plus the `diagnostics` sub-list of tam#38389 Phase 2
+#'   (relationship and residual chart data, derived from these same fits). On
+#'   failure, a short list with `analysis_status = "error"` and an
+#'   `error_code` -- and no `diagnostics` key, which consumers must tolerate.
 #' @export
 run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05,
                           keep_internals = FALSE) {
@@ -885,6 +887,15 @@ run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05,
       prep, centered$covariate_summary, homogeneity, covariate_tests, selection,
       ancova_table, adjusted_means, pairwise_comparisons, conditional_means,
       conditional_pairwise, interaction_details, raw_statistics, alpha, warnings_list)
+
+    # Phase 2 (tam#38389). A presentation layer over the fits above -- it adds
+    # no statistic and re-decides nothing. Wrapped because a diagnostic that
+    # cannot be produced must never cost the ANCOVA result itself.
+    result$diagnostics <- tryCatch(
+      compute_ancova_diagnostics(models, final_model, centered$analysis_data, prep,
+                                 centered, selection, homogeneity, covariate_tests, alpha),
+      error = function(e) list(diagnostics_version = 1, diagnostics_available = FALSE,
+                               reason = conditionMessage(e)))
 
     if (isTRUE(keep_internals)) {
       # NOT part of the serializable contract -- see the @param note. Everything

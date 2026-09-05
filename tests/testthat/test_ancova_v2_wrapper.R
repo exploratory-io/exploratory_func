@@ -311,3 +311,111 @@ test_that("the V1 error strings tam's formatter matches are preserved", {
   expect_error(exp_ancova(all_na, "y", "group", covariates = c("X1", "X2")),
                "There is no data left after removing NA.")
 })
+
+# ------------------------------------------------------------
+# Phase 2 diagnostic surfaces (tam#38389)
+# ------------------------------------------------------------
+
+test_that("type='slope_homogeneity' reports the global test the model selection used", {
+  df <- make_wrapper_data()
+  ret <- fit_v2(df)
+  tbl <- tidy_rowwise(ret, model, type = "slope_homogeneity")
+
+  expect_equal(colnames(tbl), c("DF 1", "DF 2", "F Value", "P Value", "Status"))
+  expect_equal(nrow(tbl), 1)
+  res <- ret$model[[1]]$result
+  expect_equal(tbl$`P Value`[[1]], res$slope_homogeneity$global_test$p_value)
+  expect_equal(tbl$Status[[1]], res$slope_homogeneity$status)
+  # Not recomputed anywhere -- the chart shows the number the model selection
+  # was actually made on.
+  expect_equal(tbl$`F Value`[[1]], res$slope_homogeneity$global_test$F)
+})
+
+test_that("type='slope_covariate_tests' is empty with one covariate and populated with more", {
+  df <- make_wrapper_data()
+  single <- tidy_rowwise(fit_v2(df, covariates = "X1"), model, type = "slope_covariate_tests")
+  # With one covariate this restates the global test, so it is deliberately
+  # empty -- a zero-row table renders as nothing.
+  expect_equal(nrow(single), 0)
+
+  two <- tidy_rowwise(fit_v2(df), model, type = "slope_covariate_tests")
+  expect_equal(nrow(two), 2)
+  expect_equal(colnames(two),
+               c("Covariate", "DF 1", "DF 2", "F Value", "P Value", "Adjusted P Value"))
+  expect_equal(two$Covariate, c("X1", "X2"))
+  # Holm-adjusted P is never smaller than the raw one.
+  expect_true(all(two$`Adjusted P Value` >= two$`P Value` - 1e-12))
+})
+
+test_that("type='relationship' carries points and lines for every covariate in one table", {
+  df <- make_wrapper_data()
+  tbl <- tidy_rowwise(fit_v2(df), model, type = "relationship")
+
+  expect_true(all(c("Covariate", "Group", "Row Kind", "X", "Covariate Value", "Observed",
+                    "Raw Outcome", "Predicted", "Conf Low", "Conf High", "Slope",
+                    "Reference Value") %in% colnames(tbl)))
+  expect_setequal(unique(tbl$Covariate), c("X1", "X2"))
+  expect_setequal(unique(tbl$`Row Kind`), c("point", "line"))
+
+  lines <- tbl[tbl$`Row Kind` == "line" & tbl$Covariate == "X1", ]
+  # 3 groups x the grid size.
+  expect_equal(nrow(lines), 3 * 100)
+  expect_true(all(is.na(lines$Observed)))
+  expect_true(all(lines$`Conf Low` < lines$Predicted))
+  expect_true(all(lines$`Conf High` > lines$Predicted))
+
+  points <- tbl[tbl$`Row Kind` == "point" & tbl$Covariate == "X1", ]
+  expect_equal(nrow(points), nrow(df))
+  expect_true(all(is.na(points$Predicted)))
+  # Every point knows its group's slope, so a tooltip can show it.
+  expect_true(all(is.finite(points$Slope)))
+  # The reference value is the covariate's raw grand mean, for the vertical line.
+  expect_equal(unique(points$`Reference Value`), mean(df$X1), tolerance = 1e-10)
+})
+
+test_that("type='relationship' can be narrowed to one covariate", {
+  df <- make_wrapper_data()
+  one <- tidy_rowwise(fit_v2(df), model, type = "relationship", covariate = "X2")
+  expect_equal(unique(one$Covariate), "X2")
+  expect_gt(nrow(one), 0)
+})
+
+test_that("type='residual_fitted' carries the points and the smoother as separate row kinds", {
+  df <- make_wrapper_data()
+  tbl <- tidy_rowwise(fit_v2(df), model, type = "residual_fitted")
+
+  expect_equal(colnames(tbl),
+               c("Row Kind", "Fitted Value", "Standardized Residual", "Residual", "Group"))
+  expect_setequal(unique(tbl$`Row Kind`), c("point", "smoother"))
+  pts <- tbl[tbl$`Row Kind` == "point", ]
+  expect_equal(nrow(pts), nrow(df))
+  expect_true(all(!is.na(pts$Group)))
+  expect_gt(nrow(tbl[tbl$`Row Kind` == "smoother", ]), 0)
+})
+
+test_that("type='qq' carries the reference line as a per-row column", {
+  df <- make_wrapper_data()
+  tbl <- tidy_rowwise(fit_v2(df), model, type = "qq")
+
+  expect_equal(colnames(tbl),
+               c("Theoretical Quantile", "Standardized Residual", "Reference"))
+  expect_equal(nrow(tbl), nrow(df))
+  # A straight line in the theoretical quantile: equal spacing in x gives
+  # equal spacing in Reference.
+  slopes <- diff(tbl$Reference) / diff(tbl$`Theoretical Quantile`)
+  expect_lt(diff(range(slopes)), 1e-8)
+})
+
+test_that("the diagnostic surfaces degrade to empty rather than erroring when a fit is unavailable", {
+  df <- make_wrapper_data()
+  # Constant within one group -> the interaction model cannot be estimated.
+  df$X1[df$group == "B"] <- 5
+  ret <- fit_v2(df, covariates = "X1")
+
+  expect_equal(ret$model[[1]]$result$slope_homogeneity$status, "not_estimable")
+  expect_equal(nrow(tidy_rowwise(ret, model, type = "relationship")), 0)
+  # Residual diagnostics come from the final model, which WAS fitted, so they
+  # survive -- one dead chart does not take the others with it.
+  expect_gt(nrow(tidy_rowwise(ret, model, type = "residual_fitted")), 0)
+  expect_gt(nrow(tidy_rowwise(ret, model, type = "qq")), 0)
+})
