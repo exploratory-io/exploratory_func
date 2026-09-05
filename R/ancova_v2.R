@@ -205,6 +205,12 @@ center_ancova_covariates <- function(prep) {
       max = max(x, na.rm = TRUE),
       unique_count = unique_count,
       low_cardinality = unique_count <= 5,
+      # The reference point every adjusted statistic is computed at, on the
+      # covariate's OWN raw scale -- the grand mean, because covariates are
+      # grand-mean centered. Charts that draw a reference line on a raw-scale
+      # x axis need this; `centered_reference_value` below is the same point
+      # expressed in centered space, where it is always 0 (tam#38389 Q-7).
+      reference_value = mean_j,
       centered_reference_value = 0
     )
   })
@@ -396,11 +402,15 @@ select_ancova_model <- function(homogeneity) {
     final_model_type <- "additive"
     standard_ancova_valid <- FALSE
   } else if (isTRUE(homogeneity$significant)) {
-    status <- "violated"
+    # "detected"/"not_detected", never "violated"/"homogeneous": P >= alpha does
+    # NOT establish that the slopes are equal, only that no difference was
+    # detected, and a status word that claims otherwise gets read as proof of
+    # the assumption (tam#38389 s7).
+    status <- "detected"
     final_model_type <- "interaction"
     standard_ancova_valid <- FALSE
   } else {
-    status <- "homogeneous"
+    status <- "not_detected"
     final_model_type <- "additive"
     standard_ancova_valid <- TRUE
   }
@@ -765,11 +775,20 @@ assemble_ancova_result <- function(prep, covariate_summary, homogeneity,
 #' @param covariates Character vector of 1+ numeric covariate column names.
 #' @param alpha Significance threshold (default 0.05). confidence_level is
 #'   `1 - alpha`.
+#' @param keep_internals When TRUE, the returned list carries an extra
+#'   `internals` element holding the fitted `lm` objects, the emmGrid the
+#'   adjusted/conditional means came from, and the centered analysis data.
+#'   These are R objects, NOT part of the serializable result contract --
+#'   `internals` must never be passed to `jsonlite::toJSON()`. It exists so
+#'   an in-process caller (`exp_ancova()`, and Phase 2's diagnostics) can
+#'   `predict()` / `rstandard()` off the SAME fits the reported statistics
+#'   came from instead of refitting a second, possibly divergent model.
 #' @return A nested R list mirroring the "ancova_result" shape from the
 #'   tam#38385 spec. On failure, a short list with
 #'   `analysis_status = "error"` and an `error_code`.
 #' @export
-run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05) {
+run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05,
+                          keep_internals = FALSE) {
   tryCatch({
     if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
       ancova_stop("ANCOVA_INVALID_INPUT", "`alpha` must be a single number strictly between 0 and 1.")
@@ -801,6 +820,7 @@ run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05) {
     final_model <- if (selection$final_model_type == "interaction") models$interaction else models$additive
 
     ancova_table <- NULL
+    reported_emm <- NULL
     adjusted_means <- NULL
     pairwise_comparisons <- NULL
     conditional_means <- NULL
@@ -815,6 +835,7 @@ run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05) {
         final_model, prep$safe_factor, centered$safe_xc, centered$covariate_means,
         confidence_level, source_model = "additive")
       adjusted_means <- list(means = am$means, reference_covariates = am$reference_covariates)
+      reported_emm <- am$emm
       pairwise_comparisons <- compute_ancova_pairwise(
         am$emm, prep$factor_levels, confidence_level, source_model = "additive")
     } else {
@@ -822,6 +843,7 @@ run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05) {
         final_model, prep$safe_factor, centered$safe_xc, centered$covariate_means,
         confidence_level, source_model = "interaction")
       conditional_means <- list(means = cm$means, reference_covariates = cm$reference_covariates)
+      reported_emm <- cm$emm
       conditional_pairwise <- compute_ancova_pairwise(
         cm$emm, prep$factor_levels, confidence_level, source_model = "interaction")
       interaction_details <- compute_ancova_slopes(
@@ -840,10 +862,33 @@ run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05) {
     raw_statistics <- compute_ancova_raw_statistics(
       centered$analysis_data, prep$safe_y, prep$safe_factor, prep$factor_levels, alpha)
 
-    assemble_ancova_result(
+    result <- assemble_ancova_result(
       prep, centered$covariate_summary, homogeneity, covariate_tests, selection,
       ancova_table, adjusted_means, pairwise_comparisons, conditional_means,
       conditional_pairwise, interaction_details, raw_statistics, alpha, warnings_list)
+
+    if (isTRUE(keep_internals)) {
+      # NOT part of the serializable contract -- see the @param note. Everything
+      # here is a live R object; the reported statistics above were all derived
+      # from these exact fits, so a consumer that re-derives anything from them
+      # (predict(), rstandard(), a re-adjusted pairwise contrast) cannot drift
+      # from what the report shows.
+      result$internals <- list(
+        model_additive = models$additive,
+        model_interaction = models$interaction,
+        final_model = final_model,
+        final_model_type = selection$final_model_type,
+        reported_emm = reported_emm,
+        analysis_data = centered$analysis_data,
+        safe_y = prep$safe_y,
+        safe_factor = prep$safe_factor,
+        safe_x = prep$safe_x,
+        safe_xc = centered$safe_xc,
+        covariate_means = centered$covariate_means,
+        formulas = formulas
+      )
+    }
+    result
   },
   ancova_error = function(e) {
     list(calculation_version = 2, analysis_status = "error",
