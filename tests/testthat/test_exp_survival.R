@@ -105,3 +105,45 @@ test_that("test exp_survival", {
   expect_true("grp" %in% colnames(ret2))
   expect_true("grp" %in% colnames(ret3))
 })
+
+test_that("exp_survival max_nrow caps the subjects the curve is fitted on", {
+  set.seed(1)
+  data <- data.frame(
+    `weeks on service` = sample(1:50, 400, replace = TRUE),
+    `is churned` = rep(c(TRUE, FALSE), 200),
+    grp = rep(c("a", "b"), each = 200),
+    check.names = FALSE
+  )
+
+  full <- data %>% exp_survival(`weeks on service`, `is churned`) %>% glance_rowwise(model2)
+  capped <- data %>% exp_survival(`weeks on service`, `is churned`, max_nrow = 100) %>%
+    glance_rowwise(model2)
+
+  # glance's Rows is the number of observations the fit actually saw.
+  expect_equal(full$Rows, 400)
+  expect_equal(capped$Rows, 100)
+
+  # NULL means "every row", which is what the Sample Data checkbox sends when it
+  # is off -- it must be identical to not passing the argument at all.
+  unlimited <- data %>% exp_survival(`weeks on service`, `is churned`, max_nrow = NULL) %>%
+    glance_rowwise(model2)
+  expect_equal(unlimited$Rows, 400)
+
+  # A cap above the row count changes nothing.
+  above <- data %>% exp_survival(`weeks on service`, `is churned`, max_nrow = 1000) %>%
+    glance_rowwise(model2)
+  expect_equal(above$Rows, 400)
+
+  # The cap is per group, like every other analytics function's max_nrow.
+  grouped <- data %>% dplyr::group_by(grp) %>%
+    exp_survival(`weeks on service`, `is churned`, max_nrow = 50) %>%
+    glance_rowwise(model2)
+  expect_equal(nrow(grouped), 2)
+  expect_equal(grouped$Rows, c(50, 50))
+
+  # Same seed, same sample: a sampled run has to be reproducible.
+  again <- data %>% exp_survival(`weeks on service`, `is churned`, max_nrow = 100) %>%
+    tidy_rowwise(model1)
+  expect_equal(again, data %>% exp_survival(`weeks on service`, `is churned`, max_nrow = 100) %>%
+    tidy_rowwise(model1))
+})

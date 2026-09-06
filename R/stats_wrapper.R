@@ -21,8 +21,14 @@ normalize <- function(x, center = TRUE, scale = TRUE) {
 }
 
 #' integrated do_cor
+#' @param max_nrow If the (per-group) input has more observations than this, they
+#'   are randomly sampled down to it. NULL means use every observation. An
+#'   observation is a ROW in the .cols pattern, and a row of the CAST matrix (one
+#'   per key) in the .kv pattern -- sampling the long input there would change the
+#'   aggregated values themselves.
+#' @param seed Seed for that sample, so a sampled run is reproducible.
 #' @export
-do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, max_nrow = NULL, seed = 1){
   validate_empty_data(df)
 
   if (!is.null(skv)) {
@@ -31,10 +37,11 @@ do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
       stop("length of skv has to be 2 or 3")
     }
     value <- if(length(skv) == 2) NULL else skv[[3]]
-    do_cor.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
+    do_cor.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill,
+               max_nrow = max_nrow, seed = seed, ...)
   } else {
     #.cols pattern
-    do_cor.cols(df, ...)
+    do_cor.cols(df, ..., max_nrow = max_nrow, seed = seed)
   }
 }
 
@@ -81,7 +88,9 @@ do_cor.kv_ <- function(df,
                       diag = FALSE,
                       fill = 0,
                       fun.aggregate = mean,
-                      return_type = "data.frame"
+                      return_type = "data.frame",
+                      max_nrow = NULL,
+                      seed = 1
                       )
 {
   validate_empty_data(df)
@@ -103,6 +112,7 @@ do_cor.kv_ <- function(df,
                                 c("pair.name.x", "pair.name.y",
                                   "correlation", "p_value", "statistic"))
 
+  seed_initialized <- FALSE
   do_cor_each <- function(df){
     mat <- simple_cast(
       df,
@@ -114,6 +124,17 @@ do_cor.kv_ <- function(df,
       time_unit = time_unit,
       na.rm = TRUE
     )
+    # The row cap applies to the CAST matrix -- one row per key, which is what
+    # the correlation actually treats as an observation. Sampling the long input
+    # instead would drop cells from the aggregation and change the VALUES that
+    # remain, not just how many observations there are.
+    if (!is.null(max_nrow) && nrow(mat) > max_nrow) {
+      if (!is.null(seed) && !seed_initialized) {
+        set.seed(seed)
+        seed_initialized <<- TRUE
+      }
+      mat <- mat[sort(sample.int(nrow(mat), max_nrow)), , drop = FALSE]
+    }
     if (dim(mat)[[1]] < 2) {
       # Correlation require 2 or more rows.
       if (length(grouped_col) > 0) {
@@ -180,7 +201,7 @@ do_cor.kv_ <- function(df,
 #' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
                         distinct = FALSE, diag = FALSE, variable_order = "correlation",
-                        return_type = "data.frame") {
+                        return_type = "data.frame", max_nrow = NULL, seed = 1) {
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -193,7 +214,17 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   grouped_col <- grouped_by(df)
   output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "correlation", "p_value", "statistic"))
   # check if the df's grouped
+  seed_initialized <- FALSE
   do_cor_each <- function(df){
+    # Here a row IS an observation, so the cap is a plain row sample, applied
+    # per group like every other analytics function's max_nrow.
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      if (!is.null(seed) && !seed_initialized) {
+        set.seed(seed)
+        seed_initialized <<- TRUE
+      }
+      df <- df %>% sample_rows(max_nrow)
+    }
     if (nrow(df) < 2) {
       # Correlation require 2 or more rows.
       if (length(grouped_col) > 0) {
