@@ -2,9 +2,23 @@
 #' Function for Survival Analysis view.
 #' It does survfit and survdiff.
 #' @param end_time_fill - "max", "today", or actual value or string expresion of Date.
+#' @param max_nrow If a (per-group) input has more rows than this, the subjects are
+#'   randomly sampled down to it before the fit. NULL means use every row.
+#' @param seed Seed for that sample, so a sampled run is reproducible.
 #' @export
-exp_survival <- function(df, time, status, start_time, end_time, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
+exp_survival <- function(df, time, status, start_time, end_time, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, max_nrow = NULL, seed = 1, ...){
   validate_empty_data(df)
+
+  # A row here is one subject, so capping is a plain per-group row sample. It has
+  # to happen before anything is derived from the data -- default_survival_time
+  # below is computed from the whole frame, and would otherwise describe rows the
+  # curve was not fitted on.
+  if (!is.null(max_nrow)) {
+    if (!is.null(seed)) {
+      set.seed(seed)
+    }
+    df <- df %>% sample_rows(max_nrow)
+  }
 
   grouped_col <- grouped_by(df)
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))

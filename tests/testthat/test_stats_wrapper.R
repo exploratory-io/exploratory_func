@@ -726,3 +726,80 @@ test_that("do_cmdscale all 0 distances error", {
     do_cmdscale(data, var1, var2, val)
   }, "All distances are 0. Multidimensional scaling cannot be calculated.")
 })
+
+test_that("do_cor max_nrow caps the observations, per group and reproducibly", {
+  set.seed(11)
+  data <- data.frame(a = rnorm(500), b = rnorm(500), grp = rep(c("x", "y"), each = 250))
+
+  full <- data %>% do_cor(a, b)
+  capped <- data %>% do_cor(a, b, max_nrow = 100)
+
+  # Independent oracle: the cap is a plain row sample, so the result must equal
+  # running the correlation on that sample -- drawn here with the same seed, but
+  # correlated with stats::cor rather than with do_cor's own internals.
+  set.seed(1)
+  sampled <- data %>% dplyr::select(a, b) %>% sample_rows(100)
+  expected <- stats::cor(sampled$a, sampled$b, use = "pairwise.complete.obs")
+  actual <- (capped %>% dplyr::filter(pair.name.x == "a", pair.name.y == "b"))$correlation
+  expect_equal(actual, expected)
+  expect_false(isTRUE(all.equal(
+    actual,
+    (full %>% dplyr::filter(pair.name.x == "a", pair.name.y == "b"))$correlation
+  )))
+
+  # NULL is what the Sample Data checkbox sends when it is off: every row, i.e.
+  # identical to not passing the argument at all.
+  expect_equal(data %>% do_cor(a, b, max_nrow = NULL), full)
+  # A cap above the row count changes nothing.
+  expect_equal(data %>% do_cor(a, b, max_nrow = 10000), full)
+  # Same seed, same sample.
+  expect_equal(data %>% do_cor(a, b, max_nrow = 100), capped)
+
+  # The cap is per group.
+  grouped <- data %>% dplyr::group_by(grp) %>% do_cor(a, b, max_nrow = 100)
+  set.seed(1)
+  expected_grouped <- data %>% dplyr::group_by(grp) %>% dplyr::select(a, b) %>% sample_rows(100)
+  expect_equal(
+    (grouped %>% dplyr::filter(pair.name.x == "a", pair.name.y == "b") %>% dplyr::arrange(grp))$correlation,
+    (expected_grouped %>% dplyr::group_by(grp) %>%
+      dplyr::summarize(r = stats::cor(a, b, use = "pairwise.complete.obs")) %>%
+      dplyr::arrange(grp))$r
+  )
+})
+
+test_that("do_cor max_nrow caps the cast matrix, not the long input", {
+  # 100 keys, 5 long rows each. Each key's mean is exact only if the whole key
+  # survives -- sampling the LONG input would change the aggregated values, not
+  # just how many of them there are.
+  set.seed(12)
+  key_mean_x <- rnorm(100)
+  key_mean_y <- key_mean_x * 0.7 + rnorm(100, sd = 0.5)
+  offsets <- c(-2, -1, 0, 1, 2) # sum to 0, so each key's mean is exact
+  long <- data.frame(
+    key = rep(1:100, each = 10),
+    subj = rep(rep(c("x", "y"), each = 5), 100),
+    val = as.vector(sapply(1:100, function(k) {
+      c(key_mean_x[k] + offsets, key_mean_y[k] + offsets)
+    }))
+  )
+
+  capped <- long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = 50)
+
+  # Independent oracle: aggregate first (the means the cast produces), then keep
+  # the 50 keys the cap draws, then correlate with stats::cor.
+  set.seed(1)
+  kept <- sort(sample.int(100, 50))
+  expected <- stats::cor(key_mean_x[kept], key_mean_y[kept], use = "pairwise.complete.obs")
+  actual <- (capped %>% dplyr::filter(subj.x == "x", subj.y == "y"))$correlation
+  expect_equal(actual, expected)
+
+  # Had the long rows been sampled instead, the surviving keys' means would be
+  # noisy and the correlation would not match the exact-mean oracle above.
+  full <- long %>% do_cor(skv = c("subj", "key", "val"))
+  expect_equal(
+    (full %>% dplyr::filter(subj.x == "x", subj.y == "y"))$correlation,
+    stats::cor(key_mean_x, key_mean_y, use = "pairwise.complete.obs")
+  )
+  expect_equal(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = NULL), full)
+  expect_equal(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = 1000), full)
+})

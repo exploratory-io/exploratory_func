@@ -30,3 +30,37 @@ test_that("test do_survfit", {
   ret <- data %>% do_survfit(`weeks on service`, `is churned`)
   expect_true(is.data.frame(ret))
 })
+
+test_that("do_survfit max_nrow caps the subjects the curve is fitted on", {
+  set.seed(1)
+  data <- data.frame(
+    weeks_on_service = sample(1:50, 400, replace = TRUE),
+    is_churned = rep(c(TRUE, FALSE), 200),
+    grp = rep(c("a", "b"), each = 200)
+  )
+
+  # n_risk at time 0 is every subject the fit saw.
+  at_zero <- function(ret) {
+    (ret %>% dplyr::filter(time == 0))$n_risk
+  }
+
+  full <- data %>% do_survfit(weeks_on_service, is_churned)
+  expect_equal(at_zero(full), 400)
+  expect_equal(at_zero(data %>% do_survfit(weeks_on_service, is_churned, max_nrow = 100)), 100)
+
+  # NULL is what the Sample Data checkbox sends when it is off, and a cap above
+  # the row count changes nothing.
+  expect_equal(data %>% do_survfit(weeks_on_service, is_churned, max_nrow = NULL), full)
+  expect_equal(data %>% do_survfit(weeks_on_service, is_churned, max_nrow = 1000), full)
+
+  # Same seed, same sample.
+  expect_equal(
+    data %>% do_survfit(weeks_on_service, is_churned, max_nrow = 100),
+    data %>% do_survfit(weeks_on_service, is_churned, max_nrow = 100)
+  )
+
+  # The cap is per group.
+  grouped <- data %>% dplyr::group_by(grp) %>%
+    do_survfit(weeks_on_service, is_churned, max_nrow = 50)
+  expect_equal(at_zero(grouped), c(50, 50))
+})
