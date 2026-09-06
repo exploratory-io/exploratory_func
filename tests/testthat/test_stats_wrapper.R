@@ -803,3 +803,27 @@ test_that("do_cor max_nrow caps the cast matrix, not the long input", {
   expect_equal(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = NULL), full)
   expect_equal(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = 1000), full)
 })
+
+test_that("do_cor does not reseed when no rows are sampled", {
+  data <- data.frame(a = seq_len(20), b = seq_len(20) + 1)
+
+  set.seed(123)
+  before <- .Random.seed
+  invisible(data %>% do_cor(a, b, max_nrow = NULL))
+  expect_identical(.Random.seed, before)
+
+  set.seed(123)
+  before <- .Random.seed
+  invisible(data %>% do_cor(a, b, max_nrow = 100))
+  expect_identical(.Random.seed, before)
+
+  long <- data.frame(
+    subj = rep(c("x", "y"), each = 20),
+    key = rep(seq_len(20), 2),
+    val = seq_len(40)
+  )
+  set.seed(123)
+  before <- .Random.seed
+  invisible(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = NULL))
+  expect_identical(.Random.seed, before)
+})

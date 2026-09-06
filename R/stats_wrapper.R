@@ -112,10 +112,7 @@ do_cor.kv_ <- function(df,
                                 c("pair.name.x", "pair.name.y",
                                   "correlation", "p_value", "statistic"))
 
-  if (!is.null(seed)) { # Set seed before starting to sample.
-    set.seed(seed)
-  }
-
+  seed_initialized <- FALSE
   do_cor_each <- function(df){
     mat <- simple_cast(
       df,
@@ -132,6 +129,10 @@ do_cor.kv_ <- function(df,
     # instead would drop cells from the aggregation and change the VALUES that
     # remain, not just how many observations there are.
     if (!is.null(max_nrow) && nrow(mat) > max_nrow) {
+      if (!is.null(seed) && !seed_initialized) {
+        set.seed(seed)
+        seed_initialized <<- TRUE
+      }
       mat <- mat[sort(sample.int(nrow(mat), max_nrow)), , drop = FALSE]
     }
     if (dim(mat)[[1]] < 2) {
@@ -213,14 +214,15 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   grouped_col <- grouped_by(df)
   output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "correlation", "p_value", "statistic"))
   # check if the df's grouped
-  if (!is.null(seed)) { # Set seed before starting to sample.
-    set.seed(seed)
-  }
-
+  seed_initialized <- FALSE
   do_cor_each <- function(df){
     # Here a row IS an observation, so the cap is a plain row sample, applied
     # per group like every other analytics function's max_nrow.
     if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      if (!is.null(seed) && !seed_initialized) {
+        set.seed(seed)
+        seed_initialized <<- TRUE
+      }
       df <- df %>% sample_rows(max_nrow)
     }
     if (nrow(df) < 2) {
