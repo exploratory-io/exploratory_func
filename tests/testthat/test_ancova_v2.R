@@ -371,10 +371,16 @@ test_that("Test J: different NA patterns per covariate all resolve to the same c
 # ------------------------------------------------------------
 
 test_that("Test K: adjusted means equal a direct prediction at the covariates' raw-scale means", {
-  df <- make_ancova_data(n_per_group = 60, seed = 61, covariate_names = c("X1", "X2"))
+  df <- make_ancova_data(n_per_group = 60, seed = 2026, covariate_names = c("X1", "X2"))
   res <- run_ancova_v2(df, outcome = "y", factor = "group", covariates = c("X1", "X2"), alpha = 0.05)
-  skip_if(res$model_selection$final_model_type != "additive",
-          "final model was interaction for this seed; Test K only applies to the additive case")
+  # make_ancova_data() is called without group_slope_offsets, so the true data
+  # generating process has parallel slopes and selection must land on the
+  # additive model -- which is also the only case the additive lm() oracle below
+  # can check. Assert it rather than skip on it: the seed is fixed, so this is
+  # deterministic, and the previous `skip_if` silently disabled Test K and
+  # Test L on EVERY platform because seed 61 happened to draw a Type I error on
+  # the homogeneity-of-slopes test.
+  expect_identical(res$model_selection$final_model_type, "additive")
 
   direct_model <- stats::lm(y ~ group + X1 + X2, data = df)
   ref <- data.frame(group = factor(levels(df$group), levels = levels(df$group)),
@@ -393,10 +399,10 @@ test_that("Test K: adjusted means equal a direct prediction at the covariates' r
 # ------------------------------------------------------------
 
 test_that("Test L: pairwise adjusted_difference matches the EMM difference within 1e-8", {
-  df <- make_ancova_data(n_per_group = 60, seed = 61, covariate_names = c("X1", "X2"))
+  df <- make_ancova_data(n_per_group = 60, seed = 2026, covariate_names = c("X1", "X2"))
   res <- run_ancova_v2(df, outcome = "y", factor = "group", covariates = c("X1", "X2"), alpha = 0.05)
-  skip_if(res$model_selection$final_model_type != "additive",
-          "final model was interaction for this seed")
+  # Asserted, not skipped -- see the note in Test K.
+  expect_identical(res$model_selection$final_model_type, "additive")
 
   means <- res$adjusted_means$means
   emm_by_group <- stats::setNames(means$estimate, means$group)
