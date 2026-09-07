@@ -44,7 +44,9 @@ test_that("exp_lca selects a BIC-minimum categorical model and exposes its repor
   profile_sums <- as.numeric(tapply(profiles$probability, interaction(profiles$variable, profiles$class, drop = TRUE), sum))
   expect_equal(profile_sums, rep(1, length(profile_sums)), tolerance = 1e-8)
   expect_equal(nrow(tidy(model, type = "characteristics")), glance(model)$selected_classes * 2)
-  expect_true(all(tidy(model, type = "discrimination")$max_minus_min_probability >= 0))
+  # tam#38502 deleted the per-variable-AND-category "discrimination" type along with the
+  # "Class-Characterizing Categories" chart that was its only consumer.
+  expect_error(tidy(model, type = "discrimination"), "Unknown tidy type")
 
   assignments <- tidy(model, type = "data")
   expect_equal(nrow(assignments), nrow(df))
@@ -796,13 +798,29 @@ test_that("exp_lca exposes per-variable discrimination and a class distribution 
   nclass <- length(model$selected_fit$P)
   expect_equal(nrow(pairs), 3 * choose(nclass, 2))
 
+  # tam#38502: the composition comes from the MODEL, not from the argmax assignments, so it
+  # is a probability per (variable, category, class) that sums to 1 within each answer
+  # category -- and it carries no NA class and no NA category, because neither the excluded
+  # rows nor a missing answer is something the model asserts a composition for.
   distribution <- tidy(model, type = "class_distribution")
-  expect_equal(names(distribution), c("variable", "category", "class", "rows"))
-  # Every (variable, category, class) cell exists, including the NA class carrying the
-  # rows excluded from the estimation, and every original row is accounted for exactly
-  # once per variable.
-  expect_true(any(is.na(distribution$class)))
-  per_variable <- distribution %>% dplyr::group_by(variable) %>%
-    dplyr::summarise(total = sum(rows), .groups = "drop")
-  expect_true(all(per_variable$total == nrow(df)))
+  expect_equal(names(distribution), c("variable", "category", "class", "class_composition"))
+  expect_false(any(is.na(distribution$class)))
+  expect_false(any(is.na(distribution$category)))
+  expect_true(all(distribution$class_composition >= 0 & distribution$class_composition <= 1))
+  composition_sums <- as.numeric(tapply(distribution$class_composition,
+                                        interaction(distribution$variable, distribution$category, drop = TRUE), sum))
+  expect_equal(composition_sums, rep(1, length(composition_sums)), tolerance = 1e-8)
+
+  # It reconciles with the profile table it shares a denominator with:
+  #   class_composition * P(Y = r) == P(C = c) * P(Y = r | C = c)
+  profiles <- tidy(model, type = "profiles")
+  shares <- tidy(model, type = "summary")
+  joined <- distribution %>%
+    dplyr::mutate(class = as.character(class), category = as.character(category)) %>%
+    dplyr::inner_join(profiles %>% dplyr::mutate(class = as.character(class), category = as.character(category)),
+                      by = c("variable", "category", "class")) %>%
+    dplyr::inner_join(shares %>% dplyr::transmute(class = as.character(class), class_share = share), by = "class")
+  expect_equal(nrow(joined), nrow(distribution))
+  expect_equal(joined$class_composition * joined$model_overall_probability,
+               joined$class_share * joined$probability, tolerance = 1e-8)
 })

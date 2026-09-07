@@ -26,7 +26,7 @@ exp_lca <- function(df, ...,
                     max_nclass = 6,
                     nrep = 20,
                     max_nrep = 50,
-                    maxiter = 5000,
+                    maxiter = 1000,
                     seed = 1,
                     relationship_column = NULL,
                     feature_top_n = 10,
@@ -168,10 +168,6 @@ exp_lca <- function(df, ...,
 
     class_selection <- lca_class_selection_table(candidates)
     profiles <- lca_profile_table(selected, original[complete_rows, selected_cols, drop = FALSE], selected_cols)
-    discrimination <- profiles %>%
-      dplyr::group_by(variable, category) %>%
-      dplyr::summarise(max_minus_min_probability = max(probability) - min(probability), .groups = "drop") %>%
-      dplyr::arrange(dplyr::desc(max_minus_min_probability), variable, category)
     characteristics <- profiles %>%
       dplyr::group_by(class) %>%
       dplyr::arrange(dplyr::desc(abs_difference), variable, category, .by_group = TRUE) %>%
@@ -179,8 +175,8 @@ exp_lca <- function(df, ...,
       dplyr::filter(rank <= feature_top_n) %>%
       dplyr::ungroup()
     row_assignments <- lca_assignment_table(original, used_row_ids, selected)
-    class_distribution <- lca_class_distribution_table(original, selected_cols, used_row_ids,
-                                                       selected$predclass, length(selected$P))
+    class_distribution <- lca_class_composition_table(selected, original[complete_rows, selected_cols, drop = FALSE],
+                                                      selected_cols)
     variable_discrimination <- calculate_lca_variable_discrimination(profiles)
     relationship <- lca_relationship_table(original, used_row_ids, selected$predclass, relationship_col)
 
@@ -204,7 +200,6 @@ exp_lca <- function(df, ...,
       class_selection = class_selection,
       profiles = profiles,
       characteristics = characteristics,
-      discrimination = discrimination,
       variable_discrimination = variable_discrimination,
       class_distribution = class_distribution,
       row_assignments = row_assignments,
@@ -747,36 +742,40 @@ lca_assignment_table <- function(original, used_row_ids, fit) {
     dplyr::select(-.lca_row_id)
 }
 
-# tam#38419: how the assigned classes are distributed WITHIN each answer category, for
-# every indicator variable at once. The report renders it as a 100% stacked bar faceted by
-# variable, so what matters here is the count per (variable, category, class) cell -- the
-# ratio is a chart-side window function, not something to precompute (see the spec loop's
-# "Ratio + Total: window function, never a static R column" rule).
+# tam#38502: the class composition of an answer category is a property of the MODEL, not of
+# the hard assignments, so it is derived straight from the fit:
 #
-# Rows EXCLUDED from the estimation are kept, with class NA. They are a real part of the
-# picture: an answer category answered only by rows that were dropped for missingness
-# elsewhere shows up as a full-height (NA) band rather than silently disappearing, which
-# is what the spec's reference chart shows.
+#   P(C = c | Y_j = r) = P(C = c) P(Y_j = r | C = c) / sum_c' P(C = c') P(Y_j = r | C = c')
 #
-# tidyr::complete() fills unobserved (category, class) combinations with 0 so a missing
-# cell is drawn as absent rather than collapsing the stack.
-lca_class_distribution_table <- function(original, cols, used_row_ids, predclass, nclass) {
-  class_levels <- paste("Class", seq_len(nclass))
-  assigned <- tibble::tibble(.lca_row_id = used_row_ids, class = paste("Class", predclass))
-  base <- original %>%
-    dplyr::select(dplyr::all_of(c(".lca_row_id", cols))) %>%
-    dplyr::left_join(assigned, by = ".lca_row_id")
+# Both factors are already estimated -- fit$P (class shares) and fit$probs[[col]] (class x
+# category conditional response probabilities) -- so no pass over the rows is needed at all.
+# tam#38419's predecessor counted argmax-assigned rows instead, which is why it had to carry
+# an (NA) class band for rows excluded from estimation and an (NA) category bar for rows that
+# skipped that one question. Neither is a quantity the model asserts, and the spec asks for a
+# chart whose every category bar is a clean 100%; both disappear by construction here.
+#
+# The denominator is exactly lca_profile_table()'s model_overall_probability, so the two
+# tables reconcile: class_composition * model_overall_probability == P(C=c) * probability.
+lca_class_composition_table <- function(fit, observed, cols) {
+  class_shares <- fit$P
+  class_levels <- paste("Class", seq_along(class_shares))
   dplyr::bind_rows(lapply(cols, function(col) {
-    levels <- lca_indicator_levels(original[[col]])
-    counted <- base %>%
-      dplyr::transmute(
-        category = factor(as.character(.data[[col]]), levels = levels),
-        class = factor(class, levels = class_levels)
-      ) %>%
-      dplyr::count(category, class, name = "rows")
-    tidyr::complete(counted, category, class, fill = list(rows = 0L)) %>%
-      dplyr::mutate(variable = col) %>%
-      dplyr::select(variable, category, class, rows)
+    levels <- lca_indicator_levels(observed[[col]])
+    probabilities <- fit$probs[[col]]
+    # probabilities is class x category, so multiplying by the class-share vector recycles
+    # down the ROWS -- one share per class -- giving the joint P(C=c, Y=r) cell by cell.
+    joint <- probabilities * class_shares
+    overall <- colSums(joint)
+    # A category the model gives zero marginal probability to has no composition to report.
+    # poLCA does not produce an all-zero column for a category that occurs in the data, but
+    # dividing by it would silently emit NaN rather than a value a reader could question.
+    composition <- sweep(joint, 2, ifelse(overall > 0, overall, NA_real_), "/")
+    tibble::tibble(
+      variable = col,
+      category = factor(rep(levels, each = nrow(composition)), levels = levels),
+      class = factor(rep(class_levels, times = length(levels)), levels = class_levels),
+      class_composition = as.vector(composition)
+    )
   }))
 }
 
@@ -852,10 +851,9 @@ tidy.lca_exploratory <- function(x, type = "summary", ...) {
   }
   if (type == "profiles") return(x$profiles)
   if (type == "characteristics") return(x$characteristics)
-  if (type == "discrimination") return(x$discrimination)
-  # tam#38418: per-VARIABLE discrimination (mean pairwise TVD). Distinct from the
-  # "discrimination" type above, which is per variable AND category (max - min response
-  # probability) and feeds the "Class-Characterizing Categories" chart.
+  # tam#38418: per-VARIABLE discrimination (mean pairwise TVD). tam#38502 removed the
+  # sibling per-variable-AND-category "discrimination" type together with the
+  # "Class-Characterizing Categories" chart it existed for.
   if (type == "variable_discrimination") return(x$variable_discrimination)
   if (type == "variable_discrimination_pairs") {
     pairs <- attr(x$variable_discrimination, "pairwise")
