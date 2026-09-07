@@ -570,3 +570,67 @@ test_that('silhouette_sample_size is only validated when a silhouette is compute
                                silhouette_sample_size = 2, seed = 1),
     'silhouette_sample_size must be greater than the number of clusters')
 })
+
+test_that('profile variable_order groups variables by peak cluster, regardless of profile_top_n (tam#38492)', {
+  # The Cluster Profile radar orders its category axis by variable_order so that each
+  # cluster's characteristic variables form one contiguous arc. profile_top_n keeps only
+  # each cluster's most characteristic variables, so a variable can survive for some
+  # clusters and not others -- the order must therefore be decided BEFORE that filter,
+  # or the peak cluster is read off a partial set and the arc breaks apart.
+  set.seed(11)
+  n <- 400
+  n_var <- 12
+  n_cluster <- 3
+  group <- sample(seq_len(n_cluster), n, replace = TRUE)
+  values <- matrix(3, n, n_var)
+  for (i in seq_len(n)) {
+    block <- ((group[i] - 1) * 4 + 1):((group[i] - 1) * 4 + 4)
+    values[i, block] <- values[i, block] + 1.2
+  }
+  noisy <- values + matrix(stats::rnorm(n * n_var, 0, 0.8), n, n_var)
+  df <- as.data.frame(matrix(round(pmin(5, pmax(1, as.vector(noisy)))), n, n_var))
+  names(df) <- paste0('V', sprintf('%02d', seq_len(n_var)))
+
+  fit <- function(show_all, top_n) {
+    result <- df %>% exploratory:::exp_kmedoids(
+      !!!rlang::syms(names(df)),
+      centers = n_cluster, seed = 1,
+      profile_show_all = show_all, profile_top_n = top_n
+    )
+    broom::tidy(result$model[[1]], type = 'profile')
+  }
+  order_of <- function(profile) {
+    unique(profile[order(profile$variable_order), ][['variable']])
+  }
+  # Independent oracle: the cluster whose standardized mean is highest for that variable,
+  # taken from every (variable, cluster) pair -- never from the filtered frame.
+  full <- fit(TRUE, 12)
+  peak <- full %>%
+    dplyr::group_by(variable) %>%
+    dplyr::slice_max(standardized_mean, n = 1, with_ties = FALSE) %>%
+    dplyr::ungroup()
+  runs_around_axis <- function(variables) {
+    clusters <- peak$cluster[match(variables, peak$variable)]
+    sum(clusters != c(clusters[-1], clusters[1]))
+  }
+
+  narrowed <- fit(FALSE, 4)
+  expect_lt(nrow(narrowed), nrow(full))            # the filter really did narrow the frame
+  expect_true(any(table(narrowed$variable) < n_cluster))  # ... per (variable, cluster), not per variable
+
+  expect_equal(order_of(narrowed), order_of(full))
+  expect_equal(runs_around_axis(order_of(narrowed)), dplyr::n_distinct(peak$cluster))
+})
+
+test_that('profile variable_order keeps the peak cluster primary when a z-score exceeds 10', {
+  rows <- tibble::tibble(
+    variable = rep(c('early_peak', 'late_peak'), each = 2),
+    cluster = rep(1:2, 2),
+    standardized_mean = c(0.1, 0, 0, 100)
+  )
+
+  ordered <- exploratory:::.kmedoids_profile_variable_order(rows)
+
+  expect_equal(ordered$variable, c('early_peak', 'late_peak'))
+  expect_equal(ordered$order, c(1, 2))
+})
