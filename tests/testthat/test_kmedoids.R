@@ -621,3 +621,16 @@ test_that('profile variable_order groups variables by peak cluster, regardless o
   expect_equal(order_of(narrowed), order_of(full))
   expect_equal(runs_around_axis(order_of(narrowed)), dplyr::n_distinct(peak$cluster))
 })
+
+test_that('profile variable_order keeps the peak cluster primary when a z-score exceeds 10', {
+  rows <- tibble::tibble(
+    variable = rep(c('early_peak', 'late_peak'), each = 2),
+    cluster = rep(1:2, 2),
+    standardized_mean = c(0.1, 0, 0, 100)
+  )
+
+  ordered <- exploratory:::.kmedoids_profile_variable_order(rows)
+
+  expect_equal(ordered$variable, c('early_peak', 'late_peak'))
+  expect_equal(ordered$order, c(1, 2))
+})

@@ -269,8 +269,9 @@
 #' The radar groups variables by the cluster that peaks on them, so that each
 #' cluster's characteristic variables form one contiguous arc: variables whose
 #' peak is cluster 1 come first, then cluster 2's, and so on, ordered within a
-#' group by descending peak value. (`max(value) - 10 * peak_index` -- the fixed
-#' 10 * index term dominates because `standardized_mean` is a z-score.)
+#' group by descending peak value. The peak cluster is an explicit primary sort
+#' key; using a fixed numeric penalty would be incorrect because a z-score is
+#' not bounded by 10.
 #'
 #' This MUST be computed over every (variable, cluster) pair, before
 #' `profile_top_n` narrows the frame to each cluster's most characteristic
@@ -288,10 +289,12 @@
     dplyr::summarize(value = mean(standardized_mean, na.rm = TRUE), .groups = 'drop_last') %>%
     dplyr::arrange(cluster, .by_group = TRUE) %>%
     dplyr::summarize(
-      score = max(value) - 10 * which.max(value),
+      peak_cluster = cluster[which.max(value)],
+      peak_value = max(value),
       .groups = 'drop'
-    )
-  scores$order <- rank(-scores$score, ties.method = 'first')
+    ) %>%
+    dplyr::arrange(peak_cluster, dplyr::desc(peak_value), variable)
+  scores$order <- seq_len(nrow(scores))
   scores[, c('variable', 'order')]
 }
 
