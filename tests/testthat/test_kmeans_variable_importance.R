@@ -137,3 +137,68 @@ test_that('.kmeans_variable_importance is a thin wrapper reusing cluster_variabl
   )
   expect_equal(wrapper_result, direct_result)
 })
+
+# tam#38491: the same eta-squared ranking has to reach the charts that are NOT built from
+# type='variable_importance' -- the K-Means BoxPlot and the K-Medoids Distributions boxplot,
+# whose colour legend is one entry per variable. A chart preprocessor cannot call
+# tidy_rowwise(model, ...) twice, so the ranking rides along as an `importance_order` column
+# on the per-observation frames. These tests pin that the two frames agree with the ranking
+# chart, not merely that the column exists.
+
+test_that('gathered_data carries importance_order matching the variable_importance ranking (tam#38491)', {
+  set.seed(1)
+  model_df <- iris %>% exp_kmeans(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+                                  centers = 3, seed = 1)
+  model <- model_df$model[[1]]
+  vi <- broom::tidy(model, type = 'variable_importance')
+  gathered <- broom::tidy(model, type = 'gathered_data', normalize_data = TRUE)
+
+  expect_true('importance_order' %in% colnames(gathered))
+  # One order per variable, and no variable left without one.
+  per_variable <- gathered %>%
+    dplyr::distinct(key, importance_order) %>%
+    dplyr::arrange(importance_order)
+  expect_equal(nrow(per_variable), dplyr::n_distinct(gathered$key))
+  expect_false(any(is.na(per_variable$importance_order)))
+  expect_equal(per_variable$importance_order, seq_len(nrow(per_variable)))
+  # The order IS the eta-squared ranking the Characteristic Variables bar shows.
+  expected <- vi %>% dplyr::arrange(dplyr::desc(eta_squared), variable)
+  expect_equal(per_variable$key, expected$variable)
+})
+
+test_that('K-Medoids distribution carries the same importance_order contract (tam#38491)', {
+  set.seed(1)
+  result <- iris %>% exploratory:::exp_kmedoids(
+    Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+    centers = 3, distance = 'euclidean', normalize_data = TRUE, seed = 1
+  )
+  model <- result$model[[1]]
+  vi <- broom::tidy(model, type = 'variable_importance')
+  distribution <- broom::tidy(model, type = 'distribution')
+
+  expect_true('importance_order' %in% colnames(distribution))
+  per_variable <- distribution %>%
+    dplyr::distinct(variable, importance_order) %>%
+    dplyr::arrange(importance_order)
+  expect_equal(nrow(per_variable), dplyr::n_distinct(distribution$variable))
+  expect_false(any(is.na(per_variable$importance_order)))
+  expected <- vi %>% dplyr::arrange(dplyr::desc(eta_squared), variable)
+  expect_equal(per_variable$variable, expected$variable)
+  # Adding the column must not change the rows the boxplot plots.
+  expect_equal(nrow(distribution), nrow(iris) * 4)
+})
+
+test_that('cluster_variable_importance_order covers names absent from the fitted matrix (tam#38491)', {
+  set.seed(3)
+  mat <- as.matrix(iris[, c('Sepal.Length', 'Sepal.Width')])
+  ids <- rep(1:3, length.out = nrow(mat))
+  ordered <- exploratory:::cluster_variable_importance_order(
+    mat, ids, c('Sepal.Length', 'Sepal.Width', 'Not.Fitted')
+  )
+
+  expect_equal(ordered$importance_order, 1:3)
+  expect_setequal(ordered$variable, c('Sepal.Length', 'Sepal.Width', 'Not.Fitted'))
+  # An unrankable name goes last, never NA -- a downstream forcats::fct_reorder() on an NA
+  # rank would silently scatter that level.
+  expect_equal(ordered$variable[[3]], 'Not.Fitted')
+})

@@ -1118,6 +1118,22 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       # res <- res %>% dplyr::select(!!c(column_names,"cluster"))
       res <- res %>% dplyr::mutate(row_id=seq(n())) # row_id for line representation.
       res <- res %>% tidyr::gather(key="key",value="value",!!column_names)
+      # tam#38491: carry the eta-squared rank of each clustering variable (the order the
+      # "Characteristic Variables" bar shows) so the charts built from this frame -- the
+      # BoxPlot's colour legend above all -- can order their variable axis the same way
+      # instead of falling back to character collation. A chart preprocessor cannot call
+      # tidy_rowwise(model, ...) a second time, so the rank has to travel with the rows.
+      # Only computable when a k-means fit is attached; a pure-PCA gather leaves the column
+      # out entirely rather than emitting a meaningless order.
+      if (!is.null(x$kmeans) && !is.null(x$df) && !is.null(x$selected_cols) &&
+          length(x$selected_cols) > 0) {
+        importance_order <- cluster_variable_importance_order(
+          as_numeric_matrix_(x$df, columns = x$selected_cols),
+          x$kmeans$cluster,
+          column_names
+        ) %>% dplyr::rename(key = variable)
+        res <- res %>% dplyr::left_join(importance_order, by = "key")
+      }
     }
   }
   res
