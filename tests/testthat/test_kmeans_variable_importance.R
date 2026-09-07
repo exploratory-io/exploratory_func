@@ -166,6 +166,27 @@ test_that('gathered_data carries importance_order matching the variable_importan
   expect_equal(per_variable$key, expected$variable)
 })
 
+test_that('gathered_data preserves a colliding input importance_order column', {
+  set.seed(1)
+  df <- iris %>% dplyr::mutate(
+    importance_order = paste0('subject-', dplyr::row_number())
+  )
+  model <- df %>% exp_kmeans(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+                             centers = 3, seed = 1) %>%
+    dplyr::pull(model) %>%
+    purrr::pluck(1)
+
+  gathered <- broom::tidy(model, type = 'gathered_data')
+
+  # The generated rank keeps its contract name, while the original subject column is
+  # retained under a deterministic non-conflicting name.
+  expect_true('importance_order' %in% colnames(gathered))
+  expect_true('input_importance_order' %in% colnames(gathered))
+  expect_true(is.numeric(gathered$importance_order))
+  expect_false(any(is.na(gathered$importance_order)))
+  expect_true(all(grepl('^subject-', gathered$input_importance_order)))
+})
+
 test_that('K-Medoids distribution carries the same importance_order contract (tam#38491)', {
   set.seed(1)
   result <- iris %>% exploratory:::exp_kmedoids(

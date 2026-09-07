@@ -1132,6 +1132,20 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
           x$kmeans$cluster,
           column_names
         ) %>% dplyr::rename(key = variable)
+
+        # `res` intentionally keeps non-clustering columns so the parallel-coordinate
+        # chart can use a subject column. If one of those columns is already named
+        # `importance_order`, dplyr would suffix the joined rank to `.y` and leave the
+        # user's column as `.x`, violating the tidier contract that the chart rank is
+        # available as `importance_order`. Preserve the input column under a unique name
+        # before adding the generated rank.
+        if ("importance_order" %in% colnames(res)) {
+          preserved_name <- "input_importance_order"
+          while (preserved_name %in% colnames(res)) {
+            preserved_name <- paste0(".", preserved_name)
+          }
+          names(res)[names(res) == "importance_order"] <- preserved_name
+        }
         res <- res %>% dplyr::left_join(importance_order, by = "key")
       }
     }
