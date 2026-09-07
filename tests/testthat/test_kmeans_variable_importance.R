@@ -202,3 +202,23 @@ test_that('cluster_variable_importance_order covers names absent from the fitted
   # rank would silently scatter that level.
   expect_equal(ordered$variable[[3]], 'Not.Fitted')
 })
+
+test_that('K-Medoids representative_values carries importance_order too (tam#38491)', {
+  set.seed(1)
+  result <- iris %>% exploratory:::exp_kmedoids(
+    Sepal.Length, Sepal.Width, Petal.Length, Petal.Width,
+    centers = 3, distance = 'euclidean', normalize_data = TRUE, seed = 1
+  )
+  model <- result$model[[1]]
+  vi <- broom::tidy(model, type = 'variable_importance')
+  rep_values <- broom::tidy(model, type = 'representative_values')
+
+  expect_true('importance_order' %in% colnames(rep_values))
+  per_variable <- rep_values %>%
+    dplyr::distinct(variable, importance_order) %>%
+    dplyr::arrange(importance_order)
+  expected <- vi %>% dplyr::arrange(dplyr::desc(eta_squared), variable)
+  expect_equal(per_variable$variable, expected$variable)
+  # One row per (cluster, variable) still -- the join must not duplicate rows.
+  expect_equal(nrow(rep_values), 3 * 4)
+})

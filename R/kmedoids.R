@@ -432,6 +432,9 @@
 .kmedoids_representative_values <- function(x) {
   ids <- x$clustering
   original_mat <- .kmedoids_original_fit_mat(x)
+  # tam#38491: same rank the Characteristic Variables bar sorts by, so the table can list
+  # each cluster's variables in that order instead of the fitted-column order.
+  importance_order <- cluster_variable_importance_order(x$mat, x$clustering, colnames(original_mat))
   purrr::map_dfr(sort(unique(ids)), function(cluster_id) {
     index <- which(ids == cluster_id)
     medoid_index <- x$medoid_indices[[cluster_id]]
@@ -444,7 +447,8 @@
       overall_median = apply(original_mat, 2, stats::median, na.rm = TRUE),
       overall_mean = colMeans(original_mat, na.rm = TRUE)
     )
-  })
+  }) %>%
+    dplyr::left_join(importance_order, by = 'variable')
 }
 
 #' Per-row, per-variable distribution rows (tam#37938: クラスター内のばらつき boxplot,
