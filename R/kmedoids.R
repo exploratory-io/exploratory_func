@@ -432,6 +432,9 @@
 .kmedoids_representative_values <- function(x) {
   ids <- x$clustering
   original_mat <- .kmedoids_original_fit_mat(x)
+  # tam#38491: same rank the Characteristic Variables bar sorts by, so the table can list
+  # each cluster's variables in that order instead of the fitted-column order.
+  importance_order <- cluster_variable_importance_order(x$mat, x$clustering, colnames(original_mat))
   purrr::map_dfr(sort(unique(ids)), function(cluster_id) {
     index <- which(ids == cluster_id)
     medoid_index <- x$medoid_indices[[cluster_id]]
@@ -444,7 +447,8 @@
       overall_median = apply(original_mat, 2, stats::median, na.rm = TRUE),
       overall_mean = colMeans(original_mat, na.rm = TRUE)
     )
-  })
+  }) %>%
+    dplyr::left_join(importance_order, by = 'variable')
 }
 
 #' Per-row, per-variable distribution rows (tam#37938: クラスター内のばらつき boxplot,
@@ -478,13 +482,24 @@
   standardized_mat <- x$mat
   n <- nrow(original_mat)
   p <- ncol(original_mat)
-  tibble::tibble(
+  rows <- tibble::tibble(
     cluster = rep(as.integer(ids), each = p),
     variable = rep(colnames(original_mat), times = n),
     value = as.numeric(t(original_mat)),
     standardized_value = as.numeric(t(standardized_mat)),
     is_medoid = rep(seq_len(n) %in% medoid_indices, each = p)
   )
+  # tam#38491: the boxplot's colour legend is one entry per variable and had no order of its
+  # own, so it fell back to the character collation order while the "Characteristic Variables"
+  # bar right above it was sorted by eta-squared. Ship the eta-squared rank alongside the rows
+  # so the chart preprocessor can turn `variable` into a factor in that same order. Same
+  # `x$mat` / `x$clustering` the type='variable_importance' tidier ranks, so the two charts
+  # cannot disagree.
+  rows %>%
+    dplyr::left_join(
+      cluster_variable_importance_order(x$mat, x$clustering, colnames(original_mat)),
+      by = 'variable'
+    )
 }
 
 .kmedoids_cohesion <- function(x) {

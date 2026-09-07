@@ -39,3 +39,39 @@ cluster_variable_importance_anova <- function(mat, cluster_ids) {
     )
   })
 }
+
+# Rank of each clustering variable by "characteristic-ness", as an integer order column.
+# tam#38491.
+#
+# The eta-squared ranking is what the "Characteristic Variables" bar chart shows, but the
+# sibling charts drawn from OTHER tidiers (the per-observation boxplot's colour legend, the
+# per-variable detail table) had no way to reach it: a chart preprocessor cannot call
+# `tidy_rowwise(model, ...)` twice, so the ranking cannot be joined in on the tam side. It
+# therefore has to travel WITH the frame that needs it, the same way #38492 shipped the
+# Cluster Profile axis order as a `variable_order` column.
+#
+# Returned as a rank column rather than by reordering `variable` itself, so `variable` keeps
+# its character class for every other consumer; the chart preprocessor turns the rank into
+# the factor order with `forcats::fct_reorder()`.
+#
+# @param mat a numeric matrix, one column per clustering variable (same argument as
+#   `cluster_variable_importance_anova()`).
+# @param cluster_ids a vector giving each row's cluster assignment.
+# @param variables optional character vector of variable names the caller needs an order for.
+#   Names not present in `mat` (so not rankable by eta-squared) are appended after the ranked
+#   ones in name order, so the returned map always covers every requested name and a
+#   downstream `fct_reorder()` never sees an NA rank.
+# @return a tibble with columns: variable, importance_order (1 = most characteristic).
+cluster_variable_importance_order <- function(mat, cluster_ids, variables = NULL) {
+  ranked <- cluster_variable_importance_anova(mat, cluster_ids) %>%
+    dplyr::arrange(dplyr::desc(eta_squared), variable)
+  names_in_order <- ranked$variable
+  if (!is.null(variables)) {
+    extra <- sort(setdiff(as.character(variables), names_in_order))
+    names_in_order <- c(names_in_order, extra)
+  }
+  tibble::tibble(
+    variable = names_in_order,
+    importance_order = seq_along(names_in_order)
+  )
+}
