@@ -264,6 +264,37 @@
   result
 }
 
+#' Position of each variable in the Cluster Profile radar's category axis.
+#'
+#' The radar groups variables by the cluster that peaks on them, so that each
+#' cluster's characteristic variables form one contiguous arc: variables whose
+#' peak is cluster 1 come first, then cluster 2's, and so on, ordered within a
+#' group by descending peak value. (`max(value) - 10 * peak_index` -- the fixed
+#' 10 * index term dominates because `standardized_mean` is a z-score.)
+#'
+#' This MUST be computed over every (variable, cluster) pair, before
+#' `profile_top_n` narrows the frame to each cluster's most characteristic
+#' variables (tam#38492). Computed afterwards, a variable that survived in only
+#' some clusters has its peak decided from that partial set -- on a 16-variable,
+#' 4-cluster survey, 9 of 16 variables kept only 2 of their 4 clusters, and one
+#' cluster's variables were split into two arcs on opposite sides of the wheel.
+#'
+#' Returned as a rank column rather than by reordering `variable` itself, so the
+#' column keeps its character class for every other consumer; the chart's
+#' preprocessor turns it into the factor order.
+.kmedoids_profile_variable_order <- function(rows) {
+  scores <- rows %>%
+    dplyr::group_by(variable, cluster) %>%
+    dplyr::summarize(value = mean(standardized_mean, na.rm = TRUE), .groups = 'drop_last') %>%
+    dplyr::arrange(cluster, .by_group = TRUE) %>%
+    dplyr::summarize(
+      score = max(value) - 10 * which.max(value),
+      .groups = 'drop'
+    )
+  scores$order <- rank(-scores$score, ties.method = 'first')
+  scores[, c('variable', 'order')]
+}
+
 .kmedoids_profile <- function(x) {
   mat <- x$mat
   original_mat <- .kmedoids_original_fit_mat(x)
@@ -295,10 +326,13 @@
       overall_mean = as.numeric(original_overall_mean)
     )
   })
+  variable_order <- .kmedoids_profile_variable_order(rows)
   rows %>%
     dplyr::group_by(cluster) %>%
     dplyr::mutate(rank = rank(-effect_size, ties.method = 'first')) %>%
     dplyr::ungroup() %>%
+    dplyr::left_join(variable_order, by = 'variable') %>%
+    dplyr::rename(variable_order = order) %>%
     {
       result <- .
       if (!isTRUE(x$profile_show_all)) {
