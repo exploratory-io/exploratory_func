@@ -353,10 +353,13 @@ compute_residual_smoother <- function(fitted, standardized_residual) {
 ANCOVA_QQ_ENVELOPE_NSIM <- 1000L
 ANCOVA_QQ_ENVELOPE_MIN_NSIM <- 200L
 # The bootstrap costs about `nsim * n` row-operations; measured on a 4-column
-# design, 1e7 of them take roughly a second. Capping the product keeps the
-# envelope under ~2s for ANY row count instead of letting a 100k-row ANCOVA pay
+# design, 1e7 of them take roughly a second. Capping the product holds the
+# envelope near ~2s up to about 100k rows instead of letting a large ANCOVA pay
 # ~10s for a diagnostic chart (the issue calls this out as the case that needs
-# an adjusted simulation count).
+# an adjusted simulation count). Past 100k the MIN_NSIM floor takes over and the
+# cost grows with n again -- deliberately: below ~200 draws a 2.5% quantile is
+# an interpolation between the 5th and 6th order statistics and the band's tails
+# turn to noise, which is worse than being slow.
 ANCOVA_QQ_ENVELOPE_WORK_BUDGET <- 2e7
 ANCOVA_QQ_ENVELOPE_LEVEL <- 0.95
 ANCOVA_QQ_ENVELOPE_SEED <- 123L
@@ -426,6 +429,27 @@ compute_qq_envelope <- function(model, valid, idx,
   if (n < 3 || length(idx) < 1) return(empty)
   if (is.null(nsim)) nsim <- ancova_qq_envelope_nsim(n)
 
+  # The caller hands in the residual mask rather than the residuals being
+  # recomputed here, so the leverages and the plotted points could in principle
+  # come from different rows -- same LENGTH, wrong PAIRING, no error, every point
+  # sitting slightly wrong against the band. Cheap to rule out, so rule it out.
+  own_valid <- is.finite(stats::rstandard(model))
+  if (length(own_valid) != length(valid) || !identical(unname(own_valid), unname(valid))) {
+    return(empty)
+  }
+
+  # A fixed seed makes the band reproducible, but set.seed() is a SESSION-wide
+  # side effect: Rserve keeps one R session per window, so without this every
+  # later random operation in that session (another analytics' bootstrap, a
+  # sampling step) would start from a state determined by seed 123 just because
+  # this chart happened to render.
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  if (had_seed) {
+    saved_seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+    on.exit(assign(".Random.seed", saved_seed, envir = globalenv()), add = TRUE)
+  } else {
+    on.exit(suppressWarnings(rm(".Random.seed", envir = globalenv())), add = TRUE)
+  }
   set.seed(seed)
   sims <- matrix(NA_real_, nrow = nsim, ncol = length(idx))
   for (b in seq_len(nsim)) {
@@ -437,11 +461,16 @@ compute_qq_envelope <- function(model, valid, idx,
     sims[b, ] <- sort(residual_sim / (sigma_sim * sqrt(1 - leverage)))[idx]
   }
   alpha <- 1 - level
-  tibble::tibble(
+  out <- tibble::tibble(
     lower = apply(sims, 2, stats::quantile, probs = alpha / 2, na.rm = TRUE, names = FALSE),
     upper = apply(sims, 2, stats::quantile, probs = 1 - alpha / 2, na.rm = TRUE, names = FALSE),
     expected = apply(sims, 2, stats::median, na.rm = TRUE)
   )
+  # How many draws the band was actually built from. It is NOT always the
+  # default (see ancova_qq_envelope_nsim), and a reader comparing two reports
+  # cannot otherwise tell that one band's tails are noisier than the other's.
+  attr(out, "nsim") <- nsim
+  out
 }
 
 #' Q-Q data, thinned by evenly spaced ORDER STATISTICS.
@@ -484,6 +513,7 @@ compute_qq_data <- function(standardized_residual, model = NULL) {
     points = points,
     reference_line = list(intercept = 0, slope = 1),
     envelope_level = if (nrow(envelope) == nrow(points)) ANCOVA_QQ_ENVELOPE_LEVEL else NA_real_,
+    envelope_nsim = if (nrow(envelope) == nrow(points)) attr(envelope, "nsim") else NA_integer_,
     n_total = n,
     n_displayed = length(idx),
     sampled = length(idx) < n
@@ -515,6 +545,7 @@ compute_ancova_residual_diagnostics <- function(final_model, analysis_data, safe
       points = qq$points,
       reference_line = qq$reference_line,
       envelope_level = qq$envelope_level,
+      envelope_nsim = qq$envelope_nsim,
       n_total = qq$n_total,
       n_displayed = qq$n_displayed,
       sampled = qq$sampled

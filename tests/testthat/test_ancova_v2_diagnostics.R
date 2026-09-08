@@ -350,6 +350,40 @@ test_that("Test 9b: the simulation count is bounded by row count, never below th
   expect_lte(ancova_qq_envelope_nsim(100000) * 100000, ANCOVA_QQ_ENVELOPE_WORK_BUDGET)
 })
 
+test_that("Test 9b: the envelope leaves the session RNG exactly as it found it", {
+  # Rserve keeps ONE R session per window. An unrestored set.seed(123) would make
+  # every later random operation in that session -- another analytics' bootstrap,
+  # a sampling step -- start from a state determined by this chart having rendered.
+  d <- make_diag_data(n_per_group = 40, seed = 25)
+  fit <- stats::lm(y ~ group + X1, data = d)
+  set.seed(999)
+  before <- .Random.seed
+  compute_qq_envelope(fit, is.finite(stats::rstandard(fit)), seq_len(nrow(d)))
+  expect_identical(before, .Random.seed)
+})
+
+test_that("Test 9b: a residual mask that is not this model's degrades to no band", {
+  # The caller supplies the mask, so the leverages and the plotted points could be
+  # the same LENGTH but the wrong PAIRING -- every point sitting slightly wrong
+  # against the band, with nothing to notice. Guarded, not assumed.
+  d <- make_diag_data(n_per_group = 40, seed = 26)
+  fit <- stats::lm(y ~ group + X1, data = d)
+  ok <- is.finite(stats::rstandard(fit))
+  wrong <- ok
+  wrong[1] <- FALSE
+  expect_equal(nrow(compute_qq_envelope(fit, wrong, seq_len(sum(wrong)))), 0)
+  expect_gt(nrow(compute_qq_envelope(fit, ok, seq_len(sum(ok)))), 0)
+})
+
+test_that("Test 9b: the draw count the band was built from is reported", {
+  res <- run_ancova_v2(make_diag_data(n_per_group = 40, seed = 27), "y", "group", "X1")
+  qq <- res$diagnostics$residuals$qq
+  # It is NOT always the default, so a reader comparing two reports could not
+  # otherwise tell that one band's tails came from fewer draws.
+  expect_equal(qq$envelope_nsim, ANCOVA_QQ_ENVELOPE_NSIM)
+  expect_equal(compute_qq_data(stats::rnorm(50), model = NULL)$envelope_nsim, NA_integer_)
+})
+
 test_that("Test 9b: a model the simulation cannot use degrades to no band, not an error", {
   qq <- compute_qq_data(stats::rnorm(50), model = NULL)
   expect_equal(nrow(qq$points), 50)
