@@ -346,8 +346,12 @@ ancova_v2_pairs_table <- function(x, pairs_adjust) {
     ret <- tibble::as_tibble(pw) %>%
       dplyr::mutate(conf.low = ci$lower.CL, conf.high = ci$upper.CL)
     levels_vec <- unlist(res$analysis_sample$factor_levels)
+    # Pass the internal factor column so a level emmeans PREFIXED with the
+    # variable name can be mapped back. Without it a numeric-looking level set
+    # (1..5) contrasts as `.ancova_factor1 - .ancova_factor2` and the internal
+    # column name reaches the user's Multiple Comparisons table (tam#38510).
     pairs_split <- purrr::map_dfr(ret$contrast, function(label) {
-      parts <- ancova_split_pair_label(label, levels_vec)
+      parts <- ancova_split_pair_label(label, levels_vec, x$internals$safe_factor)
       tibble::tibble(`Group 1` = parts[[1]], `Group 2` = parts[[2]])
     })
     ret <- dplyr::bind_cols(pairs_split, ret %>% dplyr::select(-contrast))
