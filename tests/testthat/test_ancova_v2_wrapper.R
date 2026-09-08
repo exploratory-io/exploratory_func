@@ -440,3 +440,55 @@ test_that("the diagnostic surfaces degrade to empty rather than erroring when a 
   expect_gt(nrow(tidy_rowwise(ret, model, type = "residual_fitted")), 0)
   expect_gt(nrow(tidy_rowwise(ret, model, type = "qq")), 0)
 })
+
+# ------------------------------------------------------------
+# tam#38510 follow-up: numeric-looking factor levels
+# ------------------------------------------------------------
+test_that("numeric-looking group levels do not leak the internal factor column", {
+  # emmeans PREFIXES the variable name onto a level when the levels are not
+  # syntactically distinguishable on their own, so a factor with levels 1..5
+  # contrasts as `.ancova_factor1 - .ancova_factor2` rather than `1 - 2`. The
+  # label splitter could not map that back to a level, fell through to its
+  # positional fallback, and the report's Multiple Comparisons table showed the
+  # INTERNAL column name in every グループ1/グループ2 cell -- found in a Japanese
+  # report dump from the running app, not by any test.
+  set.seed(1)
+  n <- 300
+  df <- data.frame(y = rnorm(n) + rep(1:5, each = 60),
+                   g = factor(rep(1:5, each = 60)),
+                   x = runif(n))
+  tbl <- tidy_rowwise(exp_ancova(df, y, g, covariates = "x"), model,
+                      type = "pairs", pairs_adjust = "bonferroni")
+
+  groups <- unique(c(as.character(tbl$`Group 1`), as.character(tbl$`Group 2`)))
+  expect_setequal(groups, as.character(1:5))
+  expect_false(any(grepl("ancova_factor", groups, fixed = TRUE)))
+})
+
+test_that("the label splitter handles bare, parenthesised and prefixed levels", {
+  levels_vec <- c("1", "2", "10")
+  expect_equal(ancova_split_pair_label("1 - 2", levels_vec), c("1", "2"))
+  expect_equal(ancova_split_pair_label(".ancova_factor1 - .ancova_factor2", levels_vec,
+                                       ".ancova_factor"), c("1", "2"))
+  # The prefix must be stripped WHOLE: "10" must not be read as the level "1"
+  # with a stray character left over.
+  expect_equal(ancova_split_pair_label(".ancova_factor10 - .ancova_factor1", levels_vec,
+                                       ".ancova_factor"), c("10", "1"))
+  # A level that genuinely contains the separator still wins over the prefix path.
+  expect_equal(ancova_split_pair_label("(A - B) - C", c("A - B", "C")), c("A - B", "C"))
+  # No factor column supplied -> unchanged behaviour.
+  expect_equal(ancova_split_pair_label(".ancova_factor1 - .ancova_factor2", levels_vec),
+               c(".ancova_factor1", ".ancova_factor2"))
+})
+
+test_that("text group levels are unaffected by the prefix handling", {
+  set.seed(2)
+  n <- 300
+  df <- data.frame(y = rnorm(n) + rep(1:3, each = 100),
+                   g = factor(rep(c("A法", "B法", "C法"), each = 100)),
+                   x = runif(n))
+  tbl <- tidy_rowwise(exp_ancova(df, y, g, covariates = "x"), model,
+                      type = "pairs", pairs_adjust = "bonferroni")
+  expect_setequal(unique(c(as.character(tbl$`Group 1`), as.character(tbl$`Group 2`))),
+                  c("A法", "B法", "C法"))
+})

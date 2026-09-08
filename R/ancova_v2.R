@@ -531,7 +531,7 @@ ancova_tidy_emm <- function(emm, safe_factor, confidence_level, source_model) {
 #' factor levels, instead of assuming " - " never occurs inside a level's
 #' own text (a level like "Q1 - Q2" would otherwise be mis-split).
 #' @noRd
-ancova_split_pair_label <- function(label, levels) {
+ancova_split_pair_label <- function(label, levels, factor_col = NULL) {
   positions <- gregexpr(" - ", label, fixed = TRUE)[[1]]
   if (positions[1] == -1) {
     return(c(NA_character_, NA_character_))
@@ -548,6 +548,19 @@ ancova_split_pair_label <- function(label, levels) {
       unwrapped <- substr(part, 2, nchar(part) - 1)
       if (unwrapped %in% levels) {
         return(unwrapped)
+      }
+    }
+    # emmeans PREFIXES the variable name onto the level when the levels are not
+    # syntactically distinguishable on their own -- numeric-looking levels are the
+    # common case, so a factor with levels 1..5 contrasts as
+    # `.ancova_factor1 - .ancova_factor2`. Without this, no branch matches, the
+    # positional fallback below returns the raw text, and the report's Multiple
+    # Comparisons table shows the INTERNAL column name to the user (tam#38510's
+    # Japanese report dump: every グループ1/グループ2 cell read `.ancova_factorN`).
+    if (!is.null(factor_col) && nzchar(factor_col) && startsWith(part, factor_col)) {
+      stripped <- substr(part, nchar(factor_col) + 1, nchar(part))
+      if (stripped %in% levels) {
+        return(stripped)
       }
     }
     NA_character_
@@ -572,13 +585,14 @@ ancova_split_pair_label <- function(label, levels) {
 #' group1/group2/<estimate col>/... using level-validated label splitting.
 #' @noRd
 ancova_tidy_pairs <- function(pw, levels, confidence_level, estimate_col_out,
-                               extra_cols = list(), source_model) {
+                               extra_cols = list(), source_model, factor_col = NULL) {
   summ <- as.data.frame(summary(pw, level = confidence_level, infer = c(TRUE, TRUE)))
   # Defensive: as.data.frame() can hand back the contrast label as a factor
   # depending on R/emmeans version defaults; vapply() over a factor would
   # silently iterate its integer codes instead of the label text.
   contrast_labels <- as.character(summ$contrast)
-  pairs_split <- t(vapply(contrast_labels, ancova_split_pair_label, character(2), levels = levels))
+  pairs_split <- t(vapply(contrast_labels, ancova_split_pair_label, character(2),
+                          levels = levels, factor_col = factor_col))
   out <- tibble::tibble(
     group1 = pairs_split[, 1],
     group2 = pairs_split[, 2],
@@ -629,10 +643,12 @@ compute_ancova_adjusted_means <- function(model, safe_factor, safe_xc,
 #' Pairwise comparisons from the exact emmGrid object used for the means
 #' above (never a fresh emmeans() call).
 #' @noRd
-compute_ancova_pairwise <- function(emm, factor_levels, confidence_level, source_model) {
+compute_ancova_pairwise <- function(emm, factor_levels, confidence_level, source_model,
+                                    factor_col = NULL) {
   pw <- emmeans::contrast(emm, method = "pairwise", adjust = "tukey")
   ancova_tidy_pairs(pw, factor_levels, confidence_level,
-                     estimate_col_out = "adjusted_difference", source_model = source_model)
+                     estimate_col_out = "adjusted_difference", source_model = source_model,
+                     factor_col = factor_col)
 }
 
 # ------------------------------------------------------------
@@ -670,6 +686,7 @@ compute_ancova_slopes <- function(model_interaction, safe_factor, safe_xc,
     pw <- emmeans::contrast(trend_emm, method = "pairwise", adjust = "tukey")
     slope_comparisons <- ancova_tidy_pairs(
       pw, factor_levels, confidence_level, estimate_col_out = "slope_difference",
+      factor_col = safe_factor,
       extra_cols = list(covariate = covariate_names[j]), source_model = "interaction"
     ) %>% dplyr::select(covariate, group1, group2, slope_difference, standard_error, df,
                         t_value, p_value, confidence_lower, confidence_upper, adjustment,
@@ -858,7 +875,8 @@ run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05,
       adjusted_means <- list(means = am$means, reference_covariates = am$reference_covariates)
       reported_emm <- am$emm
       pairwise_comparisons <- compute_ancova_pairwise(
-        am$emm, prep$factor_levels, confidence_level, source_model = "additive")
+        am$emm, prep$factor_levels, confidence_level, source_model = "additive",
+        factor_col = prep$safe_factor)
     } else {
       cm <- compute_ancova_adjusted_means(
         final_model, prep$safe_factor, centered$safe_xc, centered$covariate_means,
@@ -866,7 +884,8 @@ run_ancova_v2 <- function(data, outcome, factor, covariates, alpha = 0.05,
       conditional_means <- list(means = cm$means, reference_covariates = cm$reference_covariates)
       reported_emm <- cm$emm
       conditional_pairwise <- compute_ancova_pairwise(
-        cm$emm, prep$factor_levels, confidence_level, source_model = "interaction")
+        cm$emm, prep$factor_levels, confidence_level, source_model = "interaction",
+        factor_col = prep$safe_factor)
       interaction_details <- compute_ancova_slopes(
         final_model, prep$safe_factor, centered$safe_xc, prep$covariate_names,
         prep$factor_levels, confidence_level)
