@@ -267,6 +267,99 @@ test_that("Test 9: near-normal residuals hug the Q-Q reference line and heavy ta
 })
 
 # ------------------------------------------------------------
+# Test 9b (tam#38520): the 95% Q-Q envelope
+# ------------------------------------------------------------
+test_that("Test 9b: the Q-Q reference line is the identity y = x", {
+  res <- run_ancova_v2(make_diag_data(n_per_group = 120, seed = 21), "y", "group", "X1")
+  qq <- res$diagnostics$residuals$qq
+  # tam#38520: the Y axis is the STANDARDIZED residual, so "perfectly normal"
+  # sits on y = x. A quartile-fitted line would absorb part of the departure
+  # the envelope exists to show.
+  expect_equal(qq$reference_line$intercept, 0)
+  expect_equal(qq$reference_line$slope, 1)
+})
+
+test_that("Test 9b: the envelope brackets the points and is widest in the tails", {
+  res <- run_ancova_v2(make_diag_data(n_per_group = 150, seed = 22), "y", "group", "X1")
+  qq <- res$diagnostics$residuals$qq
+  pts <- qq$points
+
+  expect_equal(qq$envelope_level, 0.95)
+  expect_true(all(c("envelope_lower", "envelope_upper", "expected") %in% colnames(pts)))
+  expect_equal(nrow(pts), length(pts$envelope_lower))
+  expect_true(all(pts$envelope_lower < pts$envelope_upper))
+  # The simulated median sits inside its own band, by construction.
+  expect_true(all(pts$expected >= pts$envelope_lower & pts$expected <= pts$envelope_upper))
+
+  # Coverage is checked ACROSS datasets, not within one. Order statistics are
+  # strongly correlated, so a single normal sample lands anywhere from ~0.80 to
+  # 1.00 inside a POINTWISE 95% band (measured: 0.80-1.00 over ten seeds); a
+  # per-dataset threshold would be a flake generator. The average is the
+  # statement worth pinning.
+  inside_for <- function(seed) {
+    p <- run_ancova_v2(make_diag_data(n_per_group = 150, seed = seed),
+                       "y", "group", "X1")$diagnostics$residuals$qq$points
+    mean(p$observed >= p$envelope_lower & p$observed <= p$envelope_upper)
+  }
+  expect_gt(mean(vapply(21:26, inside_for, numeric(1))), 0.85)
+
+  # The band is wider at the extremes than in the middle: that shape is the
+  # whole point (an outlying tail point means less than a middle one).
+  width <- pts$envelope_upper - pts$envelope_lower
+  middle <- width[round(length(width) / 2)]
+  expect_gt(width[1], middle)
+  expect_gt(width[length(width)], middle)
+})
+
+test_that("Test 9b: heavy tails break OUT of the envelope while normal ones do not", {
+  normal_qq <- run_ancova_v2(make_diag_data(n_per_group = 150, seed = 23),
+                             "y", "group", "X1")$diagnostics$residuals$qq
+  heavy <- make_diag_data(n_per_group = 150, seed = 23)
+  set.seed(101)
+  heavy$y <- heavy$y + stats::rt(nrow(heavy), df = 2) * 12
+  heavy_qq <- run_ancova_v2(heavy, "y", "group", "X1")$diagnostics$residuals$qq
+
+  outside <- function(p) mean(p$observed < p$envelope_lower | p$observed > p$envelope_upper)
+  # The envelope has to DISCRIMINATE, or it is decoration.
+  expect_gt(outside(heavy_qq$points), outside(normal_qq$points))
+})
+
+test_that("Test 9b: the envelope is reproducible and model-based, not a plain rnorm band", {
+  d <- make_diag_data(n_per_group = 120, seed = 24)
+  a <- run_ancova_v2(d, "y", "group", "X1")$diagnostics$residuals$qq$points
+  b <- run_ancova_v2(d, "y", "group", "X1")$diagnostics$residuals$qq$points
+  # Same data in, same band out: the seed is fixed so a report does not move
+  # between two runs of the same analysis.
+  expect_equal(a$envelope_lower, b$envelope_lower)
+  expect_equal(a$envelope_upper, b$envelope_upper)
+
+  # A HIGH-leverage design must produce a different band from a balanced one on
+  # the same residual count -- that is what makes this a parametric bootstrap
+  # off the fitted model rather than a rnorm(n) band that ignores the design.
+  skewed <- d
+  skewed$X1[1:5] <- skewed$X1[1:5] + 500
+  c_pts <- run_ancova_v2(skewed, "y", "group", "X1")$diagnostics$residuals$qq$points
+  expect_false(isTRUE(all.equal(a$envelope_upper, c_pts$envelope_upper)))
+})
+
+test_that("Test 9b: the simulation count is bounded by row count, never below the floor", {
+  expect_equal(ancova_qq_envelope_nsim(1470), ANCOVA_QQ_ENVELOPE_NSIM)
+  expect_lt(ancova_qq_envelope_nsim(100000), ANCOVA_QQ_ENVELOPE_NSIM)
+  expect_gte(ancova_qq_envelope_nsim(10000000), ANCOVA_QQ_ENVELOPE_MIN_NSIM)
+  # The budget is what keeps a 100k-row ANCOVA from paying ~10s for a chart.
+  expect_lte(ancova_qq_envelope_nsim(100000) * 100000, ANCOVA_QQ_ENVELOPE_WORK_BUDGET)
+})
+
+test_that("Test 9b: a model the simulation cannot use degrades to no band, not an error", {
+  qq <- compute_qq_data(stats::rnorm(50), model = NULL)
+  expect_equal(nrow(qq$points), 50)
+  expect_false("envelope_lower" %in% colnames(qq$points))
+  expect_true(is.na(qq$envelope_level))
+  # The reference line is still the identity even with no envelope.
+  expect_equal(qq$reference_line$slope, 1)
+})
+
+# ------------------------------------------------------------
 # Test 10 (section 75): statistics on all rows, charts on a sample
 # ------------------------------------------------------------
 test_that("Test 10: a large N is fitted in full and only the scatter points are sampled", {

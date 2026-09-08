@@ -535,13 +535,25 @@ ancova_v2_qq_table <- function(x) {
   qq <- d$qq
   if (nrow(qq$points) == 0) return(tibble::tibble())
   ref <- qq$reference_line
-  tibble::tibble(
+  out <- tibble::tibble(
     `Theoretical Quantile` = qq$points$theoretical,
     `Standardized Residual` = qq$points$observed,
     # The reference line as a per-row column, so the chart can draw it as a
-    # second series without a second query.
+    # second series without a second query. Since tam#38520 this is the
+    # IDENTITY line (intercept 0, slope 1) -- see compute_qq_data().
     `Reference` = ref$intercept + ref$slope * qq$points$theoretical
   )
+  # 95% Q-Q envelope (tam#38520). Absent when the simulation could not run
+  # (no fitted model, degenerate sigma), and the chart simply draws no band --
+  # so a consumer must treat these as OPTIONAL columns.
+  if (!is.null(qq$points$envelope_lower)) {
+    out$`Envelope Lower` <- qq$points$envelope_lower
+    out$`Envelope Upper` <- qq$points$envelope_upper
+    # Returned for completeness (the simulated median at each order statistic);
+    # the report chart draws the identity line and the band, not this.
+    out$`Expected` <- qq$points$expected
+  }
+  out
 }
 
 #' Global slope-homogeneity test, one row (sections 5-7).
