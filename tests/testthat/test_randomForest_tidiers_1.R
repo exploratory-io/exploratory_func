@@ -602,6 +602,39 @@ test_that("calc_feature_imp defaults leave mtry/max.depth as ranger auto-default
   expect_equal(result$model[[1]]$max.depth, 0)
 })
 
+test_that("calc_feature_imp does not crash with 'subscript out of bounds' when the character target contains empty strings (tam #38309)", {
+  # ranger::ranger()'s own OOB-error post-processing crashes trying to select a column literally
+  # named "" from its predictions matrix by name -- R's matrix `[` never matches an empty-string
+  # name even when such a column exists. calc_feature_imp() must treat "" in the target the same
+  # as NA (dropping those rows) so this level never reaches ranger.
+  set.seed(1)
+  nrow <- 200
+  test_data <- data.frame(
+    target = sample(c("A", "B", "C", ""), nrow, replace = TRUE, prob = c(0.4, 0.3, 0.25, 0.05)),
+    x1 = rnorm(nrow),
+    x2 = sample(letters[1:5], nrow, replace = TRUE),
+    x3 = rnorm(nrow)
+  )
+  n_blank <- sum(test_data$target == "")
+  expect_true(n_blank > 0) # sanity check on the fixture itself
+
+  result <- test_data %>% calc_feature_imp(target, x1, x2, x3, with_boruta = FALSE, smote = FALSE)
+  model <- result$model[[1]]
+  expect_false("error" %in% class(model))
+  # Rows whose target was "" should be dropped, just like target NA rows already are.
+  expect_equal(model$num.samples, nrow - n_blank)
+  expect_false("" %in% levels(model$y))
+  expect_false("" %in% model$imp_df$variable)
+
+  # Same fixture, but with the target already stored as a Factor with a literal "" level.
+  factor_test_data <- test_data %>% dplyr::mutate(target = factor(target))
+  result_factor <- factor_test_data %>% calc_feature_imp(target, x1, x2, x3, with_boruta = FALSE, smote = FALSE)
+  model_factor <- result_factor$model[[1]]
+  expect_false("error" %in% class(model_factor))
+  expect_equal(model_factor$num.samples, nrow - n_blank)
+  expect_false("" %in% levels(model_factor$y))
+})
+
 test_that("calc_feature_imp errors clearly when mtry exceeds the number of predictors", {
   set.seed(1)
   test_data <- data.frame(
