@@ -1895,11 +1895,22 @@ chaid_numeric_intervals <- function(model) {
     child_labels <- edges$label[edges$parent_id == node_id]
     # tam #37177: each child edge's label is a " + "-joined run of bins; show the
     # range it actually covers. Binning method and bin count are separate columns.
-    # tam #37691: report-display only -- "> N" -> "N <" (chaid_display_symbol_after_number).
     child_labels <- vapply(child_labels, function(label) {
-      chaid_display_symbol_after_number(chaid_normalize_group_label(
-        label, chaid_group_level_order(model, variable), collapse = TRUE))
+      chaid_normalize_group_label(label, chaid_group_level_order(model, variable), collapse = TRUE)
     }, character(1), USE.NAMES = FALSE)
+    # tam #38550: `edges` inherits the CHART's own left-to-right child order
+    # (chaid_order_children_for_display() -- TRUE-rate-first for a logical
+    # target, ascending bound only as a tie-break), not numeric order. The
+    # report column must always read smallest-to-largest, so re-sort by each
+    # bucket's own lower bound before applying the display flip below.
+    lower_values <- vapply(child_labels, function(label) {
+      interval <- chaid_parse_interval(label)
+      if (is.null(interval)) NA_real_ else interval$lower_value
+    }, numeric(1))
+    child_labels <- child_labels[order(lower_values)]
+    # tam #37691: report-display only -- "> N" -> "N <" (chaid_display_symbol_after_number).
+    child_labels <- vapply(child_labels, chaid_display_symbol_after_number,
+                            character(1), USE.NAMES = FALSE)
     data.frame(
       Node = node_id,
       # tam#38107: `variable` stays CLEAN (fit-time name) for the binmap/

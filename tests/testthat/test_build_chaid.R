@@ -323,6 +323,41 @@ test_that("Final Intervals shows 'N <' for display while cond_value keeps '> N' 
                "cond_value must never carry the report-display 'N <' shape")
 })
 
+test_that("Final Intervals lists a numeric variable's buckets in ascending order, not TRUE-rate order (tam #38550)", {
+  # A logical target's siblings are drawn TRUE-rate-first for the CHART's own
+  # left-to-right order (chaid_order_children_for_display()) -- here the
+  # HIGHER-salary bucket is deliberately made more TRUE-heavy, so the buggy
+  # (un-sorted) "Final Intervals" column would list it FIRST, out of numeric
+  # order. The report column must always read smallest-to-largest regardless
+  # of which child is more TRUE-heavy.
+  set.seed(21); n <- 900
+  df <- data.frame(
+    salary = round(runif(n, 1000, 20000)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$churn <- df$salary > 11000 | runif(n) < 0.05
+  model_df <- suppressWarnings(exp_chaid(df, churn, salary, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  salary_rows <- ni[ni$Variable == "salary", , drop = FALSE]
+  expect_true(nrow(salary_rows) > 0)
+  for (final in salary_rows[["Final Intervals"]]) {
+    tokens <- trimws(strsplit(final, " / ", fixed = TRUE)[[1]])
+    expect_true(length(tokens) >= 2, "the repro needs at least 2 buckets to prove ordering")
+    lowers <- vapply(tokens, function(tok) {
+      # chaid_display_symbol_after_number() has already flipped an
+      # unbounded-above bucket to "N <" -- undo that just for the sort-key
+      # parse, since chaid_parse_interval() expects the raw "> N" shape.
+      raw <- if (grepl("<$", tok)) paste0("> ", sub("\\s*<$", "", tok)) else tok
+      interval <- chaid_parse_interval(raw)
+      if (is.null(interval)) NA_real_ else interval$lower_value
+    }, numeric(1))
+    expect_false(is.unsorted(lowers), info = paste("Final Intervals not ascending:", final))
+  }
+})
+
 test_that("category_error_distribution is empty for a non-ordered target", {
   df <- make_ordered_df()
   df$grade <- as.character(df$grade) # drop the ordered attribute
