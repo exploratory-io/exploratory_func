@@ -2127,9 +2127,20 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   clean_cols <- name_map[cols]
 
   if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
+    # Treat an empty-string target value as missing, same as NA. Without this, "" survives as its
+    # own factor level here and is only filtered out later if it happens to be NA -- and
+    # ranger::ranger()'s OOB-error post-processing crashes with "subscript out of bounds" when the
+    # target factor has a "" level: R's matrix `[` can never select a column literally named ""
+    # by name, even though `colnames(result$predictions) <- unique(y)` did create one (tam #38309).
+    target_col_data <- clean_df[[clean_target_col]]
+    if (is.factor(target_col_data)) {
+      levels(target_col_data)[levels(target_col_data) == ""] <- NA
+    } else if (is.character(target_col_data)) {
+      target_col_data[target_col_data == ""] <- NA_character_
+    }
     # limit the number of levels in factor by fct_lump
     clean_df[[clean_target_col]] <- forcats::fct_lump(
-      as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
+      as.factor(target_col_data), n = target_n, ties.method="first"
     )
   }
 
