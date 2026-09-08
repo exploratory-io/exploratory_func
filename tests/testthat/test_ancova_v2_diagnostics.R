@@ -165,28 +165,19 @@ test_that("Test 5: adjusted_y equals the reference prediction plus the observed 
 })
 
 # ------------------------------------------------------------
-# Test 6 (section 71): low-cardinality jitter is display-only
+# Test 6 (section 71): a 1-5 covariate reaches the chart as its raw values
 # ------------------------------------------------------------
-test_that("Test 6: a 1-5 covariate is jittered for display only", {
+test_that("Test 6: a 1-5 covariate keeps its raw coordinates", {
   df <- make_diag_data(seed = 15, low_card_x1 = TRUE)
   res <- run_ancova_v2(df, "y", "group", "X1")
   rel <- rel_for(res, "X1")
 
+  # Low cardinality still gets reported -- it drives the analysis warning -- but
+  # it no longer moves a single coordinate. Spreading the points out is the
+  # chart's job, so what leaves here is the value a tooltip shows.
   expect_true(res$covariate_summary$low_cardinality[[1]])
-  expect_true(rel$metadata$low_cardinality_jitter)
-  # x is the real value a tooltip shows; display_x is the nudged one.
   expect_true(all(rel$points$x %in% 1:5))
-  expect_false(all(rel$points$display_x %in% 1:5))
-  expect_lt(max(abs(rel$points$display_x - rel$points$x)), 1)
-  # The lines are never jittered -- they are model output, not display.
   expect_true(all(rel$lines$x >= 1 & rel$lines$x <= 5))
-})
-
-test_that("a covariate with many distinct values is NOT jittered", {
-  df <- make_diag_data(seed = 15)
-  rel <- rel_for(run_ancova_v2(df, "y", "group", "X1"), "X1")
-  expect_false(rel$metadata$low_cardinality_jitter)
-  expect_equal(rel$points$display_x, rel$points$x)
 })
 
 # ------------------------------------------------------------

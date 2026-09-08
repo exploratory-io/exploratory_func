@@ -161,7 +161,7 @@ compute_ancova_relationship_lines <- function(model_interaction, analysis_data, 
 #' @noRd
 compute_ancova_relationship_points <- function(model_interaction, analysis_data, safe_y, safe_factor,
                                                safe_xc_target, safe_xc_all, factor_levels,
-                                               covariate_mean, low_cardinality, max_points) {
+                                               covariate_mean, max_points) {
   n <- nrow(analysis_data)
   fitted_observed <- as.numeric(stats::predict(model_interaction, newdata = analysis_data))
   residual <- analysis_data[[safe_y]] - fitted_observed
@@ -175,24 +175,12 @@ compute_ancova_relationship_points <- function(model_interaction, analysis_data,
 
   raw_x <- analysis_data[[safe_xc_target]] + covariate_mean
 
-  # Jitter is a DISPLAY concession for a covariate with a handful of distinct
-  # values, where every point would otherwise land on the same few verticals.
-  # It never touches the model, the prediction, or the reported value: display_x
-  # is a separate column and raw x is what a tooltip reads (sections 31-32).
-  display_x <- raw_x
-  if (isTRUE(low_cardinality)) {
-    spread <- diff(range(raw_x, na.rm = TRUE))
-    width <- if (is.finite(spread) && spread > 0) spread / 60 else 0.05
-    display_x <- raw_x + stats::runif(n, -width, width)
-  }
-
   keep <- sample_ancova_scatter_points(analysis_data[[safe_factor]], max_points)
   list(
     points = tibble::tibble(
       row_id = keep,
       factor_level = as.character(analysis_data[[safe_factor]])[keep],
       x = raw_x[keep],
-      display_x = display_x[keep],
       raw_y = analysis_data[[safe_y]][keep],
       adjusted_y = adjusted_y[keep]
     ),
@@ -260,7 +248,7 @@ compute_ancova_relationships <- function(model_interaction, analysis_data, prep,
       compute_ancova_relationship_points(
         model_interaction, analysis_data, prep$safe_y, prep$safe_factor,
         safe_xc_target, centered$safe_xc, factor_levels, base$reference_value,
-        centered$covariate_summary$low_cardinality[[j]], max_points)
+        max_points)
     } else {
       list(points = tibble::tibble(), n_total = nrow(analysis_data),
            n_displayed = 0L, sampled = FALSE)
@@ -285,7 +273,6 @@ compute_ancova_relationships <- function(model_interaction, analysis_data, prep,
         source_model = "interaction",
         other_covariates_reference = if (n_cov > 1) "grand_mean" else "not_applicable",
         points_shown_by_default = show_points,
-        low_cardinality_jitter = isTRUE(centered$covariate_summary$low_cardinality[[j]]),
         n_total = pts$n_total,
         n_displayed = pts$n_displayed,
         sampled = pts$sampled
