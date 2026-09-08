@@ -373,6 +373,19 @@ test_that("type='relationship' carries points and lines for every covariate in o
   expect_equal(unique(points$`Reference Value`), mean(df$X1), tolerance = 1e-10)
 })
 
+test_that("type='relationship' reports the same X on a point row as the covariate value", {
+  # `X` predates `Covariate Value` and is kept for older readers. Nothing
+  # rewrites it any more, so the two must agree on every point row -- including
+  # a covariate with only a handful of distinct values, the case that used to
+  # be nudged.
+  df <- make_wrapper_data()
+  df$X1 <- sample(1:5, nrow(df), replace = TRUE)
+  tbl <- tidy_rowwise(fit_v2(df), model, type = "relationship")
+  p <- tbl[tbl$`Row Kind` == "point", ]
+  expect_gt(nrow(p), 0)
+  expect_identical(p$X, p$`Covariate Value`)
+})
+
 test_that("type='relationship' can be narrowed to one covariate", {
   df <- make_wrapper_data()
   one <- tidy_rowwise(fit_v2(df), model, type = "relationship", covariate = "X2")
