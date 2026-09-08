@@ -352,6 +352,11 @@ compute_residual_smoother <- function(fitted, standardized_residual) {
 
 ANCOVA_QQ_ENVELOPE_NSIM <- 1000L
 ANCOVA_QQ_ENVELOPE_MIN_NSIM <- 200L
+# With fewer than three residual degrees of freedom, internally studentized
+# residuals are too degenerate for a useful pointwise envelope (for example,
+# with one residual degree of freedom they collapse to +/-1). Keep the Q-Q
+# points and identity line, but omit the envelope in that case.
+ANCOVA_QQ_ENVELOPE_MIN_DF_RESIDUAL <- 3L
 # The bootstrap costs about `nsim * n` row-operations; measured on a 4-column
 # design, 1e7 of them take roughly a second. Capping the product holds the
 # envelope near ~2s up to about 100k rows instead of letting a large ANCOVA pay
@@ -410,7 +415,8 @@ compute_qq_envelope <- function(model, valid, idx,
   if (!inherits(model, "lm")) return(empty)
   sigma_hat <- tryCatch(summary(model)$sigma, error = function(e) NA_real_)
   df_residual <- stats::df.residual(model)
-  if (!is.finite(sigma_hat) || sigma_hat <= 0 || !is.finite(df_residual) || df_residual <= 0) {
+  if (!is.finite(sigma_hat) || sigma_hat <= 0 || !is.finite(df_residual) ||
+      df_residual < ANCOVA_QQ_ENVELOPE_MIN_DF_RESIDUAL) {
     return(empty)
   }
   X <- tryCatch(stats::model.matrix(model), error = function(e) NULL)

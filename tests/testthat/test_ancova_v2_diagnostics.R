@@ -393,6 +393,25 @@ test_that("Test 9b: a model the simulation cannot use degrades to no band, not a
   expect_equal(qq$reference_line$slope, 1)
 })
 
+test_that("Test 9b: too few residual degrees of freedom degrades to no band", {
+  # With one residual degree of freedom, studentized residuals collapse to
+  # +/-1, so the simulated envelope cannot represent the identity line.
+  d <- data.frame(
+    y = c(1.5, 0.4, -0.6, -2.2),
+    group = factor(c("A", "A", "B", "B")),
+    X1 = c(-0.02, 0.94, 0.82, 0.59)
+  )
+  fit <- stats::lm(y ~ group + X1, data = d)
+  expect_equal(stats::df.residual(fit), 1)
+
+  qq <- compute_qq_data(stats::rstandard(fit), model = fit)
+  expect_equal(nrow(qq$points), nrow(d))
+  expect_false("envelope_lower" %in% colnames(qq$points))
+  expect_true(is.na(qq$envelope_level))
+  expect_true(is.na(qq$envelope_nsim))
+  expect_equal(qq$reference_line, list(intercept = 0, slope = 1))
+})
+
 # ------------------------------------------------------------
 # Test 10 (section 75): statistics on all rows, charts on a sample
 # ------------------------------------------------------------
