@@ -350,14 +350,151 @@ compute_residual_smoother <- function(fitted, standardized_residual) {
   tibble::tibble(fitted = sm$x, smoothed_residual = sm$y)
 }
 
+ANCOVA_QQ_ENVELOPE_NSIM <- 1000L
+ANCOVA_QQ_ENVELOPE_MIN_NSIM <- 200L
+# With fewer than three residual degrees of freedom, internally studentized
+# residuals are too degenerate for a useful pointwise envelope (for example,
+# with one residual degree of freedom they collapse to +/-1). Keep the Q-Q
+# points and identity line, but omit the envelope in that case.
+ANCOVA_QQ_ENVELOPE_MIN_DF_RESIDUAL <- 3L
+# The bootstrap costs about `nsim * n` row-operations; measured on a 4-column
+# design, 1e7 of them take roughly a second. Capping the product holds the
+# envelope near ~2s up to about 100k rows instead of letting a large ANCOVA pay
+# ~10s for a diagnostic chart (the issue calls this out as the case that needs
+# an adjusted simulation count). Past 100k the MIN_NSIM floor takes over and the
+# cost grows with n again -- deliberately: below ~200 draws a 2.5% quantile is
+# an interpolation between the 5th and 6th order statistics and the band's tails
+# turn to noise, which is worse than being slow.
+ANCOVA_QQ_ENVELOPE_WORK_BUDGET <- 2e7
+ANCOVA_QQ_ENVELOPE_LEVEL <- 0.95
+ANCOVA_QQ_ENVELOPE_SEED <- 123L
+
+#' Simulation count for a model with `n` rows: the full 1000 until the work
+#' budget bites, then fewer, never below `ANCOVA_QQ_ENVELOPE_MIN_NSIM` (the
+#' point at which a pointwise 2.5%/97.5% quantile stops being meaningful).
+#' @noRd
+ancova_qq_envelope_nsim <- function(n) {
+  if (!is.finite(n) || n <= 0) return(ANCOVA_QQ_ENVELOPE_NSIM)
+  as.integer(max(ANCOVA_QQ_ENVELOPE_MIN_NSIM,
+                 min(ANCOVA_QQ_ENVELOPE_NSIM, floor(ANCOVA_QQ_ENVELOPE_WORK_BUDGET / n))))
+}
+
+#' Pointwise 95% Q-Q envelope by PARAMETRIC BOOTSTRAP off the fitted model
+#' (tam#38520).
+#'
+#' A Q-Q plot with only a reference line does not say how far off the line a
+#' point may drift before it means anything. The envelope answers that: it is
+#' the middle 95% of where each order statistic lands when the model IS true.
+#'
+#' Simulating plain `rnorm(n)` would answer a different, weaker question --
+#' "what does a normal sample look like" -- and would ignore the design. This
+#' simulates the OUTCOME from the fitted model (`fitted + rnorm(0, sigma_hat)`),
+#' refits the SAME model matrix, and standardizes with each simulation's own
+#' sigma and the ORIGINAL leverages, so the band reflects the real factor,
+#' covariates and per-observation leverage.
+#'
+#' `stats::lm.fit()` on the already-decomposed model matrix is what makes 1000
+#' refits cheap (~0.14s at n = 1470, ~1.8s at n = 20000).
+#'
+#' Only the RETAINED order statistics are kept per iteration, so the simulation
+#' matrix is bounded by `nsim x ANCOVA_QQ_MAX_POINTS` no matter how many rows
+#' the data has -- a 100k-row model costs the same memory as a 2k-row one.
+#'
+#' @param model The fitted `lm` the reported statistics came from.
+#' @param valid Logical vector marking the finite standardized residuals, in
+#'   the model's own row order (NOT sorted).
+#' @param idx Indices into the SORTED residuals that the chart will plot.
+#' @return tibble(lower, upper, expected) with one row per `idx`, or an empty
+#'   tibble when the model cannot support the simulation.
+#' @noRd
+compute_qq_envelope <- function(model, valid, idx,
+                                level = ANCOVA_QQ_ENVELOPE_LEVEL,
+                                nsim = NULL,
+                                seed = ANCOVA_QQ_ENVELOPE_SEED) {
+  empty <- tibble::tibble(lower = numeric(0), upper = numeric(0), expected = numeric(0))
+  if (!inherits(model, "lm")) return(empty)
+  sigma_hat <- tryCatch(summary(model)$sigma, error = function(e) NA_real_)
+  df_residual <- stats::df.residual(model)
+  if (!is.finite(sigma_hat) || sigma_hat <= 0 || !is.finite(df_residual) ||
+      df_residual < ANCOVA_QQ_ENVELOPE_MIN_DF_RESIDUAL) {
+    return(empty)
+  }
+  X <- tryCatch(stats::model.matrix(model), error = function(e) NULL)
+  fitted_values <- stats::fitted(model)
+  leverage <- stats::hatvalues(model)
+  if (is.null(X) || nrow(X) != length(valid) ||
+      length(fitted_values) != length(valid) || length(leverage) != length(valid)) {
+    return(empty)
+  }
+  X <- X[valid, , drop = FALSE]
+  fitted_values <- fitted_values[valid]
+  # A leverage of exactly 1 leaves a zero-variance residual; clamp so the
+  # standardization below cannot divide by 0.
+  leverage <- pmin(leverage[valid], 1 - 1e-12)
+  n <- nrow(X)
+  if (n < 3 || length(idx) < 1) return(empty)
+  if (is.null(nsim)) nsim <- ancova_qq_envelope_nsim(n)
+
+  # The caller hands in the residual mask rather than the residuals being
+  # recomputed here, so the leverages and the plotted points could in principle
+  # come from different rows -- same LENGTH, wrong PAIRING, no error, every point
+  # sitting slightly wrong against the band. Cheap to rule out, so rule it out.
+  own_valid <- is.finite(stats::rstandard(model))
+  if (length(own_valid) != length(valid) || !identical(unname(own_valid), unname(valid))) {
+    return(empty)
+  }
+
+  # A fixed seed makes the band reproducible, but set.seed() is a SESSION-wide
+  # side effect: Rserve keeps one R session per window, so without this every
+  # later random operation in that session (another analytics' bootstrap, a
+  # sampling step) would start from a state determined by seed 123 just because
+  # this chart happened to render.
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  if (had_seed) {
+    saved_seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+    on.exit(assign(".Random.seed", saved_seed, envir = globalenv()), add = TRUE)
+  } else {
+    on.exit(suppressWarnings(rm(".Random.seed", envir = globalenv())), add = TRUE)
+  }
+  set.seed(seed)
+  sims <- matrix(NA_real_, nrow = nsim, ncol = length(idx))
+  for (b in seq_len(nsim)) {
+    y_sim <- fitted_values + stats::rnorm(n, mean = 0, sd = sigma_hat)
+    fit_sim <- stats::lm.fit(x = X, y = y_sim)
+    residual_sim <- fit_sim$residuals
+    sigma_sim <- sqrt(sum(residual_sim^2) / df_residual)
+    if (!is.finite(sigma_sim) || sigma_sim <= 0) return(empty)
+    sims[b, ] <- sort(residual_sim / (sigma_sim * sqrt(1 - leverage)))[idx]
+  }
+  alpha <- 1 - level
+  out <- tibble::tibble(
+    lower = apply(sims, 2, stats::quantile, probs = alpha / 2, na.rm = TRUE, names = FALSE),
+    upper = apply(sims, 2, stats::quantile, probs = 1 - alpha / 2, na.rm = TRUE, names = FALSE),
+    expected = apply(sims, 2, stats::median, na.rm = TRUE)
+  )
+  # How many draws the band was actually built from. It is NOT always the
+  # default (see ancova_qq_envelope_nsim), and a reader comparing two reports
+  # cannot otherwise tell that one band's tails are noisier than the other's.
+  attr(out, "nsim") <- nsim
+  out
+}
+
 #' Q-Q data, thinned by evenly spaced ORDER STATISTICS.
 #'
 #' Sorting first and then taking every k-th value keeps both tails, which is
 #' the part of a Q-Q plot that carries the information; a random subsample
 #' would preferentially drop them (section 51).
+#'
+#' tam#38520 changed the reference line from the conventional first/third-
+#' quartile line to the IDENTITY y = x. The Y axis here is the STANDARDIZED
+#' residual, which is compared against a mean-0, sd-about-1 normal, so y = x is
+#' the position "perfectly normal" actually predicts -- and it is the only line
+#' the envelope below is centered on. A quartile line fitted to the data would
+#' absorb part of the very departure the band exists to show.
 #' @noRd
-compute_qq_data <- function(standardized_residual) {
-  z <- sort(standardized_residual[is.finite(standardized_residual)])
+compute_qq_data <- function(standardized_residual, model = NULL) {
+  ok <- is.finite(standardized_residual)
+  z <- sort(standardized_residual[ok])
   n <- length(z)
   if (n < 3) {
     return(list(points = tibble::tibble(), reference_line = list(intercept = NA_real_, slope = NA_real_),
@@ -370,16 +507,19 @@ compute_qq_data <- function(standardized_residual) {
     idx <- unique(round(seq(1, n, length.out = ANCOVA_QQ_MAX_POINTS)))
   }
 
-  # Reference line through the first and third quartiles -- the conventional
-  # Q-Q line, computed from ALL residuals even when the points are thinned.
-  xq <- stats::qnorm(c(0.25, 0.75))
-  yq <- stats::quantile(z, c(0.25, 0.75), names = FALSE)
-  slope <- diff(yq) / diff(xq)
-  intercept <- yq[[1]] - slope * xq[[1]]
+  points <- tibble::tibble(theoretical = theoretical[idx], observed = z[idx])
+  envelope <- compute_qq_envelope(model, ok, idx)
+  if (nrow(envelope) == nrow(points)) {
+    points$envelope_lower <- envelope$lower
+    points$envelope_upper <- envelope$upper
+    points$expected <- envelope$expected
+  }
 
   list(
-    points = tibble::tibble(theoretical = theoretical[idx], observed = z[idx]),
-    reference_line = list(intercept = intercept, slope = slope),
+    points = points,
+    reference_line = list(intercept = 0, slope = 1),
+    envelope_level = if (nrow(envelope) == nrow(points)) ANCOVA_QQ_ENVELOPE_LEVEL else NA_real_,
+    envelope_nsim = if (nrow(envelope) == nrow(points)) attr(envelope, "nsim") else NA_integer_,
     n_total = n,
     n_displayed = length(idx),
     sampled = length(idx) < n
@@ -392,7 +532,7 @@ compute_ancova_residual_diagnostics <- function(final_model, analysis_data, safe
   rf <- compute_residual_fitted_data(final_model, analysis_data, safe_factor,
                                      ANCOVA_MAX_POINTS_PER_CHART)
   smoother <- compute_residual_smoother(rf$full_fitted, rf$full_std_resid)
-  qq <- compute_qq_data(rf$full_std_resid)
+  qq <- compute_qq_data(rf$full_std_resid, final_model)
 
   list(
     available = TRUE,
@@ -410,6 +550,8 @@ compute_ancova_residual_diagnostics <- function(final_model, analysis_data, safe
     qq = list(
       points = qq$points,
       reference_line = qq$reference_line,
+      envelope_level = qq$envelope_level,
+      envelope_nsim = qq$envelope_nsim,
       n_total = qq$n_total,
       n_displayed = qq$n_displayed,
       sampled = qq$sampled

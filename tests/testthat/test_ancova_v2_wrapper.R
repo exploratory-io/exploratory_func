@@ -397,13 +397,34 @@ test_that("type='qq' carries the reference line as a per-row column", {
   df <- make_wrapper_data()
   tbl <- tidy_rowwise(fit_v2(df), model, type = "qq")
 
+  # tam#38520 added the envelope columns after Reference.
   expect_equal(colnames(tbl),
-               c("Theoretical Quantile", "Standardized Residual", "Reference"))
+               c("Theoretical Quantile", "Standardized Residual", "Reference",
+                 "Envelope Lower", "Envelope Upper", "Expected"))
   expect_equal(nrow(tbl), nrow(df))
   # A straight line in the theoretical quantile: equal spacing in x gives
   # equal spacing in Reference.
   slopes <- diff(tbl$Reference) / diff(tbl$`Theoretical Quantile`)
   expect_lt(diff(range(slopes)), 1e-8)
+  # Since tam#38520 that line is the IDENTITY, so the chart's band is centered
+  # on the position a perfectly normal residual would occupy.
+  expect_equal(tbl$Reference, tbl$`Theoretical Quantile`)
+})
+
+test_that("type='qq' carries the 95% envelope as two per-row columns (tam#38520)", {
+  tbl <- tidy_rowwise(fit_v2(make_wrapper_data()), model, type = "qq")
+
+  expect_true(all(tbl$`Envelope Lower` < tbl$`Envelope Upper`))
+  # The band brackets the identity line it is centered on.
+  expect_true(all(tbl$`Envelope Lower` <= tbl$Reference))
+  expect_true(all(tbl$`Envelope Upper` >= tbl$Reference))
+  # Widest in the tails: an outlying point at the extreme means less than one
+  # in the middle, and the band has to show that.
+  width <- tbl$`Envelope Upper` - tbl$`Envelope Lower`
+  expect_gt(width[1], width[round(length(width) / 2)])
+  expect_gt(width[length(width)], width[round(length(width) / 2)])
+  # Every column is finite -- an NA would render as a hole in the band.
+  expect_true(all(is.finite(c(tbl$`Envelope Lower`, tbl$`Envelope Upper`, tbl$Expected))))
 })
 
 test_that("the diagnostic surfaces degrade to empty rather than erroring when a fit is unavailable", {
