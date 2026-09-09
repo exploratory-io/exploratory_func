@@ -3613,8 +3613,15 @@ tidy.two_sample_prop_test_exploratory <- function(x, type = "model") {
       `Conf High`  = c(x$ciA[2], x$ciB[2]),
       `Std Error`  = c(seA, seB)
     )
-  } else { # type == "data"
+  } else if (type == "data") {
     x$data
+  } else {
+    # Deliberately an error, not a fallback (tam#38607). This used to be a catch-all `else`
+    # returning x$data, so a caller asking for a type this method does not implement was
+    # handed the model's RAW INPUT with no way to tell. That exact shape shipped in
+    # tidy.cor_exploratory and rendered a whole input data frame as an analytics report's
+    # summary table. Guarded by test_tidy_type_dispatch.R.
+    stop(paste0("Unsupported tidy type for a two-sample proportion test model: ", type))
   }
 }
 
@@ -3784,13 +3791,20 @@ tidy.one_sample_prop_test_exploratory <- function(x, type = "model") {
       `Conf High`  = x$htest$conf.int[2],
       `Std Error`  = sqrt(x$observed_prop * (1 - x$observed_prop) / x$n)
     )
-  } else { # type == "data"
+  } else if (type == "data") {
     # Return the original data so that the data-level charts (Error Bar Plot,
     # Data Distribution) can map to the target column. The chart templates
     # reference the original column name (___TARGET_COLUMN_NAME___), so the
     # raw data frame must contain that column. The exact-test CI is still
     # available via type = "model" (used by the Summary table).
     x$data
+  } else {
+    # Deliberately an error, not a fallback (tam#38607). This used to be a catch-all `else`
+    # returning x$data, so a caller asking for a type this method does not implement was
+    # handed the model's RAW INPUT with no way to tell. That exact shape shipped in
+    # tidy.cor_exploratory and rendered a whole input data frame as an analytics report's
+    # summary table. Guarded by test_tidy_type_dispatch.R.
+    stop(paste0("Unsupported tidy type for a one-sample proportion test model: ", type))
   }
 }
 
@@ -3935,8 +3949,15 @@ tidy.one_sample_t_test_exploratory <- function(x, type = "model", conf_level = 0
                                   alternative = x$alternative) %>%
         dplyr::mutate(x = mu_val + x * se_val)
     }
-  } else { # type == "data"
+  } else if (type == "data") {
     x$data
+  } else {
+    # Deliberately an error, not a fallback (tam#38607). This used to be a catch-all `else`
+    # returning x$data, so a caller asking for a type this method does not implement was
+    # handed the model's RAW INPUT with no way to tell. That exact shape shipped in
+    # tidy.cor_exploratory and rendered a whole input data frame as an analytics report's
+    # summary table. Guarded by test_tidy_type_dispatch.R.
+    stop(paste0("Unsupported tidy type for a one-sample t-test model: ", type))
   }
 }
 
