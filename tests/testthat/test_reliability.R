@@ -369,3 +369,64 @@ test_that("exp_cronbach_alpha works with group_by (per group model)", {
   res <- model_df %>% glance_rowwise(model, pretty.name = TRUE)
   expect_equal(nrow(res), 2)
 })
+
+# tam#38607 / tam#37638 -- the "Analysis Conditions and Data" table.
+# The tam template filters tidy(type="summary") down to six Metric rows. Until this shipped, only
+# "Number of Variables" existed, so the report's conditions section rendered a single-row table.
+test_that("exp_cronbach_alpha summary carries the six Analysis Conditions rows", {
+  df <- make_reliability_df()
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson")
+  summary <- model_df %>% tidy_rowwise(model, type = "summary")
+
+  wanted <- c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+              "Correlation", "Reliability Metric")
+  expect_true(all(wanted %in% summary$Metric))
+  # The row set the report's OTHER section (the reliability coefficients) filters on must survive.
+  expect_true(all(c("Cronbach's Alpha", "Standardized Alpha", "95% CI",
+                    "Average Inter-item Correlation") %in% summary$Metric))
+  # Renamed away from the old wording so the client's existing 行数 / 削除された行数 keys apply.
+  expect_false(any(c("Complete Responses", "Responses with Missing") %in% summary$Metric))
+
+  value_of <- function(metric) summary$Value[[match(metric, summary$Metric)]]
+  expect_equal(value_of("Variable Names"), paste(colnames(df), collapse = ", "))
+  expect_equal(value_of("Correlation"), "Pearson Correlation")
+  expect_equal(value_of("Reliability Metric"), "Cronbach's Alpha")
+})
+
+test_that("exp_cronbach_alpha reports Rows Removed as a count and a rate", {
+  df <- make_reliability_df()
+  df[[1]][1:2] <- NA
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson")
+  summary <- model_df %>% tidy_rowwise(model, type = "summary")
+  value_of <- function(metric) summary$Value[[match(metric, summary$Metric)]]
+
+  total <- nrow(df)
+  expect_equal(value_of("Row Count"), as.character(total - 2))
+  # "N (P%)", matching the Factor Analysis / PCA rows this table is standardized against.
+  expect_equal(value_of("Rows Removed"),
+               paste0("2 (", format(round(2 / total * 100, 1), nsmall = 1), "%)"))
+})
+
+test_that("the Correlation row and the correlation_method table cannot disagree", {
+  df <- make_reliability_df()
+  model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "auto")
+  summary <- model_df %>% tidy_rowwise(model, type = "summary")
+  method <- model_df %>% tidy_rowwise(model, type = "correlation_method")
+
+  value_of <- function(metric) summary$Value[[match(metric, summary$Metric)]]
+  reason_of <- function(metric) summary$Interpretation[[match(metric, summary$Metric)]]
+  expect_equal(value_of("Correlation"), method$Value[[match("Correlation Type", method$Item)]])
+  expect_equal(value_of("Reliability Metric"), method$Value[[match("Primary Metric", method$Item)]])
+  expect_equal(reason_of("Correlation"), method$Value[[match("Selection Reason", method$Item)]])
+})
+
+test_that("the Number of Variables description is a fixed sentence, never composed", {
+  # Report table cells are translated by EXACT string match, so a runtime-composed description
+  # ("4 items used") could never be localized.
+  df <- make_reliability_df()
+  summary <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson") %>%
+    tidy_rowwise(model, type = "summary")
+  desc <- summary$Interpretation[[match("Number of Variables", summary$Metric)]]
+  expect_equal(desc, "Number of variables used in the analysis")
+  expect_false(grepl("^[0-9]", desc))
+})
