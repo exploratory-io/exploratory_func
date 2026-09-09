@@ -898,6 +898,27 @@ test_that("do_cor analysis_conditions counts rows the way the analysis actually 
   expect_equal(na_or_complete$Value[[5]], "2 (50.0%)")
 })
 
+test_that("do_cor analysis_conditions follows the use polychoric actually runs, not the one asked for", {
+  # do_cor_internal() hands hetcor "complete.obs" only when that was asked for, and
+  # "pairwise.complete.obs" for every other mode. So a polychoric fit requested with
+  # use = "everything" still runs pairwise, and the row count has to say so. Without that
+  # remap the count would fall through to "every row was used".
+  mk <- function(v) factor(v, levels = 1:3, ordered = TRUE)
+  df <- data.frame(
+    a = mk(c(1, 2, NA, 3, 1, 2)),
+    b = mk(c(2, NA, 3, 1, 2, 3)),
+    c = mk(c(3, NA, 1, 2, 3, 1))
+  )
+  # Row 2 has a single observed value, so it forms no pair.
+  res <- suppressWarnings(
+    df %>% do_cor(`a`, `b`, `c`, method = "polychoric", use = "everything", return_type = "model")
+  ) %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  expect_equal(res$Value[[6]], "Polychoric Correlation")
+  expect_equal(res$Value[[4]], "5")
+  expect_equal(res$Value[[5]], paste0("1 (", format(round(1 / 6 * 100, 1), nsmall = 1), "%)"))
+})
+
 test_that("do_cor analysis_conditions returns an empty same-shape table for a model saved before it existed", {
   df <- data.frame(a = c(1, 2, 3, 4), b = c(2, 4, 5, 9))
   model_df <- df %>% do_cor(`a`, `b`, method = "pearson", return_type = "model")
