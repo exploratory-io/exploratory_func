@@ -827,3 +827,115 @@ test_that("do_cor does not reseed when no rows are sampled", {
   invisible(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = NULL))
   expect_identical(.Random.seed, before)
 })
+
+# tam#37638 -- the Correlation report's "Analysis Conditions and Data" table.
+# Before this existed, tidy.cor_exploratory's catch-all `else` returned the raw source data for
+# any unrecognized type, so the report rendered the whole input data frame as its summary table.
+test_that("do_cor analysis_conditions returns the report's 6-row conditions table", {
+  set.seed(1)
+  df <- data.frame(a = rnorm(20), b = rnorm(20), c = rnorm(20))
+  model_df <- df %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  expect_equal(res$Metric, c("Number of Variables", "Variable Names", "Excluded Variables",
+                             "Row Count", "Rows Removed", "Correlation"))
+  expect_equal(res$Value[[1]], "3")
+  expect_equal(res$Value[[2]], "a, b, c")
+  expect_equal(res$Value[[3]], "None")
+  expect_equal(res$Value[[4]], "20")
+  expect_equal(res$Value[[5]], "0 (0.0%)")
+  expect_equal(res$Value[[6]], "Pearson Correlation")
+  # Hidden columns the report binds its explanation text from. Strings, never R logicals.
+  expect_equal(unique(res$correlation_type), "pearson")
+  expect_equal(unique(res$correlation_is_auto), "FALSE")
+  expect_equal(unique(res$reason), "Pearson was specified in the settings.")
+})
+
+test_that("do_cor analysis_conditions reports the auto-resolved correlation and excluded variables", {
+  set.seed(2)
+  n <- 30
+  mk <- function() factor(sample(1:5, n, TRUE), levels = 1:5, ordered = TRUE)
+  df <- data.frame(q1 = mk(), q2 = mk(), flat = factor(rep(3, n), levels = 1:5, ordered = TRUE))
+  model_df <- suppressWarnings(df %>% do_cor(`q1`, `q2`, `flat`, method = "auto", return_type = "model"))
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  # `flat` never varies, so it cannot correlate with anything.
+  expect_equal(res$Value[[3]], "flat")
+  expect_equal(res$Value[[6]], "Polychoric Correlation")
+  expect_equal(unique(res$correlation_is_auto), "TRUE")
+  expect_equal(unique(res$reason), "All variables are Factor or Logical.")
+})
+
+test_that("do_cor analysis_conditions counts rows the way the analysis actually did", {
+  df <- data.frame(a = c(1, 2, 3, NA), b = c(4, 5, NA, NA), c = c(1, 3, 2, NA))
+  # pairwise.complete.obs (the default): only an ALL-missing row is unused here
+  # (rows 1-2 are complete, row 3 has two values, row 4 is all NA).
+  pairwise <- df %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(pairwise$Value[[4]], "3")
+  expect_equal(pairwise$Value[[5]], "1 (25.0%)")
+  # complete.obs: any missing value drops the whole row.
+  complete <- df %>% do_cor(`a`, `b`, `c`, method = "pearson", use = "complete.obs", return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(complete$Value[[4]], "2")
+  expect_equal(complete$Value[[5]], "2 (50.0%)")
+
+  # A row with a single observed value contributes to no pairwise coefficient.
+  one_obs <- data.frame(
+    a = c(1, 4, NA, 7),
+    b = c(2, NA, 5, 8),
+    c = c(3, NA, 6, 9)
+  )
+  pairwise_one <- one_obs %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(pairwise_one$Value[[4]], "3")
+  expect_equal(pairwise_one$Value[[5]], "1 (25.0%)")
+  # na.or.complete is listwise, same as complete.obs.
+  na_or_complete <- one_obs %>% do_cor(`a`, `b`, `c`, method = "pearson", use = "na.or.complete",
+                                      return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(na_or_complete$Value[[4]], "2")
+  expect_equal(na_or_complete$Value[[5]], "2 (50.0%)")
+})
+
+test_that("do_cor analysis_conditions follows the use polychoric actually runs, not the one asked for", {
+  # do_cor_internal() hands hetcor "complete.obs" only when that was asked for, and
+  # "pairwise.complete.obs" for every other mode. So a polychoric fit requested with
+  # use = "everything" still runs pairwise, and the row count has to say so. Without that
+  # remap the count would fall through to "every row was used".
+  mk <- function(v) factor(v, levels = 1:3, ordered = TRUE)
+  df <- data.frame(
+    a = mk(c(1, 2, NA, 3, 1, 2)),
+    b = mk(c(2, NA, 3, 1, 2, 3)),
+    c = mk(c(3, NA, 1, 2, 3, 1))
+  )
+  # Row 2 has a single observed value, so it forms no pair.
+  res <- suppressWarnings(
+    df %>% do_cor(`a`, `b`, `c`, method = "polychoric", use = "everything", return_type = "model")
+  ) %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  expect_equal(res$Value[[6]], "Polychoric Correlation")
+  expect_equal(res$Value[[4]], "5")
+  expect_equal(res$Value[[5]], paste0("1 (", format(round(1 / 6 * 100, 1), nsmall = 1), "%)"))
+})
+
+test_that("do_cor analysis_conditions returns an empty same-shape table for a model saved before it existed", {
+  df <- data.frame(a = c(1, 2, 3, 4), b = c(2, 4, 5, 9))
+  model_df <- df %>% do_cor(`a`, `b`, method = "pearson", return_type = "model")
+  # Simulate a model persisted before analysis_conditions was captured at fit time.
+  model_df$model[[1]]$analysis_conditions <- NULL
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  expect_equal(nrow(res), 0)
+  expect_true(all(c("Metric", "Value", "Description",
+                    "correlation_type", "correlation_is_auto", "reason") %in% colnames(res)))
+})
+
+test_that("tidy.cor_exploratory errors on an unsupported type instead of returning the source data", {
+  df <- data.frame(a = c(1, 2, 3, 4), b = c(2, 4, 5, 9))
+  model_df <- df %>% do_cor(`a`, `b`, method = "pearson", return_type = "model")
+  # The scatter matrix's own type must keep working.
+  expect_equal(nrow(model_df %>% tidy_rowwise(model, type = "data.frame")), 4)
+  expect_error(model_df %>% tidy_rowwise(model, type = "no_such_type"),
+               "Unsupported tidy type for a correlation model")
+})

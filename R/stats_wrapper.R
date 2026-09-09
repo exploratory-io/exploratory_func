@@ -266,7 +266,13 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     else {
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
-      ret <- list(cor = ret, data = df)
+      # analysis_conditions feeds the report's Analysis Conditions and Data table (tam#37638).
+      # Computed here because `mat` (the SELECTED columns, before any pair filtering) is only in
+      # scope now. do_cor.kv_ deliberately does NOT do this -- its `mat` is a matrix from
+      # simple_cast(), not a data frame, so the per-column predicates below do not apply. A kv_
+      # model falls through to tidy()'s empty-tibble branch instead.
+      ret <- list(cor = ret, data = df,
+                  analysis_conditions = cor_analysis_conditions(mat, method, use))
       class(ret) <- c("cor_exploratory", class(ret))
       ret
     }
@@ -280,6 +286,107 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   else {
     do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
   }
+}
+
+
+# Correlation report: the Analysis Conditions and Data table (tam#37638).
+#
+# Built at fit time, while the selected columns are still in hand, and stored on the
+# cor_exploratory model -- tidy() only reads it back. Every sentence is a FIXED English string
+# (never composed at runtime) because the client translates report table cells by exact string
+# match; a composed sentence would render untranslated in Japanese. The strings deliberately
+# match the ones reliability.R already emits, so both reports share one set of translations.
+cor_correlation_label <- function(resolved_method) {
+  switch(resolved_method,
+    pearson = "Pearson Correlation",
+    polychoric = "Polychoric Correlation",
+    mixed = "Mixed Correlation",
+    spearman = "Spearman Correlation",
+    kendall = "Kendall Correlation",
+    resolved_method)
+}
+
+cor_correlation_reason <- function(mat, requested_method) {
+  if (!identical(requested_method, "auto")) {
+    return(switch(requested_method,
+      pearson = "Pearson was specified in the settings.",
+      polychoric = "Polychoric was specified in the settings.",
+      mixed = "Mixed Correlation was specified in the settings.",
+      spearman = "Spearman was specified in the settings.",
+      kendall = "Kendall was specified in the settings.",
+      "Specified in the settings."))
+  }
+  is_ordinal <- vapply(mat, function(x) is.factor(x) || is.logical(x), logical(1))
+  is_continuous <- vapply(mat, is.numeric, logical(1))
+  if (all(is_continuous)) {
+    "All variables are Numeric."
+  } else if (all(is_ordinal)) {
+    "All variables are Factor or Logical."
+  } else {
+    "Numeric and Factor/Logical variables are mixed."
+  }
+}
+
+cor_analysis_conditions <- function(mat, requested_method, use) {
+  variable_names <- colnames(mat)
+  # A variable that is entirely missing, or that never varies, cannot produce a correlation with
+  # anything -- the same predicate PCA uses to decide what it drops before analysis.
+  is_unusable <- vapply(mat, function(x) {
+    values <- x[!is.na(x)]
+    length(values) == 0 || length(unique(values)) < 2
+  }, logical(1))
+  excluded_names <- variable_names[is_unusable]
+  total_rows <- nrow(mat)
+  resolved_method <- resolve_correlation_method(mat, requested_method)
+  # Pairwise correlations use a row only when at least two selected variables are observed; a row
+  # with one value cannot contribute to any off-diagonal pair. Polychoric and mixed correlations
+  # map every use mode other than complete.obs to pairwise.complete.obs in do_cor_internal().
+  uses_pairwise <- identical(use, "pairwise.complete.obs") ||
+    (resolved_method %in% c("polychoric", "mixed") && !identical(use, "complete.obs"))
+  rows_used <- if (uses_pairwise) {
+    sum(rowSums(!is.na(mat)) >= 2L)
+  } else if (use %in% c("complete.obs", "na.or.complete")) {
+    sum(stats::complete.cases(mat))
+  } else {
+    total_rows
+  }
+  rows_removed <- max(0L, as.integer(total_rows - rows_used))
+  removed_pct <- if (total_rows > 0) rows_removed / total_rows * 100 else 0
+  tibble::tibble(
+    Metric = c("Number of Variables", "Variable Names", "Excluded Variables",
+               "Row Count", "Rows Removed", "Correlation"),
+    Value = c(
+      as.character(length(variable_names)),
+      if (length(variable_names) == 0) "N/A" else paste(variable_names, collapse = ", "),
+      if (length(excluded_names) == 0) "None" else paste(excluded_names, collapse = ", "),
+      as.character(rows_used),
+      paste0(rows_removed, " (", format(round(removed_pct, 1), nsmall = 1), "%)"),
+      cor_correlation_label(resolved_method)
+    ),
+    Description = c(
+      "Number of variables used in the analysis.",
+      "Names of the variables used in the analysis.",
+      "Variables dropped before analysis because they were all missing or had only one unique value.",
+      "Number of rows used in the analysis.",
+      "Number and rate of rows removed because of missing values.",
+      "Which correlation the coefficients were computed with."
+    ),
+    # Hidden columns: the report reads them to decide whether to explain the automatic choice.
+    # Explicit "TRUE"/"FALSE" STRINGS, not R logicals -- a logical can reach the client as "1"/"0"
+    # depending on the pivot pipeline, and the client's isTrue() only accepts "TRUE"/"true"/true.
+    correlation_type = resolved_method,
+    correlation_is_auto = if (identical(requested_method, "auto")) "TRUE" else "FALSE",
+    reason = cor_correlation_reason(mat, requested_method)
+  )
+}
+
+# Same column shape as cor_analysis_conditions(), with no rows. Returned for a model saved before
+# analysis_conditions existed, so the report's table renders empty instead of erroring and the
+# client's extractor falls back to its own defaults.
+cor_empty_analysis_conditions <- function() {
+  tibble::tibble(Metric = character(0), Value = character(0), Description = character(0),
+                 correlation_type = character(0), correlation_is_auto = character(0),
+                 reason = character(0))
 }
 
 
@@ -419,12 +526,25 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
 }
 
 #' @export
-tidy.cor_exploratory <- function(x, type = "cor", ...) { #TODO: add test
+tidy.cor_exploratory <- function(x, type = "cor", ...) {
   if (type == "cor") {
     x$cor
   }
-  else {
+  else if (type == "analysis_conditions") {
+    # tam#37638. The Correlation report's Analysis Conditions and Data table.
+    if (is.null(x$analysis_conditions)) cor_empty_analysis_conditions() else x$analysis_conditions
+  }
+  else if (type == "data" || type == "data.frame") {
+    # The original data, used for the scatter matrix on Analytics View.
     x$data
+  }
+  else {
+    # Deliberately an error, not a fallback. This used to be a catch-all `else` returning x$data,
+    # so asking for a type this function does not implement silently handed the caller the raw
+    # source data -- which then rendered as a plausible-looking but completely wrong report table
+    # (tam#37638 shipped its analysis_conditions template ahead of the R branch here). A wrong
+    # answer that looks right is worse than a loud failure.
+    stop(paste0("Unsupported tidy type for a correlation model: ", type))
   }
 }
 
