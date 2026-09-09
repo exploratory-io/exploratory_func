@@ -337,17 +337,21 @@ cor_analysis_conditions <- function(mat, requested_method, use) {
   }, logical(1))
   excluded_names <- variable_names[is_unusable]
   total_rows <- nrow(mat)
-  # With the default pairwise.complete.obs a row still contributes to every pair it has both
-  # values for, so only an ALL-missing row is truly unused. Under complete.obs any missing value
-  # drops the whole row. Report whichever the analysis actually did.
-  rows_used <- if (identical(use, "complete.obs")) {
+  resolved_method <- resolve_correlation_method(mat, requested_method)
+  # Pairwise correlations use a row only when at least two selected variables are observed; a row
+  # with one value cannot contribute to any off-diagonal pair. Polychoric and mixed correlations
+  # map every use mode other than complete.obs to pairwise.complete.obs in do_cor_internal().
+  uses_pairwise <- identical(use, "pairwise.complete.obs") ||
+    (resolved_method %in% c("polychoric", "mixed") && !identical(use, "complete.obs"))
+  rows_used <- if (uses_pairwise) {
+    sum(rowSums(!is.na(mat)) >= 2L)
+  } else if (use %in% c("complete.obs", "na.or.complete")) {
     sum(stats::complete.cases(mat))
   } else {
-    sum(rowSums(!is.na(mat)) > 0)
+    total_rows
   }
   rows_removed <- max(0L, as.integer(total_rows - rows_used))
   removed_pct <- if (total_rows > 0) rows_removed / total_rows * 100 else 0
-  resolved_method <- resolve_correlation_method(mat, requested_method)
   tibble::tibble(
     Metric = c("Number of Variables", "Variable Names", "Excluded Variables",
                "Row Count", "Rows Removed", "Correlation"),

@@ -868,7 +868,8 @@ test_that("do_cor analysis_conditions reports the auto-resolved correlation and 
 
 test_that("do_cor analysis_conditions counts rows the way the analysis actually did", {
   df <- data.frame(a = c(1, 2, 3, NA), b = c(4, 5, NA, NA), c = c(1, 3, 2, NA))
-  # pairwise.complete.obs (the default): only an ALL-missing row is unused.
+  # pairwise.complete.obs (the default): only an ALL-missing row is unused here
+  # (rows 1-2 are complete, row 3 has two values, row 4 is all NA).
   pairwise <- df %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model") %>%
     tidy_rowwise(model, type = "analysis_conditions")
   expect_equal(pairwise$Value[[4]], "3")
@@ -878,6 +879,23 @@ test_that("do_cor analysis_conditions counts rows the way the analysis actually 
     tidy_rowwise(model, type = "analysis_conditions")
   expect_equal(complete$Value[[4]], "2")
   expect_equal(complete$Value[[5]], "2 (50.0%)")
+
+  # A row with a single observed value contributes to no pairwise coefficient.
+  one_obs <- data.frame(
+    a = c(1, 4, NA, 7),
+    b = c(2, NA, 5, 8),
+    c = c(3, NA, 6, 9)
+  )
+  pairwise_one <- one_obs %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(pairwise_one$Value[[4]], "3")
+  expect_equal(pairwise_one$Value[[5]], "1 (25.0%)")
+  # na.or.complete is listwise, same as complete.obs.
+  na_or_complete <- one_obs %>% do_cor(`a`, `b`, `c`, method = "pearson", use = "na.or.complete",
+                                      return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(na_or_complete$Value[[4]], "2")
+  expect_equal(na_or_complete$Value[[5]], "2 (50.0%)")
 })
 
 test_that("do_cor analysis_conditions returns an empty same-shape table for a model saved before it existed", {
