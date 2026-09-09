@@ -735,8 +735,8 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
         # tam#37638: a FIXED sentence, not the old composed "N items used". This cell is rendered
         # in the 説明 column of 分析条件とデータの確認 and the client translates report cells by
         # EXACT string match, so a runtime-composed string can never be localized.
-        "Number of variables used in the analysis",
-        "Variables used in the analysis",
+        "Number of variables used in the analysis.",
+        "Names of the variables used in the analysis.",
         "Rows with no missing values",
         "Rows with 1+ missing value",
         reliability_correlation_reason(correlation_method, item_types),

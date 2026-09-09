@@ -427,6 +427,8 @@ test_that("the Number of Variables description is a fixed sentence, never compos
   summary <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson") %>%
     tidy_rowwise(model, type = "summary")
   desc <- summary$Interpretation[[match("Number of Variables", summary$Metric)]]
-  expect_equal(desc, "Number of variables used in the analysis")
+  # Byte-identical to the sentence do_cor's own conditions table uses, so the two tables share
+  # ONE translation key instead of drifting into two near-duplicates.
+  expect_equal(desc, "Number of variables used in the analysis.")
   expect_false(grepl("^[0-9]", desc))
 })
