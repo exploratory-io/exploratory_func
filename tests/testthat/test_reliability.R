@@ -432,3 +432,63 @@ test_that("the Number of Variables description is a fixed sentence, never compos
   expect_equal(desc, "Number of variables used in the analysis.")
   expect_false(grepl("^[0-9]", desc))
 })
+
+# Review follow-ups on tam#38607: the rows above were only spot-checked on the Pearson path.
+test_that("the Reliability Metric row names the coefficient each correlation implies", {
+  df <- make_reliability_df()
+  ordinal_df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(),
+                                                   ~ factor(.x, ordered = TRUE)))
+  row_of <- function(model_df, metric) {
+    s <- model_df %>% tidy_rowwise(model, type = "summary")
+    i <- match(metric, s$Metric)
+    list(value = s$Value[[i]], reason = s$Interpretation[[i]])
+  }
+
+  polychoric <- exp_cronbach_alpha(ordinal_df, dplyr::everything(),
+                                   correlation_method = "polychoric")
+  expect_equal(row_of(polychoric, "Correlation")$value, "Polychoric Correlation")
+  expect_equal(row_of(polychoric, "Reliability Metric")$value, "Ordinal Alpha")
+
+  mixed <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "mixed")
+  expect_equal(row_of(mixed, "Correlation")$value, "Mixed Correlation")
+  expect_equal(row_of(mixed, "Reliability Metric")$value, "Mixed-Correlation Alpha")
+})
+
+test_that("every Reliability Metric reason is one of three fixed sentences", {
+  # These are report cells, translated by EXACT string match, so their wording is a contract with
+  # the client -- not prose to reword freely. They currently reach only the Description column,
+  # which every Analysis Conditions template hides, so no ANALYTICS.UI key exists for them yet;
+  # locking them here means a future edit has to notice that before it ships.
+  expect_equal(reliability_metric_reason("pearson"),
+               "Cronbach's Alpha was selected because the correlation is Pearson.")
+  expect_equal(reliability_metric_reason("polychoric"),
+               "Ordinal Alpha was selected because the correlation is Polychoric.")
+  expect_equal(reliability_metric_reason("mixed"),
+               "Mixed-Correlation Alpha was selected because the correlation is Mixed.")
+  # An unrecognized method must still yield a fixed sentence, never a composed one.
+  expect_equal(reliability_metric_reason("something_new"),
+               "Selected based on the correlation used.")
+
+  df <- make_reliability_df()
+  summary <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson") %>%
+    tidy_rowwise(model, type = "summary")
+  expect_equal(summary$Interpretation[[match("Reliability Metric", summary$Metric)]],
+               reliability_metric_reason("pearson"))
+})
+
+test_that("Variable Names lists what survived, and no row yet says what was dropped", {
+  # exp_cronbach_alpha drops a constant column before fitting: Number of Variables and Variable
+  # Names both shrink, but unlike PCA and Correlation there is no Excluded Variables row naming
+  # it. Pinned as the CURRENT behavior, not as the desired one -- tam's own template does not
+  # filter for such a row yet either, so adding it is a follow-up, not part of this fix.
+  df <- make_reliability_df()
+  df$`常に同じ値` <- 3L
+  summary <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson") %>%
+    tidy_rowwise(model, type = "summary")
+  value_of <- function(metric) summary$Value[[match(metric, summary$Metric)]]
+
+  expect_equal(value_of("Number of Variables"), "4")
+  expect_equal(value_of("Variable Names"), paste(colnames(df)[1:4], collapse = ", "))
+  expect_false(grepl("常に同じ値", value_of("Variable Names"), fixed = TRUE))
+  expect_false("Excluded Variables" %in% summary$Metric)
+})
