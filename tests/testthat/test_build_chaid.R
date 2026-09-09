@@ -323,13 +323,45 @@ test_that("Final Intervals shows 'N <' for display while cond_value keeps '> N' 
                "cond_value must never carry the report-display 'N <' shape")
 })
 
-test_that("Final Intervals lists a numeric variable's buckets in ascending order, not TRUE-rate order (tam #38550)", {
-  # A logical target's siblings are drawn TRUE-rate-first for the CHART's own
-  # left-to-right order (chaid_order_children_for_display()) -- here the
-  # HIGHER-salary bucket is deliberately made more TRUE-heavy, so the buggy
-  # (un-sorted) "Final Intervals" column would list it FIRST, out of numeric
-  # order. The report column must always read smallest-to-largest regardless
-  # of which child is more TRUE-heavy.
+# tam #38550 -- shared invariant: EVERY "Final Intervals" cell must list its
+# buckets smallest-to-largest, no matter what order the CHART itself draws the
+# node's children in (TRUE-rate-first for a logical target, via
+# chaid_order_children_for_display()). This is a MECHANISM, not a one-off
+# regression pin: every test_that below feeds a differently-shaped model
+# (different target type, different TRUE-rate direction, different bucket
+# count) through this ONE assertion helper, so a future change to
+# chaid_numeric_intervals()'s sort can't accidentally pass by getting lucky on
+# a single fixture the way the original bug did (TRUE-rate order happened to
+# read ascending for some datasets and not others).
+expect_numeric_intervals_ascending <- function(model_df, label) {
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  expect_true(nrow(ni) > 0, info = paste0(label, ": expected at least one numeric split"))
+  multi_bucket_seen <- FALSE
+  for (i in seq_len(nrow(ni))) {
+    final <- ni[["Final Intervals"]][i]
+    tokens <- trimws(strsplit(final, " / ", fixed = TRUE)[[1]])
+    if (length(tokens) < 2) next
+    multi_bucket_seen <- TRUE
+    lowers <- vapply(tokens, function(tok) {
+      # chaid_display_symbol_after_number() has already flipped an
+      # unbounded-above bucket to "N <" -- undo that just for the sort-key
+      # parse, since chaid_parse_interval() expects the raw "> N" shape.
+      raw <- if (grepl("<$", tok)) paste0("> ", sub("\\s*<$", "", tok)) else tok
+      interval <- chaid_parse_interval(raw)
+      if (is.null(interval)) NA_real_ else interval$lower_value
+    }, numeric(1))
+    expect_false(is.unsorted(lowers),
+      info = paste0(label, " Node ", ni$Node[i], " Variable ", ni$Variable[i],
+                    ": Final Intervals not ascending: ", final))
+  }
+  expect_true(multi_bucket_seen,
+    info = paste0(label, ": no row had >= 2 buckets, so ordering was never actually exercised"))
+}
+
+test_that("Final Intervals ascending: HIGHER bucket more TRUE-heavy (tam #38550)", {
+  # The reported case -- the CHART draws the more TRUE-heavy child first, and
+  # here that's the LARGER salary bucket, so the pre-fix (un-sorted) order
+  # would have listed it first, out of numeric order.
   set.seed(21); n <- 900
   df <- data.frame(
     salary = round(runif(n, 1000, 20000)),
@@ -340,22 +372,62 @@ test_that("Final Intervals lists a numeric variable's buckets in ascending order
   model_df <- suppressWarnings(exp_chaid(df, churn, salary, dept,
                                          min_split = 40, min_bucket = 20,
                                          max_depth = 2))
-  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
-  salary_rows <- ni[ni$Variable == "salary", , drop = FALSE]
-  expect_true(nrow(salary_rows) > 0)
-  for (final in salary_rows[["Final Intervals"]]) {
-    tokens <- trimws(strsplit(final, " / ", fixed = TRUE)[[1]])
-    expect_true(length(tokens) >= 2, "the repro needs at least 2 buckets to prove ordering")
-    lowers <- vapply(tokens, function(tok) {
-      # chaid_display_symbol_after_number() has already flipped an
-      # unbounded-above bucket to "N <" -- undo that just for the sort-key
-      # parse, since chaid_parse_interval() expects the raw "> N" shape.
-      raw <- if (grepl("<$", tok)) paste0("> ", sub("\\s*<$", "", tok)) else tok
-      interval <- chaid_parse_interval(raw)
-      if (is.null(interval)) NA_real_ else interval$lower_value
-    }, numeric(1))
-    expect_false(is.unsorted(lowers), info = paste("Final Intervals not ascending:", final))
-  }
+  expect_numeric_intervals_ascending(model_df, "higher-bucket-TRUE-heavy")
+})
+
+test_that("Final Intervals ascending: LOWER bucket more TRUE-heavy (tam #38550)", {
+  # The opposite correlation direction from the case above. Pre-fix, TRUE-rate
+  # order here happens to COINCIDE with ascending order for a 2-bucket split --
+  # exactly the kind of fixture that would let a regression slip through
+  # unnoticed if this were the only scenario under test.
+  set.seed(22); n <- 900
+  df <- data.frame(
+    salary = round(runif(n, 1000, 20000)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$churn <- df$salary < 9000 | runif(n) < 0.05
+  model_df <- suppressWarnings(exp_chaid(df, churn, salary, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  expect_numeric_intervals_ascending(model_df, "lower-bucket-TRUE-heavy")
+})
+
+test_that("Final Intervals ascending: 3+ buckets, NON-MONOTONE TRUE-rate (tam #38550)", {
+  # A 3-way split where the MIDDLE age bucket is the most TRUE-heavy child --
+  # TRUE-rate order here is neither ascending nor simply reversed, so a fix
+  # that only handles "reverse the TRUE-rate order" (rather than genuinely
+  # re-deriving ascending numeric order) would still fail this one.
+  set.seed(23); n <- 1200
+  df <- data.frame(
+    age = round(runif(n, 20, 70)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  mid <- df$age > 35 & df$age < 55
+  df$flag <- mid | (runif(n) < 0.05)
+  model_df <- suppressWarnings(exp_chaid(df, flag, age, dept,
+                                         min_split = 40, min_bucket = 15,
+                                         max_depth = 2))
+  expect_numeric_intervals_ascending(model_df, "non-monotone-TRUE-rate")
+})
+
+test_that("Final Intervals ascending: NUMERIC (regression) target (tam #38550)", {
+  # A numeric target does not go through the logical-target TRUE-rate-first
+  # branch of chaid_order_children_for_display() at all -- covered here so the
+  # shared invariant is pinned across BOTH target-type code paths, not just
+  # the logical one the reported bug happened to hit.
+  set.seed(24); n <- 900
+  df <- data.frame(
+    tenure = round(runif(n, 0, 60)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$salary <- 2000 + 30 * df$tenure + rnorm(n, sd = 200)
+  model_df <- suppressWarnings(exp_chaid(df, salary, tenure, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  expect_numeric_intervals_ascending(model_df, "numeric-target")
 })
 
 test_that("category_error_distribution is empty for a non-ordered target", {
