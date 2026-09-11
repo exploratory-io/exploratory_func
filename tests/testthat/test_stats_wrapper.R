@@ -146,11 +146,11 @@ test_that("do_cor clustering orders the groups by the strongest correlation insi
   expect_equal(levels(res$pair.name.x), c("b1", "b2", "a1", "a2"))
 })
 
-test_that("do_cor clustering orders variables inside a group by their within-group mean", {
+test_that("do_cor clustering puts the least typical member of a group last", {
   # Group a holds three variables of decreasing typicality: a1 and a2 correlate at 0.883 while a3
-  # trails at 0.589 / 0.520, giving within-group means of 0.736, 0.702 and 0.555. The most
-  # representative member of the group has to lead it. Group a also holds the strongest pair
-  # (0.883 against group b's 0.749), so it comes first.
+  # trails at 0.589 / 0.520. Running the procedure again inside the group splits off a3 on its own,
+  # and a group of one has no pair to be strong so it sorts last. Group a also holds the strongest
+  # pair overall (0.883 against group b's 0.749), so it comes first.
   set.seed(3)
   n <- 200
   ga <- rnorm(n)
@@ -165,6 +165,35 @@ test_that("do_cor clustering orders variables inside a group by their within-gro
                             variable_order = "cluster", return_type = "model")
   res <- model_df %>% tidy_rowwise(model, type = 'cor')
   expect_equal(levels(res$pair.name.x), c("a1", "a2", "a3", "b1", "b2"))
+})
+
+test_that("do_cor clustering keeps nested sub-groups contiguous", {
+  # Two super-groups, each holding two sub-groups. A single cut can only express one level: here it
+  # picks the 2-group split, and any per-group scalar sort then interleaves the sub-groups inside
+  # each half (ordering group members by their within-group mean produced a1 a2 b1 b2 c1 d2 d1 c2).
+  # Running the whole procedure again inside each group recovers all four.
+  set.seed(21)
+  n <- 400
+  s1 <- rnorm(n)
+  s2 <- rnorm(n)
+  a <- s1 + rnorm(n, sd = 0.7)
+  b <- s1 + rnorm(n, sd = 0.7)
+  cc <- s2 + rnorm(n, sd = 0.7)
+  dd <- s2 + rnorm(n, sd = 0.7)
+  df <- data.frame(a1 = a + rnorm(n, sd = 0.3), a2 = a + rnorm(n, sd = 0.3),
+                   b1 = b + rnorm(n, sd = 0.3), b2 = b + rnorm(n, sd = 0.3),
+                   c1 = cc + rnorm(n, sd = 0.3), c2 = cc + rnorm(n, sd = 0.3),
+                   d1 = dd + rnorm(n, sd = 0.3), d2 = dd + rnorm(n, sd = 0.3))
+
+  model_df <- df %>% do_cor(`a1`, `a2`, `b1`, `b2`, `c1`, `c2`, `d1`, `d2`,
+                            method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  clustered <- levels(res$pair.name.x)
+  lapply(list(c("a1", "a2"), c("b1", "b2"), c("c1", "c2"), c("d1", "d2")), function(pair) {
+    expect_equal(abs(diff(match(pair, clustered))), 1)
+  })
+  expect_equal(clustered, c("a1", "a2", "b1", "b2", "c1", "c2", "d1", "d2"))
 })
 
 test_that("do_cor clustering order with fewer than 3 variables", {
