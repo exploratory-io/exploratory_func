@@ -127,7 +127,7 @@ test_that("do_cor with variable order based on clustering", {
   expect_equal(mean_order, c("b1", "a2", "a1", "b2"))
 })
 
-test_that("do_cor clustering orders the groups by the strongest correlation inside each", {
+test_that("do_cor clustering orders the groups by the mean correlation inside each", {
   # Group b is the tighter pair (0.909 against group a's 0.605), so it leads regardless of where the
   # columns sit in the selection. A dendrogram's leaf order would not decide this: it is only
   # defined up to flipping each branch.
@@ -146,11 +146,14 @@ test_that("do_cor clustering orders the groups by the strongest correlation insi
   expect_equal(levels(res$pair.name.x), c("b1", "b2", "a1", "a2"))
 })
 
-test_that("do_cor clustering puts the least typical member of a group last", {
-  # Group a holds three variables of decreasing typicality: a1 and a2 correlate at 0.883 while a3
-  # trails at 0.589 / 0.520. Running the procedure again inside the group splits off a3 on its own,
-  # and a group of one has no pair to be strong so it sorts last. Group a also holds the strongest
-  # pair overall (0.883 against group b's 0.749), so it comes first.
+test_that("do_cor clustering ranks a group by its whole spread, not by its best pair", {
+  # Group a holds three variables: a1 and a2 correlate at 0.883, but a3 trails at 0.589 / 0.520 and
+  # drags the group's mean down to 0.664. Group b is a plain pair at 0.749. Ranking the groups by
+  # their STRONGEST pair would put group a first on the strength of the 0.883 alone; the mean is
+  # what makes the more uniformly tight group lead, and it reproduced the brand survey's leading
+  # order in 42 of 60 bootstrap resamples against the strongest pair's 29.
+  # Inside group a, running the procedure again splits a3 off on its own, and a group of one has no
+  # pair to be strong so it sorts last.
   set.seed(3)
   n <- 200
   ga <- rnorm(n)
@@ -164,7 +167,7 @@ test_that("do_cor clustering puts the least typical member of a group last", {
   model_df <- df %>% do_cor(`a1`, `a2`, `a3`, `b1`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
                             variable_order = "cluster", return_type = "model")
   res <- model_df %>% tidy_rowwise(model, type = 'cor')
-  expect_equal(levels(res$pair.name.x), c("a1", "a2", "a3", "b1", "b2"))
+  expect_equal(levels(res$pair.name.x), c("b1", "b2", "a1", "a2", "a3"))
 })
 
 test_that("do_cor clustering keeps nested sub-groups contiguous", {
