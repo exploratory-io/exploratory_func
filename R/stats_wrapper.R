@@ -255,6 +255,10 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     }
 
     if (!is.null(cluster_order)) {
+      # The long output omits uncomputable pairs when na.rm=TRUE. Keep only
+      # variables that are still represented before applying the factor order.
+      output_variables <- unique(c(as.character(ret$pair.name.x), as.character(ret$pair.name.y)))
+      cluster_order <- cluster_order[cluster_order %in% output_variables]
       ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cluster_order), pair.name.y = forcats::fct_relevel(pair.name.y, cluster_order))
     }
     else if (identical(variable_order, "input")) { # Honor the specified variable order.

@@ -214,9 +214,16 @@ test_that("do_cor clustering order with a constant column", {
   # A column that never varies correlates with nothing, so its distances are all NA. It must not
   # take the clustering -- and with it the whole analysis -- down with it.
   df <- data.frame(x = c(1, 2, 3, 4), y = c(1, 2, 3, 5), z = c(4, 3, 2, 1), const = c(1, 1, 1, 1))
+  cluster_warnings <- character(0)
   model_df <- suppressWarnings(
-    df %>% do_cor(`x`, `y`, `z`, `const`, method = "pearson", distinct = FALSE, diag = TRUE,
-                  variable_order = "cluster", return_type = "model"))
+    withCallingHandlers(
+      df %>% do_cor(`x`, `y`, `z`, `const`, method = "pearson", distinct = FALSE, diag = TRUE,
+                    variable_order = "cluster", return_type = "model"),
+      warning = function(w) {
+        cluster_warnings <<- c(cluster_warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }))
+  expect_false(any(grepl("unknown level", cluster_warnings, fixed = TRUE)))
   res <- suppressWarnings(model_df %>% tidy_rowwise(model, type = 'cor'))
   # x and y move together and z moves against them, so the two blocks stay apart.
   clustered <- levels(res$pair.name.x)
