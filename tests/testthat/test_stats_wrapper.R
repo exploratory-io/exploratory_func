@@ -113,11 +113,11 @@ test_that("do_cor with variable order based on clustering", {
   model_df <- df %>% do_cor(`a1`, `b1`, `a2`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
                             variable_order = "cluster", return_type = "model")
   res <- model_df %>% tidy_rowwise(model, type = 'cor')
-  clustered <- levels(res$pair.name.x)
-  expect_equal(levels(res$pair.name.y), clustered) # Both axes carry the same order.
-  # Each group occupies adjacent positions, whichever end each group lands on.
-  expect_equal(abs(diff(match(c("a1", "a2"), clustered))), 1)
-  expect_equal(abs(diff(match(c("b1", "b2"), clustered))), 1)
+  # Group a correlates at 0.728 and group b at 0.712, so group a leads. Inside a two-member group
+  # both members have the same single within-group correlation, and the tie falls back to the sorted
+  # column order.
+  expect_equal(levels(res$pair.name.x), c("a1", "a2", "b1", "b2"))
+  expect_equal(levels(res$pair.name.y), levels(res$pair.name.x)) # Both axes carry the same order.
   expect_equal(nrow(res), 16)
 
   # The order this replaces, on the same data, interleaves the two groups.
@@ -125,6 +125,46 @@ test_that("do_cor with variable order based on clustering", {
                                  variable_order = "correlation", return_type = "model")
   mean_order <- levels((mean_order_df %>% tidy_rowwise(model, type = 'cor'))$pair.name.x)
   expect_equal(mean_order, c("b1", "a2", "a1", "b2"))
+})
+
+test_that("do_cor clustering orders the groups by the strongest correlation inside each", {
+  # Group b is the tighter pair (0.909 against group a's 0.605), so it leads regardless of where the
+  # columns sit in the selection. A dendrogram's leaf order would not decide this: it is only
+  # defined up to flipping each branch.
+  set.seed(2)
+  n <- 200
+  ga <- rnorm(n)
+  gb <- rnorm(n)
+  df <- data.frame(a1 = ga + rnorm(n, sd = 0.9),
+                   a2 = ga + rnorm(n, sd = 0.9),
+                   b1 = gb + rnorm(n, sd = 0.3),
+                   b2 = gb + rnorm(n, sd = 0.3))
+
+  model_df <- df %>% do_cor(`a1`, `a2`, `b1`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(levels(res$pair.name.x), c("b1", "b2", "a1", "a2"))
+})
+
+test_that("do_cor clustering orders variables inside a group by their within-group mean", {
+  # Group a holds three variables of decreasing typicality: a1 and a2 correlate at 0.883 while a3
+  # trails at 0.589 / 0.520, giving within-group means of 0.736, 0.702 and 0.555. The most
+  # representative member of the group has to lead it. Group a also holds the strongest pair
+  # (0.883 against group b's 0.749), so it comes first.
+  set.seed(3)
+  n <- 200
+  ga <- rnorm(n)
+  gb <- rnorm(n)
+  df <- data.frame(a1 = ga + rnorm(n, sd = 0.3),
+                   a2 = ga + rnorm(n, sd = 0.4),
+                   a3 = ga + rnorm(n, sd = 1.2),
+                   b1 = gb + rnorm(n, sd = 0.6),
+                   b2 = gb + rnorm(n, sd = 0.6))
+
+  model_df <- df %>% do_cor(`a1`, `a2`, `a3`, `b1`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(levels(res$pair.name.x), c("a1", "a2", "a3", "b1", "b2"))
 })
 
 test_that("do_cor clustering order with fewer than 3 variables", {

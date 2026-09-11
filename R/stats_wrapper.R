@@ -354,12 +354,24 @@ cor_correlation_reason <- function(mat, requested_method) {
 # zero, giving means of 0.1225, 0.1271 and 0.1314 -- close enough that noise decided the order, and
 # one group's member was sorted into the middle of another group.
 #
+# The arrangement is built in three steps rather than read off the dendrogram's leaf order, because
+# a leaf order is only defined up to flipping every branch: it keeps each group together but says
+# nothing about which group comes first or which member of a group leads it.
+#
+#   1. Cut the tree into groups. The cut is the one with the largest jump in merge height, i.e. the
+#      point where joining two groups suddenly costs much more than every join so far.
+#   2. Order the groups by the STRONGEST correlation inside each, descending, so the tightest pair
+#      in the data is nearest the top-left corner. A group of one has no pair and goes last.
+#   3. Order the variables inside a group by their mean correlation WITH THE REST OF THAT GROUP,
+#      descending, so the most representative member of a group leads it.
+#
 # Returns NULL when the matrix cannot be clustered, so the caller can fall back instead of failing.
 cor_cluster_variable_order <- function(cor_mat) {
   if (is.null(cor_mat) || !is.matrix(cor_mat) || is.null(colnames(cor_mat))) {
     return(NULL)
   }
-  if (ncol(cor_mat) < 3) {
+  n <- ncol(cor_mat)
+  if (n < 3) {
     # hclust needs 2 or more objects, and with 2 variables every ordering is the same picture.
     return(colnames(cor_mat))
   }
@@ -373,7 +385,45 @@ cor_cluster_variable_order <- function(cor_mat) {
     dist_mat[!is.finite(dist_mat)] <- 1
     diag(dist_mat) <- 0
     hc <- stats::hclust(stats::as.dist(dist_mat), method = "average")
-    colnames(cor_mat)[hc$order]
+
+    # Step 1. hc$height is ascending and has n-1 entries; the cut that leaves k groups applies the
+    # first n-k merges, so the jump it has to clear is height[n-k+1] - height[n-k]. k runs to n-1
+    # because k = n would need height[0]. On the survey above the jumps are 0.349 at k=4 and 0.048,
+    # 0.318, 0.026 elsewhere, so the four groups the data actually has win outright. Ties take the
+    # smallest k, i.e. the coarsest grouping that explains the jump.
+    heights <- hc$height
+    candidate_k <- 2:(n - 1)
+    jumps <- heights[n - candidate_k + 1] - heights[n - candidate_k]
+    k <- candidate_k[[which.max(jumps)]]
+    membership <- stats::cutree(hc, k = k)
+
+    groups <- unique(membership) # In first-appearance order, so the tie-breaks below are stable.
+    # Step 2. The strongest correlation inside each group, self-pairs (always 1) excluded.
+    group_strength <- vapply(groups, function(g) {
+      idx <- which(membership == g)
+      if (length(idx) < 2) {
+        return(-Inf) # A group of one has no pair to be strong, so it sorts last.
+      }
+      sub <- cor_mat[idx, idx, drop = FALSE]
+      values <- sub[upper.tri(sub)]
+      values <- values[is.finite(values)]
+      if (length(values) == 0) -Inf else max(values)
+    }, numeric(1))
+    # Ties fall back to the group that appears first among the (already sorted) column names, so the
+    # same data always produces the same picture.
+    groups <- groups[order(-group_strength, seq_along(groups))]
+
+    # Step 3. Inside a group, the mean correlation with the OTHER members of the SAME group.
+    unlist(lapply(groups, function(g) {
+      idx <- which(membership == g)
+      if (length(idx) < 2) {
+        return(colnames(cor_mat)[idx])
+      }
+      sub <- cor_mat[idx, idx, drop = FALSE]
+      mean_within <- vapply(seq_along(idx), function(i) mean(sub[i, -i], na.rm = TRUE), numeric(1))
+      mean_within[!is.finite(mean_within)] <- -Inf
+      colnames(cor_mat)[idx][order(-mean_within, seq_along(idx))]
+    }), use.names = FALSE)
   }, error = function(e) {
     NULL
   })
