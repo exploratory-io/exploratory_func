@@ -197,6 +197,9 @@ do_cor.kv_ <- function(df,
 #' @param ... Arguments to select columns to calculate correlation.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
 #' @param method Method of calculation. This can be one of "auto", "pearson", "kendall", "spearman", "polychoric", or "mixed".
+#' @param variable_order How the variables are arranged. "cluster" groups variables that correlate
+#'   with each other next to each other, "correlation" sorts by each variable's mean correlation with
+#'   the others, and "input" keeps the order the columns were selected in.
 #' @return correlations between pairs of columns
 #' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
@@ -242,14 +245,26 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 
     ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=TRUE)
 
-    if (variable_order == "correlation") {
+    # "cluster" seriates the variables so that the ones correlating with each other sit next to each
+    # other. NULL means we could not cluster this matrix, and we fall back to the mean-correlation
+    # order below rather than failing the analysis.
+    cluster_order <- if (identical(variable_order, "cluster")) {
+      cor_cluster_variable_order(attr(ret, "cor_matrix"))
+    } else {
+      NULL
+    }
+
+    if (!is.null(cluster_order)) {
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cluster_order), pair.name.y = forcats::fct_relevel(pair.name.y, cluster_order))
+    }
+    else if (identical(variable_order, "input")) { # Honor the specified variable order.
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, !!select_dots), pair.name.y = forcats::fct_relevel(pair.name.y, !!select_dots))
+    }
+    else { # "correlation", and anything unknown.
       # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
       cor0 <- ret %>% dplyr::filter(pair.name.x != pair.name.y)
       cor0 <- cor0 %>% dplyr::group_by(pair.name.x) %>% dplyr::summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% dplyr::arrange(desc(mean_cor))
       ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
-    }
-    else { # "input" case. Honor the specified variable order.
-      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, !!select_dots), pair.name.y = forcats::fct_relevel(pair.name.y, !!select_dots))
     }
 
     if (distinct) {
@@ -325,6 +340,43 @@ cor_correlation_reason <- function(mat, requested_method) {
   } else {
     "Numeric and Factor/Logical variables are mixed."
   }
+}
+
+# Order the variables so that the ones correlating with each other sit next to each other, which is
+# what makes a correlation heatmap read as blocks.
+#
+# The alternative already in do_cor.cols(), variable_order="correlation", ranks each variable by the
+# MEAN of its correlations with every other variable. That mean is a single number describing how
+# strong the variable's bonds are; it carries nothing about WHICH variables it is bonded to. Two
+# variables belonging to different groups but with equally strong in-group bonds therefore end up
+# adjacent. On a 16-variable brand survey with four clean groups, three variables from three
+# different groups each had exactly three strong correlations (around 0.5 to 0.6) and twelve near
+# zero, giving means of 0.1225, 0.1271 and 0.1314 -- close enough that noise decided the order, and
+# one group's member was sorted into the middle of another group.
+#
+# Returns NULL when the matrix cannot be clustered, so the caller can fall back instead of failing.
+cor_cluster_variable_order <- function(cor_mat) {
+  if (is.null(cor_mat) || !is.matrix(cor_mat) || is.null(colnames(cor_mat))) {
+    return(NULL)
+  }
+  if (ncol(cor_mat) < 3) {
+    # hclust needs 2 or more objects, and with 2 variables every ordering is the same picture.
+    return(colnames(cor_mat))
+  }
+  tryCatch({
+    # 1 - correlation, NOT 1 - abs(correlation). Negatively correlated variables have to stay apart:
+    # that is what keeps a group which opposes everything else but agrees internally (price
+    # sensitivity on the survey above) as its own block instead of folding it into its opposites.
+    dist_mat <- 1 - cor_mat
+    # A pair whose correlation could not be computed (a constant column, or no overlapping rows under
+    # pairwise.complete.obs) gets the distance of an uncorrelated pair rather than aborting.
+    dist_mat[!is.finite(dist_mat)] <- 1
+    diag(dist_mat) <- 0
+    hc <- stats::hclust(stats::as.dist(dist_mat), method = "average")
+    colnames(cor_mat)[hc$order]
+  }, error = function(e) {
+    NULL
+  })
 }
 
 cor_analysis_conditions <- function(mat, requested_method, use) {
@@ -522,6 +574,10 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
   t_value_ret <- mat_to_df(tvalue_mat, cnames=output_cols[c(1,2,5)], diag=diag, zero.rm=FALSE)
   ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret <- ret %>% dplyr::left_join(t_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
+  # Hand the square matrix to the caller so that variable_order="cluster" can cluster on it.
+  # Reconstructing it from this long output is not equivalent: diag=FALSE drops the diagonal and
+  # na.rm=TRUE drops uncomputable pairs, so the caller would have to guess at the missing cells.
+  attr(ret, "cor_matrix") <- cor_mat
   ret
 }
 
