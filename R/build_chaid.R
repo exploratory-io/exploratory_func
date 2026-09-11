@@ -248,7 +248,16 @@ exp_chaid <- function(df,
         imp_vars <- chaid_partial_dependence_vars(
           model$importance, c_cols, model$terms_mapping, max_pd_vars_eff
         )
-        model$partial_dependence <- NULL
+        # tam #38345: PD now works for a numeric target too (predict.fun above
+        # switches to type = "value"), so the Analytics Report's
+        # {{variable_effect}} / local_importance_regression chart has data --
+        # the same contract exp_rpart's numeric report already uses. `firm`
+        # importance stays on the RMSE-drop permutation variant regardless,
+        # because calc_firm_from_pd() is written against class probabilities.
+        model$partial_dependence <- partial_dependence.exploratory_chaid(
+          model, clean_target_col, vars = imp_vars, data = df,
+          n = c(pd_grid_resolution, min(nrow(df), pd_sample_size))
+        )
       } else {
         # tam#37466: `firm` derives importance from the partial-dependence curves,
         # so unlike `permutation` it has to see the PD of EVERY predictor before it
@@ -314,7 +323,13 @@ exp_chaid <- function(df,
       }
 
       model$imp_vars <- imp_vars
-      if (isTRUE(pd_with_bin_means) && isTRUE(is_target_logical)) {
+      # tam #38345: a numeric target gets the binned-mean "Actual" overlay too --
+      # calc_partial_binning_data() takes the mean of the target within each
+      # predictor bin, which is exactly the regression reading. Multiclass is
+      # still excluded (handle_partial_dependence()'s partial_binning branch
+      # handles regression and binary only).
+      if (isTRUE(pd_with_bin_means) &&
+          (isTRUE(is_target_logical) || identical(model$target_type, "numeric"))) {
         model$partial_binning <- calc_partial_binning_data(
           df, clean_target_col, imp_vars
         )
@@ -912,10 +927,19 @@ partial_dependence.exploratory_chaid <- function(fit, target,
     return(NULL)
   }
 
+  # tam #38345: a numeric target has no class-probability distribution
+  # (chaid_predict_prepared() returns a zero-column frame for type = "prob"), so
+  # PD predicts the node MEAN instead -- the same numeric-vector contract
+  # partial_dependence.rpart() uses for its own regression case.
+  is.numeric.target <- identical(fit$target_type, "numeric")
+
   # Default S3 predict() returns class labels; PD needs class probabilities with
   # the same column names (TRUE/FALSE or class levels) that handle_partial_dependence
   # expects from rpart/ranger.
   predict.fun <- function(object, newdata) {
+    if (is.numeric.target) {
+      return(as.numeric(predict(object, newdata, type = "value")))
+    }
     prob <- as.data.frame(
       predict(object, newdata, type = "prob"),
       stringsAsFactors = FALSE,
@@ -957,16 +981,26 @@ partial_dependence.exploratory_chaid <- function(fit, target,
       if ("points" %in% names(args)) {
         args$points <- args$points[x]
       }
-      do.call(mmpf::marginalPrediction, args)
+      mp <- do.call(mmpf::marginalPrediction, args)
+      # A vector-returning predict.fun leaves mmpf's own column name on the
+      # prediction; handle_partial_dependence() finds it by attr(pd, "target").
+      if (is.numeric.target) {
+        names(mp)[ncol(mp)] <- target
+      }
+      mp
     }, simplify = FALSE), fill = TRUE)
     data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
   } else {
     pd <- do.call(mmpf::marginalPrediction, args)
+    if (is.numeric.target) {
+      names(pd)[ncol(pd)] <- target
+    }
   }
 
   attr(pd, "class") <- c("pd", "data.frame")
   attr(pd, "interaction") <- isTRUE(interaction)
-  attr(pd, "target") <- if (identical(fit$classification_type, "binary")) {
+  attr(pd, "target") <- if (is.numeric.target ||
+                            identical(fit$classification_type, "binary")) {
     target
   } else {
     fit$class_levels
@@ -1278,16 +1312,13 @@ build_chaid_tree_nodes <- function(x) {
     if (!is.null(tm) && v %in% names(tm)) unname(tm[v]) else v
   }
 
-  # Positive class first for a 2-class target (SPSS-style ordering).
-  ord <- seq_along(class_levels)
-  if (!is_reg && length(class_levels) == 2) {
-    up <- toupper(class_levels)
-    positive_idx <- if (setequal(up, c("FALSE", "TRUE"))) which(up == "TRUE")
-                    else if (setequal(up, c("NO", "YES"))) which(up == "YES")
-                    else NA_integer_
-    if (!is.na(positive_idx)) {
-      ord <- c(positive_idx, setdiff(seq_along(class_levels), positive_idx))
-    }
+  # Positive class first for a 2-class target (SPSS-style ordering). Shared with
+  # chaid_renumber_nodes_bfs()'s sibling ranking so the class table's order and
+  # the left-to-right node order can never drift apart (tam #38372).
+  ord <- if (is_reg) {
+    seq_along(class_levels)
+  } else {
+    match(chaid_display_class_order(class_levels), class_levels)
   }
 
   # tam #38166: numeric-target-only. A shared-breaks target histogram per
@@ -1372,6 +1403,20 @@ build_chaid_tree_nodes <- function(x) {
     if (length(edge_row) == 1) {
       cond_column <- map_name(edges$split_variable[edge_row])
       original_categories <- strsplit(edges$original_categories[edge_row], " \\| ")[[1]]
+      # tam #38372: CHAID records a merged group in MERGE order, so a branch on a
+      # declared factor read "30代, 20代, 40代". CART emits its category lists
+      # straight out of `attr(x, "xlevels")`, i.e. always in level order. Re-order
+      # to the predictor's declared order (chaid_group_level_order() falls back to
+      # ordered/binned-numeric levels, then to alphabetical) BEFORE collapsing --
+      # the merges table has done this since tam #37177, so the tree used to
+      # disagree with it on the very same model. Ordering first also gives
+      # chaid_collapse_intervals() the ascending run it needs to fold.
+      # `edges$split_variable` is the CLEAN (fit-time) name that
+      # chaid_group_level_order() expects; `cond_column` is already mapped back.
+      original_categories <- chaid_order_group_parts(
+        original_categories,
+        chaid_group_level_order(x, edges$split_variable[edge_row])
+      )
       # tam #37177: a branch built from a run of contiguous numeric bins reads
       # as the range it covers ("<= 2317.6, (2317.6, 2695.8]" -> "<= 2695.8").
       # cond_value stays the collapsed bin/category labels so DTreeGenerator's
@@ -1381,10 +1426,7 @@ build_chaid_tree_nodes <- function(x) {
       # "給料 = (2695.8, 4228.8]" -> "2695.8 < 給料 <= 4228.8") so the
       # characteristic-groups Condition column and tree chart match CART.
       display_categories <- chaid_collapse_intervals(original_categories)
-      edge_label <- chaid_readable_one_condition(
-        paste0(cond_column, " in {",
-               paste(display_categories, collapse = CHAID_GROUP_SEPARATOR), "}")
-      )
+      edge_label <- chaid_tree_edge_label(cond_column, display_categories)
       cond_value <- as.character(jsonlite::toJSON(as.character(display_categories)))
     } else {
       cond_column <- NA_character_

@@ -1657,9 +1657,23 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 }
 
 #' tidy after generating survfit
+#' @param max_nrow If a (per-group) input has more rows than this, the subjects are
+#'   randomly sampled down to it before the fit. NULL means use every row.
+#' @param seed Seed for that sample, so a sampled run is reproducible.
 #' @export
-do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
+do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", max_nrow = NULL, seed = 1, ...){
   validate_empty_data(df)
+
+  # A row here is one subject, so capping is a plain per-group row sample. The
+  # formal is not optional decoration: `...` is forwarded straight into
+  # survival::survfit below, so without it a max_nrow argument would reach
+  # survfit and error out.
+  if (!is.null(max_nrow)) {
+    if (!is.null(seed)) {
+      set.seed(seed)
+    }
+    df <- df %>% sample_rows(max_nrow)
+  }
 
   grouped_col <- grouped_by(df)
 

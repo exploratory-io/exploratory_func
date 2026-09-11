@@ -264,6 +264,40 @@
   result
 }
 
+#' Position of each variable in the Cluster Profile radar's category axis.
+#'
+#' The radar groups variables by the cluster that peaks on them, so that each
+#' cluster's characteristic variables form one contiguous arc: variables whose
+#' peak is cluster 1 come first, then cluster 2's, and so on, ordered within a
+#' group by descending peak value. The peak cluster is an explicit primary sort
+#' key; using a fixed numeric penalty would be incorrect because a z-score is
+#' not bounded by 10.
+#'
+#' This MUST be computed over every (variable, cluster) pair, before
+#' `profile_top_n` narrows the frame to each cluster's most characteristic
+#' variables (tam#38492). Computed afterwards, a variable that survived in only
+#' some clusters has its peak decided from that partial set -- on a 16-variable,
+#' 4-cluster survey, 9 of 16 variables kept only 2 of their 4 clusters, and one
+#' cluster's variables were split into two arcs on opposite sides of the wheel.
+#'
+#' Returned as a rank column rather than by reordering `variable` itself, so the
+#' column keeps its character class for every other consumer; the chart's
+#' preprocessor turns it into the factor order.
+.kmedoids_profile_variable_order <- function(rows) {
+  scores <- rows %>%
+    dplyr::group_by(variable, cluster) %>%
+    dplyr::summarize(value = mean(standardized_mean, na.rm = TRUE), .groups = 'drop_last') %>%
+    dplyr::arrange(cluster, .by_group = TRUE) %>%
+    dplyr::summarize(
+      peak_cluster = cluster[which.max(value)],
+      peak_value = max(value),
+      .groups = 'drop'
+    ) %>%
+    dplyr::arrange(peak_cluster, dplyr::desc(peak_value), variable)
+  scores$order <- seq_len(nrow(scores))
+  scores[, c('variable', 'order')]
+}
+
 .kmedoids_profile <- function(x) {
   mat <- x$mat
   original_mat <- .kmedoids_original_fit_mat(x)
@@ -295,10 +329,13 @@
       overall_mean = as.numeric(original_overall_mean)
     )
   })
+  variable_order <- .kmedoids_profile_variable_order(rows)
   rows %>%
     dplyr::group_by(cluster) %>%
     dplyr::mutate(rank = rank(-effect_size, ties.method = 'first')) %>%
     dplyr::ungroup() %>%
+    dplyr::left_join(variable_order, by = 'variable') %>%
+    dplyr::rename(variable_order = order) %>%
     {
       result <- .
       if (!isTRUE(x$profile_show_all)) {
@@ -395,6 +432,9 @@
 .kmedoids_representative_values <- function(x) {
   ids <- x$clustering
   original_mat <- .kmedoids_original_fit_mat(x)
+  # tam#38491: same rank the Characteristic Variables bar sorts by, so the table can list
+  # each cluster's variables in that order instead of the fitted-column order.
+  importance_order <- cluster_variable_importance_order(x$mat, x$clustering, colnames(original_mat))
   purrr::map_dfr(sort(unique(ids)), function(cluster_id) {
     index <- which(ids == cluster_id)
     medoid_index <- x$medoid_indices[[cluster_id]]
@@ -407,7 +447,8 @@
       overall_median = apply(original_mat, 2, stats::median, na.rm = TRUE),
       overall_mean = colMeans(original_mat, na.rm = TRUE)
     )
-  })
+  }) %>%
+    dplyr::left_join(importance_order, by = 'variable')
 }
 
 #' Per-row, per-variable distribution rows (tam#37938: クラスター内のばらつき boxplot,
@@ -441,13 +482,24 @@
   standardized_mat <- x$mat
   n <- nrow(original_mat)
   p <- ncol(original_mat)
-  tibble::tibble(
+  rows <- tibble::tibble(
     cluster = rep(as.integer(ids), each = p),
     variable = rep(colnames(original_mat), times = n),
     value = as.numeric(t(original_mat)),
     standardized_value = as.numeric(t(standardized_mat)),
     is_medoid = rep(seq_len(n) %in% medoid_indices, each = p)
   )
+  # tam#38491: the boxplot's colour legend is one entry per variable and had no order of its
+  # own, so it fell back to the character collation order while the "Characteristic Variables"
+  # bar right above it was sorted by eta-squared. Ship the eta-squared rank alongside the rows
+  # so the chart preprocessor can turn `variable` into a factor in that same order. Same
+  # `x$mat` / `x$clustering` the type='variable_importance' tidier ranks, so the two charts
+  # cannot disagree.
+  rows %>%
+    dplyr::left_join(
+      cluster_variable_importance_order(x$mat, x$clustering, colnames(original_mat)),
+      by = 'variable'
+    )
 }
 
 .kmedoids_cohesion <- function(x) {

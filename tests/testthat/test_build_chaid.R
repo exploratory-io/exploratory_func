@@ -323,6 +323,113 @@ test_that("Final Intervals shows 'N <' for display while cond_value keeps '> N' 
                "cond_value must never carry the report-display 'N <' shape")
 })
 
+# tam #38550 -- shared invariant: EVERY "Final Intervals" cell must list its
+# buckets smallest-to-largest, no matter what order the CHART itself draws the
+# node's children in (TRUE-rate-first for a logical target, via
+# chaid_order_children_for_display()). This is a MECHANISM, not a one-off
+# regression pin: every test_that below feeds a differently-shaped model
+# (different target type, different TRUE-rate direction, different bucket
+# count) through this ONE assertion helper, so a future change to
+# chaid_numeric_intervals()'s sort can't accidentally pass by getting lucky on
+# a single fixture the way the original bug did (TRUE-rate order happened to
+# read ascending for some datasets and not others).
+expect_numeric_intervals_ascending <- function(model_df, label) {
+  ni <- model_df %>% tidy_rowwise(model, type = "numeric_intervals")
+  expect_true(nrow(ni) > 0, info = paste0(label, ": expected at least one numeric split"))
+  multi_bucket_seen <- FALSE
+  for (i in seq_len(nrow(ni))) {
+    final <- ni[["Final Intervals"]][i]
+    tokens <- trimws(strsplit(final, " / ", fixed = TRUE)[[1]])
+    if (length(tokens) < 2) next
+    multi_bucket_seen <- TRUE
+    lowers <- vapply(tokens, function(tok) {
+      # chaid_display_symbol_after_number() has already flipped an
+      # unbounded-above bucket to "N <" -- undo that just for the sort-key
+      # parse, since chaid_parse_interval() expects the raw "> N" shape.
+      raw <- if (grepl("<$", tok)) paste0("> ", sub("\\s*<$", "", tok)) else tok
+      interval <- chaid_parse_interval(raw)
+      if (is.null(interval)) NA_real_ else interval$lower_value
+    }, numeric(1))
+    expect_false(is.unsorted(lowers),
+      info = paste0(label, " Node ", ni$Node[i], " Variable ", ni$Variable[i],
+                    ": Final Intervals not ascending: ", final))
+  }
+  expect_true(multi_bucket_seen,
+    info = paste0(label, ": no row had >= 2 buckets, so ordering was never actually exercised"))
+}
+
+test_that("Final Intervals ascending: HIGHER bucket more TRUE-heavy (tam #38550)", {
+  # The reported case -- the CHART draws the more TRUE-heavy child first, and
+  # here that's the LARGER salary bucket, so the pre-fix (un-sorted) order
+  # would have listed it first, out of numeric order.
+  set.seed(21); n <- 900
+  df <- data.frame(
+    salary = round(runif(n, 1000, 20000)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$churn <- df$salary > 11000 | runif(n) < 0.05
+  model_df <- suppressWarnings(exp_chaid(df, churn, salary, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  expect_numeric_intervals_ascending(model_df, "higher-bucket-TRUE-heavy")
+})
+
+test_that("Final Intervals ascending: LOWER bucket more TRUE-heavy (tam #38550)", {
+  # The opposite correlation direction from the case above. Pre-fix, TRUE-rate
+  # order here happens to COINCIDE with ascending order for a 2-bucket split --
+  # exactly the kind of fixture that would let a regression slip through
+  # unnoticed if this were the only scenario under test.
+  set.seed(22); n <- 900
+  df <- data.frame(
+    salary = round(runif(n, 1000, 20000)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$churn <- df$salary < 9000 | runif(n) < 0.05
+  model_df <- suppressWarnings(exp_chaid(df, churn, salary, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  expect_numeric_intervals_ascending(model_df, "lower-bucket-TRUE-heavy")
+})
+
+test_that("Final Intervals ascending: 3+ buckets, NON-MONOTONE TRUE-rate (tam #38550)", {
+  # A 3-way split where the MIDDLE age bucket is the most TRUE-heavy child --
+  # TRUE-rate order here is neither ascending nor simply reversed, so a fix
+  # that only handles "reverse the TRUE-rate order" (rather than genuinely
+  # re-deriving ascending numeric order) would still fail this one.
+  set.seed(23); n <- 1200
+  df <- data.frame(
+    age = round(runif(n, 20, 70)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  mid <- df$age > 35 & df$age < 55
+  df$flag <- mid | (runif(n) < 0.05)
+  model_df <- suppressWarnings(exp_chaid(df, flag, age, dept,
+                                         min_split = 40, min_bucket = 15,
+                                         max_depth = 2))
+  expect_numeric_intervals_ascending(model_df, "non-monotone-TRUE-rate")
+})
+
+test_that("Final Intervals ascending: NUMERIC (regression) target (tam #38550)", {
+  # A numeric target does not go through the logical-target TRUE-rate-first
+  # branch of chaid_order_children_for_display() at all -- covered here so the
+  # shared invariant is pinned across BOTH target-type code paths, not just
+  # the logical one the reported bug happened to hit.
+  set.seed(24); n <- 900
+  df <- data.frame(
+    tenure = round(runif(n, 0, 60)),
+    dept = sample(c("sales", "rnd", "hr"), n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  df$salary <- 2000 + 30 * df$tenure + rnorm(n, sd = 200)
+  model_df <- suppressWarnings(exp_chaid(df, salary, tenure, dept,
+                                         min_split = 40, min_bucket = 20,
+                                         max_depth = 2))
+  expect_numeric_intervals_ascending(model_df, "numeric-target")
+})
+
 test_that("category_error_distribution is empty for a non-ordered target", {
   df <- make_ordered_df()
   df$grade <- as.character(df$grade) # drop the ordered attribute
@@ -788,4 +895,184 @@ test_that("a comma-containing predictor column name survives report tables uncor
   if (nrow(intervals) > 0) {
     expect_true(all(intervals$Variable %in% c("price", "気に入った, 理由")))
   }
+})
+
+# tam #38372 -----------------------------------------------------------------
+# A declared factor whose CHAID merge order differs from its level order. The
+# probabilities make {20s, 30s, 40s} merge into one branch and {50s, 60s+} into
+# another; which of the three is merged first (and therefore the order CHAID
+# records) is an artifact of the merge loop, so the tree used to read
+# "40s, 30s, 20s".
+make_declared_level_df <- function(n = 1000, seed = 38372) {
+  set.seed(seed)
+  age_levels <- c("20s", "30s", "40s", "50s", "60s+")
+  job_levels <- c("student", "employee", "homemaker", "specialist", "parttime",
+                  "selfemployed", "unemployed", "officer", "executive", "other")
+  df <- data.frame(
+    age = factor(sample(age_levels, n, TRUE, prob = c(.2, .25, .25, .2, .1)),
+                 levels = age_levels),
+    job = factor(sample(job_levels, n, TRUE), levels = job_levels),
+    stringsAsFactors = FALSE
+  )
+  df$renew <- runif(n) < ifelse(df$age %in% c("20s", "30s", "40s"), 0.66, 0.32)
+  attr(df, "level_order") <- list(age = age_levels, job = job_levels)
+  df
+}
+
+test_that("tree_nodes category branches use the declared level order (tam #38372)", {
+  df <- make_declared_level_df()
+  level_order <- attr(df, "level_order")
+  model_df <- suppressWarnings(exp_chaid(df, renew, age, job,
+                                         min_split = 40, min_bucket = 20))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  branches <- nodes[!is.na(nodes$cond_column), ]
+  expect_gt(nrow(branches), 0)
+
+  values_of <- lapply(branches$cond_value, jsonlite::fromJSON)
+  # Guard the guard: a tree whose every branch holds ONE category would make the
+  # ordering assertion below vacuously true.
+  expect_true(any(vapply(values_of, length, integer(1)) > 1))
+
+  for (i in seq_len(nrow(branches))) {
+    values <- values_of[[i]]
+    declared <- level_order[[branches$cond_column[i]]]
+    # Same contract as CART: the members are the declared levels, in declared
+    # order (build_rpart_tree_nodes reads them out of attr(x, "xlevels")).
+    expect_equal(values, declared[declared %in% values])
+    # ...and the branch label is CART's "col = a, b, c", not "col in (a + b)".
+    expect_equal(branches$edge_label[i],
+                 paste0(branches$cond_column[i], " = ",
+                        paste(values, collapse = ", ")))
+  }
+})
+
+test_that("node_summary / rules category groups match the tree's order (tam #38372)", {
+  df <- make_declared_level_df()
+  level_order <- attr(df, "level_order")
+  model_df <- suppressWarnings(exp_chaid(df, renew, age, job,
+                                         min_split = 40, min_bucket = 20))
+
+  # Every "<var> in (a + b)" group in any rendered rule, from every table that
+  # renders one, must be in the same declared order the tree branch uses.
+  expect_groups_ordered <- function(text) {
+    hits <- regmatches(text, gregexpr("[^ &]+ in \\([^)]*\\)", text))
+    for (rule_hits in hits) {
+      for (hit in rule_hits) {
+        m <- regmatches(hit, regexec("^(.*) in \\((.*)\\)$", hit))[[1]]
+        declared <- level_order[[m[2]]]
+        if (is.null(declared)) next
+        members <- strsplit(m[3], " + ", fixed = TRUE)[[1]]
+        expect_equal(members, declared[declared %in% members])
+      }
+    }
+  }
+  node_summary <- model_df %>% tidy_rowwise(model, type = "node_summary")
+  rules <- model_df %>% tidy_rowwise(model, type = "rules")
+  merges <- model_df %>% tidy_rowwise(model, type = "category_merges")
+  expect_gt(sum(grepl(" in \\(", node_summary$Rule)), 0)
+  expect_groups_ordered(node_summary$Rule)
+  expect_groups_ordered(rules$Rule)
+
+  # The original symptom: the Category Merges table has ordered its members
+  # since tam #37177, so the tree and the rules disagreed with it on the very
+  # same model. Every merged group must now appear in the rules verbatim.
+  merged <- merges[["Merged Category"]]
+  merged <- merged[grepl(" + ", merged, fixed = TRUE)]
+  expect_gt(length(merged), 0)
+  for (group in merged) {
+    expect_true(any(grepl(paste0("(", group, ")"), node_summary$Rule, fixed = TRUE)))
+  }
+})
+
+test_that("node ids are assigned in the chart's left-to-right order (tam #38372)", {
+  # A nominal split whose two branches predict DIFFERENT classes: the chart ranks
+  # them by predicted class, so the ids must too or every report tab's Node
+  # column points at the wrong branch.
+  set.seed(38372); n <- 1200
+  jobs <- c("student", "employee", "homemaker", "specialist", "parttime",
+            "selfemployed", "unemployed", "officer", "executive", "other")
+  job <- sample(jobs, n, TRUE)
+  band <- ifelse(runif(n) < ifelse(job %in% c("homemaker", "employee"), 0.15, 0.80), "50s", "40s")
+  df <- data.frame(job = job, renewed = runif(n) < 0.5,
+                   age_band = factor(band, levels = c("20s", "30s", "40s", "50s", "60s+")),
+                   stringsAsFactors = FALSE)
+  model_df <- suppressWarnings(exp_chaid(df, age_band, job, renewed,
+                                         min_split = 20, min_bucket = 10, max_depth = 3))
+  model <- model_df$model[[1]]
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+
+  # The tidy is 0-based, the model 1-based; both must be the SAME ordering.
+  expect_equal(model$nodes$node_id, sort(model$nodes$node_id))
+  expect_equal(nodes$node_id, model$nodes$node_id - 1L)
+
+  # Re-derive the chart's own sibling order from the emitted rows and require the
+  # ids to already be in it -- i.e. DTreeGenerator's reorder is a no-op.
+  class_order <- chaid_display_class_order(model$class_levels)
+  by_parent <- split(nodes$node_id[!is.na(nodes$parent_id)],
+                     nodes$parent_id[!is.na(nodes$parent_id)])
+  expect_gt(length(by_parent), 0)
+  for (kids in by_parent) {
+    expect_equal(kids, sort(kids), info = "children ids must ascend left to right")
+    predicted <- vapply(kids, function(k) as.character(nodes$predicted[nodes$node_id == k]),
+                        character(1))
+    ranks <- match(predicted, class_order)
+    # Within one parent, predicted-class ranks are non-decreasing unless a
+    # TRUE/FALSE or numeric-bin rule took precedence. This fixture's splits are
+    # nominal, so the class rule is the one in force.
+    if (all(!is.na(ranks))) {
+      expect_equal(ranks, sort(ranks),
+                   info = "nominal siblings must be ordered by predicted class")
+    }
+  }
+
+  # The reported symptom, stated directly: the FIRST child of the root is the one
+  # predicting the EARLIER class, not the one CHAID happened to merge first.
+  root_kids <- sort(nodes$node_id[!is.na(nodes$parent_id) & nodes$parent_id == 0])
+  expect_gte(length(root_kids), 2)
+  first_pred <- as.character(nodes$predicted[nodes$node_id == root_kids[1]])
+  last_pred <- as.character(nodes$predicted[nodes$node_id == root_kids[length(root_kids)]])
+  expect_lte(match(first_pred, class_order), match(last_pred, class_order))
+})
+
+test_that("a logical predictor's TRUE branch gets the lower node id (tam #38372)", {
+  set.seed(23); n <- 900
+  renewed <- runif(n) < 0.5
+  df <- data.frame(renewed = renewed, tenure = sample(1:60, n, TRUE), stringsAsFactors = FALSE)
+  df$satisfied <- runif(n) < ifelse(renewed, 0.85, 0.15)
+  model_df <- suppressWarnings(exp_chaid(df, satisfied, renewed, tenure,
+                                         min_split = 20, min_bucket = 10, max_depth = 3))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  logical_edges <- nodes[!is.na(nodes$cond_column) & nodes$cond_column == "renewed", ]
+  expect_gte(nrow(logical_edges), 2)
+  value_of <- function(i) jsonlite::fromJSON(logical_edges$cond_value[i])[[1]]
+  true_id <- logical_edges$node_id[vapply(seq_len(nrow(logical_edges)),
+                                          function(i) identical(value_of(i), "TRUE"), logical(1))]
+  false_id <- logical_edges$node_id[vapply(seq_len(nrow(logical_edges)),
+                                           function(i) identical(value_of(i), "FALSE"), logical(1))]
+  expect_length(true_id, 1)
+  expect_length(false_id, 1)
+  expect_lt(true_id, false_id)
+})
+
+test_that("a logical target's TRUE-heavy branch gets the lower node id (tam #38357)", {
+  # The low numeric range has the lowest condition bound, but the high range has
+  # the much higher TRUE rate. The chart puts TRUE-heavy children on the left,
+  # so CHAID must assign ids in that order before emitting tree_nodes.
+  set.seed(1); n <- 1000
+  x <- rnorm(n)
+  y <- runif(n) < ifelse(x > 0, 0.9, 0.1)
+  model_df <- suppressWarnings(exp_chaid(data.frame(x = x, y = y), y, x,
+                                         min_split = 20, min_bucket = 10, max_depth = 1,
+                                         max_pd_vars = 0, seed = 1))
+  nodes <- model_df %>% tidy_rowwise(model, type = "tree_nodes")
+  root_kids <- nodes$node_id[!is.na(nodes$parent_id) & nodes$parent_id == 0]
+  expect_gte(length(root_kids), 2)
+  true_rate <- function(id) {
+    classes <- jsonlite::fromJSON(nodes$class_json[nodes$node_id == id])
+    hit <- classes$pct[toupper(as.character(classes$label)) %in% c('TRUE', 'YES')]
+    if (length(hit) == 0) 0 else as.numeric(hit[1])
+  }
+  rates <- vapply(root_kids, true_rate, numeric(1))
+  expect_gt(max(rates) - min(rates), 0.5)
+  expect_equal(rates, sort(rates, decreasing = TRUE))
 })

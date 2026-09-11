@@ -1118,6 +1118,36 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       # res <- res %>% dplyr::select(!!c(column_names,"cluster"))
       res <- res %>% dplyr::mutate(row_id=seq(n())) # row_id for line representation.
       res <- res %>% tidyr::gather(key="key",value="value",!!column_names)
+      # tam#38491: carry the eta-squared rank of each clustering variable (the order the
+      # "Characteristic Variables" bar shows) so the charts built from this frame -- the
+      # BoxPlot's colour legend above all -- can order their variable axis the same way
+      # instead of falling back to character collation. A chart preprocessor cannot call
+      # tidy_rowwise(model, ...) a second time, so the rank has to travel with the rows.
+      # Only computable when a k-means fit is attached; a pure-PCA gather leaves the column
+      # out entirely rather than emitting a meaningless order.
+      if (!is.null(x$kmeans) && !is.null(x$df) && !is.null(x$selected_cols) &&
+          length(x$selected_cols) > 0) {
+        importance_order <- cluster_variable_importance_order(
+          as_numeric_matrix_(x$df, columns = x$selected_cols),
+          x$kmeans$cluster,
+          column_names
+        ) %>% dplyr::rename(key = variable)
+
+        # `res` intentionally keeps non-clustering columns so the parallel-coordinate
+        # chart can use a subject column. If one of those columns is already named
+        # `importance_order`, dplyr would suffix the joined rank to `.y` and leave the
+        # user's column as `.x`, violating the tidier contract that the chart rank is
+        # available as `importance_order`. Preserve the input column under a unique name
+        # before adding the generated rank.
+        if ("importance_order" %in% colnames(res)) {
+          preserved_name <- "input_importance_order"
+          while (preserved_name %in% colnames(res)) {
+            preserved_name <- paste0(".", preserved_name)
+          }
+          names(res)[names(res) == "importance_order"] <- preserved_name
+        }
+        res <- res %>% dplyr::left_join(importance_order, by = "key")
+      }
     }
   }
   res

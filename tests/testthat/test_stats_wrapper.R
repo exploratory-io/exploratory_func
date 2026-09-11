@@ -726,3 +726,216 @@ test_that("do_cmdscale all 0 distances error", {
     do_cmdscale(data, var1, var2, val)
   }, "All distances are 0. Multidimensional scaling cannot be calculated.")
 })
+
+test_that("do_cor max_nrow caps the observations, per group and reproducibly", {
+  set.seed(11)
+  data <- data.frame(a = rnorm(500), b = rnorm(500), grp = rep(c("x", "y"), each = 250))
+
+  full <- data %>% do_cor(a, b)
+  capped <- data %>% do_cor(a, b, max_nrow = 100)
+
+  # Independent oracle: the cap is a plain row sample, so the result must equal
+  # running the correlation on that sample -- drawn here with the same seed, but
+  # correlated with stats::cor rather than with do_cor's own internals.
+  set.seed(1)
+  sampled <- data %>% dplyr::select(a, b) %>% sample_rows(100)
+  expected <- stats::cor(sampled$a, sampled$b, use = "pairwise.complete.obs")
+  actual <- (capped %>% dplyr::filter(pair.name.x == "a", pair.name.y == "b"))$correlation
+  expect_equal(actual, expected)
+  expect_false(isTRUE(all.equal(
+    actual,
+    (full %>% dplyr::filter(pair.name.x == "a", pair.name.y == "b"))$correlation
+  )))
+
+  # NULL is what the Sample Data checkbox sends when it is off: every row, i.e.
+  # identical to not passing the argument at all.
+  expect_equal(data %>% do_cor(a, b, max_nrow = NULL), full)
+  # A cap above the row count changes nothing.
+  expect_equal(data %>% do_cor(a, b, max_nrow = 10000), full)
+  # Same seed, same sample.
+  expect_equal(data %>% do_cor(a, b, max_nrow = 100), capped)
+
+  # The cap is per group.
+  grouped <- data %>% dplyr::group_by(grp) %>% do_cor(a, b, max_nrow = 100)
+  set.seed(1)
+  expected_grouped <- data %>% dplyr::group_by(grp) %>% dplyr::select(a, b) %>% sample_rows(100)
+  expect_equal(
+    (grouped %>% dplyr::filter(pair.name.x == "a", pair.name.y == "b") %>% dplyr::arrange(grp))$correlation,
+    (expected_grouped %>% dplyr::group_by(grp) %>%
+      dplyr::summarize(r = stats::cor(a, b, use = "pairwise.complete.obs")) %>%
+      dplyr::arrange(grp))$r
+  )
+})
+
+test_that("do_cor max_nrow caps the cast matrix, not the long input", {
+  # 100 keys, 5 long rows each. Each key's mean is exact only if the whole key
+  # survives -- sampling the LONG input would change the aggregated values, not
+  # just how many of them there are.
+  set.seed(12)
+  key_mean_x <- rnorm(100)
+  key_mean_y <- key_mean_x * 0.7 + rnorm(100, sd = 0.5)
+  offsets <- c(-2, -1, 0, 1, 2) # sum to 0, so each key's mean is exact
+  long <- data.frame(
+    key = rep(1:100, each = 10),
+    subj = rep(rep(c("x", "y"), each = 5), 100),
+    val = as.vector(sapply(1:100, function(k) {
+      c(key_mean_x[k] + offsets, key_mean_y[k] + offsets)
+    }))
+  )
+
+  capped <- long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = 50)
+
+  # Independent oracle: aggregate first (the means the cast produces), then keep
+  # the 50 keys the cap draws, then correlate with stats::cor.
+  set.seed(1)
+  kept <- sort(sample.int(100, 50))
+  expected <- stats::cor(key_mean_x[kept], key_mean_y[kept], use = "pairwise.complete.obs")
+  actual <- (capped %>% dplyr::filter(subj.x == "x", subj.y == "y"))$correlation
+  expect_equal(actual, expected)
+
+  # Had the long rows been sampled instead, the surviving keys' means would be
+  # noisy and the correlation would not match the exact-mean oracle above.
+  full <- long %>% do_cor(skv = c("subj", "key", "val"))
+  expect_equal(
+    (full %>% dplyr::filter(subj.x == "x", subj.y == "y"))$correlation,
+    stats::cor(key_mean_x, key_mean_y, use = "pairwise.complete.obs")
+  )
+  expect_equal(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = NULL), full)
+  expect_equal(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = 1000), full)
+})
+
+test_that("do_cor does not reseed when no rows are sampled", {
+  data <- data.frame(a = seq_len(20), b = seq_len(20) + 1)
+
+  set.seed(123)
+  before <- .Random.seed
+  invisible(data %>% do_cor(a, b, max_nrow = NULL))
+  expect_identical(.Random.seed, before)
+
+  set.seed(123)
+  before <- .Random.seed
+  invisible(data %>% do_cor(a, b, max_nrow = 100))
+  expect_identical(.Random.seed, before)
+
+  long <- data.frame(
+    subj = rep(c("x", "y"), each = 20),
+    key = rep(seq_len(20), 2),
+    val = seq_len(40)
+  )
+  set.seed(123)
+  before <- .Random.seed
+  invisible(long %>% do_cor(skv = c("subj", "key", "val"), max_nrow = NULL))
+  expect_identical(.Random.seed, before)
+})
+
+# tam#37638 -- the Correlation report's "Analysis Conditions and Data" table.
+# Before this existed, tidy.cor_exploratory's catch-all `else` returned the raw source data for
+# any unrecognized type, so the report rendered the whole input data frame as its summary table.
+test_that("do_cor analysis_conditions returns the report's 6-row conditions table", {
+  set.seed(1)
+  df <- data.frame(a = rnorm(20), b = rnorm(20), c = rnorm(20))
+  model_df <- df %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  expect_equal(res$Metric, c("Number of Variables", "Variable Names", "Excluded Variables",
+                             "Row Count", "Rows Removed", "Correlation"))
+  expect_equal(res$Value[[1]], "3")
+  expect_equal(res$Value[[2]], "a, b, c")
+  expect_equal(res$Value[[3]], "None")
+  expect_equal(res$Value[[4]], "20")
+  expect_equal(res$Value[[5]], "0 (0.0%)")
+  expect_equal(res$Value[[6]], "Pearson Correlation")
+  # Hidden columns the report binds its explanation text from. Strings, never R logicals.
+  expect_equal(unique(res$correlation_type), "pearson")
+  expect_equal(unique(res$correlation_is_auto), "FALSE")
+  expect_equal(unique(res$reason), "Pearson was specified in the settings.")
+})
+
+test_that("do_cor analysis_conditions reports the auto-resolved correlation and excluded variables", {
+  set.seed(2)
+  n <- 30
+  mk <- function() factor(sample(1:5, n, TRUE), levels = 1:5, ordered = TRUE)
+  df <- data.frame(q1 = mk(), q2 = mk(), flat = factor(rep(3, n), levels = 1:5, ordered = TRUE))
+  model_df <- suppressWarnings(df %>% do_cor(`q1`, `q2`, `flat`, method = "auto", return_type = "model"))
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  # `flat` never varies, so it cannot correlate with anything.
+  expect_equal(res$Value[[3]], "flat")
+  expect_equal(res$Value[[6]], "Polychoric Correlation")
+  expect_equal(unique(res$correlation_is_auto), "TRUE")
+  expect_equal(unique(res$reason), "All variables are Factor or Logical.")
+})
+
+test_that("do_cor analysis_conditions counts rows the way the analysis actually did", {
+  df <- data.frame(a = c(1, 2, 3, NA), b = c(4, 5, NA, NA), c = c(1, 3, 2, NA))
+  # pairwise.complete.obs (the default): only an ALL-missing row is unused here
+  # (rows 1-2 are complete, row 3 has two values, row 4 is all NA).
+  pairwise <- df %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(pairwise$Value[[4]], "3")
+  expect_equal(pairwise$Value[[5]], "1 (25.0%)")
+  # complete.obs: any missing value drops the whole row.
+  complete <- df %>% do_cor(`a`, `b`, `c`, method = "pearson", use = "complete.obs", return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(complete$Value[[4]], "2")
+  expect_equal(complete$Value[[5]], "2 (50.0%)")
+
+  # A row with a single observed value contributes to no pairwise coefficient.
+  one_obs <- data.frame(
+    a = c(1, 4, NA, 7),
+    b = c(2, NA, 5, 8),
+    c = c(3, NA, 6, 9)
+  )
+  pairwise_one <- one_obs %>% do_cor(`a`, `b`, `c`, method = "pearson", return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(pairwise_one$Value[[4]], "3")
+  expect_equal(pairwise_one$Value[[5]], "1 (25.0%)")
+  # na.or.complete is listwise, same as complete.obs.
+  na_or_complete <- one_obs %>% do_cor(`a`, `b`, `c`, method = "pearson", use = "na.or.complete",
+                                      return_type = "model") %>%
+    tidy_rowwise(model, type = "analysis_conditions")
+  expect_equal(na_or_complete$Value[[4]], "2")
+  expect_equal(na_or_complete$Value[[5]], "2 (50.0%)")
+})
+
+test_that("do_cor analysis_conditions follows the use polychoric actually runs, not the one asked for", {
+  # do_cor_internal() hands hetcor "complete.obs" only when that was asked for, and
+  # "pairwise.complete.obs" for every other mode. So a polychoric fit requested with
+  # use = "everything" still runs pairwise, and the row count has to say so. Without that
+  # remap the count would fall through to "every row was used".
+  mk <- function(v) factor(v, levels = 1:3, ordered = TRUE)
+  df <- data.frame(
+    a = mk(c(1, 2, NA, 3, 1, 2)),
+    b = mk(c(2, NA, 3, 1, 2, 3)),
+    c = mk(c(3, NA, 1, 2, 3, 1))
+  )
+  # Row 2 has a single observed value, so it forms no pair.
+  res <- suppressWarnings(
+    df %>% do_cor(`a`, `b`, `c`, method = "polychoric", use = "everything", return_type = "model")
+  ) %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  expect_equal(res$Value[[6]], "Polychoric Correlation")
+  expect_equal(res$Value[[4]], "5")
+  expect_equal(res$Value[[5]], paste0("1 (", format(round(1 / 6 * 100, 1), nsmall = 1), "%)"))
+})
+
+test_that("do_cor analysis_conditions returns an empty same-shape table for a model saved before it existed", {
+  df <- data.frame(a = c(1, 2, 3, 4), b = c(2, 4, 5, 9))
+  model_df <- df %>% do_cor(`a`, `b`, method = "pearson", return_type = "model")
+  # Simulate a model persisted before analysis_conditions was captured at fit time.
+  model_df$model[[1]]$analysis_conditions <- NULL
+  res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
+
+  expect_equal(nrow(res), 0)
+  expect_true(all(c("Metric", "Value", "Description",
+                    "correlation_type", "correlation_is_auto", "reason") %in% colnames(res)))
+})
+
+test_that("tidy.cor_exploratory errors on an unsupported type instead of returning the source data", {
+  df <- data.frame(a = c(1, 2, 3, 4), b = c(2, 4, 5, 9))
+  model_df <- df %>% do_cor(`a`, `b`, method = "pearson", return_type = "model")
+  # The scatter matrix's own type must keep working.
+  expect_equal(nrow(model_df %>% tidy_rowwise(model, type = "data.frame")), 4)
+  expect_error(model_df %>% tidy_rowwise(model, type = "no_such_type"),
+               "Unsupported tidy type for a correlation model")
+})

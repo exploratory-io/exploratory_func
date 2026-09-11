@@ -191,7 +191,7 @@ chaid_fit <- function(data,
       class_levels = class.levels,
       numeric_target = numeric.target
     )
-    tree <- chaid_renumber_nodes_bfs(tree)
+    tree <- chaid_renumber_nodes_bfs(tree, class_levels = class.levels)
     model$nodes <- tree$nodes
     model$edges <- tree$edges
     model$.node_metadata <- tree$node_metadata
@@ -1249,18 +1249,27 @@ grow_chaid_tree <- function(data, target, predictors, parameters,
 #' ids through chaid_build_split_index.
 #'
 #' @param tree The list returned by grow_chaid_tree.
+#' @param class_levels The fitted target's class levels, or `NULL` for a numeric
+#'   target. Used only to rank siblings by predicted class
+#'   ([chaid_order_children_for_display()]).
 #' @return The same list with node ids renumbered breadth-first.
-chaid_renumber_nodes_bfs <- function(tree) {
+chaid_renumber_nodes_bfs <- function(tree, class_levels = NULL) {
   nodes <- tree$nodes
   if (is.null(nodes) || nrow(nodes) < 2) {
     return(tree)
   }
   edges <- tree$edges
-  # Children in creation order, which is the group order = left to right.
+  # tam #38372: children in the order the CHART draws them, left to right -- NOT
+  # in group-creation order. Creation order is CHAID's category-merge order, so
+  # the ids it produced disagreed with the chart's chip numbers the moment the
+  # chart applied its own TRUE-left / bins-ascending / predicted-class ordering,
+  # desynchronising every report tab's Node column from the diagram.
+  class.order <- if (is.null(class_levels)) NULL else chaid_display_class_order(class_levels)
   children.of <- if (is.null(edges) || nrow(edges) == 0) {
     list()
   } else {
-    split(as.integer(edges$child_id), as.character(edges$parent_id))
+    lapply(split(as.integer(edges$child_id), as.character(edges$parent_id)),
+           function(kids) chaid_order_children_for_display(kids, edges, nodes, class.order))
   }
 
   visit.order <- integer(0)
@@ -1665,7 +1674,8 @@ chaid_node_summary <- function(model) {
   if (identical(model$target_type, 'numeric')) {
     return(data.frame(
       Node = model$nodes$node_id,
-      Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule, model$terms_mapping)),
+      Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule, model), model$terms_mapping)),
       Rows = model$nodes$n,
       `%` = model$nodes$n / root.n * 100,
       Mean = model$nodes$node_mean,
@@ -1686,7 +1696,8 @@ chaid_node_summary <- function(model) {
     # collapsed to one inequality. The root row reads "All".
     # `rule`/`split_variable` are in CLEAN (fit-time) name space -- map back to
     # the column's real name for display (chaid_map_display_name(_in_text)()).
-    Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule, model$terms_mapping)),
+    Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule, model), model$terms_mapping)),
     Rows = model$nodes$n,
     `%` = model$nodes$n / root.n * 100,
     `Predicted Class` = model$nodes$predicted_class,
@@ -1714,7 +1725,8 @@ chaid_rule_table <- function(model) {
   if (identical(model$target_type, 'numeric')) {
     return(data.frame(
       Node = model$nodes$node_id[terminal],
-      Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule[terminal], model$terms_mapping)),
+      Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule[terminal], model), model$terms_mapping)),
       Prediction = model$nodes$predicted_class[terminal],
       Mean = model$nodes$node_mean[terminal],
       `Std. Dev.` = model$nodes$node_sd[terminal],
@@ -1726,7 +1738,8 @@ chaid_rule_table <- function(model) {
   data.frame(
     Node = model$nodes$node_id[terminal],
     # tam #37177: see chaid_node_summary(). tam#38107: map clean -> original name.
-    Rule = chaid_readable_condition(chaid_map_display_names_in_text(model$nodes$rule[terminal], model$terms_mapping)),
+    Rule = chaid_readable_condition(chaid_map_display_names_in_text(
+      chaid_normalize_condition_groups(model$nodes$rule[terminal], model), model$terms_mapping)),
     Prediction = model$nodes$predicted_class[terminal],
     Probability = vapply(
       model$nodes$class_distribution[terminal],
@@ -1882,11 +1895,22 @@ chaid_numeric_intervals <- function(model) {
     child_labels <- edges$label[edges$parent_id == node_id]
     # tam #37177: each child edge's label is a " + "-joined run of bins; show the
     # range it actually covers. Binning method and bin count are separate columns.
-    # tam #37691: report-display only -- "> N" -> "N <" (chaid_display_symbol_after_number).
     child_labels <- vapply(child_labels, function(label) {
-      chaid_display_symbol_after_number(chaid_normalize_group_label(
-        label, chaid_group_level_order(model, variable), collapse = TRUE))
+      chaid_normalize_group_label(label, chaid_group_level_order(model, variable), collapse = TRUE)
     }, character(1), USE.NAMES = FALSE)
+    # tam #38550: `edges` inherits the CHART's own left-to-right child order
+    # (chaid_order_children_for_display() -- TRUE-rate-first for a logical
+    # target, ascending bound only as a tie-break), not numeric order. The
+    # report column must always read smallest-to-largest, so re-sort by each
+    # bucket's own lower bound before applying the display flip below.
+    lower_values <- vapply(child_labels, function(label) {
+      interval <- chaid_parse_interval(label)
+      if (is.null(interval)) NA_real_ else interval$lower_value
+    }, numeric(1))
+    child_labels <- child_labels[order(lower_values)]
+    # tam #37691: report-display only -- "> N" -> "N <" (chaid_display_symbol_after_number).
+    child_labels <- vapply(child_labels, chaid_display_symbol_after_number,
+                            character(1), USE.NAMES = FALSE)
     data.frame(
       Node = node_id,
       # tam#38107: `variable` stays CLEAN (fit-time name) for the binmap/
