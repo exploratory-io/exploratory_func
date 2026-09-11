@@ -246,3 +246,17 @@ test_that("an unknown label column is rejected by name", {
     "no_such_column"
   )
 })
+
+test_that("singleton cuts do not crash when silhouette is undefined", {
+  result <- exp_hclust(
+    data.frame(x = 1:4, y = (1:4)^2),
+    x, y, centers = 4, max_interactive_k = 4,
+    elbow_method_mode = "none", seed = 1
+  )
+  summary_df <- broom::tidy(result$model[[1]], type = "summary")
+
+  expect_equal(nrow(summary_df), 4L)
+  expect_true(all(is.na(summary_df$avg_silhouette)))
+  expect_true(all(is.na(summary_df$min_silhouette)))
+  expect_true(all(is.na(summary_df$pct_negative)))
+})

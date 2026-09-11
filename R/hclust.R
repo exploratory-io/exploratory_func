@@ -588,14 +588,17 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
   }
   if (length(silhouette_indices) > 1L) {
     chosen_ids <- .hclust_membership(model, centers)[silhouette_indices]
-    if (length(unique(chosen_ids)) > 1L) {
+    if (length(unique(chosen_ids)) > 1L &&
+        length(unique(chosen_ids)) < length(chosen_ids)) {
       value <- tryCatch(
         cluster::silhouette(
           chosen_ids, stats::dist(mat[silhouette_indices, , drop = FALSE], method = distance)
         ),
         error = function(e) NULL
       )
-      if (!is.null(value)) model$silhouette_values[silhouette_indices] <- as.numeric(value[, 'sil_width'])
+      if (is.matrix(value)) {
+        model$silhouette_values[silhouette_indices] <- as.numeric(value[, 'sil_width'])
+      }
     }
   }
   if (identical(elbow_method_mode, 'elbow')) model$elbow_result <- .hclust_elbow(model)
