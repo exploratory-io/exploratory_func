@@ -20,6 +20,9 @@
 #'   class for the report.
 #' @param max_nrow Maximum number of rows to fit on. Larger inputs are randomly
 #'   sampled down to this many rows. \code{NULL} uses every row.
+#' @param numeric_handling How a numeric indicator becomes categories: one of
+#'   "auto", "as_category", "equal_width". Same rule as K-Modes (tam#38689).
+#' @param numeric_bins Number of equal-width bins for a numeric indicator.
 #' @export
 exp_lca <- function(df, ...,
                     min_nclass = 2,
@@ -30,7 +33,9 @@ exp_lca <- function(df, ...,
                     seed = 1,
                     relationship_column = NULL,
                     feature_top_n = 10,
-                    max_nrow = NULL) {
+                    max_nrow = NULL,
+                    numeric_handling = "auto",
+                    numeric_bins = 10) {
   if (!requireNamespace("poLCA", quietly = TRUE)) {
     stop("Latent Class Analysis requires the poLCA package.")
   }
@@ -57,6 +62,13 @@ exp_lca <- function(df, ...,
     if (relationship_col %in% grouped_cols) {
       stop("Repeat-By column cannot be used as a relationship variable.")
     }
+    # tam#38689: numeric indicators are now converted to categories, but the relationship
+    # variable is a descriptive categorical comparison and is never converted. Refuse a
+    # non-categorical one instead of silently as.character()-ing each distinct number.
+    relationship_values <- df[[relationship_col]]
+    if (!(is.character(relationship_values) || is.factor(relationship_values) || is.logical(relationship_values))) {
+      stop("The relationship variable must be a character, factor, ordered, or logical column.")
+    }
   }
 
   min_nclass <- as.integer(min_nclass)
@@ -77,11 +89,20 @@ exp_lca <- function(df, ...,
     stop("Trial Times, Max Iteration Times, and Number of Characteristics must be 1 or larger.")
   }
 
+  numeric_handling <- match.arg(as.character(numeric_handling),
+                                c("auto", "as_category", "equal_width"))
+  numeric_bins <- suppressWarnings(as.integer(numeric_bins))
+  if (length(numeric_bins) != 1 || is.na(numeric_bins) || numeric_bins < 2) {
+    stop("Number of Bins must be 2 or larger.")
+  }
+
+  # tam#38689: numeric is supported (converted to categories by lca_prepare_indicators).
+  # is.numeric() is FALSE for Date / POSIXct / difftime, so those stay unsupported.
   unsupported <- selected_cols[!vapply(df[selected_cols], function(x) {
-    is.character(x) || is.factor(x) || is.logical(x)
+    is.character(x) || is.factor(x) || is.logical(x) || is.numeric(x)
   }, logical(1))]
   if (length(unsupported)) {
-    stop(paste0("Latent Class Analysis supports character, factor, ordered, and logical variables only. Unsupported: ",
+    stop(paste0("Latent Class Analysis supports character, factor, ordered, logical, and numeric variables only. Unsupported: ",
                 paste(unsupported, collapse = ", "), "."))
   }
 
@@ -101,7 +122,12 @@ exp_lca <- function(df, ...,
       group_df <- group_df %>% sample_rows(max_nrow)
     }
     original <- group_df %>% dplyr::mutate(.lca_row_id = dplyr::row_number())
-    indicators <- lca_encode_indicators(original, selected_cols)
+    # tam#38689: numeric indicators become ordered factors for the MODEL only. `original`
+    # keeps the raw values, because it is what the Output Data table is built from.
+    indicator_df <- lca_prepare_indicators(original, selected_cols,
+                                           numeric_handling = numeric_handling,
+                                           numeric_bins = numeric_bins)
+    indicators <- lca_encode_indicators(indicator_df, selected_cols)
     complete_rows <- stats::complete.cases(indicators)
     used <- indicators[complete_rows, , drop = FALSE]
     used_row_ids <- original$.lca_row_id[complete_rows]
@@ -167,7 +193,7 @@ exp_lca <- function(df, ...,
     selected <- normalized$fit
 
     class_selection <- lca_class_selection_table(candidates)
-    profiles <- lca_profile_table(selected, original[complete_rows, selected_cols, drop = FALSE], selected_cols)
+    profiles <- lca_profile_table(selected, indicator_df[complete_rows, selected_cols, drop = FALSE], selected_cols)
     characteristics <- profiles %>%
       dplyr::group_by(class) %>%
       dplyr::arrange(dplyr::desc(abs_difference), variable, category, .by_group = TRUE) %>%
@@ -175,7 +201,7 @@ exp_lca <- function(df, ...,
       dplyr::filter(rank <= feature_top_n) %>%
       dplyr::ungroup()
     row_assignments <- lca_assignment_table(original, used_row_ids, selected)
-    class_distribution <- lca_class_composition_table(selected, original[complete_rows, selected_cols, drop = FALSE],
+    class_distribution <- lca_class_composition_table(selected, indicator_df[complete_rows, selected_cols, drop = FALSE],
                                                       selected_cols)
     variable_discrimination <- calculate_lca_variable_discrimination(profiles)
     relationship <- lca_relationship_table(original, used_row_ids, selected$predclass, relationship_col)
@@ -240,6 +266,37 @@ lca_indicator_levels <- function(x) {
     return(c(kept, sort(setdiff(present, kept), method = "radix")))
   }
   sort(present, method = "radix")
+}
+
+#' Convert numeric LCA indicators to ordered factors (tam#38689).
+#'
+#' The keep-values-or-bin decision is K-Modes' own kmodes_prepare_column(), so the two
+#' analytics cannot drift into different rules. What LCA adds is ORDER: the result is a
+#' factor, and lca_indicator_levels() already honours a factor's declared levels, so the
+#' encoding and every report table agree on it with no further change.
+#'   - equal-width bins keep cut()'s ascending order ("(2,3]" before "(10,11]");
+#'   - values kept as categories sort numerically (1, 2, 10 -- not "1", "10", "2").
+#' Non-finite values are NA'd by kmodes_prepare_column(), so those rows are excluded.
+#' Non-numeric columns are returned untouched.
+#' @param df The data frame.
+#' @param cols The indicator column names.
+#' @param numeric_handling One of "auto", "as_category", "equal_width".
+#' @param numeric_bins Number of equal-width bins.
+#' @return `df` with each numeric indicator replaced by a factor.
+lca_prepare_indicators <- function(df, cols, numeric_handling = "auto", numeric_bins = 10) {
+  for (col in cols) {
+    x <- df[[col]]
+    if (!is.numeric(x)) {
+      next
+    }
+    converted <- kmodes_prepare_column(x, numeric_handling = numeric_handling, numeric_bins = numeric_bins)
+    levels <- converted$display_levels
+    if (is.null(levels)) {
+      levels <- as.character(sort(unique(x[is.finite(x)])))
+    }
+    df[[col]] <- factor(converted$values, levels = levels)
+  }
+  df
 }
 
 lca_encode_indicators <- function(df, cols) {
