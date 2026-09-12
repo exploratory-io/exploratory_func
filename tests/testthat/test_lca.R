@@ -149,9 +149,11 @@ test_that("exp_lca excludes non-converged fits from the recommended model and al
 })
 
 test_that("exp_lca rejects non-categorical, insufficient, and invalid class selections", {
-  df <- data.frame(a = c("x", "y", "x", "y"), b = c("m", "m", "n", "n"), number = 1:4)
+  df <- data.frame(a = c("x", "y", "x", "y"), b = c("m", "m", "n", "n"), number = 1:4,
+                   day = as.Date("2026-01-01") + 0:3)
   expect_error(exp_lca(df, a), "at least 2 categorical variables")
-  expect_error(exp_lca(df, a, number), "supports character, factor, ordered, and logical")
+  # tam#38689: numeric indicators are accepted now; a Date still has no category meaning.
+  expect_error(exp_lca(df, a, day), "supports character, factor, ordered, logical, and numeric")
   expect_error(exp_lca(df, a, b, min_nclass = 4, max_nclass = 2), "Class counts")
   expect_error(exp_lca(df, a, b, relationship_column = a), "must be different")
 })
@@ -545,6 +547,100 @@ test_that("exp_lca reports factor categories in their declared order", {
   observed_order <- as.character(unique(tenure_rows$category[order(tenure_rows$class,
                                                                   as.integer(tenure_rows$category))]))
   expect_equal(observed_order[seq_along(lv)], lv)
+})
+
+# ---------------------------------------------------------------------------
+# tam#38689 -- numeric indicators, converted to categories the way K-Modes does
+# ---------------------------------------------------------------------------
+
+lca_numeric_fixture <- function(n = 300, seed = 38689) {
+  set.seed(seed)
+  cls <- sample(1:2, n, replace = TRUE)
+  df <- data.frame(
+    # distinct 3 -> kept as categories. Chosen so numeric order (1, 2, 10) and text order
+    # ("1", "10", "2") disagree -- a fixture where they coincide cannot tell them apart.
+    score = ifelse(cls == 1, sample(c(1, 2, 10), n, TRUE, c(.6, .3, .1)),
+                   sample(c(1, 2, 10), n, TRUE, c(.1, .3, .6))),
+    # distinct 15 -> kept under numeric_bins >= 15, binned below that.
+    days = ifelse(cls == 1, sample(1:15, n, TRUE, rep(c(.12, .01), c(8, 7))),
+                  sample(1:15, n, TRUE, rep(c(.01, .12), c(7, 8)))),
+    # continuous -> equal-width bins under auto. The canonical stress-test name.
+    amount = ifelse(cls == 1, stats::runif(n, 0, 50), stats::runif(n, 40, 100)),
+    b = ifelse(cls == 1, sample(c("m", "n"), n, TRUE, c(.8, .2)), sample(c("m", "n"), n, TRUE, c(.2, .8))),
+    stringsAsFactors = FALSE
+  )
+  names(df)[names(df) == "amount"] <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  df
+}
+
+lca_class1_categories <- function(model, variable) {
+  profiles <- tidy(model, type = "profiles")
+  as.character(profiles$category[profiles$variable == variable & profiles$class == "Class 1"])
+}
+
+lca_bin_lower_bounds <- function(labels) {
+  as.numeric(sub("^[[(]([^,]+),.*$", "\\1", labels))
+}
+
+test_that("exp_lca accepts numeric indicators as ordered categories and keeps raw values in the output (tam#38689)", {
+  df <- lca_numeric_fixture()
+  stress <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  model <- exp_lca(df, score, `航空 会社 !"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表`, b,
+                   min_nclass = 2, max_nclass = 2, nrep = 3, maxiter = 300, seed = 1)$model[[1]]
+
+  # Few distinct values: the values ARE the categories, in numeric order.
+  expect_equal(lca_class1_categories(model, "score"), c("1", "2", "10"))
+
+  # Continuous: 10 equal-width bins (the default), in ascending bin order, not text order.
+  bins <- lca_class1_categories(model, stress)
+  expect_equal(length(bins), 10)
+  expect_true(all(diff(lca_bin_lower_bounds(bins)) > 0))
+
+  # The same order reaches the class composition table (one shared level rule).
+  composition <- tidy(model, type = "class_distribution")
+  comp_bins <- unique(as.character(composition$category[composition$variable == stress]))
+  expect_equal(comp_bins, bins)
+
+  # Conversion feeds the model only: Output Data keeps the original numbers.
+  data <- tidy(model, type = "data")
+  expect_true(is.numeric(data[[stress]]))
+  expect_equal(sort(data[[stress]]), sort(df[[stress]]))
+  expect_equal(sort(data$score), sort(df$score))
+})
+
+test_that("exp_lca numeric_handling and numeric_bins follow the K-Modes rule (tam#38689)", {
+  df <- lca_numeric_fixture()
+  fit <- function(...) {
+    exp_lca(df, days, b, min_nclass = 2, max_nclass = 2, nrep = 1, maxiter = 100, seed = 1, ...)$model[[1]]
+  }
+  # auto: 15 distinct > 10 bins -> binned into 10.
+  expect_equal(length(lca_class1_categories(fit(), "days")), 10)
+  # auto: 15 distinct <= 20 bins -> the threshold is the CONFIGURED bin count, so values stay.
+  expect_equal(lca_class1_categories(fit(numeric_bins = 20), "days"), as.character(1:15))
+  # as_category forces the values, in numeric order (text order would put "10" after "1").
+  expect_equal(lca_class1_categories(fit(numeric_handling = "as_category"), "days"), as.character(1:15))
+  # equal_width with an explicit bin count.
+  four <- lca_class1_categories(fit(numeric_handling = "equal_width", numeric_bins = 4), "days")
+  expect_equal(length(four), 4)
+  expect_true(all(diff(lca_bin_lower_bounds(four)) > 0))
+})
+
+test_that("exp_lca treats non-finite numeric indicator values as missing (tam#38689)", {
+  df <- lca_numeric_fixture()
+  df$score[c(3, 7)] <- c(Inf, -Inf)
+  model <- exp_lca(df, score, b, min_nclass = 2, max_nclass = 2, nrep = 1, maxiter = 100, seed = 1)$model[[1]]
+  expect_equal(model$excluded_nrow, 2)
+  expect_equal(lca_class1_categories(model, "score"), c("1", "2", "10"))
+  data <- tidy(model, type = "data")
+  expect_equal(sum(data$`Is Excluded`), 2)
+})
+
+test_that("exp_lca validates numeric settings and keeps the relationship variable categorical (tam#38689)", {
+  df <- lca_numeric_fixture(n = 60)
+  expect_error(exp_lca(df, score, b, numeric_bins = 1), "Number of Bins must be 2 or larger.")
+  expect_error(exp_lca(df, score, b, numeric_handling = "bogus"), "should be one of")
+  expect_error(exp_lca(df, b, days, relationship_column = score),
+               "relationship variable must be a character, factor, ordered, or logical column")
 })
 
 # ---------------------------------------------------------------------------
