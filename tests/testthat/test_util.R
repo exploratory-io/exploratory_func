@@ -999,6 +999,29 @@ test_that("test pivot", {
 
 })
 
+test_that("pivot with sum_if applies condition per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "y", "x", "y", "y"),
+    val = c(10, 20, 5, 7, 8, 9),
+    flag = c(TRUE, FALSE, TRUE, TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  # Group A/col x: rows val=10 (flag=T), val=20 (flag=F) -> sum_if(flag) = 10
+  expect_equal(res$x[res$grp == "A"], 10)
+  # Group A/col y: val=5, flag=T -> 5
+  expect_equal(res$y[res$grp == "A"], 5)
+  # Group B/col x: val=7, flag=T -> 7
+  expect_equal(res$x[res$grp == "B"], 7)
+  # Group B/col y: val=8 (flag=T), val=9 (flag=F) -> 8
+  expect_equal(res$y[res$grp == "B"], 8)
+})
+
 test_that("test pivot with NA", {
   test_df_na <- data.frame(
     carrier = c("AA", "AA", "UA"),

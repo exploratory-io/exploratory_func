@@ -931,8 +931,8 @@ get_confint <- function(val, se, conf_int = 0.95) {
 }
 
 
-pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, ...) {
-  pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, ...)
+pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, value_condition = NULL, ...) {
+  pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, value_condition = value_condition, ...)
 }
 
 #' Calculate a pivot table.
@@ -946,8 +946,12 @@ pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, val
 #' @param fill - Value to be filled for missing values
 #' @param na.rm - If na should be removed from values
 #' @param cols_sep - If na should be removed from values
+#' @param value_condition - Optional condition passed through to a conditional
+#'   aggregate function (e.g. sum_if, count_if) as its extra `...` argument.
+#'   Accepts either a string parsed with rlang::parse_expr(), or an already
+#'   quoted expression/quosure for direct R callers.
 #' @export
-pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
+pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_", value_condition = NULL) {
   # make sure to ungroup the data frame first if the row_cols are same as grouped columns.
   grouped_col <- grouped_by(df)
   if (!is.null(row_cols) && any(grouped_col %in% row_cols)) {
@@ -1036,6 +1040,11 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   }
   # make sure the value column name is unique and does not conflict existing columns in the source data frame.
   value_col_name = avoid_conflict(colnames(df), c("value"))
+  # Parse value_condition once, outside the per-group closure, since it is the same for every cell.
+  # Accept either a string (parsed with rlang::parse_expr()) or an already quoted expression/quosure.
+  value_condition_expr <- if (!is.null(value_condition)) {
+    if (is.character(value_condition)) rlang::parse_expr(value_condition) else rlang::enquo(value_condition)
+  }
   pivot_each <- function(df) {
     res <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
@@ -1053,7 +1062,11 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
         df <- df %>% dplyr::filter(!is.na(!!rlang::sym(value_col)))
       }
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col)))
+      if (!is.null(value_condition_expr)) {
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col), !!value_condition_expr))
+      } else {
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col)))
+      }
     }
     res <- res %>% dplyr::arrange(!!!rlang::syms(new_col_cols)) # arrange before pivot_wider, so that the create columns are sorted.
     # Dynamically set value column name to list passed to value_fill argument.
