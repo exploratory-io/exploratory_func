@@ -1105,6 +1105,43 @@ test_that("pivot with mean_if_pct computes percentage against the unfiltered gro
   expect_equal(res$x[res$grp == "A"], 100 * 35 / 30)
 })
 
+test_that("pivot with sum_if and no matching rows in a cell returns 0", {
+  df <- tibble::tibble(grp = c("A", "A"), col = c("x", "x"), val = c(10, 20), flag = c(FALSE, FALSE))
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag"
+  )
+  # sum() of an empty numeric vector is 0, with no warning.
+  expect_equal(res$x[res$grp == "A"], 0)
+})
+
+test_that("pivot with mean_if and no matching rows in a cell returns NaN/NA with no warning", {
+  df <- tibble::tibble(grp = c("A", "A"), col = c("x", "x"), val = c(10, 20), flag = c(FALSE, FALSE))
+  # mean() of an empty numeric vector returns NaN silently (unlike min()/max(), it does not warn).
+  # is.na(NaN) is TRUE in R, so the pivoted cell reads as NA.
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::mean_if,
+    value_condition = "flag"
+  )
+  expect_true(is.na(res$x[res$grp == "A"]))
+})
+
+test_that("pivot with min_if and no matching rows in a cell returns Inf with a warning", {
+  df <- tibble::tibble(grp = c("A", "A"), col = c("x", "x"), val = c(10, 20), flag = c(FALSE, FALSE))
+  # min() of an empty numeric vector returns Inf and warns
+  # ("no non-missing arguments to min; returning Inf"), unlike mean()/median().
+  expect_warning(
+    res <- df %>% exploratory::pivot(
+      row_cols = "grp", col_cols = "col", value = "val",
+      fun.aggregate = exploratory::min_if,
+      value_condition = "flag"
+    )
+  )
+  expect_equal(res$x[res$grp == "A"], Inf)
+})
+
 test_that("test pivot with NA", {
   test_df_na <- data.frame(
     carrier = c("AA", "AA", "UA"),
