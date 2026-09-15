@@ -1073,6 +1073,38 @@ test_that("pivot with count_if_pct and no value column computes match percentage
   expect_equal(res$y[res$grp == "B"], 100) # 2 of 2 rows in B/y have flag=TRUE
 })
 
+test_that("pivot with sum_if_ratio computes ratio against the unfiltered group total", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, 20, 30),
+    flag = c(TRUE, FALSE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if_ratio,
+    value_condition = "flag"
+  )
+  # sum_if_ratio = sum(val[flag]) / sum(val) = (10+30) / (10+20+30) = 40/60
+  expect_equal(res$x[res$grp == "A"], 40 / 60)
+})
+
+test_that("pivot with mean_if_pct computes percentage against the unfiltered group mean", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, 20, 60),
+    flag = c(TRUE, FALSE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::mean_if_pct,
+    value_condition = "flag"
+  )
+  # mean_if_pct = 100 * mean(val[flag]) / mean(val) = 100 * mean(10, 60) / mean(10, 20, 60) = 100 * 35/30
+  expect_equal(res$x[res$grp == "A"], 100 * 35 / 30)
+})
+
 test_that("test pivot with NA", {
   test_df_na <- data.frame(
     carrier = c("AA", "AA", "UA"),
