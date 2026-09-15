@@ -1024,18 +1024,53 @@ test_that("pivot with sum_if applies condition per cell", {
 
 test_that("pivot with count_if and no value column counts matching rows per cell", {
   df <- tibble::tibble(
-    grp = c("A", "A", "A", "B", "B"),
-    col = c("x", "x", "y", "x", "y"),
-    flag = c(TRUE, FALSE, TRUE, TRUE, TRUE)
+    grp = c("A", "A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "x", "y", "x", "y", "y"),
+    flag = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE)
   )
   res <- df %>% exploratory::pivot(
     row_cols = "grp", col_cols = "col",
     fun.aggregate = exploratory::count_if,
     value_condition = "flag"
   )
-  expect_equal(res$x[res$grp == "A"], 1) # 1 of 2 rows in A/x has flag=TRUE
-  expect_equal(res$y[res$grp == "A"], 1)
-  expect_equal(res$x[res$grp == "B"], 1)
+  expect_equal(res$x[res$grp == "A"], 2) # 2 of 3 rows in A/x have flag=TRUE
+  expect_equal(res$y[res$grp == "A"], 1) # 1 of 1 row in A/y has flag=TRUE
+  expect_equal(res$x[res$grp == "B"], 0) # 0 of 1 row in B/x has flag=TRUE (zero-match cell)
+  expect_equal(res$y[res$grp == "B"], 2) # 2 of 2 rows in B/y have flag=TRUE
+})
+
+test_that("pivot with count_if_ratio and no value column computes match ratio per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "x", "y", "x", "y", "y"),
+    flag = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if_ratio,
+    value_condition = "flag"
+  )
+  expect_equal(res$x[res$grp == "A"], 2 / 3) # 2 of 3 rows in A/x have flag=TRUE
+  expect_equal(res$y[res$grp == "A"], 1) # 1 of 1 row in A/y has flag=TRUE
+  expect_equal(res$x[res$grp == "B"], 0) # 0 of 1 row in B/x has flag=TRUE (zero-match cell)
+  expect_equal(res$y[res$grp == "B"], 1) # 2 of 2 rows in B/y have flag=TRUE
+})
+
+test_that("pivot with count_if_pct and no value column computes match percentage per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "x", "y", "x", "y", "y"),
+    flag = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if_pct,
+    value_condition = "flag"
+  )
+  expect_equal(res$x[res$grp == "A"], 200 / 3) # 2 of 3 rows in A/x have flag=TRUE
+  expect_equal(res$y[res$grp == "A"], 100) # 1 of 1 row in A/y has flag=TRUE
+  expect_equal(res$x[res$grp == "B"], 0) # 0 of 1 row in B/x has flag=TRUE (zero-match cell)
+  expect_equal(res$y[res$grp == "B"], 100) # 2 of 2 rows in B/y have flag=TRUE
 })
 
 test_that("test pivot with NA", {
