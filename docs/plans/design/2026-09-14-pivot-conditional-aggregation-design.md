@@ -1,7 +1,7 @@
 # Design: Conditional aggregation support in pivot()
 
 ## Status
-Design approved. Not yet implemented.
+In progress. Task 1 implemented (`value_condition`, string-only — see note below).
 
 ## Overview
 
@@ -25,9 +25,14 @@ aggregating within each pivot cell (row × column group), while preserving
 
 ## Design
 
-Add an optional `value_condition` argument to `pivot()`/`pivot_()`: a quoted R
-expression (parsed via `rlang::parse_expr()` when passed as a string, or
-accepted directly as a quosure/expression from NSE callers). Thread it through
+Add an optional `value_condition` argument to `pivot()`/`pivot_()`: a **string**
+containing an R expression, parsed via `rlang::parse_expr()`. (An earlier
+revision of this design considered also accepting an already-quoted
+expression/quosure for direct R callers; implementation showed that path is
+unreliable — a quosure's captured environment doesn't survive being
+re-forwarded through `summarize_group()` → `dplyr::summarize()` →
+`sum_if`/`aggregate_if`'s own internal `dplyr_quosures(...)` capture, so it was
+dropped. `value_condition` is string-only.) Thread it through
 `pivot_each()`'s `summarize_group()` call site (`R/util.R:1056`) so that when
 `value_condition` is supplied, the aggregate call becomes:
 
