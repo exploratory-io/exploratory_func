@@ -1073,6 +1073,60 @@ test_that("pivot with count_if_pct and no value column computes match percentage
   expect_equal(res$y[res$grp == "B"], 100) # 2 of 2 rows in B/y have flag=TRUE
 })
 
+test_that("pivot with count_if and a value column does not drop condition-matching rows whose value is NA", {
+  # count_if's count is based on the condition (flag), not on the value column, so a row
+  # matching the condition must still be counted even when the (semantically irrelevant)
+  # value column happens to be NA for that row.
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, NA, 5),
+    flag = c(TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::count_if,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  # 2 of the 3 rows in A/x have flag=TRUE (row2's val=NA must not exclude it from the count).
+  expect_equal(res$x[res$grp == "A"], 2)
+})
+
+test_that("pivot with count_if_ratio and a value column keeps the full row count as denominator despite NA values", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, NA, 5),
+    flag = c(TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::count_if_ratio,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  # 2 of 3 rows in A/x have flag=TRUE; the NA value in row2 must not shrink either the
+  # numerator (matches) or the denominator (total rows).
+  expect_equal(res$x[res$grp == "A"], 2 / 3)
+})
+
+test_that("pivot with count_if_pct and a value column keeps the full row count as denominator despite NA values", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, NA, 5),
+    flag = c(TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::count_if_pct,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  expect_equal(res$x[res$grp == "A"], 200 / 3)
+})
+
 test_that("pivot with sum_if_ratio computes ratio against the unfiltered group total", {
   df <- tibble::tibble(
     grp = c("A", "A", "A"),

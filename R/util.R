@@ -1077,8 +1077,13 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
          !identical(na_pct, fun.aggregate) &&
          !identical(non_na_pct, fun.aggregate) &&
          !identical(na_count, fun.aggregate) &&
-         !identical(non_na_count, fun.aggregate)){
-        # remove NA, unless fun.aggregate function is one of the above NA related ones.
+         !identical(non_na_count, fun.aggregate) &&
+         !identical(count_if, fun.aggregate) &&
+         !identical(count_if_ratio, fun.aggregate) &&
+         !identical(count_if_pct, fun.aggregate)){
+        # remove NA, unless fun.aggregate function is one of the above NA related ones,
+        # or one of the count_if family, whose count is based on value_condition, not on
+        # the value column's own nullness (mirrors the na_*/non_na_* exclusion above).
         df <- df %>% dplyr::filter(!is.na(!!rlang::sym(value_col)))
       }
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
