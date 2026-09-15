@@ -1127,6 +1127,55 @@ test_that("pivot with count_if_pct and a value column keeps the full row count a
   expect_equal(res$x[res$grp == "A"], 200 / 3)
 })
 
+test_that("pivot forwards na.rm to conditional aggregates", {
+  df <- tibble::tibble(
+    grp = c("A", "A"),
+    col = c("x", "x"),
+    val = c(10, NA),
+    flag = c(TRUE, TRUE)
+  )
+
+  value_res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag", na.rm = FALSE
+  )
+  expect_true(is.na(value_res$x[value_res$grp == "A"]))
+
+  count_df <- df
+  count_df$flag <- c(TRUE, NA)
+  count_res <- count_df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if,
+    value_condition = "flag", na.rm = FALSE
+  )
+  expect_true(is.na(count_res$x[count_res$grp == "A"]))
+})
+
+test_that("pivot count_if ratios and percentages use the full cell denominator with NA conditions", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, 20, 30),
+    flag = c(TRUE, FALSE, NA)
+  )
+
+  for (fn in list(exploratory::count_if_ratio, exploratory::count_if_pct)) {
+    no_value_res <- df %>% exploratory::pivot(
+      row_cols = "grp", col_cols = "col",
+      fun.aggregate = fn, value_condition = "flag"
+    )
+    value_res <- df %>% exploratory::pivot(
+      row_cols = "grp", col_cols = "col", value = "val",
+      fun.aggregate = fn, value_condition = "flag"
+    )
+
+    expected <- if (identical(fn, exploratory::count_if_ratio)) 1 / 3 else 100 / 3
+    expect_equal(no_value_res$x[no_value_res$grp == "A"], expected)
+    expect_equal(value_res$x[value_res$grp == "A"], expected)
+  }
+})
+
 test_that("pivot with sum_if_ratio computes ratio against the unfiltered group total", {
   df <- tibble::tibble(
     grp = c("A", "A", "A"),

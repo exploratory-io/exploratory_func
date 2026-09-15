@@ -1066,7 +1066,10 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
           (identical(fun.aggregate, count_if) ||
            identical(fun.aggregate, count_if_ratio) ||
            identical(fun.aggregate, count_if_pct))) {
-        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!value_condition_expr))
+        # Use the two-argument count_if form for all three functions. The
+        # one-argument ratio/pct forms use mean(cond), which drops NA
+        # conditions from the denominator instead of using the full cell size.
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(rep(TRUE, dplyr::n()), !!value_condition_expr, na.rm = na.rm))
       } else {
         df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
       }
@@ -1088,7 +1091,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
       }
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
       if (!is.null(value_condition_expr)) {
-        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col), !!value_condition_expr))
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col), !!value_condition_expr, na.rm = na.rm))
       } else {
         df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col)))
       }
