@@ -948,8 +948,9 @@ pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, val
 #' @param cols_sep - If na should be removed from values
 #' @param value_condition - Optional condition passed through to a conditional
 #'   aggregate function (e.g. sum_if, count_if) as its extra `...` argument.
-#'   Accepts either a string parsed with rlang::parse_expr(), or an already
-#'   quoted expression/quosure for direct R callers.
+#'   Must be a string (e.g. "flag" or "val > 10"), which is parsed with
+#'   rlang::parse_expr(). count_if without a value column (value = NULL) is
+#'   not supported yet; see the dplyr::n() branch below.
 #' @export
 pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_", value_condition = NULL) {
   # make sure to ungroup the data frame first if the row_cols are same as grouped columns.
@@ -1041,13 +1042,22 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   # make sure the value column name is unique and does not conflict existing columns in the source data frame.
   value_col_name = avoid_conflict(colnames(df), c("value"))
   # Parse value_condition once, outside the per-group closure, since it is the same for every cell.
-  # Accept either a string (parsed with rlang::parse_expr()) or an already quoted expression/quosure.
+  # Only a string is supported: rlang::parse_expr() produces a bare, env-less symbol that resolves
+  # purely through summarize_group()'s data mask, exactly like the pre-existing rlang::sym(value_col)
+  # does. An enquo()-captured quosure does NOT survive being re-forwarded through
+  # summarize_group() -> dplyr::summarize() -> sum_if/aggregate_if's own dplyr_quosures(...), so it is
+  # not supported here.
+  if (!is.null(value_condition)) {
+    stopifnot("value_condition must be a string parsed with rlang::parse_expr()" = is.character(value_condition))
+  }
   value_condition_expr <- if (!is.null(value_condition)) {
-    if (is.character(value_condition)) rlang::parse_expr(value_condition) else rlang::enquo(value_condition)
+    rlang::parse_expr(value_condition)
   }
   pivot_each <- function(df) {
     res <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
+      # Note: value_condition (count_if without a value column) is not applied in this branch yet;
+      # that is separate, not-yet-implemented scope, not a silent no-op supported today.
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
       df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
     } else {
