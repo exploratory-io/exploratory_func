@@ -1940,8 +1940,12 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' is effectively skipped when the variable is empty or NULL.
 #' @export
 `%equal_or_all%` <- function(x, y) {
+  # Zero-length y (e.g. an empty numeric/Date parameter with no selection) means "all".
+  if (length(y) == 0) {
+    return(TRUE)
+  }
   # Use %in_or_all% if y has more than one element
-  if (length(y) > 1) {
+  else if (length(y) > 1) {
     return(x %in_or_all% y)
   }
   # Check if y is NULL or empty
@@ -1961,8 +1965,12 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' is effectively skipped when the variable is empty or NULL.
 #' @export
 `%not_equal_or_all%` <- function(x, y) {
+  # Zero-length y (e.g. an empty numeric/Date parameter with no selection) means "all".
+  if (length(y) == 0) {
+    return(TRUE)
+  }
   # Use x %nin% y if y has more than one element
-  if (length(y) > 1) {
+  else if (length(y) > 1) {
     return(x %nin% y)
   }
   # Check if y is NULL or empty
@@ -1980,7 +1988,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1993,7 +2001,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_equal_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -2006,7 +2014,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -2019,7 +2027,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_equal_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
