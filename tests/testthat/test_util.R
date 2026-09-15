@@ -1022,6 +1022,22 @@ test_that("pivot with sum_if applies condition per cell", {
   expect_equal(res$y[res$grp == "B"], 8)
 })
 
+test_that("pivot with count_if and no value column counts matching rows per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "B", "B"),
+    col = c("x", "x", "y", "x", "y"),
+    flag = c(TRUE, FALSE, TRUE, TRUE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if,
+    value_condition = "flag"
+  )
+  expect_equal(res$x[res$grp == "A"], 1) # 1 of 2 rows in A/x has flag=TRUE
+  expect_equal(res$y[res$grp == "A"], 1)
+  expect_equal(res$x[res$grp == "B"], 1)
+})
+
 test_that("test pivot with NA", {
   test_df_na <- data.frame(
     carrier = c("AA", "AA", "UA"),

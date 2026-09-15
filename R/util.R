@@ -947,10 +947,12 @@ pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, val
 #' @param na.rm - If na should be removed from values
 #' @param cols_sep - If na should be removed from values
 #' @param value_condition - Optional condition passed through to a conditional
-#'   aggregate function (e.g. sum_if, count_if) as its extra `...` argument.
-#'   Must be a string (e.g. "flag" or "val > 10"), which is parsed with
-#'   rlang::parse_expr(). count_if without a value column (value = NULL) is
-#'   not supported yet; see the dplyr::n() branch below.
+#'   aggregate function. Must be a string (e.g. "flag" or "val > 10"), which is
+#'   parsed with rlang::parse_expr(). When a value column is present (value is
+#'   not NULL), it is passed as the extra `...` argument to fun.aggregate (e.g.
+#'   sum_if, count_if). When there is no value column (value = NULL) and
+#'   fun.aggregate is count_if/count_if_ratio/count_if_pct, it is passed as
+#'   that function's sole `cond` argument instead of counting all rows.
 #' @export
 pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_", value_condition = NULL) {
   # make sure to ungroup the data frame first if the row_cols are same as grouped columns.
@@ -1056,10 +1058,18 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   pivot_each <- function(df) {
     res <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      # Note: value_condition (count_if without a value column) is not applied in this branch yet;
-      # that is separate, not-yet-implemented scope, not a silent no-op supported today.
+      # count_if (and its ratio/pct siblings) take the condition as their only meaningful
+      # argument (no separate value column), unlike sum_if(x, cond, ...) etc., so they get
+      # their own branch here instead of going through the fun.aggregate(value, condition) path.
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
+      if (!is.null(value_condition_expr) &&
+          (identical(fun.aggregate, count_if) ||
+           identical(fun.aggregate, count_if_ratio) ||
+           identical(fun.aggregate, count_if_pct))) {
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!value_condition_expr))
+      } else {
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
+      }
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
