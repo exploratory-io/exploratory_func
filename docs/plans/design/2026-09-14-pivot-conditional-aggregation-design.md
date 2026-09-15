@@ -1,7 +1,7 @@
 # Design: Conditional aggregation support in pivot()
 
 ## Status
-In progress. Task 1 implemented (`value_condition`, string-only — see note below).
+Implemented. `value_condition` is string-only (see note below).
 
 ## Overview
 
@@ -77,6 +77,16 @@ directly instead of reimplementing it.
 - `_ratio`/`_pct` variants: denominator is the unfiltered group count.
 - Complex column name (spaces, multibyte characters, symbols) referenced by
   the condition expression.
+
+## Edge Cases Covered
+
+- Value-column and no-value-column paths for `count_if`, `count_if_ratio`, and
+  `count_if_pct`.
+- Explicit `na.rm = FALSE` propagation to conditional aggregates.
+- `NA` conditions retain the full cell denominator for count ratios and
+  percentages.
+- Ratio and percentage aggregates use unfiltered group totals.
+- Empty post-condition groups and complex/multibyte column names.
 
 ## Out of Scope
 
