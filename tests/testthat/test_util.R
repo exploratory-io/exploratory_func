@@ -1142,6 +1142,53 @@ test_that("pivot with min_if and no matching rows in a cell returns Inf with a w
   expect_equal(res$x[res$grp == "A"], Inf)
 })
 
+test_that("pivot with sum_if handles a complex/multibyte value column name", {
+  # value column name has spaces, multibyte chars, and symbols. It is resolved via
+  # tidyselect::vars_select, a different code path than the condition string below.
+  stress_col <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "B"),
+    col = c("x", "x", "y", "x"),
+    flag = c(TRUE, FALSE, TRUE, TRUE)
+  )
+  df[[stress_col]] <- c(10, 20, 5, 7)
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = stress_col,
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag"
+  )
+  # Group A/col x: val=10 (flag=T), val=20 (flag=F) -> sum_if(flag) = 10
+  expect_equal(res$x[res$grp == "A"], 10)
+  # Group A/col y: val=5, flag=T -> 5
+  expect_equal(res$y[res$grp == "A"], 5)
+  # Group B/col x: val=7, flag=T -> 7
+  expect_equal(res$x[res$grp == "B"], 7)
+})
+
+test_that("pivot with sum_if handles a complex/multibyte column name inside value_condition", {
+  # value_condition is parsed from a string with rlang::parse_expr(), a different code path
+  # than the value column above (tidyselect::vars_select), and needs correct R backtick-quoting
+  # for the non-syntactic condition-referenced column name.
+  cond_col <- "複雑 な 条件 列 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~"
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "B"),
+    col = c("x", "x", "y", "x"),
+    val = c(10, 20, 5, 7)
+  )
+  df[[cond_col]] <- c(5, -1, 3, 2)
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = paste0("`", cond_col, "` > 0")
+  )
+  # Group A/col x: val=10 (cond=5>0 TRUE), val=20 (cond=-1>0 FALSE) -> sum_if = 10
+  expect_equal(res$x[res$grp == "A"], 10)
+  # Group A/col y: val=5, cond=3>0 TRUE -> 5
+  expect_equal(res$y[res$grp == "A"], 5)
+  # Group B/col x: val=7, cond=2>0 TRUE -> 7
+  expect_equal(res$x[res$grp == "B"], 7)
+})
+
 test_that("test pivot with NA", {
   test_df_na <- data.frame(
     carrier = c("AA", "AA", "UA"),
