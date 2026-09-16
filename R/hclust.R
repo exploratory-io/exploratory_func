@@ -523,10 +523,16 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
     mat[is.nan(mat)] <- 0
   }
   distance_object <- stats::dist(mat, method = distance)
-  if (!requireNamespace('fastcluster', quietly = TRUE)) {
-    stop('The fastcluster package is required for hierarchical clustering.', call. = FALSE)
+  # fastcluster is an optional accelerator.  The analytics test image does not
+  # install it, and hierarchical clustering is also available in base R, so a
+  # missing accelerator must not prevent the package itself from installing or
+  # the analytics from running.
+  .hclust_fun <- if (requireNamespace('fastcluster', quietly = TRUE)) {
+    fastcluster::hclust
+  } else {
+    stats::hclust
   }
-  hc <- fastcluster::hclust(distance_object, method = linkage)
+  hc <- .hclust_fun(distance_object, method = linkage)
   n <- nrow(mat)
   node_labels <- if (is.null(source_labels)) row_ids else source_labels[valid]
   nodes <- .hclust_build_nodes(hc, row_ids, node_labels)
