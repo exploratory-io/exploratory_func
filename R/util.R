@@ -931,8 +931,8 @@ get_confint <- function(val, se, conf_int = 0.95) {
 }
 
 
-pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, ...) {
-  pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, ...)
+pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, value_condition = NULL, ...) {
+  pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, value_condition = value_condition, ...)
 }
 
 #' Calculate a pivot table.
@@ -946,8 +946,15 @@ pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, val
 #' @param fill - Value to be filled for missing values
 #' @param na.rm - If na should be removed from values
 #' @param cols_sep - If na should be removed from values
+#' @param value_condition - Optional condition passed through to a conditional
+#'   aggregate function. Must be a string (e.g. "flag" or "val > 10"), which is
+#'   parsed with rlang::parse_expr(). When a value column is present (value is
+#'   not NULL), it is passed as the extra `...` argument to fun.aggregate (e.g.
+#'   sum_if, count_if). When there is no value column (value = NULL) and
+#'   fun.aggregate is count_if/count_if_ratio/count_if_pct, it is passed as
+#'   that function's sole `cond` argument instead of counting all rows.
 #' @export
-pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
+pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_", value_condition = NULL) {
   # make sure to ungroup the data frame first if the row_cols are same as grouped columns.
   grouped_col <- grouped_by(df)
   if (!is.null(row_cols) && any(grouped_col %in% row_cols)) {
@@ -1036,11 +1043,36 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   }
   # make sure the value column name is unique and does not conflict existing columns in the source data frame.
   value_col_name = avoid_conflict(colnames(df), c("value"))
+  # Parse value_condition once, outside the per-group closure, since it is the same for every cell.
+  # Only a string is supported: rlang::parse_expr() produces a bare, env-less symbol that resolves
+  # purely through summarize_group()'s data mask, exactly like the pre-existing rlang::sym(value_col)
+  # does. An enquo()-captured quosure does NOT survive being re-forwarded through
+  # summarize_group() -> dplyr::summarize() -> sum_if/aggregate_if's own dplyr_quosures(...), so it is
+  # not supported here.
+  if (!is.null(value_condition)) {
+    stopifnot("value_condition must be a string parsed with rlang::parse_expr()" = is.character(value_condition))
+  }
+  value_condition_expr <- if (!is.null(value_condition)) {
+    rlang::parse_expr(value_condition)
+  }
   pivot_each <- function(df) {
     res <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
+      # count_if (and its ratio/pct siblings) take the condition as their only meaningful
+      # argument (no separate value column), unlike sum_if(x, cond, ...) etc., so they get
+      # their own branch here instead of going through the fun.aggregate(value, condition) path.
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
+      if (!is.null(value_condition_expr) &&
+          (identical(fun.aggregate, count_if) ||
+           identical(fun.aggregate, count_if_ratio) ||
+           identical(fun.aggregate, count_if_pct))) {
+        # Use the two-argument count_if form for all three functions. The
+        # one-argument ratio/pct forms use mean(cond), which drops NA
+        # conditions from the denominator instead of using the full cell size.
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(rep(TRUE, dplyr::n()), !!value_condition_expr, na.rm = na.rm))
+      } else {
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := dplyr::n())
+      }
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
@@ -1048,12 +1080,21 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
          !identical(na_pct, fun.aggregate) &&
          !identical(non_na_pct, fun.aggregate) &&
          !identical(na_count, fun.aggregate) &&
-         !identical(non_na_count, fun.aggregate)){
-        # remove NA, unless fun.aggregate function is one of the above NA related ones.
+         !identical(non_na_count, fun.aggregate) &&
+         !identical(count_if, fun.aggregate) &&
+         !identical(count_if_ratio, fun.aggregate) &&
+         !identical(count_if_pct, fun.aggregate)){
+        # remove NA, unless fun.aggregate function is one of the above NA related ones,
+        # or one of the count_if family, whose count is based on value_condition, not on
+        # the value column's own nullness (mirrors the na_*/non_na_* exclusion above).
         df <- df %>% dplyr::filter(!is.na(!!rlang::sym(value_col)))
       }
       # use glue for custom result name ref: https://www.tidyverse.org/blog/2020/02/glue-strings-and-tidy-eval/#custom-result-names
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col)))
+      if (!is.null(value_condition_expr)) {
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col), !!value_condition_expr, na.rm = na.rm))
+      } else {
+        df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, "{value_col_name}" := fun.aggregate(!!rlang::sym(value_col)))
+      }
     }
     res <- res %>% dplyr::arrange(!!!rlang::syms(new_col_cols)) # arrange before pivot_wider, so that the create columns are sorted.
     # Dynamically set value column name to list passed to value_fill argument.
@@ -1899,8 +1940,12 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' is effectively skipped when the variable is empty or NULL.
 #' @export
 `%equal_or_all%` <- function(x, y) {
+  # Zero-length y (e.g. an empty numeric/Date parameter with no selection) means "all".
+  if (length(y) == 0) {
+    return(TRUE)
+  }
   # Use %in_or_all% if y has more than one element
-  if (length(y) > 1) {
+  else if (length(y) > 1) {
     return(x %in_or_all% y)
   }
   # Check if y is NULL or empty
@@ -1920,8 +1965,12 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' is effectively skipped when the variable is empty or NULL.
 #' @export
 `%not_equal_or_all%` <- function(x, y) {
+  # Zero-length y (e.g. an empty numeric/Date parameter with no selection) means "all".
+  if (length(y) == 0) {
+    return(TRUE)
+  }
   # Use x %nin% y if y has more than one element
-  if (length(y) > 1) {
+  else if (length(y) > 1) {
     return(x %nin% y)
   }
   # Check if y is NULL or empty
@@ -1939,7 +1988,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1952,7 +2001,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%greater_or_equal_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1965,7 +2014,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
@@ -1978,7 +2027,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%less_or_equal_or_all%` <- function(x,y) {
-  if (is.null(y) || (is.character(y) && y == "")) {
+  if (length(y) == 0 || is.null(y) || (is.character(y) && y == "")) {
     return (TRUE)
   }
   else {
