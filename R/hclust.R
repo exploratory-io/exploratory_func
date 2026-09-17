@@ -376,6 +376,20 @@
   )
 }
 
+.hclust_show_detail_data <- function(x, k = NULL) {
+  k <- .hclust_safe_numeric(k)
+  k <- if (is.null(k)) x$centers else as.integer(floor(k))
+  if (k < 2L || k > x$valid_nrow) {
+    stop(paste0('k must be between 2 and ', x$valid_nrow, '.'), call. = FALSE)
+  }
+  rows <- as.integer(x$source_row_ids)
+  out <- x$original_data[rows, , drop = FALSE]
+  cluster <- rep(NA_integer_, length(rows))
+  cluster[x$valid_indices] <- as.integer(.hclust_membership(x, k))
+  out[['.hclust.cluster']] <- cluster
+  tibble::as_tibble(out, .name_repair = 'minimal')
+}
+
 #' Hierarchical clustering analytics.
 #'
 #' @param df A data frame.
@@ -615,8 +629,14 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
 
 #' Tidy a hierarchical clustering model for Analytics report sections.
 #' @export
-tidy.hclust_exploratory <- function(x, type = 'summary', with_excluded_rows = FALSE, ...) {
+tidy.hclust_exploratory <- function(x, type = 'summary', with_excluded_rows = FALSE, k = NULL, ...) {
   switch(type,
+    # tam#38161: the data behind Show Detail on a dendrogram cluster. Every row
+    # that entered the clustering (after sampling), with ALL of its original
+    # columns, plus the display-order cluster at `k` -- the widget's current
+    # cluster count, whose numbering (1..k left to right) is exactly the one the
+    # dendrogram shows. Rows excluded for missing values get NA.
+    show_detail_data = .hclust_show_detail_data(x, k),
     summary = .hclust_summary(x, with_excluded_rows),
     analysis_conditions = .hclust_analysis_conditions(x),
     dendrogram_nodes = .hclust_dendrogram_nodes(x),

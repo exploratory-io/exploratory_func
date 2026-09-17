@@ -260,3 +260,35 @@ test_that("singleton cuts do not crash when silhouette is undefined", {
   expect_true(all(is.na(summary_df$min_silhouette)))
   expect_true(all(is.na(summary_df$pct_negative)))
 })
+
+test_that('show_detail_data returns every clustered row with its cluster at k (tam#38161)', {
+  data <- mtcars %>% tibble::rownames_to_column('car')
+  data$mpg[c(3, 7)] <- NA
+  model_df <- data %>% exploratory:::exp_hclust(
+    mpg, disp, hp, centers = 3, max_interactive_k = 6, elbow_method_mode = 'none',
+    takeSample = FALSE, seed = 1
+  )
+  model <- model_df$model[[1]]
+  for (k in 2:6) {
+    out <- tidy_rowwise(model_df, model, type = 'show_detail_data', k = k)
+    expect_equal(names(out), c(names(data), '.hclust.cluster'))
+    expect_equal(nrow(out), nrow(data))
+    expect_equal(out$car, data$car)
+    expect_true(all(is.na(out$.hclust.cluster[c(3, 7)])))
+    expect_equal(out$.hclust.cluster[-c(3, 7)], model$memberships[[as.character(k)]])
+    expect_equal(sort(unique(stats::na.omit(out$.hclust.cluster))), seq_len(k))
+  }
+  # Default k is the report's number of clusters.
+  default_cluster <- broom::tidy(model, type = 'show_detail_data')$.hclust.cluster
+  expect_equal(default_cluster[!is.na(default_cluster)], as.integer(model$clustering))
+  expect_error(broom::tidy(model, type = 'show_detail_data', k = 100), 'k must be between')
+
+  # Sampling: only the sampled rows, still aligned with their own columns.
+  sampled_df <- data %>% exploratory:::exp_hclust(disp, hp, centers = 2, max_nrow = 10, takeSample = TRUE,
+                                                  elbow_method_mode = 'none', seed = 2)
+  sampled <- sampled_df$model[[1]]
+  out <- broom::tidy(sampled, type = 'show_detail_data', k = 2)
+  expect_equal(nrow(out), 10L)
+  expect_equal(out$car, data$car[as.integer(sampled$source_row_ids)])
+  expect_equal(out$.hclust.cluster, sampled$memberships[['2']])
+})
