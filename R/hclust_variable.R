@@ -56,16 +56,27 @@
   as.numeric(value[, 'sil_width'])
 }
 
+# TRUE for each variable that is alone in its cluster. cluster::silhouette gives
+# such a variable 0 by definition (Rousseeuw 1987): it keeps counting as 0 in an
+# average, but a per-variable or per-cluster 0 would read as "poorly separated",
+# and it would floor every minimum at 0, so those are reported as NA instead.
+.hclust_variable_singleton <- function(ids) {
+  counts <- table(ids)
+  as.vector(counts[as.character(ids)] == 1L)
+}
+
 .hclust_variable_silhouette <- function(x) {
   upper <- min(x$max_centers, x$valid_nrow - 1L)
   if (upper < 2L) return(.hclust_variable_empty('silhouette'))
   purrr::map_dfr(seq.int(2L, upper), function(k) {
-    widths <- .hclust_variable_silhouette_widths(.hclust_membership(x, k), x$distance_object)
+    ids <- .hclust_membership(x, k)
+    widths <- .hclust_variable_silhouette_widths(ids, x$distance_object)
     has_value <- any(is.finite(widths))
+    grouped <- widths[!.hclust_variable_singleton(ids)]
     tibble::tibble(
       center = k,
       avg_silhouette = if (has_value) mean(widths, na.rm = TRUE) else NA_real_,
-      min_silhouette = if (has_value) min(widths, na.rm = TRUE) else NA_real_,
+      min_silhouette = if (any(is.finite(grouped))) min(grouped, na.rm = TRUE) else NA_real_,
       pct_negative = if (has_value) mean(widths < 0, na.rm = TRUE) else NA_real_
     )
   })
@@ -78,7 +89,7 @@
     index <- which(ids == cluster_id)
     in_display_order <- order_index[order_index %in% index]
     values <- x$silhouette_values[index]
-    has_value <- any(is.finite(values))
+    has_value <- length(index) > 1L && any(is.finite(values))
     tibble::tibble(
       cluster = as.integer(cluster_id), n_variables = length(index),
       variables = paste(x$selected_cols[in_display_order], collapse = ', '),
@@ -91,11 +102,13 @@
 
 .hclust_variable_analysis_conditions <- function(x) {
   tibble::tibble(
-    Metric = c('Number of Variables', 'Variable Names', 'Row Count', 'Number of Clusters',
+    Metric = c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Used for Correlation (Min)',
+               'Non-finite Values (Treated as Missing)', 'Number of Clusters',
                'Correlation Method', 'Distance', 'Linkage', 'Missing Values'),
     Value = c(
       as.character(length(x$selected_cols)), paste(x$selected_cols, collapse = ', '),
-      as.character(x$nrow), as.character(x$centers), x$cor_method, '1 - Correlation',
+      as.character(x$nrow), as.character(x$min_pair_nrow %||% x$nrow),
+      as.character(x$n_nonfinite %||% 0L), as.character(x$centers), x$cor_method, '1 - Correlation',
       x$linkage, 'Pairwise'
     )
   )
@@ -139,7 +152,7 @@
       avg_cor_own = avg_cor_own,
       nearest_cluster = if (is.na(nearest)) NA_integer_ else as.integer(others[[nearest]]),
       avg_cor_nearest = if (is.na(nearest)) NA_real_ else as.numeric(other_means[[nearest]]),
-      silhouette = x$silhouette_values[[index]]
+      silhouette = if (length(own) > 1L) x$silhouette_values[[index]] else NA_real_
     )
   })
   dplyr::arrange(rows, display_order)
@@ -183,6 +196,9 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
   max_centers <- as.integer(floor(max_centers))
 
   mat <- as.matrix(df[selected_cols])
+  # Inf/-Inf would make cor() return NaN for every pair they touch; they are
+  # treated as missing, and counted so the report can say so.
+  infinite <- is.infinite(mat)
   mat[!is.finite(mat)] <- NA_real_
   # Same policy and wording as exp_hclust: a variable with no usable value is
   # dropped with a warning that names it, so the rest still clusters.
@@ -201,6 +217,7 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
             call. = FALSE)
     selected_cols <- selected_cols[!unusable]
     mat <- mat[, !unusable, drop = FALSE]
+    infinite <- infinite[, !unusable, drop = FALSE]
   }
   # A constant variable has no correlation with anything. Name it instead of
   # letting it silently sit at distance 1 from every other variable.
@@ -222,6 +239,9 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
   max_interactive_k <- min(max_interactive_k, p)
 
   cor_mat <- suppressWarnings(stats::cor(mat, method = cor_method, use = 'pairwise.complete.obs'))
+  present <- !is.na(mat)
+  pair_nrow <- crossprod(present)
+  min_pair_nrow <- as.integer(min(pair_nrow[upper.tri(pair_nrow)]))
   dimnames(cor_mat) <- list(selected_cols, selected_cols)
   # 1 - r, NOT 1 - abs(r): a negatively correlated pair stays apart. A pair with
   # no overlapping rows has no correlation; treat it as uncorrelated (distance 1)
@@ -260,6 +280,7 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
     cuts = cut_data$cuts, leaf_order = as.integer(hc$order) - 1L,
     dendrogram_nodes = nodes, valid_nrow = p,
     centers = centers, cor_method = cor_method, linkage = linkage,
+    n_nonfinite = sum(infinite), min_pair_nrow = min_pair_nrow,
     max_interactive_k = max_interactive_k, elbow_method_mode = elbow_method_mode,
     max_centers = max_centers,
     silhouette_values = NULL, silhouette_result = NULL

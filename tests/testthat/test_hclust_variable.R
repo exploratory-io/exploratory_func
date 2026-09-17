@@ -85,8 +85,12 @@ test_that('report tables have the documented columns and consistent values', {
 
   conditions <- broom::tidy(model, type = 'analysis_conditions')
   expect_equal(conditions$Metric, c('Number of Variables', 'Variable Names', 'Row Count',
+                                    'Rows Used for Correlation (Min)',
+                                    'Non-finite Values (Treated as Missing)',
                                     'Number of Clusters', 'Correlation Method', 'Distance',
                                     'Linkage', 'Missing Values'))
+  expect_equal(conditions$Value[conditions$Metric == 'Rows Used for Correlation (Min)'], '32')
+  expect_equal(conditions$Value[conditions$Metric == 'Non-finite Values (Treated as Missing)'], '0')
   expect_equal(conditions$Value[[3]], '32')
 
   merge <- broom::tidy(model, type = 'merge_distance')
@@ -135,6 +139,11 @@ test_that('pairwise missing values, dropped and constant variables, and bounds',
   )
   expect_equal(model$selected_cols, c('x', 'y', 'z'))
   expect_equal(model$cor_mat['x', 'z'], stats::cor(data$x, data$z, use = 'pairwise.complete.obs'))
+  conditions <- broom::tidy(model, type = 'analysis_conditions')
+  # y's Inf is counted and treated as missing; every pair then shares 4 of the 6 rows.
+  expect_equal(conditions$Value[conditions$Metric == 'Non-finite Values (Treated as Missing)'], '1')
+  expect_equal(conditions$Value[conditions$Metric == 'Rows Used for Correlation (Min)'], '4')
+  expect_equal(conditions$Value[conditions$Metric == 'Row Count'], '6')
 
   expect_error(exploratory:::exp_hclust_variable(tibble::tibble(a = 1:5, b = 1), a, b, centers = 2),
                'b has the same value in every row')
@@ -159,4 +168,33 @@ test_that('complex column names survive as leaf labels', {
   expect_true(name %in% nodes$label)
   expect_true(name %in% broom::tidy(model, type = 'data')$variable)
   expect_true(name %in% levels(broom::tidy(model, type = 'cor')$pair.name.x))
+})
+
+test_that('a variable alone in its cluster reports NA silhouette, but still counts as 0 in the sweep average', {
+  set.seed(1)
+  base <- rnorm(60)
+  data <- tibble::tibble(a = base + rnorm(60, sd = 0.1), b = base + rnorm(60, sd = 0.1),
+                         c = base + rnorm(60, sd = 0.2), d = rnorm(60), e = rnorm(60))
+  model <- exploratory:::exp_hclust_variable(data, a, b, c, d, e, centers = 3)$model[[1]]
+  ids <- model$clustering
+  singleton <- as.vector(table(ids)[as.character(ids)] == 1L)
+  expect_true(any(singleton))
+  expect_true(any(!singleton))
+
+  summary <- broom::tidy(model, type = 'summary')
+  expect_true(all(is.na(summary$avg_silhouette[summary$n_variables == 1L])))
+  expect_true(all(is.na(summary$min_silhouette[summary$n_variables == 1L])))
+  expect_true(all(is.finite(summary$avg_silhouette[summary$n_variables > 1L])))
+
+  data_out <- broom::tidy(model, type = 'data')
+  lone <- data_out$variable %in% model$selected_cols[singleton]
+  expect_true(all(is.na(data_out$silhouette[lone])))
+  expect_true(all(is.finite(data_out$silhouette[!lone])))
+
+  widths <- cluster::silhouette(ids, model$distance_object)[, 'sil_width']
+  sweep <- broom::tidy(model, type = 'silhouette')
+  row <- sweep[sweep$center == 3L, ]
+  expect_equal(row$avg_silhouette, mean(widths))
+  expect_equal(row$min_silhouette, min(widths[!singleton]))
+  expect_gt(row$min_silhouette, 0)
 })
