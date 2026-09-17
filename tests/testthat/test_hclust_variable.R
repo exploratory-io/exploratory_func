@@ -197,4 +197,10 @@ test_that('a variable alone in its cluster reports NA silhouette, but still coun
   expect_equal(row$avg_silhouette, mean(widths))
   expect_equal(row$min_silhouette, min(widths[!singleton]))
   expect_gt(row$min_silhouette, 0)
+  expect_equal(row$n_singleton_clusters, sum(singleton))
+  # Every k reports its own count: one cluster per variable at k = p would be p.
+  for (k in sweep$center) {
+    cut <- model$memberships[[as.character(k)]] %||% stats::cutree(model$hclust, k)
+    expect_equal(sweep$n_singleton_clusters[sweep$center == k], sum(table(cut) == 1L))
+  }
 })
