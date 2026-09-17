@@ -292,3 +292,65 @@ test_that('show_detail_data returns every clustered row with its cluster at k (t
   expect_equal(out$car, data$car[as.integer(sampled$source_row_ids)])
   expect_equal(out$.hclust.cluster, sampled$memberships[['2']])
 })
+
+test_that('radar/profile carries a peak-cluster variable_order matching #38492-style grouping (tam#38404/#38491)', {
+  # 3 variables, 2 clusters, each variable's peak deliberately in a different cluster.
+  data <- tibble::tibble(
+    a = c(10, 10, 10, 10, 0, 0, 0, 0),
+    b = c(0, 0, 0, 0, 10, 10, 10, 10),
+    c = c(5, 5, 5, 5, 6, 6, 6, 6)
+  )
+  model <- exploratory:::exp_hclust(data, a, b, c, centers = 2, elbow_method_mode = 'none', seed = 1)$model[[1]]
+  rows <- broom::tidy(model, type = 'radar')
+  expect_true('variable_order' %in% names(rows))
+  order_map <- rows %>% dplyr::distinct(variable, variable_order) %>% dplyr::arrange(variable_order)
+  # `a` peaks in the lower-numbered cluster, `b` in the higher one; `c` (nearly
+  # constant across clusters) sits between them by its own tiny peak margin.
+  # The exact cluster numbering depends on cutree, so only the RELATIVE order
+  # (a before b) and internal consistency (variable_order groups by peak
+  # cluster) is asserted, matching how #38492 is itself verified.
+  expect_equal(sort(order_map$variable), c('a', 'b', 'c'))
+  expect_equal(nrow(order_map), 3L)
+  expect_equal(sort(order_map$variable_order), 1:3)
+  a_peak_cluster <- rows$cluster[rows$variable == 'a'][which.max(rows$standardized_mean[rows$variable == 'a'])]
+  b_peak_cluster <- rows$cluster[rows$variable == 'b'][which.max(rows$standardized_mean[rows$variable == 'b'])]
+  a_order <- order_map$variable_order[order_map$variable == 'a']
+  b_order <- order_map$variable_order[order_map$variable == 'b']
+  if (a_peak_cluster != b_peak_cluster) {
+    expect_equal(a_order < b_order, a_peak_cluster < b_peak_cluster)
+  }
+})
+
+test_that('radar variable_order survives profile_show_all=FALSE narrowing, unlike a post-hoc reorder (tam#38492 class)', {
+  set.seed(7)
+  data <- as.data.frame(matrix(rnorm(200), ncol = 10))
+  names(data) <- paste0('v', 1:10)
+  full <- exploratory:::exp_hclust(data, dplyr::everything(), centers = 4, profile_show_all = TRUE,
+                                   profile_top_n = 10, elbow_method_mode = 'none', seed = 1)$model[[1]]
+  narrowed <- exploratory:::exp_hclust(data, dplyr::everything(), centers = 4, profile_show_all = FALSE,
+                                       profile_top_n = 2, elbow_method_mode = 'none', seed = 1)$model[[1]]
+  full_order <- broom::tidy(full, type = 'radar') %>% dplyr::distinct(variable, variable_order) %>%
+    dplyr::arrange(variable_order)
+  narrowed_order <- broom::tidy(narrowed, type = 'radar') %>% dplyr::distinct(variable, variable_order) %>%
+    dplyr::arrange(variable_order)
+  # Every variable that survived the top-2-per-cluster narrowing keeps EXACTLY
+  # the rank it has in the full, unfiltered order -- proving the order was
+  # computed before narrowing, not recomputed on the reduced set.
+  expect_true(nrow(narrowed_order) < nrow(full_order))
+  merged <- dplyr::inner_join(narrowed_order, full_order, by = 'variable', suffix = c('_narrowed', '_full'))
+  expect_equal(rank(merged$variable_order_narrowed), rank(merged$variable_order_full))
+})
+
+test_that('distribution carries the same importance_order as the Characteristic Variables rank (tam#38491)', {
+  model <- mtcars %>% exploratory:::exp_hclust(
+    mpg, disp, hp, wt, qsec, centers = 3, elbow_method_mode = 'none', seed = 1
+  ) %>% .$model %>% .[[1]]
+  distribution <- broom::tidy(model, type = 'distribution')
+  expect_true('importance_order' %in% names(distribution))
+  importance <- broom::tidy(model, type = 'variable_importance') %>%
+    dplyr::arrange(dplyr::desc(eta_squared), variable)
+  expected_order <- setNames(seq_len(nrow(importance)), importance$variable)
+  distinct_order <- distribution %>% dplyr::distinct(variable, importance_order)
+  expect_equal(distinct_order$importance_order[match(names(expected_order), distinct_order$variable)],
+               unname(expected_order))
+})

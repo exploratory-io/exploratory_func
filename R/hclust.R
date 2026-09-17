@@ -255,6 +255,34 @@
   )
 }
 
+#' The radar chart's category-axis order (tam#38404/#38491): group each
+#' cluster's own peak (highest standardized_mean) variables into one arc,
+#' rather than leaving the axis in fitted-column order. Computed on the FULL,
+#' unfiltered profile frame -- .hclust_profile() below narrows to the top N
+#' variables per cluster AFTER this runs, and scoring on an already-narrowed
+#' frame would silently drop a variable's peak cluster whenever that cluster's
+#' copy of it did not survive the narrowing (the same #38492 trap K-Medoids hit).
+#' Returned as a rank column, not by reordering `variable` itself, so `variable`
+#' keeps its character class for every other consumer; the chart's own
+#' preprocessor turns it into the factor order with forcats::fct_reorder().
+#' Identical in shape to .kmedoids_profile_variable_order() (R/kmedoids.R) --
+#' kept as its own copy because the two models' `rows` frames are unrelated
+#' objects that happen to share this one column's meaning.
+.hclust_profile_variable_order <- function(rows) {
+  scores <- rows %>%
+    dplyr::group_by(variable, cluster) %>%
+    dplyr::summarize(value = mean(standardized_mean, na.rm = TRUE), .groups = 'drop_last') %>%
+    dplyr::arrange(cluster, .by_group = TRUE) %>%
+    dplyr::summarize(
+      peak_cluster = cluster[which.max(value)],
+      peak_value = max(value),
+      .groups = 'drop'
+    ) %>%
+    dplyr::arrange(peak_cluster, dplyr::desc(peak_value), variable)
+  scores$variable_order <- seq_len(nrow(scores))
+  scores[, c('variable', 'variable_order')]
+}
+
 .hclust_profile <- function(x) {
   original <- x$original_fit_mat
   overall_mean <- colMeans(x$mat)
@@ -276,6 +304,8 @@
   rows <- rows %>% dplyr::group_by(cluster) %>%
     dplyr::mutate(rank = as.integer(rank(-effect_size, ties.method = 'first'))) %>%
     dplyr::ungroup()
+  variable_order <- .hclust_profile_variable_order(rows)
+  rows <- dplyr::left_join(rows, variable_order, by = 'variable')
   if (!isTRUE(x$profile_show_all)) rows <- dplyr::filter(rows, rank <= x$profile_top_n)
   if (identical(x$profile_variable_order, 'effect_size')) {
     rows <- dplyr::arrange(rows, cluster, rank)
@@ -286,12 +316,22 @@
 .hclust_distribution <- function(x) {
   n <- nrow(x$original_fit_mat)
   p <- ncol(x$original_fit_mat)
+  # tam#38491: the boxplot's colour legend is one entry per variable and had no
+  # order of its own. Ship the SAME eta-squared rank the "Characteristic
+  # Variables" bar/table sort by (cluster_variable_importance_order(), shared
+  # with K-Means/K-Medoids in R/cluster_variable_importance.R), over the SAME
+  # x$mat / x$clustering the type='variable_importance' tidier ranks, so the
+  # two charts cannot disagree.
   tibble::tibble(
     cluster = rep(as.integer(x$clustering), each = p),
     variable = rep(colnames(x$original_fit_mat), times = n),
     value = as.numeric(t(x$original_fit_mat)),
     standardized_value = as.numeric(t(x$mat))
-  )
+  ) %>%
+    dplyr::left_join(
+      cluster_variable_importance_order(x$mat, x$clustering, colnames(x$original_fit_mat)),
+      by = 'variable'
+    )
 }
 
 .hclust_gathered_data <- function(x) {
