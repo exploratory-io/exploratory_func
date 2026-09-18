@@ -96,6 +96,141 @@ test_that("do_cor with variable order based on the input order", {
   expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
 })
 
+test_that("do_cor with variable order based on clustering", {
+  # Two groups of two. Within a group the correlation is about 0.7; across groups it is about 0.
+  # The mean-correlation order cannot see the groups, because a variable's mean says how strong its
+  # bonds are and not who they are with: it produces b1, a2, a1, b2, splitting group b to opposite
+  # ends of the heatmap. Clustering keeps each group contiguous.
+  set.seed(1)
+  n <- 200
+  ga <- rnorm(n)
+  gb <- rnorm(n)
+  df <- data.frame(a1 = ga + rnorm(n, sd = 0.5),
+                   b1 = gb + rnorm(n, sd = 0.4),
+                   a2 = ga + rnorm(n, sd = 0.6),
+                   b2 = gb + rnorm(n, sd = 0.8))
+
+  model_df <- df %>% do_cor(`a1`, `b1`, `a2`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  # Group a correlates at 0.728 and group b at 0.712, so group a leads. Inside a two-member group
+  # both members have the same single within-group correlation, and the tie falls back to the sorted
+  # column order.
+  expect_equal(levels(res$pair.name.x), c("a1", "a2", "b1", "b2"))
+  expect_equal(levels(res$pair.name.y), levels(res$pair.name.x)) # Both axes carry the same order.
+  expect_equal(nrow(res), 16)
+
+  # The order this replaces, on the same data, interleaves the two groups.
+  mean_order_df <- df %>% do_cor(`a1`, `b1`, `a2`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
+                                 variable_order = "correlation", return_type = "model")
+  mean_order <- levels((mean_order_df %>% tidy_rowwise(model, type = 'cor'))$pair.name.x)
+  expect_equal(mean_order, c("b1", "a2", "a1", "b2"))
+})
+
+test_that("do_cor clustering orders the groups by the mean correlation inside each", {
+  # Group b is the tighter pair (0.909 against group a's 0.605), so it leads regardless of where the
+  # columns sit in the selection. A dendrogram's leaf order would not decide this: it is only
+  # defined up to flipping each branch.
+  set.seed(2)
+  n <- 200
+  ga <- rnorm(n)
+  gb <- rnorm(n)
+  df <- data.frame(a1 = ga + rnorm(n, sd = 0.9),
+                   a2 = ga + rnorm(n, sd = 0.9),
+                   b1 = gb + rnorm(n, sd = 0.3),
+                   b2 = gb + rnorm(n, sd = 0.3))
+
+  model_df <- df %>% do_cor(`a1`, `a2`, `b1`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(levels(res$pair.name.x), c("b1", "b2", "a1", "a2"))
+})
+
+test_that("do_cor clustering ranks a group by its whole spread, not by its best pair", {
+  # Group a holds three variables: a1 and a2 correlate at 0.883, but a3 trails at 0.589 / 0.520 and
+  # drags the group's mean down to 0.664. Group b is a plain pair at 0.749. Ranking the groups by
+  # their STRONGEST pair would put group a first on the strength of the 0.883 alone; the mean is
+  # what makes the more uniformly tight group lead, and it reproduced the brand survey's leading
+  # order in 42 of 60 bootstrap resamples against the strongest pair's 29.
+  # Inside group a, running the procedure again splits a3 off on its own, and a group of one has no
+  # pair to be strong so it sorts last.
+  set.seed(3)
+  n <- 200
+  ga <- rnorm(n)
+  gb <- rnorm(n)
+  df <- data.frame(a1 = ga + rnorm(n, sd = 0.3),
+                   a2 = ga + rnorm(n, sd = 0.4),
+                   a3 = ga + rnorm(n, sd = 1.2),
+                   b1 = gb + rnorm(n, sd = 0.6),
+                   b2 = gb + rnorm(n, sd = 0.6))
+
+  model_df <- df %>% do_cor(`a1`, `a2`, `a3`, `b1`, `b2`, method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(levels(res$pair.name.x), c("b1", "b2", "a1", "a2", "a3"))
+})
+
+test_that("do_cor clustering keeps nested sub-groups contiguous", {
+  # Two super-groups, each holding two sub-groups. A single cut can only express one level: here it
+  # picks the 2-group split, and any per-group scalar sort then interleaves the sub-groups inside
+  # each half (ordering group members by their within-group mean produced a1 a2 b1 b2 c1 d2 d1 c2).
+  # Running the whole procedure again inside each group recovers all four.
+  set.seed(21)
+  n <- 400
+  s1 <- rnorm(n)
+  s2 <- rnorm(n)
+  a <- s1 + rnorm(n, sd = 0.7)
+  b <- s1 + rnorm(n, sd = 0.7)
+  cc <- s2 + rnorm(n, sd = 0.7)
+  dd <- s2 + rnorm(n, sd = 0.7)
+  df <- data.frame(a1 = a + rnorm(n, sd = 0.3), a2 = a + rnorm(n, sd = 0.3),
+                   b1 = b + rnorm(n, sd = 0.3), b2 = b + rnorm(n, sd = 0.3),
+                   c1 = cc + rnorm(n, sd = 0.3), c2 = cc + rnorm(n, sd = 0.3),
+                   d1 = dd + rnorm(n, sd = 0.3), d2 = dd + rnorm(n, sd = 0.3))
+
+  model_df <- df %>% do_cor(`a1`, `a2`, `b1`, `b2`, `c1`, `c2`, `d1`, `d2`,
+                            method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  clustered <- levels(res$pair.name.x)
+  lapply(list(c("a1", "a2"), c("b1", "b2"), c("c1", "c2"), c("d1", "d2")), function(pair) {
+    expect_equal(abs(diff(match(pair, clustered))), 1)
+  })
+  expect_equal(clustered, c("a1", "a2", "b1", "b2", "c1", "c2", "d1", "d2"))
+})
+
+test_that("do_cor clustering order with fewer than 3 variables", {
+  # hclust needs 2 or more objects. With 2 variables there is nothing to arrange, and the analysis
+  # has to come back with the full pair set rather than an error.
+  df <- data.frame(x = c(1, 1, 0, 0), y = c(1, 0, 1, 0))
+  model_df <- df %>% do_cor(`x`, `y`, method = "pearson", distinct = FALSE, diag = TRUE,
+                            variable_order = "cluster", return_type = "model")
+  res <- model_df %>% tidy_rowwise(model, type = 'cor')
+  expect_equal(sort(levels(res$pair.name.x)), c("x", "y"))
+  expect_equal(nrow(res), 4)
+})
+
+test_that("do_cor clustering order with a constant column", {
+  # A column that never varies correlates with nothing, so its distances are all NA. It must not
+  # take the clustering -- and with it the whole analysis -- down with it.
+  df <- data.frame(x = c(1, 2, 3, 4), y = c(1, 2, 3, 5), z = c(4, 3, 2, 1), const = c(1, 1, 1, 1))
+  cluster_warnings <- character(0)
+  model_df <- suppressWarnings(
+    withCallingHandlers(
+      df %>% do_cor(`x`, `y`, `z`, `const`, method = "pearson", distinct = FALSE, diag = TRUE,
+                    variable_order = "cluster", return_type = "model"),
+      warning = function(w) {
+        cluster_warnings <<- c(cluster_warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }))
+  expect_false(any(grepl("unknown level", cluster_warnings, fixed = TRUE)))
+  res <- suppressWarnings(model_df %>% tidy_rowwise(model, type = 'cor'))
+  # x and y move together and z moves against them, so the two blocks stay apart.
+  clustered <- levels(res$pair.name.x)
+  expect_equal(abs(diff(match(c("x", "y"), clustered))), 1)
+  expect_true(all(c("x", "y", "z") %in% clustered))
+})
+
 test_that("do_cor with only lower triangle", {
   # Steps to produce the output
   df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
