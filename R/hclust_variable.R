@@ -17,7 +17,7 @@
     analysis_conditions = tibble::tibble(Metric = character(), Value = character()),
     silhouette = tibble::tibble(
       center = integer(), avg_silhouette = numeric(), min_silhouette = numeric(),
-      pct_negative = numeric()
+      pct_negative = numeric(), n_singleton_clusters = integer()
     ),
     cor = tibble::tibble(
       pair.name.x = factor(), pair.name.y = factor(), correlation = numeric(),
@@ -72,12 +72,16 @@
     ids <- .hclust_membership(x, k)
     widths <- .hclust_variable_silhouette_widths(ids, x$distance_object)
     has_value <- any(is.finite(widths))
-    grouped <- widths[!.hclust_variable_singleton(ids)]
+    alone <- .hclust_variable_singleton(ids)
+    grouped <- widths[!alone]
     tibble::tibble(
       center = k,
       avg_silhouette = if (has_value) mean(widths, na.rm = TRUE) else NA_real_,
       min_silhouette = if (any(is.finite(grouped))) min(grouped, na.rm = TRUE) else NA_real_,
-      pct_negative = if (has_value) mean(widths < 0, na.rm = TRUE) else NA_real_
+      pct_negative = if (has_value) mean(widths < 0, na.rm = TRUE) else NA_real_,
+      # How many clusters hold a single variable. Their 0 lowers the average and is
+      # left out of the minimum, so a k with many of them needs this to be read.
+      n_singleton_clusters = as.integer(sum(alone))
     )
   })
 }
