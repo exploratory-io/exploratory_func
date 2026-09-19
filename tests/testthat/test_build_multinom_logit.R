@@ -131,6 +131,45 @@ test_that("vif, importance, partial dependence and report helpers return data", 
   expect_equal(nrow(probs), 3 * nrow(df))
 })
 
+test_that("importance p-values match exact predictor terms", {
+  set.seed(22)
+  n <- 800
+  x <- stats::rnorm(n)
+  x2 <- stats::rnorm(n)
+  eta <- 2.2 * x2
+  p <- cbind(exp(eta), 1, 1)
+  p <- p / rowSums(p)
+  y <- apply(p, 1, function(pr) sample(c("A", "B", "C"), 1, prob = pr))
+  df <- data.frame(y = y, x = x, x2 = x2)
+
+  model_df <- df %>% build_multinom_logit(y, x, x2, reference_category = "C")
+  coef_df <- model_df %>% tidy_rowwise(model, conf.int = FALSE, exponentiate = FALSE)
+  imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
+
+  expected_x_p <- min(coef_df$p.value[coef_df$term == "x"])
+  actual_x_p <- imp_df$p.value[imp_df$variable == "x"]
+  expect_equal(actual_x_p, expected_x_p)
+  expect_gt(actual_x_p, 0.1)
+  expect_lt(imp_df$p.value[imp_df$variable == "x2"], 1e-10)
+})
+
+test_that("ordered test splits reject target categories absent from training", {
+  df <- data.frame(
+    y = c(rep("A", 30), rep("B", 30), rep("C", 30), rep("D", 10)),
+    x = seq_len(100)
+  )
+
+  expect_error(
+    df %>% build_multinom_logit(
+      y, x,
+      reference_category = "A",
+      test_rate = 0.1,
+      test_split_type = "ordered"
+    ),
+    "[Tt]arget categories.*training data"
+  )
+})
+
 test_that("perfectly collinear predictors surface a collinearity message instead of failing", {
   df <- make_multinom_test_df()
   df$x2 <- df$x1 * 2
