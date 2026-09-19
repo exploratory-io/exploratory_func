@@ -450,18 +450,17 @@ tidy.multinom_logit_exploratory <- function(x, type = "coefficients", conf.int =
     # Smallest P value among the variable's terms across ALL category comparisons.
     coef_df <- tidy.multinom_logit_exploratory(x, type = "coefficients", conf.int = FALSE, exponentiate = FALSE)
     slope_df <- coef_df %>% dplyr::filter(coefficient_type == "coefficient")
+    # R backtick-quotes a term whenever the name is not syntactic -- including for
+    # non-ASCII punctuation such as a Japanese comma -- so compare with the quoting
+    # removed instead of guessing R's rule (tam#37033).
+    unquoted_terms <- gsub("`", "", as.character(slope_df$raw_term), fixed = TRUE)
     ret <- ret %>% dplyr::mutate(p.value = purrr::map_dbl(variable, function(var) {
-      quoted_var <- if (grepl("[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]", var, perl = TRUE)) {
-        paste0("`", var, "`")
-      } else {
-        var
-      }
       factor_terms <- if (!is.null(x$xlevels) && var %in% names(x$xlevels)) {
-        paste0(quoted_var, x$xlevels[[var]][-1])
+        paste0(var, x$xlevels[[var]][-1])
       } else {
         character()
       }
-      matched <- slope_df$p.value[slope_df$raw_term %in% c(var, factor_terms)]
+      matched <- slope_df$p.value[unquoted_terms %in% c(var, factor_terms)]
       if (length(matched) == 0 || all(is.na(matched))) NA_real_ else min(matched, na.rm = TRUE)
     }))
     if (identical(type, "permutation_importance")) {
@@ -518,14 +517,27 @@ tidy.multinom_logit_exploratory <- function(x, type = "coefficients", conf.int =
     }
   }
 
-  if (length(x$xlevels) > 0) {
-    base_level_table <- xlevels_to_base_level_table(x$xlevels)
-    ret <- ret %>% dplyr::left_join(base_level_table, by = "term")
-    ret$term <- prettify_polr_factor_terms(ret$term, x$xlevels)
-  }
-  # R backtick-quotes a term whose column name needs it (`サポート満足度 (1-5)`); the
-  # report shows column names, so drop the quoting. raw_term keeps the original.
+  # R backtick-quotes a term whenever the column name is not syntactic -- ASCII
+  # symbols AND non-ASCII punctuation such as a Japanese comma -- so match terms
+  # with the quoting removed rather than re-deriving R's rule (the shared
+  # xlevels_to_base_level_table()/prettify_polr_factor_terms() only quote for ASCII
+  # symbols, which left "`地域、区分`東" unformatted with no base level, tam#37033).
+  # The report shows column names, so the quoting is dropped; raw_term keeps it.
   ret$term <- gsub("`", "", ret$term, fixed = TRUE)
+  ret$base.level <- NA_character_
+  for (var in names(x$xlevels)) {
+    lvls <- x$xlevels[[var]]
+    if (length(lvls) < 2) next
+    for (lvl in lvls[-1]) {
+      is_term <- ret$term == paste0(var, lvl)
+      ret$base.level[is_term] <- lvls[[1]]
+      ret$term[is_term] <- paste0(var, ": ", lvl)
+    }
+  }
+  if (all(is.na(ret$base.level))) {
+    # Same contract as before: the column exists only when a categorical predictor does.
+    ret$base.level <- NULL
+  }
   ret$reference_category <- x$reference_category
 
   if (pretty.name) {

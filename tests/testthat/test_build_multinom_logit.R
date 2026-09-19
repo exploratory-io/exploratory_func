@@ -195,3 +195,24 @@ test_that("Repeat By fits one model per group against the same reference", {
   coef_df <- model_df %>% tidy_rowwise(model)
   expect_setequal(unique(coef_df$grp), c("A", "B"))
 })
+
+test_that("importance p-values are found for names R backtick-quotes because of non-ASCII punctuation", {
+  # A Japanese comma makes the name non-syntactic, so R quotes the model term
+  # (`...、...`) even though the name has no ASCII symbol.
+  set.seed(7)
+  n <- 600
+  df <- data.frame(
+    y = sample(c("A", "B", "C"), n, replace = TRUE),
+    check.names = FALSE
+  )
+  df[["同じような商品であれば、価格が安い方を選ぶ"]] <- sample(1:5, n, TRUE)
+  df[["満足度"]] <- sample(1:5, n, TRUE)
+  df[["地域、区分"]] <- sample(c("東", "西", "南"), n, TRUE)
+  model_df <- df %>% build_multinom_logit(y, `同じような商品であれば、価格が安い方を選ぶ`, `満足度`, `地域、区分`)
+  coef_df <- model_df %>% tidy_rowwise(model, conf.int = FALSE, exponentiate = FALSE)
+  imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
+  for (var in c("同じような商品であれば、価格が安い方を選ぶ", "満足度", "地域、区分")) {
+    expected <- min(coef_df$p.value[coef_df$term == var | startsWith(coef_df$term, paste0(var, ": "))])
+    expect_equal(imp_df$p.value[imp_df$variable == var], expected, info = var)
+  }
+})
