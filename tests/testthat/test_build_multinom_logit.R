@@ -90,6 +90,12 @@ test_that("complex column names work as target and predictor, with weight, NA an
   coef_df <- model_df %>% tidy_rowwise(model, pretty.name = TRUE)
   expect_true(all(c("Category", "Term", "Odds Ratio", "P Value", "Base Level", "Reference Category") %in% colnames(coef_df)))
   expect_true(any(startsWith(coef_df$Term, "部署 名!#: ")))
+  # Terms are shown as plain column names, never backtick-quoted.
+  numeric_df <- df
+  numeric_df$`満足度 (1-5)` <- round(stats::runif(nrow(df), 1, 5))
+  numeric_terms <- (numeric_df %>% build_multinom_logit(nps, `満足度 (1-5)`, x1) %>% tidy_rowwise(model))$term
+  expect_true("満足度 (1-5)" %in% numeric_terms)
+  expect_false(any(grepl("`", numeric_terms, fixed = TRUE)))
 
   eval_df <- model_df %>% evaluate_multinom_logit(data = "training_and_test")
   expect_equal(eval_df$`Data Type`, c("Training", "Test"))

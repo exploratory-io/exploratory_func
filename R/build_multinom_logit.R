@@ -501,6 +501,9 @@ tidy.multinom_logit_exploratory <- function(x, type = "coefficients", conf.int =
     ret <- ret %>% dplyr::left_join(base_level_table, by = "term")
     ret$term <- prettify_polr_factor_terms(ret$term, x$xlevels)
   }
+  # R backtick-quotes a term whose column name needs it (`サポート満足度 (1-5)`); the
+  # report shows column names, so drop the quoting. raw_term keeps the original.
+  ret$term <- gsub("`", "", ret$term, fixed = TRUE)
   ret$reference_category <- x$reference_category
 
   if (pretty.name) {
