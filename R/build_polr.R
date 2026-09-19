@@ -758,7 +758,11 @@ calc_vif_polr <- function(model) {
 # ground-truth category (a plain negative probability rather than a negative LOG
 # probability, so a zero probability for the observed class cannot contribute an
 # infinite penalty).
-calc_permutation_importance_polr <- function(fit, target, vars, data) {
+# `prob_fun(object, newdata)` must return the n x n_category probability matrix; it
+# defaults to clm's predict so build_polr() is unchanged, and lets
+# build_multinom_logit() (tam#37033) reuse this for nnet::multinom.
+calc_permutation_importance_polr <- function(fit, target, vars, data,
+                                             prob_fun = function(object, newdata) clm_predict(object, newdata = newdata, type = "prob")) {
   if (!requireNamespace("mmpf", quietly = TRUE)) {
     return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
   }
@@ -768,9 +772,7 @@ calc_permutation_importance_polr <- function(fit, target, vars, data) {
       mmpf::permutationImportance(
         data, var, target, fit,
         nperm = 1, # 1 permutation for performance, matching the other models.
-        predict.fun = function(object, newdata) {
-          clm_predict(object, newdata = newdata, type = "prob")
-        },
+        predict.fun = prob_fun,
         loss.fun = function(x, y) {
           sum(-(x[match(y[[1]][row(x)], colnames(x)) == col(x)]), na.rm = TRUE)
         }
@@ -796,7 +798,9 @@ calc_permutation_importance_polr <- function(fit, target, vars, data) {
 # take its multiclass branch.
 partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(data),
                                                 n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
-                                                interaction = FALSE, uniform = TRUE, data, ...) {
+                                                interaction = FALSE, uniform = TRUE, data,
+                                                prob_fun = function(object, newdata) clm_predict(object, newdata = newdata, type = "prob"),
+                                                ...) {
   if (!requireNamespace("mmpf", quietly = TRUE)) {
     return(NULL)
   }
@@ -817,7 +821,7 @@ partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(dat
 
   predict.fun <- function(object, newdata) {
     colnames(newdata) <- orig_names[match(colnames(newdata), safe_names)]
-    clm_predict(object, newdata = newdata, type = "prob")
+    prob_fun(object, newdata)
   }
 
   # Grid points based on quantiles so an outlier does not dominate the grid,
