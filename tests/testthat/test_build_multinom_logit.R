@@ -216,3 +216,20 @@ test_that("importance p-values are found for names R backtick-quotes because of 
     expect_equal(imp_df$p.value[imp_df$variable == var], expected, info = var)
   }
 })
+
+test_that("importance p-values are found for logical predictors, whose term ends in TRUE", {
+  set.seed(11)
+  n <- 800
+  flag <- stats::runif(n) < 0.5
+  x <- stats::rnorm(n)
+  p <- cbind(1, exp(1.2 * flag), exp(0.3 * x))
+  p <- p / rowSums(p)
+  df <- data.frame(y = apply(p, 1, function(pr) sample(c("A", "B", "C"), 1, prob = pr)), x = x)
+  df[["アプリ利用"]] <- flag
+  model_df <- df %>% build_multinom_logit(y, `アプリ利用`, x, reference_category = "A")
+  coef_df <- model_df %>% tidy_rowwise(model, conf.int = FALSE, exponentiate = FALSE)
+  imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
+  expected <- min(coef_df$p.value[coef_df$term == "アプリ利用TRUE"])
+  expect_false(is.na(expected))
+  expect_equal(imp_df$p.value[imp_df$variable == "アプリ利用"], expected)
+})

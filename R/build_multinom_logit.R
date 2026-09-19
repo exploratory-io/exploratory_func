@@ -457,6 +457,9 @@ tidy.multinom_logit_exploratory <- function(x, type = "coefficients", conf.int =
     ret <- ret %>% dplyr::mutate(p.value = purrr::map_dbl(variable, function(var) {
       factor_terms <- if (!is.null(x$xlevels) && var %in% names(x$xlevels)) {
         paste0(var, x$xlevels[[var]][-1])
+      } else if (is.data.frame(x$model) && is.logical(x$model[[var]])) {
+        # A logical predictor has no xlevels entry; its single term is "<var>TRUE".
+        paste0(var, "TRUE")
       } else {
         character()
       }
