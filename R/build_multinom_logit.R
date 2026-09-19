@@ -203,6 +203,19 @@ build_multinom_logit <- function(df,
     if (!(reference_category %in% levels(train_data[[target_col]]))) {
       stop(paste0("Reference category (", reference_category, ") does not appear in the training data of this group."))
     }
+    if (!is.null(test_data) && nrow(test_data) > 0) {
+      test_only_categories <- setdiff(
+        unique(as.character(test_data[[target_col]])),
+        levels(train_data[[target_col]])
+      )
+      if (length(test_only_categories) > 0) {
+        stop(paste0(
+          "Target categories (", paste(test_only_categories, collapse = ", "),
+          ") appear only in the test data and are absent from the training data. ",
+          "Adjust the test split so every test category is represented in training data."
+        ))
+      }
+    }
 
     # Rebind the formula's environment so `weights =` resolves in this frame (see build_polr()).
     local_fml <- fml
@@ -438,8 +451,17 @@ tidy.multinom_logit_exploratory <- function(x, type = "coefficients", conf.int =
     coef_df <- tidy.multinom_logit_exploratory(x, type = "coefficients", conf.int = FALSE, exponentiate = FALSE)
     slope_df <- coef_df %>% dplyr::filter(coefficient_type == "coefficient")
     ret <- ret %>% dplyr::mutate(p.value = purrr::map_dbl(variable, function(var) {
-      bare_terms <- sub("^`", "", as.character(slope_df$raw_term))
-      matched <- slope_df$p.value[startsWith(bare_terms, as.character(var))]
+      quoted_var <- if (grepl("[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]", var, perl = TRUE)) {
+        paste0("`", var, "`")
+      } else {
+        var
+      }
+      factor_terms <- if (!is.null(x$xlevels) && var %in% names(x$xlevels)) {
+        paste0(quoted_var, x$xlevels[[var]][-1])
+      } else {
+        character()
+      }
+      matched <- slope_df$p.value[slope_df$raw_term %in% c(var, factor_terms)]
       if (length(matched) == 0 || all(is.na(matched))) NA_real_ else min(matched, na.rm = TRUE)
     }))
     if (identical(type, "permutation_importance")) {
