@@ -196,40 +196,19 @@ test_that("Repeat By fits one model per group against the same reference", {
   expect_setequal(unique(coef_df$grp), c("A", "B"))
 })
 
-test_that("importance p-values are found for names R backtick-quotes because of non-ASCII punctuation", {
-  # A Japanese comma makes the name non-syntactic, so R quotes the model term
-  # (`...、...`) even though the name has no ASCII symbol.
-  set.seed(7)
-  n <- 600
-  df <- data.frame(
-    y = sample(c("A", "B", "C"), n, replace = TRUE),
-    check.names = FALSE
-  )
-  df[["同じような商品であれば、価格が安い方を選ぶ"]] <- sample(1:5, n, TRUE)
-  df[["満足度"]] <- sample(1:5, n, TRUE)
-  df[["地域、区分"]] <- sample(c("東", "西", "南"), n, TRUE)
-  model_df <- df %>% build_multinom_logit(y, `同じような商品であれば、価格が安い方を選ぶ`, `満足度`, `地域、区分`)
-  coef_df <- model_df %>% tidy_rowwise(model, conf.int = FALSE, exponentiate = FALSE)
-  imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
-  for (var in c("同じような商品であれば、価格が安い方を選ぶ", "満足度", "地域、区分")) {
-    expected <- min(coef_df$p.value[coef_df$term == var | startsWith(coef_df$term, paste0(var, ": "))])
-    expect_equal(imp_df$p.value[imp_df$variable == var], expected, info = var)
-  }
-})
+# Predictor-shape coverage for importance p-values lives in test_importance_pvalue_contract.R,
+# which runs the same matrix against EVERY model that maps terms back to variables.
 
-test_that("importance p-values are found for logical predictors, whose term ends in TRUE", {
-  set.seed(11)
-  n <- 800
-  flag <- stats::runif(n) < 0.5
-  x <- stats::rnorm(n)
-  p <- cbind(1, exp(1.2 * flag), exp(0.3 * x))
-  p <- p / rowSums(p)
-  df <- data.frame(y = apply(p, 1, function(pr) sample(c("A", "B", "C"), 1, prob = pr)), x = x)
-  df[["アプリ利用"]] <- flag
-  model_df <- df %>% build_multinom_logit(y, `アプリ利用`, x, reference_category = "A")
-  coef_df <- model_df %>% tidy_rowwise(model, conf.int = FALSE, exponentiate = FALSE)
+test_that("a variable whose coefficients have no p-value keeps NA (the real unavailable case)", {
+  # The chart's 判定不可 / "P Value unavailable" state must still exist -- it is correct
+  # when the model cannot estimate standard errors at all.
+  set.seed(5)
+  n <- 300
+  df <- data.frame(y = sample(c("A", "B", "C"), n, TRUE), x = stats::rnorm(n), z = stats::rnorm(n))
+  model_df <- df %>% build_multinom_logit(y, x, z)
+  model <- model_df$model[[1]]
+  model$Hessian <- NULL   # vcov unavailable -> every standard error is NA
+  model_df$model[[1]] <- model
   imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
-  expected <- min(coef_df$p.value[coef_df$term == "アプリ利用TRUE"])
-  expect_false(is.na(expected))
-  expect_equal(imp_df$p.value[imp_df$variable == "アプリ利用"], expected)
+  expect_true(all(is.na(imp_df$p.value)))
 })
