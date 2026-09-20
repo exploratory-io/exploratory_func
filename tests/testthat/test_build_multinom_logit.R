@@ -196,72 +196,8 @@ test_that("Repeat By fits one model per group against the same reference", {
   expect_setequal(unique(coef_df$grp), c("A", "B"))
 })
 
-# Every predictor SHAPE the importance chart must be able to map back to its own
-# coefficients. Each row is a column name plus how its value is built; the model is
-# fitted with ALL of them at once, and every variable must end up with the smallest
-# P value among its own coefficient rows.
-#
-# This is a matrix, not one test per bug, on purpose (tam#37033): the term text R
-# produces depends on the predictor's TYPE and on whether its NAME is syntactic, and
-# two separate shapes shipped broken one after the other -- a name with a Japanese
-# comma (R backtick-quotes it, an ASCII-only quoting guess missed it) and a logical
-# predictor (term is "<var>TRUE" and it has NO xlevels entry). Add a row here for any
-# new shape instead of a new test.
-MULTINOM_PREDICTOR_SHAPES <- list(
-  list(name = "満足度", type = "numeric"),
-  list(name = "サポート満足度 (1-5)", type = "numeric"),          # ASCII space + parens -> quoted
-  list(name = "商品を購入する前に、価格を比較する", type = "numeric"), # 、 -> quoted, no ASCII symbol
-  list(name = "x", type = "numeric"),                            # prefix of "x2" below
-  list(name = "x2", type = "numeric"),
-  list(name = "プラン", type = "character"),
-  list(name = "地域、区分", type = "character"),                  # quoted factor
-  list(name = "満足度ランク", type = "ordered"),                  # ordered factor -> unordered in the fit
-  list(name = "モバイルアプリ利用", type = "logical"),             # term is "<var>TRUE"
-  list(name = "解約、意向あり", type = "logical")                  # quoted AND TRUE-suffixed
-)
-
-test_that("every predictor shape gets its importance p-value from its own coefficients", {
-  set.seed(37033)
-  n <- 900
-  df <- data.frame(.row = seq_len(n))
-  for (shape in MULTINOM_PREDICTOR_SHAPES) {
-    df[[shape$name]] <- switch(shape$type,
-      numeric = stats::rnorm(n),
-      character = sample(c("A", "B", "C"), n, replace = TRUE),
-      ordered = factor(sample(c("低", "中", "高"), n, replace = TRUE), levels = c("低", "中", "高"), ordered = TRUE),
-      logical = stats::runif(n) < 0.5
-    )
-  }
-  # A target every predictor influences, so no coefficient is estimated at exactly 0.
-  score <- df[["満足度"]] + df[["x"]] - df[["x2"]] + df[["サポート満足度 (1-5)"]] +
-    df[["商品を購入する前に、価格を比較する"]] +
-    (df[["プラン"]] == "A") + (df[["地域、区分"]] == "B") +
-    as.numeric(df[["満足度ランク"]] == "高") +
-    df[["モバイルアプリ利用"]] + df[["解約、意向あり"]]
-  p <- cbind(1, exp(0.8 * score), exp(-0.8 * score))
-  p <- p / rowSums(p)
-  df$y <- apply(p, 1, function(pr) sample(c("Passive", "Promoter", "Detractor"), 1, prob = pr))
-  df$.row <- NULL
-
-  predictors <- vapply(MULTINOM_PREDICTOR_SHAPES, function(s) s$name, character(1))
-  model_df <- df %>% build_multinom_logit(y, !!!rlang::syms(predictors), reference_category = "Passive")
-  coef_df <- model_df %>% tidy_rowwise(model, conf.int = FALSE, exponentiate = FALSE)
-  imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
-
-  expect_setequal(imp_df$variable, predictors)
-  for (var in predictors) {
-    # The variable's own coefficient rows: the bare name (numeric/ordered-as-numeric),
-    # "<var>: <level>" (categorical, after prettifying) or "<var>TRUE" (logical).
-    own <- coef_df$p.value[coef_df$term == var |
-                             startsWith(coef_df$term, paste0(var, ": ")) |
-                             coef_df$term == paste0(var, "TRUE")]
-    expect_true(length(own) > 0, info = paste("no coefficient row found for", var))
-    expect_false(any(is.na(own)), info = paste("coefficients have NA p-value for", var))
-    expect_equal(imp_df$p.value[imp_df$variable == var], min(own), info = var)
-  }
-  # Nothing may be reported as "P Value unavailable" when its coefficients have p-values.
-  expect_false(any(is.na(imp_df$p.value)))
-})
+# Predictor-shape coverage for importance p-values lives in test_importance_pvalue_contract.R,
+# which runs the same matrix against EVERY model that maps terms back to variables.
 
 test_that("a variable whose coefficients have no p-value keeps NA (the real unavailable case)", {
   # The chart's 判定不可 / "P Value unavailable" state must still exist -- it is correct
