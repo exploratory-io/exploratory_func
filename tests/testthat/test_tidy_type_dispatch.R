@@ -33,7 +33,8 @@ ALLOWED <- list()
 #' Every top-level `tidy.*`/`glance.*` definition in R/ that dispatches on a `type` argument.
 #' @return list of list(name, file, body)
 collect_type_dispatch_methods <- function() {
-  r_dir <- normalizePath(file.path(rprojroot::find_package_root_file(), "R"), mustWork = TRUE)
+  # Resolve from the test file so this guard does not depend on an undeclared helper package.
+  r_dir <- normalizePath(testthat::test_path("..", "..", "R"), mustWork = TRUE)
   files <- list.files(r_dir, pattern = "[.][Rr]$", full.names = TRUE)
   out <- list()
   for (f in files) {
@@ -90,8 +91,10 @@ terminal_default <- function(body_expr) {
       args <- as.list(e)[-(1:2)]
       nms <- names(args)
       if (is.null(nms)) nms <- rep("", length(args))
-      # A switch default is the LAST argument with no name.
-      if (nms[[length(nms)]] == "") { found <<- args[[length(args)]]; done <<- TRUE }
+      # For a character switch, the first unnamed argument is the default, regardless of where
+      # it appears among named cases.
+      default_idx <- which(nms == "")[1]
+      if (!is.na(default_idx)) { found <<- args[[default_idx]]; done <<- TRUE }
       return(invisible(NULL))
     }
 
@@ -133,7 +136,6 @@ returned_input_field <- function(expr) {
 }
 
 test_that("the package's own source is where the method list comes from", {
-  skip_if_not_installed("rprojroot")
   methods <- collect_type_dispatch_methods()
   # Discovering the population instead of listing it is the whole point; if discovery breaks, this
   # guard would pass while checking nothing.
@@ -142,7 +144,6 @@ test_that("the package's own source is where the method list comes from", {
 })
 
 test_that("no type dispatch falls through to the model's own input data (tam#38607)", {
-  skip_if_not_installed("rprojroot")
   offenders <- character(0)
   for (m in collect_type_dispatch_methods()) {
     field <- returned_input_field(terminal_default(m$body))
@@ -186,7 +187,11 @@ test_that("the guard actually fires on the shape it was written for", {
   })
   expect_true(is.na(returned_input_field(terminal_default(fixed))))
 
-  # A switch default is the same hazard reached by a different syntax.
+  # A switch default is the same hazard reached by a different syntax, including when the
+  # unnamed default appears before named cases.
   switched <- quote(switch(type, summary = x$summary, x$data))
   expect_equal(returned_input_field(terminal_default(switched)), "data")
+
+  switched_default_first <- quote(switch(type, x$data, summary = x$summary))
+  expect_equal(returned_input_field(terminal_default(switched_default_first)), "data")
 })
