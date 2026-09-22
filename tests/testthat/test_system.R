@@ -1287,6 +1287,71 @@ test_that("oracleOCIPoolKey builds identical keys from getDBConnection and clear
   expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, "", "prefetch=TRUE"))
 })
 
+test_that("MySQL SSL CA normalization is shared by connection pool keys", {
+  expect_equal(
+    exploratory:::normalize_mysql_ssl_ca("custom-ca.pem", sysname = "Linux"),
+    "/etc/ssl/certs/rds-combined-ca-bundle.pem"
+  )
+  expect_equal(
+    exploratory:::normalize_mysql_ssl_ca("custom-ca.pem", sysname = "Darwin"),
+    "custom-ca.pem"
+  )
+  expect_equal(exploratory:::normalize_mysql_ssl_ca("", sysname = "Linux"), "")
+  expect_equal(exploratory:::normalize_mysql_ssl_ca(NA_character_, sysname = "Linux"), "")
+
+  fromGet <- exploratory:::mysql_pool_key(
+    "host", 3306, "db", "user", "UTC", "custom-ca.pem", "require", sysname = "Linux"
+  )
+  fromClear <- exploratory:::mysql_pool_key(
+    "host", 3306, "db", "user", "UTC", "/etc/ssl/certs/rds-combined-ca-bundle.pem", "require",
+    sysname = "Linux"
+  )
+  expect_equal(fromGet, fromClear)
+  expect_false(fromGet == exploratory:::mysql_pool_key(
+    "host", 3306, "db", "user", "UTC", "custom-ca.pem", "verify-full", sysname = "Linux"
+  ))
+})
+
+test_that("MySQL SSL modes use supported RMariaDB connection arguments", {
+  sslFlag <- 2048L
+  verifyServerCertFlag <- 1073741824L
+
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "disable", sslFlag, verifyServerCertFlag),
+    list(client.flag = 0L)
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "allow", sslFlag, verifyServerCertFlag),
+    list(client.flag = 0L, ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "prefer", sslFlag, verifyServerCertFlag),
+    list(client.flag = 0L, ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "require", sslFlag, verifyServerCertFlag),
+    list(client.flag = sslFlag, ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "verify-ca", sslFlag, verifyServerCertFlag),
+    list(client.flag = sslFlag, ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "verify-full", sslFlag, verifyServerCertFlag),
+    list(client.flag = bitwOr(sslFlag, verifyServerCertFlag), ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("", "verify-full", sslFlag, verifyServerCertFlag),
+    list(client.flag = bitwOr(sslFlag, verifyServerCertFlag))
+  )
+
+  modes <- c("", "unknown")
+  for (mode in modes) {
+    args <- exploratory:::rmariadb_ssl_connection_args("ca.pem", mode, sslFlag, verifyServerCertFlag)
+    expect_false("ssl.mode" %in% names(args))
+  }
+})
+
 test_that("findOracleClientLibDir handles both Oracle client layouts", {
   base <- tempfile()
   dir.create(base)
