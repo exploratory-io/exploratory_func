@@ -1576,12 +1576,15 @@ get_var_min_pvalue <- function(var, coef_df, x) {
 
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
-tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, test_mode = FALSE, test_rate = 0, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
   }
   switch(type,
+    analysis_conditions = {
+      .lm_glm_report_analysis_conditions(x, test_mode = test_mode, test_rate = test_rate)
+    },
     coefficients = {
       # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
       # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
@@ -1670,10 +1673,74 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
   )
 }
 
+# Map sanitized "cN_" column names back to their original names. Single-bracket indexing
+# ([ ], not [[ ]]) so a name absent from mapping returns NA rather than erroring, which
+# ifelse() then falls back to the clean name for.
+.lm_glm_map_orig_names <- function(names_clean, mapping) {
+  if (is.null(mapping) || is.null(names_clean) || length(names_clean) == 0) return(names_clean)
+  orig <- unname(mapping[names_clean])
+  ifelse(is.na(orig), names_clean, orig)
+}
+
+# Shared "分析条件とデータの確認" (Analysis Conditions and Data) table for the lm/glm-family
+# Prediction Model reports (tam#38536): Linear Regression (lm_exploratory) and the Logistic
+# Regression / GLM family (glm_exploratory -- binomial/gaussian/Gamma/inverse.gaussian/poisson/
+# negativebinomial all share this one class). Mirrors the vertical Metric/Value shape the
+# Clustering (kmeans/kmodes/kmedoids) and Factor Analysis/PCA reports already use for the same
+# purpose (the analysis_conditions branches in prcomp.R / kmodes.R / kmedoids.R / hclust*.R) --
+# this is one more sibling of that established pattern, not a new mechanism.
+#
+# Rows Removed (削除された行数) is intentionally NOT included: unlike kmeans/PCA (which track
+# n_rows_used / excluded_nrow at fit time), lm_exploratory/glm_exploratory keep no na.action /
+# original-row-count bookkeeping anywhere reachable from the fitted model object, so there is no
+# reliable source of truth for it yet. Left as a documented follow-up (would need build_lm()/
+# build_glm() itself to stash the pre-NA-filter row count).
+#
+# カテゴリの順序 (category order) is also out of scope here on purpose -- that only applies to
+# Ordered Logistic Regression (MASS::polr, a different model class entirely), also a follow-up.
+.lm_glm_report_analysis_conditions <- function(x, test_mode = FALSE, test_rate = 0) {
+  if ("error" %in% class(x)) return(data.frame())
+
+  target_orig <- .lm_glm_map_orig_names(x$target_col, x$terms_mapping)
+
+  predictor_labels <- tryCatch(attr(stats::terms(x), "term.labels"), error = function(e) character(0))
+  predictor_orig <- unique(.lm_glm_map_orig_names(predictor_labels, x$terms_mapping))
+  predictor_display <- if (length(predictor_orig) == 0) "N/A" else paste(predictor_orig, collapse = ", ")
+
+  metrics <- c("Target Variable")
+  values <- c(as.character(target_orig))
+
+  # Only glm_exploratory's binomial/quasibinomial family is a binary-categorical target here
+  # (lm_exploratory's target is always numeric; the other glm families are numeric/count targets).
+  is_binary_target <- inherits(x, "glm_exploratory") && !is.null(x$family) &&
+    !is.null(x$family$family) && x$family$family %in% c("binomial", "quasibinomial")
+  if (is_binary_target) {
+    metrics <- c(metrics, "Number of Categories")
+    values <- c(values, "2")
+  }
+
+  # nrow(x$model), not length(x$y), since plain lm() fits do not always retain $y (glance.lm's
+  # own convention -- see glance.lm_exploratory above), while $model (the fitted model frame) is
+  # always kept for both lm and glm fits.
+  metrics <- c(metrics, "Explanatory Variables", "Row Count")
+  values <- c(values, predictor_display, as.character(nrow(x$model)))
+
+  test_rate_num <- suppressWarnings(as.numeric(test_rate))
+  validation_display <- if (!isTRUE(test_mode) || is.na(test_rate_num) || test_rate_num <= 0) {
+    "None"
+  } else {
+    paste0("Test (", round(test_rate_num * 100), "%)")
+  }
+  metrics <- c(metrics, "Validation Data")
+  values <- c(values, validation_display)
+
+  tibble::tibble(Metric = metrics, Value = values)
+}
+
 #' Special version of tidy.glm function to use with build_lm.fast.
 #' In case of error, returns empty data frame, or data frame with Note column.
 #' @export
-tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, converged_only = FALSE, ...) { #TODO: add test
+tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, converged_only = FALSE, test_mode = FALSE, test_rate = 0, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -1685,6 +1752,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     return(ret)
   }
   switch(type,
+    analysis_conditions = {
+      .lm_glm_report_analysis_conditions(x, test_mode = test_mode, test_rate = test_rate)
+    },
     coefficients = {
       ret <- broom:::tidy.glm(x)
       ret <- ret %>% mutate(conf.low=estimate-1.96*std.error, conf.high=estimate+1.96*std.error)
