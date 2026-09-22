@@ -467,6 +467,63 @@ test_that("characteristic_categories and category_composition honor a factor's d
   expect_equal(levels(droplevels(plan_comp_levels)), sort(unique(df$plan)))
 })
 
+test_that("category_composition keeps unused declared Factor levels (tam#38122 analog)", {
+  # Factor type keeps every declared level, including ones with 0 rows. The
+  # composition table used to call table() on as.character(factor), which
+  # dropped unused levels before they could become n=0 bars on that variable's
+  # Category Composition panel.
+  set.seed(7)
+  n <- 80
+  df <- tibble::tibble(
+    tenure = factor(sample(c("3年以上", "1年-3年"), n, TRUE),
+                    levels = c("6ヶ月未満", "1年未満", "1年-3年", "3年以上")),
+    plan = sample(c("Enterprise", "Free", "Standard"), n, TRUE)
+  )
+  expect_false("6ヶ月未満" %in% as.character(df$tenure))
+  expect_false("1年未満" %in% as.character(df$tenure))
+
+  composition <- exp_kmodes(df, tenure, plan, centers = 2, seed = 1,
+                            elbow_method_mode = "none") %>%
+    tidy_rowwise(model, type = "category_composition")
+
+  tenure_rows <- composition %>% dplyr::filter(variable == "tenure")
+  tenure_cats <- as.character(tenure_rows$category)
+  expect_true(all(c("6ヶ月未満", "1年未満", "1年-3年", "3年以上") %in% tenure_cats))
+  unused <- tenure_rows %>% dplyr::filter(category %in% c("6ヶ月未満", "1年未満"))
+  expect_true(nrow(unused) > 0)
+  expect_true(all(unused$n == 0))
+  expect_true(all(unused$pct == 0 | is.na(unused$pct)))
+
+  # Unused tenure levels must not be copied onto the sibling character variable.
+  plan_cats <- composition %>% dplyr::filter(variable == "plan") %>%
+    dplyr::pull(category) %>% as.character()
+  expect_false(any(plan_cats %in% c("6ヶ月未満", "1年未満")))
+})
+
+test_that("category_composition does not resurrect empty equal-width bins", {
+  # display_levels for a cut() numeric also lists empty bins. Those are not
+  # user-declared Factor levels; Category Composition must keep omitting them.
+  set.seed(7)
+  df <- tibble::tibble(
+    grp = sample(c("A", "B"), 80, TRUE),
+    score = sample(1:5, 80, TRUE)
+  )
+  composition <- exp_kmodes(df, grp, score, centers = 2, seed = 1,
+                            numeric_handling = "equal_width", numeric_bins = 10,
+                            elbow_method_mode = "none") %>%
+    tidy_rowwise(model, type = "category_composition")
+  score_rows <- composition %>% dplyr::filter(variable == "score")
+  expect_true(nrow(score_rows) > 0)
+  # A category can be n=0 in one cluster and still observed overall. The
+  # lock is that a cut() bin which never appears in ANY row stays omitted --
+  # 5 distinct scores cannot fill 10 equal-width bins.
+  totals <- score_rows %>%
+    dplyr::group_by(category) %>%
+    dplyr::summarize(total = sum(n), .groups = "drop")
+  expect_true(all(totals$total > 0))
+  expect_lt(nrow(totals), 10)
+})
+
 test_that("the observed/expected ratio is NA rather than Inf when nothing is expected", {
   expect_true(is.na(kmodes_adjusted_residual(1, 0, 0.5, 0.5)))
 })

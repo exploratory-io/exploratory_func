@@ -21,8 +21,14 @@ normalize <- function(x, center = TRUE, scale = TRUE) {
 }
 
 #' integrated do_cor
+#' @param max_nrow If the (per-group) input has more observations than this, they
+#'   are randomly sampled down to it. NULL means use every observation. An
+#'   observation is a ROW in the .cols pattern, and a row of the CAST matrix (one
+#'   per key) in the .kv pattern -- sampling the long input there would change the
+#'   aggregated values themselves.
+#' @param seed Seed for that sample, so a sampled run is reproducible.
 #' @export
-do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, max_nrow = NULL, seed = 1){
   validate_empty_data(df)
 
   if (!is.null(skv)) {
@@ -31,10 +37,11 @@ do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
       stop("length of skv has to be 2 or 3")
     }
     value <- if(length(skv) == 2) NULL else skv[[3]]
-    do_cor.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
+    do_cor.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill,
+               max_nrow = max_nrow, seed = seed, ...)
   } else {
     #.cols pattern
-    do_cor.cols(df, ...)
+    do_cor.cols(df, ..., max_nrow = max_nrow, seed = seed)
   }
 }
 
@@ -81,7 +88,9 @@ do_cor.kv_ <- function(df,
                       diag = FALSE,
                       fill = 0,
                       fun.aggregate = mean,
-                      return_type = "data.frame"
+                      return_type = "data.frame",
+                      max_nrow = NULL,
+                      seed = 1
                       )
 {
   validate_empty_data(df)
@@ -103,6 +112,7 @@ do_cor.kv_ <- function(df,
                                 c("pair.name.x", "pair.name.y",
                                   "correlation", "p_value", "statistic"))
 
+  seed_initialized <- FALSE
   do_cor_each <- function(df){
     mat <- simple_cast(
       df,
@@ -114,6 +124,17 @@ do_cor.kv_ <- function(df,
       time_unit = time_unit,
       na.rm = TRUE
     )
+    # The row cap applies to the CAST matrix -- one row per key, which is what
+    # the correlation actually treats as an observation. Sampling the long input
+    # instead would drop cells from the aggregation and change the VALUES that
+    # remain, not just how many observations there are.
+    if (!is.null(max_nrow) && nrow(mat) > max_nrow) {
+      if (!is.null(seed) && !seed_initialized) {
+        set.seed(seed)
+        seed_initialized <<- TRUE
+      }
+      mat <- mat[sort(sample.int(nrow(mat), max_nrow)), , drop = FALSE]
+    }
     if (dim(mat)[[1]] < 2) {
       # Correlation require 2 or more rows.
       if (length(grouped_col) > 0) {
@@ -176,11 +197,14 @@ do_cor.kv_ <- function(df,
 #' @param ... Arguments to select columns to calculate correlation.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
 #' @param method Method of calculation. This can be one of "auto", "pearson", "kendall", "spearman", "polychoric", or "mixed".
+#' @param variable_order How the variables are arranged. "cluster" groups variables that correlate
+#'   with each other next to each other, "correlation" sorts by each variable's mean correlation with
+#'   the others, and "input" keeps the order the columns were selected in.
 #' @return correlations between pairs of columns
 #' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
                         distinct = FALSE, diag = FALSE, variable_order = "correlation",
-                        return_type = "data.frame") {
+                        return_type = "data.frame", max_nrow = NULL, seed = 1) {
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -193,7 +217,17 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   grouped_col <- grouped_by(df)
   output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "correlation", "p_value", "statistic"))
   # check if the df's grouped
+  seed_initialized <- FALSE
   do_cor_each <- function(df){
+    # Here a row IS an observation, so the cap is a plain row sample, applied
+    # per group like every other analytics function's max_nrow.
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      if (!is.null(seed) && !seed_initialized) {
+        set.seed(seed)
+        seed_initialized <<- TRUE
+      }
+      df <- df %>% sample_rows(max_nrow)
+    }
     if (nrow(df) < 2) {
       # Correlation require 2 or more rows.
       if (length(grouped_col) > 0) {
@@ -211,14 +245,30 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 
     ret <- do_cor_internal(mat, use, method, diag, output_cols, na.rm=TRUE)
 
-    if (variable_order == "correlation") {
+    # "cluster" seriates the variables so that the ones correlating with each other sit next to each
+    # other. NULL means we could not cluster this matrix, and we fall back to the mean-correlation
+    # order below rather than failing the analysis.
+    cluster_order <- if (identical(variable_order, "cluster")) {
+      cor_cluster_variable_order(attr(ret, "cor_matrix"))
+    } else {
+      NULL
+    }
+
+    if (!is.null(cluster_order)) {
+      # The long output omits uncomputable pairs when na.rm=TRUE. Keep only
+      # variables that are still represented before applying the factor order.
+      output_variables <- unique(c(as.character(ret$pair.name.x), as.character(ret$pair.name.y)))
+      cluster_order <- cluster_order[cluster_order %in% output_variables]
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cluster_order), pair.name.y = forcats::fct_relevel(pair.name.y, cluster_order))
+    }
+    else if (identical(variable_order, "input")) { # Honor the specified variable order.
+      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, !!select_dots), pair.name.y = forcats::fct_relevel(pair.name.y, !!select_dots))
+    }
+    else { # "correlation", and anything unknown.
       # Set factor levels to pair.name.x and pair.name.y based on the mean of correlations with other columns.
       cor0 <- ret %>% dplyr::filter(pair.name.x != pair.name.y)
       cor0 <- cor0 %>% dplyr::group_by(pair.name.x) %>% dplyr::summarize(mean_cor=mean(correlation, na.rm=TRUE)) %>% dplyr::arrange(desc(mean_cor))
       ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, cor0$pair.name.x), pair.name.y = forcats::fct_relevel(pair.name.y, cor0$pair.name.x))
-    }
-    else { # "input" case. Honor the specified variable order.
-      ret <- ret %>% dplyr::mutate(pair.name.x = forcats::fct_relevel(pair.name.x, !!select_dots), pair.name.y = forcats::fct_relevel(pair.name.y, !!select_dots))
     }
 
     if (distinct) {
@@ -235,7 +285,13 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     else {
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
-      ret <- list(cor = ret, data = df)
+      # analysis_conditions feeds the report's Analysis Conditions and Data table (tam#37638).
+      # Computed here because `mat` (the SELECTED columns, before any pair filtering) is only in
+      # scope now. do_cor.kv_ deliberately does NOT do this -- its `mat` is a matrix from
+      # simple_cast(), not a data frame, so the per-column predicates below do not apply. A kv_
+      # model falls through to tidy()'s empty-tibble branch instead.
+      ret <- list(cor = ret, data = df,
+                  analysis_conditions = cor_analysis_conditions(mat, method, use))
       class(ret) <- c("cor_exploratory", class(ret))
       ret
     }
@@ -249,6 +305,209 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   else {
     do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
   }
+}
+
+
+# Correlation report: the Analysis Conditions and Data table (tam#37638).
+#
+# Built at fit time, while the selected columns are still in hand, and stored on the
+# cor_exploratory model -- tidy() only reads it back. Every sentence is a FIXED English string
+# (never composed at runtime) because the client translates report table cells by exact string
+# match; a composed sentence would render untranslated in Japanese. The strings deliberately
+# match the ones reliability.R already emits, so both reports share one set of translations.
+cor_correlation_label <- function(resolved_method) {
+  switch(resolved_method,
+    pearson = "Pearson Correlation",
+    polychoric = "Polychoric Correlation",
+    mixed = "Mixed Correlation",
+    spearman = "Spearman Correlation",
+    kendall = "Kendall Correlation",
+    resolved_method)
+}
+
+cor_correlation_reason <- function(mat, requested_method) {
+  if (!identical(requested_method, "auto")) {
+    return(switch(requested_method,
+      pearson = "Pearson was specified in the settings.",
+      polychoric = "Polychoric was specified in the settings.",
+      mixed = "Mixed Correlation was specified in the settings.",
+      spearman = "Spearman was specified in the settings.",
+      kendall = "Kendall was specified in the settings.",
+      "Specified in the settings."))
+  }
+  is_ordinal <- vapply(mat, function(x) is.factor(x) || is.logical(x), logical(1))
+  is_continuous <- vapply(mat, is.numeric, logical(1))
+  if (all(is_continuous)) {
+    "All variables are Numeric."
+  } else if (all(is_ordinal)) {
+    "All variables are Factor or Logical."
+  } else {
+    "Numeric and Factor/Logical variables are mixed."
+  }
+}
+
+# Order the variables so that the ones correlating with each other sit next to each other, which is
+# what makes a correlation heatmap read as blocks.
+#
+# The alternative already in do_cor.cols(), variable_order="correlation", ranks each variable by the
+# MEAN of its correlations with every other variable. That mean is a single number describing how
+# strong the variable's bonds are; it carries nothing about WHICH variables it is bonded to. Two
+# variables belonging to different groups but with equally strong in-group bonds therefore end up
+# adjacent. On a 16-variable brand survey with four clean groups, three variables from three
+# different groups each had exactly three strong correlations (around 0.5 to 0.6) and twelve near
+# zero, giving means of 0.1225, 0.1271 and 0.1314 -- close enough that noise decided the order, and
+# one group's member was sorted into the middle of another group.
+#
+# Returns NULL when the matrix cannot be clustered, so the caller can fall back instead of failing.
+cor_cluster_variable_order <- function(cor_mat) {
+  if (is.null(cor_mat) || !is.matrix(cor_mat) || is.null(colnames(cor_mat))) {
+    return(NULL)
+  }
+  if (ncol(cor_mat) < 3) {
+    # hclust needs 2 or more objects, and with 2 variables every ordering is the same picture.
+    return(colnames(cor_mat))
+  }
+  tryCatch(cor_cluster_order_recursive(cor_mat), error = function(e) NULL)
+}
+
+# One level of the arrangement, applied again to each group it produces.
+#
+# The order is built from the clustering rather than read off the dendrogram's leaf order, because a
+# leaf order is only defined up to flipping every branch: it keeps each group together but says
+# nothing about which group comes first or which member leads a group.
+#
+#   1. Cut the tree into groups at the largest jump in merge height, i.e. where joining two groups
+#      suddenly costs much more than every join so far.
+#   2. Order the groups by the MEAN of the correlations inside each, descending, so the tightest
+#      group is nearest the top-left corner. A group of one has no pair and goes last. The mean
+#      rather than the strongest pair: a single pair is one number out of many and moves with the
+#      sample. Ranking the brand survey's four groups by their strongest pair reproduced the same
+#      leading order in 29 of 60 bootstrap resamples; by their mean, in 42 of 60.
+#   3. Arrange each group of 3 or more by running all of this again on that group alone.
+#
+# Step 3 is the reason this recurses instead of finishing with a per-group scalar sort. A single cut
+# can only express ONE level of structure, and correlation data is routinely nested: on the brand
+# survey the cut leaving 2 groups (price against everything else) scores 0.318 against the winning
+# 4-group cut's 0.349, so the coarse split is nearly chosen and the fine one would then be lost.
+# Sorting a group's members by any single number -- their mean correlation within the group, say --
+# reintroduces exactly the defect this whole function exists to fix, one level down: on a fixture
+# with two super-groups of two sub-groups each, that produced a1 a2 b1 b2 | c1 d2 d1 c2, with the
+# c and d sub-groups interleaved. Recursion terminates because every group it hands back down is
+# strictly smaller, and groups of 2 or fewer stop.
+cor_cluster_order_recursive <- function(cor_mat) {
+  n <- ncol(cor_mat)
+  if (n <= 2) {
+    # Nothing left to arrange. Two variables are adjacent either way, and the column order (already
+    # sorted by the caller) breaks the tie the same way every time.
+    return(colnames(cor_mat))
+  }
+
+  # 1 - correlation, NOT 1 - abs(correlation). Negatively correlated variables have to stay apart:
+  # that is what keeps a group which opposes everything else but agrees internally (price
+  # sensitivity on the survey above) as its own block instead of folding it into its opposites.
+  dist_mat <- 1 - cor_mat
+  # A pair whose correlation could not be computed (a constant column, or no overlapping rows under
+  # pairwise.complete.obs) gets the distance of an uncorrelated pair rather than aborting.
+  dist_mat[!is.finite(dist_mat)] <- 1
+  diag(dist_mat) <- 0
+  hc <- stats::hclust(stats::as.dist(dist_mat), method = "average")
+
+  # Step 1. hc$height is ascending and has n-1 entries, so the cut that leaves k groups applies the
+  # first n-k merges and the jump it has to clear is height[n-k+1] - height[n-k]. k runs to n-1
+  # because k = n would need height[0]. Ties take the smallest k, i.e. the coarsest grouping that
+  # explains the jump.
+  heights <- hc$height
+  candidate_k <- 2:(n - 1)
+  jumps <- heights[n - candidate_k + 1] - heights[n - candidate_k]
+  k <- candidate_k[[which.max(jumps)]]
+  membership <- stats::cutree(hc, k = k)
+
+  groups <- unique(membership) # In first-appearance order, so the tie-breaks below are stable.
+  # Step 2. The mean correlation inside each group, self-pairs (always 1) excluded.
+  group_strength <- vapply(groups, function(g) {
+    idx <- which(membership == g)
+    if (length(idx) < 2) {
+      return(-Inf) # A group of one has no pair to be strong, so it sorts last.
+    }
+    sub <- cor_mat[idx, idx, drop = FALSE]
+    values <- sub[upper.tri(sub)]
+    values <- values[is.finite(values)]
+    if (length(values) == 0) -Inf else mean(values)
+  }, numeric(1))
+  # Ties fall back to the group that appears first among the (already sorted) column names, so the
+  # same data always produces the same picture.
+  groups <- groups[order(-group_strength, seq_along(groups))]
+
+  # Step 3.
+  unlist(lapply(groups, function(g) {
+    idx <- which(membership == g)
+    if (length(idx) <= 2) {
+      return(colnames(cor_mat)[idx])
+    }
+    cor_cluster_order_recursive(cor_mat[idx, idx, drop = FALSE])
+  }), use.names = FALSE)
+}
+
+cor_analysis_conditions <- function(mat, requested_method, use) {
+  variable_names <- colnames(mat)
+  # A variable that is entirely missing, or that never varies, cannot produce a correlation with
+  # anything -- the same predicate PCA uses to decide what it drops before analysis.
+  is_unusable <- vapply(mat, function(x) {
+    values <- x[!is.na(x)]
+    length(values) == 0 || length(unique(values)) < 2
+  }, logical(1))
+  excluded_names <- variable_names[is_unusable]
+  total_rows <- nrow(mat)
+  resolved_method <- resolve_correlation_method(mat, requested_method)
+  # Pairwise correlations use a row only when at least two selected variables are observed; a row
+  # with one value cannot contribute to any off-diagonal pair. Polychoric and mixed correlations
+  # map every use mode other than complete.obs to pairwise.complete.obs in do_cor_internal().
+  uses_pairwise <- identical(use, "pairwise.complete.obs") ||
+    (resolved_method %in% c("polychoric", "mixed") && !identical(use, "complete.obs"))
+  rows_used <- if (uses_pairwise) {
+    sum(rowSums(!is.na(mat)) >= 2L)
+  } else if (use %in% c("complete.obs", "na.or.complete")) {
+    sum(stats::complete.cases(mat))
+  } else {
+    total_rows
+  }
+  rows_removed <- max(0L, as.integer(total_rows - rows_used))
+  removed_pct <- if (total_rows > 0) rows_removed / total_rows * 100 else 0
+  tibble::tibble(
+    Metric = c("Number of Variables", "Variable Names", "Excluded Variables",
+               "Row Count", "Rows Removed", "Correlation"),
+    Value = c(
+      as.character(length(variable_names)),
+      if (length(variable_names) == 0) "N/A" else paste(variable_names, collapse = ", "),
+      if (length(excluded_names) == 0) "None" else paste(excluded_names, collapse = ", "),
+      as.character(rows_used),
+      paste0(rows_removed, " (", format(round(removed_pct, 1), nsmall = 1), "%)"),
+      cor_correlation_label(resolved_method)
+    ),
+    Description = c(
+      "Number of variables used in the analysis.",
+      "Names of the variables used in the analysis.",
+      "Variables dropped before analysis because they were all missing or had only one unique value.",
+      "Number of rows used in the analysis.",
+      "Number and rate of rows removed because of missing values.",
+      "Which correlation the coefficients were computed with."
+    ),
+    # Hidden columns: the report reads them to decide whether to explain the automatic choice.
+    # Explicit "TRUE"/"FALSE" STRINGS, not R logicals -- a logical can reach the client as "1"/"0"
+    # depending on the pivot pipeline, and the client's isTrue() only accepts "TRUE"/"true"/true.
+    correlation_type = resolved_method,
+    correlation_is_auto = if (identical(requested_method, "auto")) "TRUE" else "FALSE",
+    reason = cor_correlation_reason(mat, requested_method)
+  )
+}
+
+# Same column shape as cor_analysis_conditions(), with no rows. Returned for a model saved before
+# analysis_conditions existed, so the report's table renders empty instead of erroring and the
+# client's extractor falls back to its own defaults.
+cor_empty_analysis_conditions <- function() {
+  tibble::tibble(Metric = character(0), Value = character(0), Description = character(0),
+                 correlation_type = character(0), correlation_is_auto = character(0),
+                 reason = character(0))
 }
 
 
@@ -384,16 +643,33 @@ do_cor_internal <- function(mat, use, method, diag, output_cols, na.rm) {
   t_value_ret <- mat_to_df(tvalue_mat, cnames=output_cols[c(1,2,5)], diag=diag, zero.rm=FALSE)
   ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret <- ret %>% dplyr::left_join(t_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
+  # Hand the square matrix to the caller so that variable_order="cluster" can cluster on it.
+  # Reconstructing it from this long output is not equivalent: diag=FALSE drops the diagonal and
+  # na.rm=TRUE drops uncomputable pairs, so the caller would have to guess at the missing cells.
+  attr(ret, "cor_matrix") <- cor_mat
   ret
 }
 
 #' @export
-tidy.cor_exploratory <- function(x, type = "cor", ...) { #TODO: add test
+tidy.cor_exploratory <- function(x, type = "cor", ...) {
   if (type == "cor") {
     x$cor
   }
-  else {
+  else if (type == "analysis_conditions") {
+    # tam#37638. The Correlation report's Analysis Conditions and Data table.
+    if (is.null(x$analysis_conditions)) cor_empty_analysis_conditions() else x$analysis_conditions
+  }
+  else if (type == "data" || type == "data.frame") {
+    # The original data, used for the scatter matrix on Analytics View.
     x$data
+  }
+  else {
+    # Deliberately an error, not a fallback. This used to be a catch-all `else` returning x$data,
+    # so asking for a type this function does not implement silently handed the caller the raw
+    # source data -- which then rendered as a plausible-looking but completely wrong report table
+    # (tam#37638 shipped its analysis_conditions template ahead of the R branch here). A wrong
+    # answer that looks right is worse than a loud failure.
+    stop(paste0("Unsupported tidy type for a correlation model: ", type))
   }
 }
 

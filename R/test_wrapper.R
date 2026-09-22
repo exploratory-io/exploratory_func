@@ -697,8 +697,13 @@ calculate_welch_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, alternat
 }
 
 # Calculate t statistic for Welch's t-test.
-calculate_welch_t <- function(N1, N2, X1, X2, s1, s2) {
-  ret <- (X1 - X2)/sqrt(s1^2/N1 + s2^2/N2)
+# mu (the hypothesized difference between the two population means, default
+# 0) was previously accepted by t.test.aggregated() and stored in the result
+# for display (null.value), but never actually subtracted here -- the
+# statistic/p-value/CI always tested against a null of "difference = 0"
+# regardless of what mu was set to. tam#38168.
+calculate_welch_t <- function(N1, N2, X1, X2, s1, s2, mu = 0) {
+  ret <- (X1 - X2 - mu)/sqrt(s1^2/N1 + s2^2/N2)
   ret
 }
 
@@ -709,8 +714,8 @@ calculate_welch_dof <- function(N1, N2, s1, s2) {
 }
 
 # Calculate p value for Welch's t-test.
-calculate_welch_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
-  t <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+calculate_welch_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided", mu = 0) {
+  t <- calculate_welch_t(N1, N2, X1, X2, s1, s2, mu = mu)
   dof <- calculate_welch_dof(N1, N2, s1, s2)
   p <- pt(t,dof)
   if (alternative == "two.sided") {
@@ -752,9 +757,10 @@ calculate_student_confint <- function(N1, N2, X1, X2, s1, s2, conf.level, altern
   res
 }
 
-# Calculate t statistic for Student's t-test.
-calculate_student_t <- function(N1, N2, X1, X2, s1, s2) {
-  ret <- (X1 - X2)/(calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2))
+# Calculate t statistic for Student's t-test. See calculate_welch_t's
+# comment on mu -- same defect, same fix. tam#38168.
+calculate_student_t <- function(N1, N2, X1, X2, s1, s2, mu = 0) {
+  ret <- (X1 - X2 - mu)/(calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2))
   ret
 }
 
@@ -765,8 +771,8 @@ calculate_student_dof <- function(N1, N2) {
 }
 
 # Calculate p value for Student's t-test.
-calculate_student_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided") {
-  t <- calculate_student_t(N1, N2, X1, X2, s1, s2)
+calculate_student_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided", mu = 0) {
+  t <- calculate_student_t(N1, N2, X1, X2, s1, s2, mu = mu)
   dof <- calculate_student_dof(N1, N2)
   p <- pt(t,dof)
   if (alternative == "two.sided") {
@@ -788,20 +794,30 @@ calculate_student_p <- function(N1, N2, X1, X2, s1, s2, alternative = "two.sided
 # X1, X2 - Means
 # s1, s2 - Standard Deviations
 t.test.aggregated <- function(N1, N2, X1, X2, s1, s2, conf.level=0.95, mu=0, alternative = "two.sided", paired = FALSE, var.equal = FALSE) {
+  # Zero variance in BOTH groups makes the standard error (and so the t
+  # statistic/p-value) undefined -- Welch's method previously crashed deep
+  # inside pt()/the dof calculation with a raw, uninterpretable "missing
+  # value where TRUE/FALSE needed"; Student's method silently "succeeded"
+  # with t = +/-Inf (or NaN if the means also happen to be equal) instead of
+  # erroring at all. Reject up front with a message naming the actual cause.
+  # tam#38168.
+  if (isTRUE(s1 == 0) && isTRUE(s2 == 0)) {
+    stop("Both groups have a standard deviation of 0 -- the t-test is undefined when there is no variation in either group.")
+  }
   if (!var.equal) {
     method="Welch Two Sample t-test"
-    statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2)
+    statistic <- calculate_welch_t(N1, N2, X1, X2, s1, s2, mu = mu)
     parameter <- calculate_welch_dof(N1, N2, s1, s2)
-    p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2, alternative = alternative)
+    p.value <- calculate_welch_p(N1, N2, X1, X2, s1, s2, alternative = alternative, mu = mu)
     conf.int <- calculate_welch_confint(N1, N2, X1, X2, s1, s2, conf.level, alternative = alternative)
     estimate <- c(X1, X2)
     stderr <- calculate_welch_stderr(N1, N2, s1, s2)
   }
   else {
     method="Two Sample t-test"
-    statistic <- calculate_student_t(N1, N2, X1, X2, s1, s2)
+    statistic <- calculate_student_t(N1, N2, X1, X2, s1, s2, mu = mu)
     parameter <- calculate_student_dof(N1, N2)
-    p.value <- calculate_student_p(N1, N2, X1, X2, s1, s2, alternative = alternative)
+    p.value <- calculate_student_p(N1, N2, X1, X2, s1, s2, alternative = alternative, mu = mu)
     conf.int <- calculate_student_confint(N1, N2, X1, X2, s1, s2, conf.level, alternative = alternative)
     estimate <- c(X1, X2)
     stderr <- calculate_pooled_stderr(N1, N2, s1, s2)*sqrt(1/N1 + 1/N2)
@@ -880,11 +896,12 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
         stop("There is NA in the aggregated input data.")
       }
 
-      if(length(grouped_cols) > 0) {
-        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
-        if (n_distinct_res_each != 2) {
-          stop("The explanatory variable needs to have 2 unique values.")
-        }
+      # Re-check regardless of grouping -- see tam#38168 / the identical fix
+      # in exp_ttest/exp_wilcox for why gating this on grouped_cols alone is
+      # wrong (a hand-copied sibling of the same bug).
+      n_distinct_res_each <- n_distinct(df[[var2_col]])
+      if (n_distinct_res_each != 2) {
+        stop("The explanatory variable needs to have 2 unique values.")
       }
       # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
       # Check it here, rather than handling it later.
@@ -1064,6 +1081,14 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       if (nrow(df) == 0) {
         stop("There is no data left after removing NA.")
       }
+      # A character valueColumn bypassing the UI's numeric-only gate (e.g. an
+      # upstream column re-typed after this step was configured) previously
+      # reached t.test()'s formula interface with no error -- silently
+      # producing a fully-NA "successful" Summary row instead of a friendly
+      # rejection. tam#38168.
+      if (!is.numeric(df[[var1_col]])) {
+        stop("The Value column must be numeric.")
+      }
       if (!is.null(outlier_filter_type)) {
         is_outlier <- function(x) {
           res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("Lower", "Upper")
@@ -1075,11 +1100,15 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         df$.is.outlier <- NULL
       }
 
-      if(length(grouped_cols) > 0) {
-        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
-        if (n_distinct_res_each != 2) {
-          stop("The explanatory variable needs to have 2 unique values.")
-        }
+      # Re-check regardless of grouping -- see tam#38168. The top-level check
+      # (before this each_func runs) can pass even when outlier removal
+      # empties one explanatory-variable group entirely; ungrouped and
+      # grouped runs both filter outliers the same way and need the same
+      # guard, or the ungrouped path falls through to
+      # calculate_cohens_d()'s raw "subscript out of bounds".
+      n_distinct_res_each <- n_distinct(df[[var2_col]])
+      if (n_distinct_res_each != 2) {
+        stop("The explanatory variable needs to have 2 unique values.")
       }
       # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
       # Check it here, rather than handling it later.
@@ -1223,8 +1252,16 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
     }
 
-    # Calculate stderr.  Difference (estimate) / t-value (statistic)
-    ret <- ret %>% dplyr::mutate(stderr = estimate / statistic)
+    # Aggregated t-tests already calculate the standard error directly. Using
+    # estimate / statistic only works when the null difference is zero; with a
+    # nonzero mu, t = (estimate - mu) / stderr. Keep the old fallback for raw
+    # t-tests, whose htest object does not carry the precomputed stderr.
+    if (!is.null(x$stderr)) {
+      ret <- ret %>% dplyr::mutate(stderr = !!x$stderr)
+    } else {
+      null_value <- if (is.null(x$null.value)) 0 else unname(x$null.value)[1]
+      ret <- ret %>% dplyr::mutate(stderr = (estimate - !!null_value) / statistic)
+    }
 
     # Get sample sizes for the 2 groups (n1, n2).
     n1 <- x$n1 # number of 1st class
@@ -1358,22 +1395,30 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     # Data for the probability distribution (line) chart on the DIFFERENCE scale. This is
     # the sampling distribution of the difference of means under H0 "no difference", i.e.
     # the t-value distribution relocated/rescaled onto the difference axis via
-    # difference = 0 + t * stderr. We reuse the t-value generator and remap its x column
-    # so the shading semantics (critical region, sig.level based) stay identical to the
-    # t-value tab. The marked statistic point lands at t * stderr = the observed
-    # difference, and the curve peaks at 0 (the hypothesized difference).
+    # difference = null difference + t * stderr. We reuse the t-value generator
+    # and remap its x column so the shading semantics (critical region, sig.level
+    # based) stay identical to the t-value tab. The marked statistic point lands
+    # at the observed difference and the curve peaks at the hypothesized
+    # difference.
     # estimate is c(mean of group1, mean of group2) for an unpaired test, or a single
-    # value (mean of the differences) for a paired test; stderr = difference / t.
+    # value (mean of the differences) for a paired test.
     est <- unname(x$estimate)
     difference <- if (length(est) >= 2) est[1] - est[2] else est[1]
+    null_value <- if (is.null(x$null.value)) 0 else unname(x$null.value)[1]
     t_stat <- unname(x$statistic)
-    se_val <- if (!is.na(t_stat) && t_stat != 0) abs(difference / t_stat) else NA_real_
+    se_val <- if (!is.null(x$stderr)) {
+      unname(x$stderr)[1]
+    } else if (!is.na(t_stat) && t_stat != 0) {
+      abs((difference - null_value) / t_stat)
+    } else {
+      NA_real_
+    }
     if (is.na(se_val) || se_val == 0) {
       ret <- tibble::tibble(x = numeric(0), y = numeric(0)) # degenerate input -> chart no-ops
     } else {
       ret <- generate_ttest_density_data(t = t_stat, p.value = x$p.value, df = unname(x$parameter),
                                          sig_level = x$test_sig_level, alternative = x$alternative) %>%
-        dplyr::mutate(x = x * se_val)
+        dplyr::mutate(x = null_value + x * se_val)
     }
     ret
   }
@@ -1494,11 +1539,14 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
       if (nrow(df) == 0) {
         stop("There is no data left after removing NA.")
       }
-      if(length(grouped_cols) > 0) {
-        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
-        if (n_distinct_res_each != 2) {
-          stop("The explanatory variable needs to have 2 unique values.")
-        }
+      # Re-check regardless of grouping -- see tam#38168 (same fix applied to
+      # exp_ttest for this hand-copied block). The top-level check (before
+      # this each_func runs) can pass even when the target-column NA rows
+      # removed just above coincide entirely with one explanatory-variable
+      # group.
+      n_distinct_res_each <- n_distinct(df[[var2_col]])
+      if (n_distinct_res_each != 2) {
+        stop("The explanatory variable needs to have 2 unique values.")
       }
       # Adjust the factor levels since t.test consideres the 2nd level to be the base, which is not what we want.
       # We keep the original df as is, since we want to keep the original factor order for display purpose.
@@ -1790,10 +1838,18 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
     }
   }
 
-  # If explanatory variable(s) are numeric, convet them into factor. 
+  # If explanatory variable(s) are numeric, logical, character, or Date/POSIXct, convert
+  # them into factor. Previously only numeric was handled: a logical
+  # categoryColumn crashed model fitting with an opaque array-dims error
+  # (`dims [product N] do not match...`), and a Date/POSIXct categoryColumn
+  # (e.g. after a client-side "Round: Year" conversion, which keeps the
+  # column Date-classed) crashed with "contrasts apply only to factors".
+  # tam#38168.
   for (i in 1:length(var2_col)) {
-    if (is.numeric(df[[var2_col[[i]]]])) {
-      df[[var2_col[[i]]]] <- factor(df[[var2_col[[i]]]])
+    col_i <- df[[var2_col[[i]]]]
+    if (is.numeric(col_i) || is.logical(col_i) || is.character(col_i) ||
+        lubridate::is.Date(col_i) || lubridate::is.POSIXct(col_i)) {
+      df[[var2_col[[i]]]] <- factor(col_i)
     }
   }
 
@@ -1889,23 +1945,34 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         df$.is.outlier <- NULL
       }
 
-      if(length(grouped_cols) > 0) {
-        # Check n_distinct again within group after handling outliers.
-        # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
-        for (i in 1:length(var2_col)) {
-          n_distinct_res_each <- n_distinct(df[[var2_col[i]]], na.rm=TRUE)
-          if (n_distinct_res_each < 2) {
-            stop(paste0("The explanatory variable needs to have 2 or more unique values."))
-          }
+      # Re-check regardless of grouping -- see tam#38168 (same fix applied to
+      # exp_ttest for this hand-copied block, "TODO: duplicated code with
+      # exp_ttest" above). The top-level check can pass even when outlier
+      # removal just above empties one explanatory-variable group entirely.
+      # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
+      for (i in 1:length(var2_col)) {
+        n_distinct_res_each <- n_distinct(df[[var2_col[i]]], na.rm=TRUE)
+        if (n_distinct_res_each < 2) {
+          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
         }
       }
       # It seems that the 2nd row of broom:::tidy.aov(x) is missed, if no group has more than 1 row. Check it here, rather than handling it later.
-      count_df <- df %>% group_by(!!!rlang::syms(as.character(var2_col))) %>% summarize(n=n()) %>% ungroup() %>% summarize(max_n=max(n),tot_n=sum(n))
-      if (count_df$max_n <= 1) {
-        e <- simpleError("At least one group needs to have 2 or more rows.")
-        class(e) <- c("anova_exploratory", class(e))
-        e$n <- count_df$tot_n
-        return(e)
+      # Checking max_n alone only catches the all-groups-degenerate case;
+      # one lone group with n=1 among otherwise-normal groups (max_n > 1)
+      # passed this guard and fell through to oneway.test()'s own raw,
+      # unfriendly error instead of getting the same graceful degradation
+      # as the all-tiny case. This requirement applies to the one-way
+      # oneway.test() path; lm()-based two-way ANOVA and ANCOVA can be
+      # estimable with an unbalanced design containing a singleton cell.
+      # tam#38168.
+      if (is.null(covariates) && length(var2_col) == 1 && !with_repeated_measures) {
+        count_df <- df %>% group_by(!!!rlang::syms(as.character(var2_col))) %>% summarize(n=n()) %>% ungroup() %>% summarize(min_n=min(n),tot_n=sum(n))
+        if (count_df$min_n <= 1) {
+          e <- simpleError("Every group needs to have 2 or more rows.")
+          class(e) <- c("anova_exploratory", class(e))
+          e$n <- count_df$tot_n
+          return(e)
+        }
       }
       if (with_repeated_measures) {
         model <- afex::aov_car(formula, data = df, type = "III")
@@ -1917,9 +1984,23 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
         tryCatch({
           ss3 <- broom::tidy(car::Anova(model, type="III"))
         }, error = function(e) { # This can fail depending on the data.
-          # With 2-way ANOVA with interaction, car::Anova(x, type="III") fails with "there are aliased coefficients in the model" when there are empty cells.
-          if (with_interaction && any(stringr::str_detect(e$message, "there are aliased coefficients in the model"))) {
-            stop('EXP-ANA-9 :: [] :: Most likely there is a combination of categories with no rows. Try exclusing interaction.')
+          # car::Anova(x, type="III") fails with "there are aliased coefficients
+          # in the model" for more than one root cause -- 2-way ANOVA with
+          # interaction and an empty cell (a combination of categories with no
+          # rows), but ALSO ANCOVA with a constant or collinear covariate, which
+          # can happen with with_interaction=FALSE too. The gate previously only
+          # fired for the interaction case, so the constant/collinear-covariate
+          # case fell through to this raw car::Anova message instead of a
+          # friendly one. tam#38168.
+          if (any(stringr::str_detect(e$message, "there are aliased coefficients in the model"))) {
+            alias_message <- 'The model could not be fit. Likely causes: a covariate with no variation (constant), a covariate collinear with another covariate or with the group variable, or (with interaction enabled) a combination of categories with no rows. Try removing or adjusting the covariate(s), or disabling interaction.'
+            # Grouped analyses surface errors as a per-group Note. Keep that
+            # established behavior instead of sending the EXP-ANA translation
+            # code down a path that deliberately rethrows grouped errors.
+            if (length(grouped_cols) > 0) {
+              stop(alias_message)
+            }
+            stop(paste0('EXP-ANA-9 :: [] :: ', alias_message))
           }
           else {
             stop(e)
@@ -2552,8 +2633,16 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjus
       conf_threshold = 1 - (1 - conf_level)/2
 
       # For ANCOVA, join regular mean. [[1]] is necessary to remove name from x$var2.
-      mean_df <- x$dataframe %>% 
-        dplyr::group_by(!!rlang::sym(x$var2)) %>% 
+      # x$dataframe only had var1's own NAs removed (see model$dataframe <-
+      # df above); lm()'s own fit -- which the adjusted (emmean/DF) columns
+      # this gets joined to come from -- additionally drops any row with an
+      # NA covariate via its default na.action. Restrict to the same
+      # complete-case rows here so unadjusted Rows/Mean/... describe the
+      # SAME row set as the adjusted columns instead of silently diverging
+      # whenever a covariate has NAs. tam#38168.
+      complete_rows <- stats::complete.cases(x$dataframe[, c(x$var1, x$covariates), drop = FALSE])
+      mean_df <- x$dataframe[complete_rows, , drop = FALSE] %>%
+        dplyr::group_by(!!rlang::sym(x$var2)) %>%
         dplyr::summarize(`Rows`=length(!!rlang::sym(x$var1)),
           Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
           `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
@@ -2820,6 +2909,20 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pai
     stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
 
+  # kruskal.test()'s own formula interface tolerates a Date/POSIXct/numeric
+  # var2_col (it coerces internally), but dunn.test::dunn.test() -- a
+  # separate package, called below for the pairwise post-hoc table -- does
+  # not: it explicitly rejects anything that is not a factor, character, or
+  # integer vector. A Date categoryColumn (e.g. after a client-side
+  # "Round: Year" conversion, which keeps the Date class) crashed dunn.test
+  # with "g must be a factor, character vector, or integer vector." even
+  # though the kruskal.test model fit fine. Convert once here so both calls
+  # see the same, dunn.test-safe representation. tam#38168.
+  if (is.numeric(df[[var2_col]]) || is.logical(df[[var2_col]]) ||
+      lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col)))
+  }
+
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   each_func <- function(df) {
@@ -2828,11 +2931,12 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pai
       if (nrow(df) == 0) {
         stop("There is no data left after removing NA.")
       }
-      if(length(grouped_cols) > 0) {
-        # Check n_distinct again within group after handling outliers.
-        if (n_distinct(df[[var2_col]]) < 2) {
-          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
-        }
+      # Re-check regardless of grouping -- see tam#38168 (same fix applied to
+      # exp_ttest for this hand-copied block). The top-level check can pass
+      # even when the target-column NA rows removed just above coincide
+      # entirely with one explanatory-variable group.
+      if (n_distinct(df[[var2_col]]) < 2) {
+        stop(paste0("The explanatory variable needs to have 2 or more unique values."))
       }
       model <- kruskal.test(formula, data = df, ...)
 
@@ -3013,44 +3117,91 @@ exp_normality<- function(df, ...,
     df.qqline <- data.frame()
     df.model <- data.frame()
     for (col in selected_cols) {
-      if (n_distinct(df[[col]], na.rm=TRUE) <= 1) {
-        # skip if the column has only 1 unique value or only NAs, to avoid error.
-        # TODO: show what happened in the summary table.
-      }
-      else {
+      # Isolate failures per column -- previously any error anywhere in this
+      # loop body (a naturally-tiny column, an n_sample below shapiro.test's
+      # own lower bound, etc.) propagated out and killed every OTHER,
+      # otherwise-fine column in the same command with no per-column
+      # signal. tam#38168.
+      col_result <- tryCatch({
+        # `return()` inside a tryCatch() expression exits the ENCLOSING
+        # FUNCTION (shapiro_each), not just this block -- an early return()
+        # here would abort the whole for loop, not just skip to the next
+        # column. Wrapping the body in an immediately-invoked function
+        # makes return() exit only this per-column IIFE. tam#38168.
+        (function() {
+        # Remove NA BEFORE sampling, not after. Previously sample() drew
+        # from the raw (NA-containing) column, so the exact same command
+        # with the exact same n_sample crashed or succeeded purely
+        # depending on the random seed -- whether the draw happened to
+        # include enough non-NA values. Filtering first makes the draw
+        # deterministic given a fixed seed. tam#38168.
+        vals <- df[[col]]
+        vals <- vals[!is.na(vals)]
+
+        if (n_distinct(vals) <= 1) {
+          # Only 1 distinct (non-NA) value, or no data at all -- Shapiro-Wilk
+          # needs variation to test. Previously silently dropped the column
+          # from the Summary table with no explanation (the "TODO: show what
+          # happened" this comment used to name); now records a Note row
+          # instead. tam#38168.
+          return(list(qq = NULL, qqline = NULL,
+                      model = data.frame(col = col, statistic = NA_real_, p.value = NA_real_,
+                                         sample_size = length(vals),
+                                         Note = "Not enough distinct values to test for normality.")))
+        }
+
         # set plot.it to FALSE to disable plotting (avoid launching another window)
-        res <- stats::qqnorm(df[[col]], plot.it=FALSE)
-        df.qq <- dplyr::bind_rows(df.qq, data.frame(x=res$x, y=res$y, col=col))
+        res <- stats::qqnorm(vals, plot.it=FALSE)
+        qq_df <- data.frame(x=res$x, y=res$y, col=col)
 
         # bind reference line data too.
-        ref_res <- qqline_data(df[[col]])
+        ref_res <- qqline_data(vals)
         min_x <- min(res$x, na.rm=TRUE)
         max_x <- max(res$x, na.rm=TRUE)
         ref_min_y <- ref_res[[1]] + ref_res[[2]] * min_x
         ref_max_y <- ref_res[[1]] + ref_res[[2]] * max_x
-        df.qqline <- dplyr::bind_rows(df.qqline, data.frame(x=c(min_x, max_x), refline_y=c(ref_min_y,ref_max_y), col=col))
+        qqline_df <- data.frame(x=c(min_x, max_x), refline_y=c(ref_min_y,ref_max_y), col=col)
 
-        if (n_sample > 5000) {
-          n_sample <- 5000 # shapiro.test takes only up to max of 5000 samples. 
+        n_sample_local <- n_sample
+        if (n_sample_local > 5000) {
+          n_sample_local <- 5000 # shapiro.test takes only up to max of 5000 samples.
+        }
+        if (n_sample_local < 3) {
+          # shapiro.test() requires n between 3 and 5000; the UI's own
+          # "Sample Data" field only enforced a min of 1, so n_sample=1/2
+          # (both UI-legal) previously crashed the whole analysis instead of
+          # being clamped the same way the upper bound already is. tam#38168.
+          n_sample_local <- 3
         }
 
-        if (length(df[[col]]) > n_sample) {
-          col_to_test <- sample(df[[col]], n_sample)
-          # If sampled, check if the column has only 1 unique value or only NAs again, to avoid error.
-          if (n_distinct(col_to_test, na.rm=TRUE) <= 1) {
-            next
+        if (length(vals) > n_sample_local) {
+          col_to_test <- sample(vals, n_sample_local) # vals is already NA-free, so this draw is deterministic given a fixed seed.
+          # If sampled, check if the sample has only 1 unique value again, to avoid error.
+          if (n_distinct(col_to_test) <= 1) {
+            return(list(qq = qq_df, qqline = qqline_df,
+                        model = data.frame(col = col, statistic = NA_real_, p.value = NA_real_,
+                                           sample_size = length(col_to_test),
+                                           Note = "The random sample drawn for testing had only 1 distinct value.")))
           }
-          sample_size <- n_sample
+          sample_size <- n_sample_local
         }
         else {
-          col_to_test <- df[[col]]
+          col_to_test <- vals
           sample_size <- length(col_to_test)
         }
-        res <- shapiro.test(col_to_test) %>% tidy() %>%
+        model_res <- shapiro.test(col_to_test) %>% tidy() %>%
           dplyr::mutate(col=!!col, sample_size=!!sample_size) %>%
           dplyr::select(col, everything())
-        df.model <- dplyr::bind_rows(df.model, res)
-      }
+        list(qq = qq_df, qqline = qqline_df, model = model_res)
+        })()
+      }, error = function(e) {
+        list(qq = NULL, qqline = NULL,
+             model = data.frame(col = col, statistic = NA_real_, p.value = NA_real_,
+                                sample_size = NA_integer_, Note = conditionMessage(e)))
+      })
+      if (!is.null(col_result$qq)) df.qq <- dplyr::bind_rows(df.qq, col_result$qq)
+      if (!is.null(col_result$qqline)) df.qqline <- dplyr::bind_rows(df.qqline, col_result$qqline)
+      df.model <- dplyr::bind_rows(df.model, col_result$model)
     }
 
     model <- list()
@@ -3088,7 +3239,14 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
   else {
     ret <- x$model_summary
     ret <- ret %>% dplyr::mutate(normal=ifelse(p.value > !!signif_level, "Normality assumption is valid.", "Normality assumption is not valid."))
-    ret <- ret %>% dplyr::select(-method)
+    # `method` only exists on rows where shapiro.test() actually ran --
+    # per-column error/skip rows (see shapiro_each's tam#38168 fix) never
+    # have it. If EVERY selected column errors or is skipped, `method`
+    # doesn't exist in model_summary at all, and a bare `-method` throws
+    # "Can't subset columns that don't exist" -- the same
+    # constantColumnAloneCrashesDefect this fix addresses, just reached one
+    # step further downstream by fixing the loop above.
+    ret <- ret %>% dplyr::select(-dplyr::any_of("method"))
     ret <- ret %>% dplyr::rename(`Column`=col, `W Value`=statistic, `P Value`=p.value, `Result`=normal, `Sample Size`=sample_size)
     ret
   }
@@ -3305,7 +3463,15 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
     tryCatch({
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var_col)))
       if (nrow(df) == 0) stop("There is no data left after removing NA.")
-      if (length(grouped_cols) > 0 && n_distinct(df[[exp_col]]) != 2) {
+      # Re-check after target-NA removal, not just when grouped (Repeat By).
+      # The top-level check above runs on the whole (pre-filter) data frame,
+      # so it can pass even when the target column's NAs coincide entirely
+      # with one explanatory-variable group -- ungrouped and grouped runs
+      # both filter var_col the same way, and both need the same guard, or
+      # the ungrouped path falls through to a raw "missing value where
+      # TRUE/FALSE needed" once the collapsed group's lv[2] resolves to NA.
+      # tam#38168.
+      if (n_distinct(df[[exp_col]]) != 2) {
         stop("The explanatory variable needs to have 2 unique values.")
       }
 
@@ -3499,6 +3665,16 @@ exp_one_sample_prop_test <- function(df, var, p = 0.5, alternative = "two.sided"
       if (use_exact) {
         res <- binom.test(x = x, n = n, p = p, alternative = alternative,
                           conf.level = conf_level)
+        # stats::binom.test() returns a bare logical (not numeric) p.value
+        # when the benchmark p is exactly 0 or 1 -- TRUE if x matches the
+        # degenerate hypothesis exactly (all mass at x=0 or x=n, p.value
+        # should read 1), FALSE otherwise (any other count contradicts a
+        # 0%/100% hypothesis outright, p.value should read 0). Both
+        # coercions are the mathematically correct p-value at this
+        # boundary, not just a defensive cast; downstream code (the
+        # `< sig.level` comparison, jsonlite serialization) expects a
+        # double. tam#38168.
+        res$p.value <- as.numeric(res$p.value)
         method_used <- "Exact Binomial Test"
       } else {
         res <- prop.test(x = x, n = n, p = p, alternative = alternative,
@@ -3643,7 +3819,20 @@ exp_one_sample_t_test <- function(df, var, mu = 0, alternative = "two.sided",
   t_test_each <- function(df) {
     tryCatch({
       vec <- df[[var_col]]
-      vec <- vec[!is.na(vec)]
+      # A character or logical column that bypasses the UI's numeric-only
+      # gate (e.g. an upstream column re-typed after this step was
+      # configured) previously passed silently: mean()/sd() on character
+      # data return NA with only a base-R warning (no visible error), and
+      # on logical data silently coerce TRUE/FALSE to 1/0 and compute a
+      # meaningless-but-plausible-looking mean. tam#38168.
+      if (!is.numeric(vec)) {
+        stop("The selected column must be numeric.")
+      }
+      # is.finite() excludes NA, NaN, Inf, and -Inf in one pass -- Inf
+      # previously survived this filter and silently propagated to
+      # Mean=Inf / every other stat NaN, while the Result column still
+      # printed a confident "Not statistically significant." tam#38168.
+      vec <- vec[is.finite(vec)]
       n <- length(vec)
       if (n < 2) stop("There are not enough valid (non-NA) values in the selected column.")
 
@@ -3706,7 +3895,9 @@ tidy.one_sample_t_test_exploratory <- function(x, type = "model", conf_level = 0
   } else if (type == "data_summary") {
     conf_threshold <- 1 - (1 - conf_level) / 2
     vec <- x$data[[x$var_col]]
-    vec <- vec[!is.na(vec)]
+    # Keep this summary consistent with the model, which excludes Inf and
+    # -Inf along with NA/NaN before fitting.
+    vec <- vec[is.finite(vec)]
     n <- length(vec)
     mean_val <- mean(vec)
     sd_val <- sd(vec)

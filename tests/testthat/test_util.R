@@ -999,6 +999,299 @@ test_that("test pivot", {
 
 })
 
+test_that("pivot with sum_if applies condition per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "y", "x", "y", "y"),
+    val = c(10, 20, 5, 7, 8, 9),
+    flag = c(TRUE, FALSE, TRUE, TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  # Group A/col x: rows val=10 (flag=T), val=20 (flag=F) -> sum_if(flag) = 10
+  expect_equal(res$x[res$grp == "A"], 10)
+  # Group A/col y: val=5, flag=T -> 5
+  expect_equal(res$y[res$grp == "A"], 5)
+  # Group B/col x: val=7, flag=T -> 7
+  expect_equal(res$x[res$grp == "B"], 7)
+  # Group B/col y: val=8 (flag=T), val=9 (flag=F) -> 8
+  expect_equal(res$y[res$grp == "B"], 8)
+})
+
+test_that("pivot with count_if and no value column counts matching rows per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "x", "y", "x", "y", "y"),
+    flag = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if,
+    value_condition = "flag"
+  )
+  expect_equal(res$x[res$grp == "A"], 2) # 2 of 3 rows in A/x have flag=TRUE
+  expect_equal(res$y[res$grp == "A"], 1) # 1 of 1 row in A/y has flag=TRUE
+  expect_equal(res$x[res$grp == "B"], 0) # 0 of 1 row in B/x has flag=TRUE (zero-match cell)
+  expect_equal(res$y[res$grp == "B"], 2) # 2 of 2 rows in B/y have flag=TRUE
+})
+
+test_that("pivot with count_if_ratio and no value column computes match ratio per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "x", "y", "x", "y", "y"),
+    flag = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if_ratio,
+    value_condition = "flag"
+  )
+  expect_equal(res$x[res$grp == "A"], 2 / 3) # 2 of 3 rows in A/x have flag=TRUE
+  expect_equal(res$y[res$grp == "A"], 1) # 1 of 1 row in A/y has flag=TRUE
+  expect_equal(res$x[res$grp == "B"], 0) # 0 of 1 row in B/x has flag=TRUE (zero-match cell)
+  expect_equal(res$y[res$grp == "B"], 1) # 2 of 2 rows in B/y have flag=TRUE
+})
+
+test_that("pivot with count_if_pct and no value column computes match percentage per cell", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "A", "B", "B", "B"),
+    col = c("x", "x", "x", "y", "x", "y", "y"),
+    flag = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if_pct,
+    value_condition = "flag"
+  )
+  expect_equal(res$x[res$grp == "A"], 200 / 3) # 2 of 3 rows in A/x have flag=TRUE
+  expect_equal(res$y[res$grp == "A"], 100) # 1 of 1 row in A/y has flag=TRUE
+  expect_equal(res$x[res$grp == "B"], 0) # 0 of 1 row in B/x has flag=TRUE (zero-match cell)
+  expect_equal(res$y[res$grp == "B"], 100) # 2 of 2 rows in B/y have flag=TRUE
+})
+
+test_that("pivot with count_if and a value column does not drop condition-matching rows whose value is NA", {
+  # count_if's count is based on the condition (flag), not on the value column, so a row
+  # matching the condition must still be counted even when the (semantically irrelevant)
+  # value column happens to be NA for that row.
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, NA, 5),
+    flag = c(TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::count_if,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  # 2 of the 3 rows in A/x have flag=TRUE (row2's val=NA must not exclude it from the count).
+  expect_equal(res$x[res$grp == "A"], 2)
+})
+
+test_that("pivot with count_if_ratio and a value column keeps the full row count as denominator despite NA values", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, NA, 5),
+    flag = c(TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::count_if_ratio,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  # 2 of 3 rows in A/x have flag=TRUE; the NA value in row2 must not shrink either the
+  # numerator (matches) or the denominator (total rows).
+  expect_equal(res$x[res$grp == "A"], 2 / 3)
+})
+
+test_that("pivot with count_if_pct and a value column keeps the full row count as denominator despite NA values", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, NA, 5),
+    flag = c(TRUE, TRUE, FALSE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::count_if_pct,
+    value_condition = "flag",
+    na.rm = TRUE
+  )
+  expect_equal(res$x[res$grp == "A"], 200 / 3)
+})
+
+test_that("pivot forwards na.rm to conditional aggregates", {
+  df <- tibble::tibble(
+    grp = c("A", "A"),
+    col = c("x", "x"),
+    val = c(10, NA),
+    flag = c(TRUE, TRUE)
+  )
+
+  value_res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag", na.rm = FALSE
+  )
+  expect_true(is.na(value_res$x[value_res$grp == "A"]))
+
+  count_df <- df
+  count_df$flag <- c(TRUE, NA)
+  count_res <- count_df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col",
+    fun.aggregate = exploratory::count_if,
+    value_condition = "flag", na.rm = FALSE
+  )
+  expect_true(is.na(count_res$x[count_res$grp == "A"]))
+})
+
+test_that("pivot count_if ratios and percentages use the full cell denominator with NA conditions", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, 20, 30),
+    flag = c(TRUE, FALSE, NA)
+  )
+
+  for (fn in list(exploratory::count_if_ratio, exploratory::count_if_pct)) {
+    no_value_res <- df %>% exploratory::pivot(
+      row_cols = "grp", col_cols = "col",
+      fun.aggregate = fn, value_condition = "flag"
+    )
+    value_res <- df %>% exploratory::pivot(
+      row_cols = "grp", col_cols = "col", value = "val",
+      fun.aggregate = fn, value_condition = "flag"
+    )
+
+    expected <- if (identical(fn, exploratory::count_if_ratio)) 1 / 3 else 100 / 3
+    expect_equal(no_value_res$x[no_value_res$grp == "A"], expected)
+    expect_equal(value_res$x[value_res$grp == "A"], expected)
+  }
+})
+
+test_that("pivot with sum_if_ratio computes ratio against the unfiltered group total", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, 20, 30),
+    flag = c(TRUE, FALSE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if_ratio,
+    value_condition = "flag"
+  )
+  # sum_if_ratio = sum(val[flag]) / sum(val) = (10+30) / (10+20+30) = 40/60
+  expect_equal(res$x[res$grp == "A"], 40 / 60)
+})
+
+test_that("pivot with mean_if_pct computes percentage against the unfiltered group mean", {
+  df <- tibble::tibble(
+    grp = c("A", "A", "A"),
+    col = c("x", "x", "x"),
+    val = c(10, 20, 60),
+    flag = c(TRUE, FALSE, TRUE)
+  )
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::mean_if_pct,
+    value_condition = "flag"
+  )
+  # mean_if_pct = 100 * mean(val[flag]) / mean(val) = 100 * mean(10, 60) / mean(10, 20, 60) = 100 * 35/30
+  expect_equal(res$x[res$grp == "A"], 100 * 35 / 30)
+})
+
+test_that("pivot with sum_if and no matching rows in a cell returns 0", {
+  df <- tibble::tibble(grp = c("A", "A"), col = c("x", "x"), val = c(10, 20), flag = c(FALSE, FALSE))
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag"
+  )
+  # sum() of an empty numeric vector is 0, with no warning.
+  expect_equal(res$x[res$grp == "A"], 0)
+})
+
+test_that("pivot with mean_if and no matching rows in a cell returns NaN/NA with no warning", {
+  df <- tibble::tibble(grp = c("A", "A"), col = c("x", "x"), val = c(10, 20), flag = c(FALSE, FALSE))
+  # mean() of an empty numeric vector returns NaN silently (unlike min()/max(), it does not warn).
+  # is.na(NaN) is TRUE in R, so the pivoted cell reads as NA.
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::mean_if,
+    value_condition = "flag"
+  )
+  expect_true(is.na(res$x[res$grp == "A"]))
+})
+
+test_that("pivot with min_if and no matching rows in a cell returns Inf with a warning", {
+  df <- tibble::tibble(grp = c("A", "A"), col = c("x", "x"), val = c(10, 20), flag = c(FALSE, FALSE))
+  # min() of an empty numeric vector returns Inf and warns
+  # ("no non-missing arguments to min; returning Inf"), unlike mean()/median().
+  expect_warning(
+    res <- df %>% exploratory::pivot(
+      row_cols = "grp", col_cols = "col", value = "val",
+      fun.aggregate = exploratory::min_if,
+      value_condition = "flag"
+    )
+  )
+  expect_equal(res$x[res$grp == "A"], Inf)
+})
+
+test_that("pivot with sum_if handles a complex/multibyte value column name", {
+  # value column name has spaces, multibyte chars, and symbols. It is resolved via
+  # tidyselect::vars_select, a different code path than the condition string below.
+  stress_col <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "B"),
+    col = c("x", "x", "y", "x"),
+    flag = c(TRUE, FALSE, TRUE, TRUE)
+  )
+  df[[stress_col]] <- c(10, 20, 5, 7)
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = stress_col,
+    fun.aggregate = exploratory::sum_if,
+    value_condition = "flag"
+  )
+  # Group A/col x: val=10 (flag=T), val=20 (flag=F) -> sum_if(flag) = 10
+  expect_equal(res$x[res$grp == "A"], 10)
+  # Group A/col y: val=5, flag=T -> 5
+  expect_equal(res$y[res$grp == "A"], 5)
+  # Group B/col x: val=7, flag=T -> 7
+  expect_equal(res$x[res$grp == "B"], 7)
+})
+
+test_that("pivot with sum_if handles a complex/multibyte column name inside value_condition", {
+  # value_condition is parsed from a string with rlang::parse_expr(), a different code path
+  # than the value column above (tidyselect::vars_select), and needs correct R backtick-quoting
+  # for the non-syntactic condition-referenced column name.
+  cond_col <- "複雑 な 条件 列 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~"
+  df <- tibble::tibble(
+    grp = c("A", "A", "A", "B"),
+    col = c("x", "x", "y", "x"),
+    val = c(10, 20, 5, 7)
+  )
+  df[[cond_col]] <- c(5, -1, 3, 2)
+  res <- df %>% exploratory::pivot(
+    row_cols = "grp", col_cols = "col", value = "val",
+    fun.aggregate = exploratory::sum_if,
+    value_condition = paste0("`", cond_col, "` > 0")
+  )
+  # Group A/col x: val=10 (cond=5>0 TRUE), val=20 (cond=-1>0 FALSE) -> sum_if = 10
+  expect_equal(res$x[res$grp == "A"], 10)
+  # Group A/col y: val=5, cond=3>0 TRUE -> 5
+  expect_equal(res$y[res$grp == "A"], 5)
+  # Group B/col x: val=7, cond=2>0 TRUE -> 7
+  expect_equal(res$x[res$grp == "B"], 7)
+})
+
 test_that("test pivot with NA", {
   test_df_na <- data.frame(
     carrier = c("AA", "AA", "UA"),
@@ -1199,6 +1492,18 @@ test_that("test %equal_or_all%", {
   ret <- df %>% dplyr::filter(x %equal_or_all% c(lubridate::ymd("2024-01-01"),
                                                  lubridate::ymd("2024-01-03")))
   expect_equal(nrow(ret), 2)
+
+  # Test with zero-length numeric vector, e.g. an unselected numeric parameter (should return all rows)
+  df <- data.frame(x = c(1, 2, 3))
+  ret <- df %>% dplyr::filter(x %equal_or_all% numeric(0))
+  expect_equal(nrow(ret), 3)
+
+  # Test with zero-length Date vector, e.g. an unselected Date parameter (should return all rows)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"),
+                         lubridate::ymd("2024-01-02"),
+                         lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %equal_or_all% as.Date(character(0)))
+  expect_equal(nrow(ret), 3)
 })
 
 test_that("test %not_equal_or_all%", {
@@ -1230,6 +1535,18 @@ test_that("test %not_equal_or_all%", {
   ret <- df %>% dplyr::filter(x %not_equal_or_all% c(lubridate::ymd("2024-01-01"),
                                                      lubridate::ymd("2024-01-03")))
   expect_equal(nrow(ret), 1)
+
+  # Test with zero-length numeric vector, e.g. an unselected numeric parameter (should return all rows)
+  df <- data.frame(x = c(1, 2, 3))
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% numeric(0))
+  expect_equal(nrow(ret), 3)
+
+  # Test with zero-length Date vector, e.g. an unselected Date parameter (should return all rows)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"),
+                         lubridate::ymd("2024-01-02"),
+                         lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %not_equal_or_all% as.Date(character(0)))
+  expect_equal(nrow(ret), 3)
 })
 
 test_that("test %greater_or_all%", {
@@ -1247,6 +1564,16 @@ test_that("test %greater_or_all%", {
   expect_equal(nrow(ret),1)
   ret <- df %>% dplyr::filter(x %greater_or_all% NULL)
   expect_equal(nrow(ret),3)
+
+  # Test with zero-length numeric vector, e.g. an unselected numeric parameter (should return all rows)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_all% numeric(0))
+  expect_equal(nrow(ret), 3)
+
+  # Test with zero-length Date vector, e.g. an unselected Date parameter (should return all rows)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %greater_or_all% as.Date(character(0)))
+  expect_equal(nrow(ret), 3)
 })
 
 test_that("test %greater_or_equal_or_all%", {
@@ -1264,6 +1591,16 @@ test_that("test %greater_or_equal_or_all%", {
   expect_equal(nrow(ret),2)
   ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% NULL)
   expect_equal(nrow(ret),3)
+
+  # Test with zero-length numeric vector, e.g. an unselected numeric parameter (should return all rows)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% numeric(0))
+  expect_equal(nrow(ret), 3)
+
+  # Test with zero-length Date vector, e.g. an unselected Date parameter (should return all rows)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %greater_or_equal_or_all% as.Date(character(0)))
+  expect_equal(nrow(ret), 3)
 })
 
 test_that("test %less_or_all%", {
@@ -1281,6 +1618,16 @@ test_that("test %less_or_all%", {
   expect_equal(nrow(ret),1)
   ret <- df %>% dplyr::filter(x %less_or_all% NULL)
   expect_equal(nrow(ret),3)
+
+  # Test with zero-length numeric vector, e.g. an unselected numeric parameter (should return all rows)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_all% numeric(0))
+  expect_equal(nrow(ret), 3)
+
+  # Test with zero-length Date vector, e.g. an unselected Date parameter (should return all rows)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %less_or_all% as.Date(character(0)))
+  expect_equal(nrow(ret), 3)
 })
 
 test_that("test %less_or_equal_or_all%", {
@@ -1298,6 +1645,16 @@ test_that("test %less_or_equal_or_all%", {
   expect_equal(nrow(ret),2)
   ret <- df %>% dplyr::filter(x %less_or_equal_or_all% NULL)
   expect_equal(nrow(ret),3)
+
+  # Test with zero-length numeric vector, e.g. an unselected numeric parameter (should return all rows)
+  df <- data.frame(x  = c (1,2,3))
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% numeric(0))
+  expect_equal(nrow(ret), 3)
+
+  # Test with zero-length Date vector, e.g. an unselected Date parameter (should return all rows)
+  df <- data.frame(x = c(lubridate::ymd("2024-01-01"), lubridate::ymd("2024-01-02"), lubridate::ymd("2024-01-03")))
+  ret <- df %>% dplyr::filter(x %less_or_equal_or_all% as.Date(character(0)))
+  expect_equal(nrow(ret), 3)
 })
 
 test_that("test mase", {

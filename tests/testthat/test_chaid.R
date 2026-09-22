@@ -3,7 +3,13 @@ test_that('chaid_fit rejects invalid targets and predictors', {
 
   expect_error(chaid_fit(data, target = 'missing'), 'target')
   expect_error(chaid_fit(data, target = 'target', predictors = 'missing'), 'predictor')
-  expect_error(chaid_fit(data.frame(target = 1:2, x = 1:2), target = 'target'), 'character, factor, or logical')
+  # tam #38166: numeric targets are now valid (One-way ANOVA F-test); a
+  # datetime target is explicitly out of scope (spec section 3) and still
+  # rejected -- POSIXct is double-backed with NO is.numeric.POSIXct method in
+  # base R, so a bare is.numeric() check alone would wrongly accept it.
+  expect_error(chaid_fit(data.frame(
+      target = as.POSIXct(c('2020-01-01', '2020-01-02'), tz = 'UTC'), x = 1:2),
+    target = 'target'), 'character, factor, logical, or numeric')
   expect_error(chaid_fit(data, target = 'target', min_split = 1, min_bucket = 2), 'min_split')
   expect_error(chaid_fit(data.frame(target = c(NA_character_, NA_character_), x = c('a', 'b')),
                          target = 'target'), 'non-missing')

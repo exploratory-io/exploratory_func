@@ -261,3 +261,144 @@ test_that('chaid_group_level_order resolves a CLEAN variable name through terms_
   # exactly as chaid_numeric_intervals()/chaid_category_merge_table() do).
   expect_equal(chaid_group_level_order(model, '部署.1'), c('営業', '研究開発', '人事'))
 })
+
+# tam #38372 -----------------------------------------------------------------
+# CHAID records a merged group in MERGE order; CART (build_rpart_tree_nodes())
+# emits its category lists straight out of attr(x, "xlevels"), i.e. always in
+# level order. These two helpers bring the tree chart and the rule tables onto
+# CART's convention.
+
+test_that('chaid_tree_edge_label writes a categorical branch in CART form (tam #38372)', {
+  # Multi-member categorical group -> "col = a, b, c" (build_rpart_tree_nodes'
+  # make_edge_and_cond()), NOT CHAID's report-table "col in (a + b + c)".
+  expect_equal(chaid_tree_edge_label('部署', c('営業', '研究開発', '人事')),
+               '部署 = 営業, 研究開発, 人事')
+  # A single member already reads as an equality in both algorithms.
+  expect_equal(chaid_tree_edge_label('部署', '営業'), '部署 = 営業')
+  # A collapsed numeric run keeps the readable inequality form (tam #37177).
+  expect_equal(chaid_tree_edge_label('給料', '<= 2695.8'), '給料 <= 2695.8')
+  expect_equal(chaid_tree_edge_label('給料', '> 4228.8'), '給料 > 4228.8')
+  expect_equal(chaid_tree_edge_label('給料', '(2695.8, 4228.8]'),
+               '2695.8 < 給料 <= 4228.8')
+  # A multi-member run that still contains an interval (a NON-contiguous bin run
+  # that would not collapse) must not read "給料 = <= 2, (2.8, 5]".
+  expect_equal(chaid_tree_edge_label('給料', c('<= 2', '(2.8, 5]')),
+               '給料 in (<= 2 + (2.8, 5])')
+})
+
+test_that('chaid_normalize_condition_groups reorders every group in a rule (tam #38372)', {
+  model <- list(
+    original_factor_levels = list(部署 = c('営業', '研究開発', '人事')),
+    predictor_info = list(
+      部署 = list(ordered = FALSE, levels = c('研究開発', '人事', '営業')),
+      婚姻ステータス = list(ordered = FALSE, levels = c('離婚', '既婚', '独身')),
+      年齢 = list(ordered = TRUE, levels = c('<= 26', '(26, 29]', '> 29'))
+    )
+  )
+  # Declared factor order.
+  expect_equal(chaid_normalize_condition_groups('部署 in {人事 + 営業}', model),
+               '部署 in {営業 + 人事}')
+  # Every condition of a composite rule is normalized independently, and the
+  # "Root" term is passed through untouched for chaid_readable_condition().
+  expect_equal(
+    chaid_normalize_condition_groups(
+      'Root & 部署 in {人事 + 研究開発 + 営業} & 年齢 in {> 29 + (26, 29]}', model),
+    'Root & 部署 in {営業 + 研究開発 + 人事} & 年齢 in {(26, 29] + > 29}')
+  # A character predictor has no declared order -> alphabetical (same rule the
+  # Category Merges table already applies).
+  expect_equal(
+    chaid_normalize_condition_groups('婚姻ステータス in {独身 + 既婚}', model),
+    '婚姻ステータス in {既婚 + 独身}')
+  # A variable with no level information keeps alphabetical order; a fragment
+  # that is not a group condition is left alone; NA passes through.
+  expect_equal(chaid_normalize_condition_groups('存在しない列 in {b + a}', model),
+               '存在しない列 in {a + b}')
+  expect_equal(chaid_normalize_condition_groups('Root', model), 'Root')
+  expect_true(is.na(chaid_normalize_condition_groups(NA_character_, model)))
+  expect_equal(chaid_normalize_condition_groups(character(0), model), character(0))
+  # Vectorized.
+  expect_equal(
+    chaid_normalize_condition_groups(c('部署 in {人事 + 営業}', 'Root'), model),
+    c('部署 in {営業 + 人事}', 'Root'))
+})
+
+# tam #38372 (follow-up) ------------------------------------------------------
+# CHAID used to assign node ids in group-CREATION order and leave the
+# left-to-right reordering to the chart, so every report tab's Node column
+# disagreed with the chart's chip numbers. The ordering now happens where the
+# ids are assigned.
+
+test_that('chaid_display_class_order puts the positive class first for a binary target', {
+  expect_equal(chaid_display_class_order(c('FALSE', 'TRUE')), c('TRUE', 'FALSE'))
+  expect_equal(chaid_display_class_order(c('TRUE', 'FALSE')), c('TRUE', 'FALSE'))
+  expect_equal(chaid_display_class_order(c('No', 'Yes')), c('Yes', 'No'))
+  # A 2-class target that is neither logical nor Yes/No keeps its level order.
+  expect_equal(chaid_display_class_order(c('B', 'A')), c('B', 'A'))
+  # 3+ classes always keep their level order.
+  expect_equal(chaid_display_class_order(c('20代', '30代', '40代')), c('20代', '30代', '40代'))
+  expect_equal(chaid_display_class_order(character(0)), character(0))
+})
+
+test_that('chaid_order_children_for_display ranks TRUE first and FALSE last', {
+  edges <- data.frame(parent_id = c(1L, 1L), child_id = c(2L, 3L),
+                      original_categories = c('FALSE', 'TRUE'), stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L, 3L), predicted_class = c('X', 'X', 'X'),
+                      stringsAsFactors = FALSE)
+  # R created the FALSE child first (id 2); TRUE must still come out on the left.
+  expect_equal(chaid_order_children_for_display(c(2L, 3L), edges, nodes, c('X')), c(3L, 2L))
+})
+
+test_that('chaid_order_children_for_display keeps binned-numeric children ascending', {
+  edges <- data.frame(parent_id = rep(1L, 3), child_id = c(2L, 3L, 4L),
+                      original_categories = c('(30, 40]', '> 40', '<= 30'),
+                      stringsAsFactors = FALSE)
+  # Deliberately non-monotone predicted classes: the numeric order must win, or a
+  # numeric axis stops reading low -> high left -> right.
+  nodes <- data.frame(node_id = c(1L, 2L, 3L, 4L),
+                      predicted_class = c('40代', '50代', '20代', '40代'),
+                      stringsAsFactors = FALSE)
+  expect_equal(
+    chaid_order_children_for_display(c(2L, 3L, 4L), edges, nodes,
+                                     c('20代', '30代', '40代', '50代')),
+    c(4L, 2L, 3L))
+})
+
+test_that('chaid_order_children_for_display ranks nominal children by predicted class', {
+  edges <- data.frame(parent_id = c(1L, 1L), child_id = c(2L, 3L),
+                      original_categories = c('その他 | 公務員', '会社員'),
+                      stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L, 3L), predicted_class = c('50代', '50代', '40代'),
+                      stringsAsFactors = FALSE)
+  # The 40代 child was created second (id 3) but must render on the left.
+  expect_equal(
+    chaid_order_children_for_display(c(2L, 3L), edges, nodes,
+                                     c('20代', '30代', '40代', '50代')),
+    c(3L, 2L))
+  # With no class information (numeric target) it falls back to a stable id order.
+  expect_equal(chaid_order_children_for_display(c(2L, 3L), edges, nodes, NULL), c(2L, 3L))
+})
+
+test_that('chaid_order_children_for_display ranks a logical target by TRUE rate first', {
+  edges <- data.frame(parent_id = c(1L, 1L), child_id = c(2L, 3L),
+                      original_categories = c('<= 0', '> 0'), stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L, 3L), predicted_class = c('TRUE', 'FALSE', 'TRUE'),
+                      stringsAsFactors = FALSE)
+  nodes$class_distribution <- list(
+    c('TRUE' = 0.5, 'FALSE' = 0.5),
+    c('TRUE' = 0.1, 'FALSE' = 0.9),
+    c('TRUE' = 0.9, 'FALSE' = 0.1)
+  )
+  # The numeric condition would put <= 0 first, but tam's logical-tree chart
+  # puts the more TRUE-heavy > 0 child on the left.
+  expect_equal(
+    chaid_order_children_for_display(c(2L, 3L), edges, nodes, c('TRUE', 'FALSE')),
+    c(3L, 2L))
+})
+
+test_that('chaid_order_children_for_display is a no-op for fewer than two children', {
+  edges <- data.frame(parent_id = 1L, child_id = 2L, original_categories = 'A',
+                      stringsAsFactors = FALSE)
+  nodes <- data.frame(node_id = c(1L, 2L), predicted_class = c('A', 'A'), stringsAsFactors = FALSE)
+  expect_equal(chaid_order_children_for_display(2L, edges, nodes, c('A')), 2L)
+  expect_equal(chaid_order_children_for_display(integer(0), edges, nodes, c('A')), integer(0))
+})
