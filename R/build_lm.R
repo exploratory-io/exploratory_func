@@ -854,7 +854,14 @@ build_lm.fast <- function(df,
 
       df_test <- NULL # declare variable for test data
 
+      # 削除された行数 (Rows Removed) for the 分析条件とデータの確認 table (tam#38536).
+      # Count only rows dropped as invalid for the model: NA/Inf filtering here, the outlier
+      # filter below, and anything lm/glm's own na.action drops. Down-sampling (max_nrow),
+      # the test split and SMOTE are NOT removals. Counted inside each_func so a Repeat By
+      # run gets its own per-group count.
+      nrow_before_na_filter <- nrow(df)
       df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols)
+      excluded_nrow <- nrow_before_na_filter - nrow(df)
       clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
 
       # Sample the data because randomForest takes long time if data size is too large.
@@ -871,11 +878,13 @@ build_lm.fast <- function(df,
       # Remove outliers if specified so.
       # This has to be done before preprocess_regression_data_after_sample, since it can remove rows and reduce number of unique values,
       # just like sampling.
+      nrow_before_outlier_filter <- nrow(df)
       df <- remove_outliers_for_regression_data(df, clean_target_col, clean_cols,
                                                 target_outlier_filter_type,
                                                 target_outlier_filter_threshold,
                                                 predictor_outlier_filter_type,
                                                 predictor_outlier_filter_threshold)
+      excluded_nrow <- excluded_nrow + (nrow_before_outlier_filter - nrow(df))
 
       # Capture the classes of the columns at this point before preprocess_regression_data_after_sample,
       # so that we know the original classes of columns before characters are turned into factors,
@@ -1156,6 +1165,10 @@ build_lm.fast <- function(df,
 
       # For displaying if sampling happened or not.
       model$sampled_nrow <- sampled_nrow
+      # Rows Removed for the analysis_conditions table (tam#38536). na.action is normally empty
+      # since NA rows are already filtered above, but add it so the count stays right if lm/glm
+      # itself drops a row.
+      model$excluded_nrow <- excluded_nrow + length(model$na.action)
 
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
@@ -1690,11 +1703,11 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
 # purpose (the analysis_conditions branches in prcomp.R / kmodes.R / kmedoids.R / hclust*.R) --
 # this is one more sibling of that established pattern, not a new mechanism.
 #
-# Rows Removed (削除された行数) is intentionally NOT included: unlike kmeans/PCA (which track
-# n_rows_used / excluded_nrow at fit time), lm_exploratory/glm_exploratory keep no na.action /
-# original-row-count bookkeeping anywhere reachable from the fitted model object, so there is no
-# reliable source of truth for it yet. Left as a documented follow-up (would need build_lm()/
-# build_glm() itself to stash the pre-NA-filter row count).
+# Rows Removed (削除された行数) comes from x$excluded_nrow, which build_lm.fast() records per
+# model at fit time (rows dropped by NA/Inf filtering, the outlier filter and lm/glm's own
+# na.action; sampling, the test split and SMOTE are not removals), the same field name the
+# kmeans/kmodes/kmedoids/hclust/lca models use. It is always shown, even when 0, like those
+# precedents. Models built before this field existed render "N/A" rather than a made-up 0.
 #
 # カテゴリの順序 (category order) is also out of scope here on purpose -- that only applies to
 # Ordered Logistic Regression (MASS::polr, a different model class entirely), also a follow-up.
@@ -1724,6 +1737,14 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
   # always kept for both lm and glm fits.
   metrics <- c(metrics, "Explanatory Variables", "Row Count")
   values <- c(values, predictor_display, as.character(nrow(x$model)))
+
+  excluded_display <- if (length(x$excluded_nrow) == 1L && !is.na(x$excluded_nrow)) {
+    as.character(x$excluded_nrow)
+  } else {
+    "N/A"
+  }
+  metrics <- c(metrics, "Rows Removed")
+  values <- c(values, excluded_display)
 
   test_rate_num <- suppressWarnings(as.numeric(test_rate))
   validation_display <- if (!isTRUE(test_mode) || is.na(test_rate_num) || test_rate_num <= 0) {
