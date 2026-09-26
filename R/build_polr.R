@@ -924,19 +924,82 @@ prettify_polr_factor_terms <- function(term, xlevels) {
   })
 }
 
+#' Shared "分析条件とデータの確認" (Analysis Conditions and Data) vertical Metric/Value table
+#' for Ordered Logistic Regression (tam#38536 rework), mirroring
+#' .lm_glm_report_analysis_conditions() (R/build_lm.R) and the Clustering/PCA
+#' analysis_conditions branches -- one more sibling of that established pattern, not a new
+#' rendering mechanism. Target/predictor-name resolution and the Validation Data string both
+#' reuse .lm_glm_map_orig_names() / the same "None" / "Test (XX%)" convention build_lm.R already
+#' has, so this is a reshaping of already-tested values, not new statistical computation.
+#'
+#' Category Order (カテゴリの順序) reads levels(x$model[[1]]), the SAME ordered-factor levels
+#' polr_report_basic_info() (above) already reads for its own WIDE table's "Category Order"
+#' column -- lm/glm has no equivalent since neither target is an ordered factor.
+#'
+#' Rows Removed (削除された行数) is deliberately NOT included here yet: build_polr() filters
+#' NA target/predictor rows on the ungrouped df BEFORE group_by()/each_func() runs (see the
+#' "Filter out rows with NA in the target or any predictor" loop above), so a per-Repeat-By-group
+#' original row count is not available inside each_func() the way build_lm.fast()'s
+#' excluded_nrow is (that field is set per-group, inside each_func). Left as a follow-up,
+#' same as documented in the tam-side design doc for this rework.
+#' @param x A model built by build_polr(), with class clm_exploratory_0.
+#' @param test_mode Whether Test Mode was on for this run.
+#' @param test_rate Ratio for Test Data (0-1), only meaningful when test_mode is TRUE.
+#' @return A tibble with Metric/Value columns.
+.polr_report_analysis_conditions <- function(x, test_mode = FALSE, test_rate = 0) {
+  if (inherits(x, "error")) return(data.frame())
+
+  target_col <- x$orig_target_col
+  lvls <- levels(x$model[[1]])
+  if (is.null(lvls)) lvls <- character(0)
+
+  predictor_labels <- tryCatch(gsub("^`|`$", "", labels(stats::terms(x))), error = function(e) character(0))
+  predictor_labels <- predictor_labels[!is.na(predictor_labels) & nzchar(predictor_labels)]
+  predictor_orig <- unique(.lm_glm_map_orig_names(predictor_labels, x$terms_mapping))
+  predictor_display <- if (length(predictor_orig) == 0) "N/A" else paste(predictor_orig, collapse = ", ")
+
+  metrics <- c("Target Variable", "Number of Categories")
+  values <- c(if (is.null(target_col)) NA_character_ else as.character(target_col), as.character(length(lvls)))
+
+  if (length(lvls) > 0) {
+    metrics <- c(metrics, "Category Order")
+    values <- c(values, paste(lvls, collapse = " < "))
+  }
+
+  metrics <- c(metrics, "Explanatory Variables", "Row Count")
+  values <- c(values, predictor_display, as.character(nrow(x$model)))
+
+  test_rate_num <- suppressWarnings(as.numeric(test_rate))
+  validation_display <- if (!isTRUE(test_mode) || is.na(test_rate_num) || test_rate_num <= 0) {
+    "None"
+  } else {
+    paste0("Test (", round(test_rate_num * 100), "%)")
+  }
+  metrics <- c(metrics, "Validation Data")
+  values <- c(values, validation_display)
+
+  tibble::tibble(Metric = metrics, Value = values)
+}
+
 #' Coefficient / odds-ratio table for an Ordered Logistic Regression model.
 #' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param type What to return: "coefficients" (default), "vif", "importance",
-#'   "partial_dependence", or "nominal_test" (the proportional-odds assumption
-#'   test, which is specific to an ordinal model). Mirrors tidy.glm_exploratory().
+#'   "partial_dependence", "analysis_conditions" (tam#38536), or "nominal_test" (the
+#'   proportional-odds assumption test, which is specific to an ordinal model). Mirrors
+#'   tidy.glm_exploratory().
 #' @param conf.int Whether to compute a (Wald, i.e. normal-approximation) confidence interval.
 #' @param conf.level Confidence level for conf.int.
 #' @param exponentiate Whether to add an odds.ratio column (exp(estimate)) for slope coefficients.
 #' @param pretty.name Whether to rename columns to display-friendly names.
+#' @param test_mode Whether Test Mode was on for this run (used by type = "analysis_conditions").
+#' @param test_rate Ratio for Test Data (used by type = "analysis_conditions").
 #' @export
-tidy.clm_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, ...) {
+tidy.clm_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, test_mode = FALSE, test_rate = 0, ...) {
   if (inherits(x, "error")) {
     return(data.frame())
+  }
+  if (identical(type, "analysis_conditions")) {
+    return(.polr_report_analysis_conditions(x, test_mode = test_mode, test_rate = test_rate))
   }
   # Non-coefficient outputs mirror tidy.glm_exploratory()'s switch. They return
   # an EMPTY data.frame (not an error) when unavailable so a single failing
