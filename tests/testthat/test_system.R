@@ -934,6 +934,28 @@ test_that("test setTokenInfo and getTokenInfo", {
   expect_null(exploratory::getTokenInfo("nonexistent_key"))
 })
 
+test_that("test resolveFredAPIKey falls back to the Default connection's token when no password is supplied", {
+  # A real Connection's own API key (entered by the user) is used as-is, even if
+  # a "Default" token happens to be seeded in the same session.
+  exploratory::setTokenInfo("fred-api-key", "default-key-from-server")
+  expect_equal(exploratory::resolveFredAPIKey("users-own-key"), "users-own-key")
+
+  # "" (what the Desktop app sends for the "Default" connection placeholder,
+  # since it never has a real per-user key) falls back to the seeded token.
+  expect_equal(exploratory::resolveFredAPIKey(""), "default-key-from-server")
+
+  # NULL (e.g. a hand-written R script that omits the password argument) also
+  # falls back to the seeded token.
+  expect_equal(exploratory::resolveFredAPIKey(NULL), "default-key-from-server")
+
+  # If nothing was ever seeded (no "Default" key configured on the server),
+  # a clear error is raised instead of silently calling fredr::fredr_set_key()
+  # with an invalid/empty key.
+  exploratory::setTokenInfo("fred-api-key", NULL)
+  expect_error(exploratory::resolveFredAPIKey(""), "FRED API key is not available")
+  expect_error(exploratory::resolveFredAPIKey(NULL), "FRED API key is not available")
+})
+
 test_that("test geocode_us_state", {
   df <- data.frame(state = c("CA", "NY"), stringsAsFactors = FALSE)
   result <- exploratory::geocode_us_state(df, "state")
