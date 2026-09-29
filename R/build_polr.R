@@ -166,6 +166,17 @@ build_polr <- function(df,
     df <- dplyr::group_by(df, !!!rlang::syms(colnames(df)[group_col_index]))
   }
 
+  # Preserve the number of rows that the following NA filter removes, separately for each
+  # Repeat By group. The count travels through nesting in a temporary column and is removed
+  # from both the fitted input and the returned source.data.
+  excluded_nrow_col <- make.unique(c(colnames(df), ".excluded_nrow"))[ncol(df) + 1L]
+  df <- df %>%
+    dplyr::mutate(
+      !!rlang::sym(excluded_nrow_col) := sum(
+        !dplyr::if_all(dplyr::all_of(c(target_col, selected_cols)), ~ !is.na(.x))
+      )
+    )
+
   # Filter out rows with NA in the target or any predictor -- polr() would silently drop these
   # anyway, but doing it up front keeps the training/test split counts consistent.
   for (col in c(target_col, selected_cols)) {
@@ -186,6 +197,9 @@ build_polr <- function(df,
   fml <- stats::as.formula(paste0("`", target_col, "` ~ ", rhs))
 
   each_func <- function(source_data) {
+    excluded_nrow <- source_data[[excluded_nrow_col]][[1]]
+    source_data <- dplyr::select(source_data, -dplyr::all_of(excluded_nrow_col))
+
     if (!is.null(seed)) {
       set.seed(seed)
     }
@@ -248,6 +262,7 @@ build_polr <- function(df,
     # take their multiclass branch, and record the target's ordered levels.
     model$classification_type <- "multi"
     model$orig_target_col <- target_col
+    model$excluded_nrow <- excluded_nrow
     attr(model, "ylevels") <- levels(train_data[[target_col]])
     if (!is.null(predictor_funs)) {
       # train_data/test_data already contain these derived columns, but callers
@@ -331,6 +346,9 @@ build_polr <- function(df,
       .test_data = purrr::map(.fit, function(f) f$test_data),
       .target_col = target_col
     ) %>%
+    dplyr::mutate(source.data = purrr::map(source.data, function(sdf) {
+      dplyr::select(sdf, -dplyr::all_of(excluded_nrow_col))
+    })) %>%
     dplyr::mutate(.model_metadata = purrr::map(source.data, function(sdf) {
       tryCatch(create_model_meta(sdf, fml), error = function(e) list())
     })) %>%
@@ -936,12 +954,8 @@ prettify_polr_factor_terms <- function(term, xlevels) {
 #' polr_report_basic_info() (above) already reads for its own WIDE table's "Category Order"
 #' column -- lm/glm has no equivalent since neither target is an ordered factor.
 #'
-#' Rows Removed (削除された行数) is deliberately NOT included here yet: build_polr() filters
-#' NA target/predictor rows on the ungrouped df BEFORE group_by()/each_func() runs (see the
-#' "Filter out rows with NA in the target or any predictor" loop above), so a per-Repeat-By-group
-#' original row count is not available inside each_func() the way build_lm.fast()'s
-#' excluded_nrow is (that field is set per-group, inside each_func). Left as a follow-up,
-#' same as documented in the tam-side design doc for this rework.
+#' Rows Removed (削除された行数) comes from x$excluded_nrow, recorded per group in build_polr()
+#' before its NA target/predictor filter. Models saved before this field existed render "N/A".
 #' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param test_mode Whether Test Mode was on for this run.
 #' @param test_rate Ratio for Test Data (0-1), only meaningful when test_mode is TRUE.
@@ -968,6 +982,14 @@ prettify_polr_factor_terms <- function(term, xlevels) {
 
   metrics <- c(metrics, "Explanatory Variables", "Row Count")
   values <- c(values, predictor_display, as.character(nrow(x$model)))
+
+  excluded_display <- if (length(x$excluded_nrow) == 1L && !is.na(x$excluded_nrow)) {
+    as.character(x$excluded_nrow)
+  } else {
+    "N/A"
+  }
+  metrics <- c(metrics, "Rows Removed")
+  values <- c(values, excluded_display)
 
   test_rate_num <- suppressWarnings(as.numeric(test_rate))
   validation_display <- if (!isTRUE(test_mode) || is.na(test_rate_num) || test_rate_num <= 0) {
