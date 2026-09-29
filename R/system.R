@@ -1169,16 +1169,28 @@ mysql_pool_key <- function(host, port, databaseName, username, timezone,
 }
 
 # RMariaDB does not expose a PostgreSQL-style sslmode argument. Its supported
-# interface uses client flags: CLIENT_SSL enforces TLS and
-# CLIENT_SSL_VERIFY_SERVER_CERT enables server certificate verification. The
-# verify-ca mode shares CLIENT_SSL because RMariaDB has no separate client flag
-# for CA-only verification; ssl.ca supplies the configured trust store.
+# interface uses client flags: CLIENT_SSL enforces TLS only (no certificate
+# validation of any kind -- not the chain, not the hostname), and
+# CLIENT_SSL_VERIFY_SERVER_CERT is the ONLY flag that verifies the server
+# certificate against ssl.ca. There is no separate RMariaDB flag for
+# "verify chain but not hostname" (a PostgreSQL-style verify-ca), so:
+#   - "require": CLIENT_SSL only. TLS is enforced but nothing is verified, and
+#     no ssl.ca is passed since it would not be used for anything.
+#   - "verify-full": CLIENT_SSL + CLIENT_SSL_VERIFY_SERVER_CERT, plus ssl.ca.
+#   - "verify-ca" is intentionally NOT offered in the connection dialog (see
+#     tam#36505 review) because RMariaDB cannot honestly implement "verify
+#     the CA chain but not the hostname" -- CLIENT_SSL_VERIFY_SERVER_CERT does
+#     not distinguish the two. The value is still accepted here for backward
+#     compatibility with anything that may already pass it, and is mapped to
+#     the EXACT SAME verification as "verify-full" -- never to the old,
+#     non-verifying CLIENT_SSL-only behavior, which silently claimed CA
+#     verification while performing none.
 rmariadb_client_flag <- function(sslMode,
                                  sslFlag = RMariaDB::CLIENT_SSL,
                                  verifyServerCertFlag = RMariaDB::CLIENT_SSL_VERIFY_SERVER_CERT) {
   switch(sslMode,
     "require" = sslFlag,
-    "verify-ca" = sslFlag,
+    "verify-ca" = bitwOr(sslFlag, verifyServerCertFlag),
     "verify-full" = bitwOr(sslFlag, verifyServerCertFlag),
     0L
   )
@@ -1192,7 +1204,13 @@ rmariadb_ssl_connection_args <- function(sslCA, sslMode,
     sslFlag = sslFlag,
     verifyServerCertFlag = verifyServerCertFlag
   ))
-  if (sslMode != "disable" && sslCA != "") {
+  # "require" enforces TLS but verifies nothing, so a CA file would have no
+  # effect -- do not pass ssl.ca for it (this is the one behavior change from
+  # before this fix). Every other non-disabled mode -- including an unset/""
+  # sslMode, which callers such as Amazon Aurora's plain "use SSL CA file"
+  # checkbox still pass -- keeps the prior inclusive behavior so a configured
+  # CA file is not silently dropped.
+  if (sslCA != "" && !(sslMode %in% c("disable", "require"))) {
     args$ssl.ca <- sslCA
   }
   args
