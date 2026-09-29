@@ -36,12 +36,13 @@ test_that("Target Variable/Categories/Category Order/Explanatory Variables/Row C
 
   res <- tidy(model, type = "analysis_conditions", test_mode = TRUE, test_rate = 0.3)
   expect_equal(res$Metric, c("Target Variable", "Number of Categories", "Category Order",
-                            "Explanatory Variables", "Row Count", "Validation Data"))
+                            "Explanatory Variables", "Row Count", "Rows Removed", "Validation Data"))
   expect_equal(get_value(res, "Target Variable"), "満足度")
   expect_equal(get_value(res, "Number of Categories"), "3")
   expect_equal(get_value(res, "Category Order"), "Low < Medium < High")
   expect_equal(get_value(res, "Explanatory Variables"), "年齢, 部署 名!#")
   expect_equal(get_value(res, "Row Count"), as.character(nrow(model$model)))
+  expect_equal(get_value(res, "Rows Removed"), "0")
   expect_equal(get_value(res, "Validation Data"), "Test (30%)")
 })
 
@@ -74,6 +75,22 @@ test_that("Repeat By: each group's model gets its own Row Count and Category Ord
     expect_equal(get_value(g, "Category Order"), "Low < Medium < High")
     expect_true(as.numeric(get_value(g, "Row Count")) > 0)
   }
+})
+
+test_that("Rows Removed counts NA rows independently for each Repeat By group", {
+  df <- make_conditions_polr_df(n = 120)
+  df$`年齢`[1:2] <- NA
+  df$`満足度`[3] <- NA
+  trial <- df %>% build_polr(`満足度`, `年齢`, group_cols = "region")
+
+  res <- trial %>% tidy_rowwise(model, type = "analysis_conditions")
+  removed <- res %>%
+    dplyr::filter(Metric == "Rows Removed") %>%
+    dplyr::arrange(region)
+
+  expect_equal(removed$region, c("East", "West"))
+  expect_equal(removed$Value, c("2", "1"))
+  expect_false(any(grepl(".excluded_nrow", names(trial$source.data[[1]]), fixed = TRUE)))
 })
 
 test_that("complex column names round-trip", {
