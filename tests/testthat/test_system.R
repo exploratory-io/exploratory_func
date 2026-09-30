@@ -1287,6 +1287,104 @@ test_that("oracleOCIPoolKey builds identical keys from getDBConnection and clear
   expect_false(fromGet == exploratory:::oracleOCIPoolKey("host", 1521, "svc", "user", "", 10000, "", "prefetch=TRUE"))
 })
 
+test_that("MySQL SSL CA normalization is shared by connection pool keys", {
+  expect_equal(
+    exploratory:::normalize_mysql_ssl_ca("custom-ca.pem", sysname = "Linux"),
+    "/etc/ssl/certs/rds-combined-ca-bundle.pem"
+  )
+  expect_equal(
+    exploratory:::normalize_mysql_ssl_ca("custom-ca.pem", sysname = "Darwin"),
+    "custom-ca.pem"
+  )
+  expect_equal(exploratory:::normalize_mysql_ssl_ca("", sysname = "Linux"), "")
+  expect_equal(exploratory:::normalize_mysql_ssl_ca(NA_character_, sysname = "Linux"), "")
+
+  fromGet <- exploratory:::mysql_pool_key(
+    "host", 3306, "db", "user", "UTC", "custom-ca.pem", "require", sysname = "Linux"
+  )
+  fromClear <- exploratory:::mysql_pool_key(
+    "host", 3306, "db", "user", "UTC", "/etc/ssl/certs/rds-combined-ca-bundle.pem", "require",
+    sysname = "Linux"
+  )
+  expect_equal(fromGet, fromClear)
+  expect_false(fromGet == exploratory:::mysql_pool_key(
+    "host", 3306, "db", "user", "UTC", "custom-ca.pem", "verify-full", sysname = "Linux"
+  ))
+})
+
+test_that("MySQL SSL modes use supported RMariaDB connection arguments", {
+  # Regression coverage for tam#36505's corrected mapping: RMariaDB's
+  # CLIENT_SSL flag alone verifies NOTHING (not the chain, not the hostname).
+  # Only CLIENT_SSL_VERIFY_SERVER_CERT actually verifies the server
+  # certificate. Before this fix, "verify-ca" was mapped to CLIENT_SSL alone
+  # -- identical to "require" -- which silently claimed CA-chain verification
+  # while performing none. "require" must never carry ssl.ca (there is
+  # nothing for RMariaDB to verify with it), and "verify-ca"/"verify-full"
+  # must both set CLIENT_SSL_VERIFY_SERVER_CERT and both carry ssl.ca.
+  sslFlag <- 2048L
+  verifyServerCertFlag <- 1073741824L
+  verifiedFlag <- bitwOr(sslFlag, verifyServerCertFlag)
+
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "disable", sslFlag, verifyServerCertFlag),
+    list(client.flag = 0L)
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "allow", sslFlag, verifyServerCertFlag),
+    list(client.flag = 0L, ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "prefer", sslFlag, verifyServerCertFlag),
+    list(client.flag = 0L, ssl.ca = "ca.pem")
+  )
+  # "require": TLS is enforced, but NOTHING is verified -- CLIENT_SSL alone,
+  # and critically, no ssl.ca even though one was passed in, since it would
+  # not be used for anything and passing it would misleadingly suggest
+  # verification is happening.
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "require", sslFlag, verifyServerCertFlag),
+    list(client.flag = sslFlag)
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("", "require", sslFlag, verifyServerCertFlag),
+    list(client.flag = sslFlag)
+  )
+  # "verify-ca" is not offered in the UI any more (RMariaDB cannot honestly
+  # distinguish "verify chain" from "verify chain + hostname"), but is kept
+  # here for backward compatibility and must map to the SAME verification as
+  # "verify-full" -- never the old CLIENT_SSL-only behavior.
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "verify-ca", sslFlag, verifyServerCertFlag),
+    list(client.flag = verifiedFlag, ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "verify-full", sslFlag, verifyServerCertFlag),
+    list(client.flag = verifiedFlag, ssl.ca = "ca.pem")
+  )
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("", "verify-full", sslFlag, verifyServerCertFlag),
+    list(client.flag = verifiedFlag)
+  )
+  expect_equal(
+    exploratory:::rmariadb_client_flag("verify-ca", sslFlag, verifyServerCertFlag),
+    exploratory:::rmariadb_client_flag("verify-full", sslFlag, verifyServerCertFlag)
+  )
+
+  # An unset ("") sslMode is what Amazon Aurora's plain "use SSL CA file"
+  # checkbox still sends (it has no SSL Mode dropdown at all) -- a configured
+  # CA file must keep being forwarded for it, unlike "require"/"disable".
+  expect_equal(
+    exploratory:::rmariadb_ssl_connection_args("ca.pem", "", sslFlag, verifyServerCertFlag),
+    list(client.flag = 0L, ssl.ca = "ca.pem")
+  )
+
+  modes <- c("", "unknown")
+  for (mode in modes) {
+    args <- exploratory:::rmariadb_ssl_connection_args("ca.pem", mode, sslFlag, verifyServerCertFlag)
+    expect_false("ssl.mode" %in% names(args))
+  }
+})
+
 test_that("findOracleClientLibDir handles both Oracle client layouts", {
   base <- tempfile()
   dir.create(base)

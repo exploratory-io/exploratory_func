@@ -87,6 +87,21 @@ test_that("build_polr rejects a grouping column reused as a variable", {
   )
 })
 
+test_that("build_polr rejects a grouping column reused as the target or weight (message, not a dplyr tidyselect error)", {
+  df <- make_ordinal_test_df()
+  # 3 categories so the target-level-count validation passes and the grouping check is reached.
+  df$group1 <- rep(c("a", "b", "c"), length.out = nrow(df))
+  expect_error(
+    df %>% build_polr(group1, `年齢`, group_cols = "group1"),
+    "grouping column"
+  )
+  df$gw <- rep(c(1, 2), length.out = nrow(df))
+  expect_error(
+    df %>% build_polr(`満足度`, `年齢`, weight = gw, group_cols = "gw"),
+    "grouping column"
+  )
+})
+
 test_that("build_polr supports group_cols (Repeat By)", {
   df <- make_ordinal_test_df(n = 90)
   df$region <- rep(c("East", "West", "North"), length.out = nrow(df))

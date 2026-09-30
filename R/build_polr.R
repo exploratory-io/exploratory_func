@@ -166,14 +166,10 @@ build_polr <- function(df,
     df <- dplyr::group_by(df, !!!rlang::syms(colnames(df)[group_col_index]))
   }
 
-  # Filter out rows with NA in the target or any predictor -- polr() would silently drop these
-  # anyway, but doing it up front keeps the training/test split counts consistent.
-  for (col in c(target_col, selected_cols)) {
-    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
-  }
-
   # check if grouping columns are (still, after the possible rename above) in use as the
-  # target/predictor/weight columns.
+  # target/predictor/weight columns. This must run BEFORE the .excluded_nrow mutate below: inside a
+  # grouped mutate, if_all(all_of(...)) cannot see a grouping column, so dplyr would fail first with
+  # an opaque "Can't subset elements that don't exist" instead of this message.
   group_col_names <- grouped_by(df)
   grouped_var <- group_col_names[group_col_names %in% c(target_col, selected_cols, weight_col)]
   if (length(grouped_var) == 1) {
@@ -182,10 +178,30 @@ build_polr <- function(df,
     stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
   }
 
+  # Preserve the number of rows that the following NA filter removes, separately for each
+  # Repeat By group. The count travels through nesting in a temporary column and is removed
+  # from both the fitted input and the returned source.data.
+  excluded_nrow_col <- make.unique(c(colnames(df), ".excluded_nrow"))[ncol(df) + 1L]
+  df <- df %>%
+    dplyr::mutate(
+      !!rlang::sym(excluded_nrow_col) := sum(
+        !dplyr::if_all(dplyr::all_of(c(target_col, selected_cols)), ~ !is.na(.x))
+      )
+    )
+
+  # Filter out rows with NA in the target or any predictor -- polr() would silently drop these
+  # anyway, but doing it up front keeps the training/test split counts consistent.
+  for (col in c(target_col, selected_cols)) {
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
+  }
+
   rhs <- paste0("`", selected_cols, "`", collapse = " + ")
   fml <- stats::as.formula(paste0("`", target_col, "` ~ ", rhs))
 
   each_func <- function(source_data) {
+    excluded_nrow <- source_data[[excluded_nrow_col]][[1]]
+    source_data <- dplyr::select(source_data, -dplyr::all_of(excluded_nrow_col))
+
     if (!is.null(seed)) {
       set.seed(seed)
     }
@@ -248,6 +264,7 @@ build_polr <- function(df,
     # take their multiclass branch, and record the target's ordered levels.
     model$classification_type <- "multi"
     model$orig_target_col <- target_col
+    model$excluded_nrow <- excluded_nrow
     attr(model, "ylevels") <- levels(train_data[[target_col]])
     if (!is.null(predictor_funs)) {
       # train_data/test_data already contain these derived columns, but callers
@@ -331,6 +348,9 @@ build_polr <- function(df,
       .test_data = purrr::map(.fit, function(f) f$test_data),
       .target_col = target_col
     ) %>%
+    dplyr::mutate(source.data = purrr::map(source.data, function(sdf) {
+      dplyr::select(sdf, -dplyr::all_of(excluded_nrow_col))
+    })) %>%
     dplyr::mutate(.model_metadata = purrr::map(source.data, function(sdf) {
       tryCatch(create_model_meta(sdf, fml), error = function(e) list())
     })) %>%
@@ -758,7 +778,11 @@ calc_vif_polr <- function(model) {
 # ground-truth category (a plain negative probability rather than a negative LOG
 # probability, so a zero probability for the observed class cannot contribute an
 # infinite penalty).
-calc_permutation_importance_polr <- function(fit, target, vars, data) {
+# `prob_fun(object, newdata)` must return the n x n_category probability matrix; it
+# defaults to clm's predict so build_polr() is unchanged, and lets
+# build_multinom_logit() (tam#37033) reuse this for nnet::multinom.
+calc_permutation_importance_polr <- function(fit, target, vars, data,
+                                             prob_fun = function(object, newdata) clm_predict(object, newdata = newdata, type = "prob")) {
   if (!requireNamespace("mmpf", quietly = TRUE)) {
     return(simpleError("Package 'mmpf' is not available. Permutation importance cannot be calculated."))
   }
@@ -768,9 +792,7 @@ calc_permutation_importance_polr <- function(fit, target, vars, data) {
       mmpf::permutationImportance(
         data, var, target, fit,
         nperm = 1, # 1 permutation for performance, matching the other models.
-        predict.fun = function(object, newdata) {
-          clm_predict(object, newdata = newdata, type = "prob")
-        },
+        predict.fun = prob_fun,
         loss.fun = function(x, y) {
           sum(-(x[match(y[[1]][row(x)], colnames(x)) == col(x)]), na.rm = TRUE)
         }
@@ -796,7 +818,9 @@ calc_permutation_importance_polr <- function(fit, target, vars, data) {
 # take its multiclass branch.
 partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(data),
                                                 n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
-                                                interaction = FALSE, uniform = TRUE, data, ...) {
+                                                interaction = FALSE, uniform = TRUE, data,
+                                                prob_fun = function(object, newdata) clm_predict(object, newdata = newdata, type = "prob"),
+                                                ...) {
   if (!requireNamespace("mmpf", quietly = TRUE)) {
     return(NULL)
   }
@@ -817,7 +841,7 @@ partial_dependence.polr_exploratory <- function(fit, target, vars = colnames(dat
 
   predict.fun <- function(object, newdata) {
     colnames(newdata) <- orig_names[match(colnames(newdata), safe_names)]
-    clm_predict(object, newdata = newdata, type = "prob")
+    prob_fun(object, newdata)
   }
 
   # Grid points based on quantiles so an outlier does not dominate the grid,
@@ -920,19 +944,86 @@ prettify_polr_factor_terms <- function(term, xlevels) {
   })
 }
 
+#' Shared "分析条件とデータの確認" (Analysis Conditions and Data) vertical Metric/Value table
+#' for Ordered Logistic Regression (tam#38536 rework), mirroring
+#' .lm_glm_report_analysis_conditions() (R/build_lm.R) and the Clustering/PCA
+#' analysis_conditions branches -- one more sibling of that established pattern, not a new
+#' rendering mechanism. Target/predictor-name resolution and the Validation Data string both
+#' reuse .lm_glm_map_orig_names() / the same "None" / "Test (XX%)" convention build_lm.R already
+#' has, so this is a reshaping of already-tested values, not new statistical computation.
+#'
+#' Category Order (カテゴリの順序) reads levels(x$model[[1]]), the SAME ordered-factor levels
+#' polr_report_basic_info() (above) already reads for its own WIDE table's "Category Order"
+#' column -- lm/glm has no equivalent since neither target is an ordered factor.
+#'
+#' Rows Removed (削除された行数) comes from x$excluded_nrow, recorded per group in build_polr()
+#' before its NA target/predictor filter. Models saved before this field existed render "N/A".
+#' @param x A model built by build_polr(), with class clm_exploratory_0.
+#' @param test_mode Whether Test Mode was on for this run.
+#' @param test_rate Ratio for Test Data (0-1), only meaningful when test_mode is TRUE.
+#' @return A tibble with Metric/Value columns.
+.polr_report_analysis_conditions <- function(x, test_mode = FALSE, test_rate = 0) {
+  if (inherits(x, "error")) return(data.frame())
+
+  target_col <- x$orig_target_col
+  lvls <- levels(x$model[[1]])
+  if (is.null(lvls)) lvls <- character(0)
+
+  predictor_labels <- tryCatch(gsub("^`|`$", "", labels(stats::terms(x))), error = function(e) character(0))
+  predictor_labels <- predictor_labels[!is.na(predictor_labels) & nzchar(predictor_labels)]
+  predictor_orig <- unique(.lm_glm_map_orig_names(predictor_labels, x$terms_mapping))
+  predictor_display <- if (length(predictor_orig) == 0) "N/A" else paste(predictor_orig, collapse = ", ")
+
+  metrics <- c("Target Variable", "Number of Categories")
+  values <- c(if (is.null(target_col)) NA_character_ else as.character(target_col), as.character(length(lvls)))
+
+  if (length(lvls) > 0) {
+    metrics <- c(metrics, "Category Order")
+    values <- c(values, paste(lvls, collapse = " < "))
+  }
+
+  metrics <- c(metrics, "Explanatory Variables", "Row Count")
+  values <- c(values, predictor_display, as.character(nrow(x$model)))
+
+  excluded_display <- if (length(x$excluded_nrow) == 1L && !is.na(x$excluded_nrow)) {
+    as.character(x$excluded_nrow)
+  } else {
+    "N/A"
+  }
+  metrics <- c(metrics, "Rows Removed")
+  values <- c(values, excluded_display)
+
+  test_rate_num <- suppressWarnings(as.numeric(test_rate))
+  validation_display <- if (!isTRUE(test_mode) || is.na(test_rate_num) || test_rate_num <= 0) {
+    "None"
+  } else {
+    paste0("Test (", round(test_rate_num * 100), "%)")
+  }
+  metrics <- c(metrics, "Validation Data")
+  values <- c(values, validation_display)
+
+  tibble::tibble(Metric = metrics, Value = values)
+}
+
 #' Coefficient / odds-ratio table for an Ordered Logistic Regression model.
 #' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param type What to return: "coefficients" (default), "vif", "importance",
-#'   "partial_dependence", or "nominal_test" (the proportional-odds assumption
-#'   test, which is specific to an ordinal model). Mirrors tidy.glm_exploratory().
+#'   "partial_dependence", "analysis_conditions" (tam#38536), or "nominal_test" (the
+#'   proportional-odds assumption test, which is specific to an ordinal model). Mirrors
+#'   tidy.glm_exploratory().
 #' @param conf.int Whether to compute a (Wald, i.e. normal-approximation) confidence interval.
 #' @param conf.level Confidence level for conf.int.
 #' @param exponentiate Whether to add an odds.ratio column (exp(estimate)) for slope coefficients.
 #' @param pretty.name Whether to rename columns to display-friendly names.
+#' @param test_mode Whether Test Mode was on for this run (used by type = "analysis_conditions").
+#' @param test_rate Ratio for Test Data (used by type = "analysis_conditions").
 #' @export
-tidy.clm_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, ...) {
+tidy.clm_exploratory_0 <- function(x, type = "coefficients", conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE, pretty.name = FALSE, test_mode = FALSE, test_rate = 0, ...) {
   if (inherits(x, "error")) {
     return(data.frame())
+  }
+  if (identical(type, "analysis_conditions")) {
+    return(.polr_report_analysis_conditions(x, test_mode = test_mode, test_rate = test_rate))
   }
   # Non-coefficient outputs mirror tidy.glm_exploratory()'s switch. They return
   # an EMPTY data.frame (not an error) when unavailable so a single failing
