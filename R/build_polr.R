@@ -166,6 +166,18 @@ build_polr <- function(df,
     df <- dplyr::group_by(df, !!!rlang::syms(colnames(df)[group_col_index]))
   }
 
+  # check if grouping columns are (still, after the possible rename above) in use as the
+  # target/predictor/weight columns. This must run BEFORE the .excluded_nrow mutate below: inside a
+  # grouped mutate, if_all(all_of(...)) cannot see a grouping column, so dplyr would fail first with
+  # an opaque "Can't subset elements that don't exist" instead of this message.
+  group_col_names <- grouped_by(df)
+  grouped_var <- group_col_names[group_col_names %in% c(target_col, selected_cols, weight_col)]
+  if (length(grouped_var) == 1) {
+    stop(paste0(grouped_var, " is a grouping column. Please remove it from variables."))
+  } else if (length(grouped_var) > 0) {
+    stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
+  }
+
   # Preserve the number of rows that the following NA filter removes, separately for each
   # Repeat By group. The count travels through nesting in a temporary column and is removed
   # from both the fitted input and the returned source.data.
@@ -181,16 +193,6 @@ build_polr <- function(df,
   # anyway, but doing it up front keeps the training/test split counts consistent.
   for (col in c(target_col, selected_cols)) {
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
-  }
-
-  # check if grouping columns are (still, after the possible rename above) in use as the
-  # target/predictor/weight columns.
-  group_col_names <- grouped_by(df)
-  grouped_var <- group_col_names[group_col_names %in% c(target_col, selected_cols, weight_col)]
-  if (length(grouped_var) == 1) {
-    stop(paste0(grouped_var, " is a grouping column. Please remove it from variables."))
-  } else if (length(grouped_var) > 0) {
-    stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
   }
 
   rhs <- paste0("`", selected_cols, "`", collapse = " + ")
