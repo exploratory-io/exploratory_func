@@ -2866,9 +2866,20 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
   conditions <- dplyr:::dplyr_quosures(...)
   # iterate the if conditions and creates consolidated conditions connected with &
   flatten_conditions_exprs <- conditions %>% purrr::reduce(bind_expr)
-  # create a dummy data frame that has 2 columns (one with original x and the other with TRUE/FALSE results for specified conditions)
-  # then extract the only x column as a vector (same as doing df$x) with dplyr::pull()
-  condition <- tibble::tibble(x = x) %>% dplyr::mutate(exp_internal_condition_col = !!flatten_conditions_exprs) %>% dplyr::pull(exp_internal_condition_col)
+  # Evaluate the combined condition expression directly with tidy eval, using the
+  # quosure's own captured data mask (the per-group data inside summarize()/mutate()).
+  # Do NOT route this through a throwaway tibble(x = x) %>% mutate(...): when the
+  # value column is (intentionally) re-used as the output name of an EARLIER
+  # expression in the same summarize_group()/summarize() call -- e.g.
+  # `col = sum(col, na.rm = TRUE)` followed later by `new_col = count_if(col, cond)` --
+  # dplyr's sequential-summarise semantics replace later references to `col` with the
+  # already-computed scalar. That silently shrinks `x` to length 1 while `cond`
+  # (referencing a different, non-shadowed column) still evaluates to the full
+  # per-group length, and `tibble(x = x) %>% mutate(exp_internal_condition_col = cond)`
+  # then throws "exp_internal_condition_col must be size 1, not N" even though the
+  # condition itself is perfectly valid (tam#37945). Evaluating the condition on its
+  # own sidesteps x's (possibly stale) length entirely.
+  condition <- rlang::eval_tidy(flatten_conditions_exprs)
 
   if (aggregateFunc == "sum") {
     sum(x[condition], na.rm = na.rm)
