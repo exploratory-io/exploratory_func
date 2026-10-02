@@ -2701,6 +2701,11 @@ calc_feature_imp <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$y <- model.response(model_df)
+      if (smote_applied && !smote_keep_synthetic) {
+        # tam#39340: prediction_training was made on the original training rows (model_df_original), so
+        # the actual values that tidy / glance compare it with must come from the same rows, not the SMOTE-resampled ones.
+        model$y <- model.response(model_df_original)
+      }
       model$df <- model_df
       # To avoid saving a huge environment when caching with RDS.
       attr(attr(model$df, "terms"), ".Environment") <- NULL
