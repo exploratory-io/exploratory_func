@@ -66,7 +66,7 @@
     # asked for more than one trial, so nstart = 1 (the default) stays
     # byte-identical to the pre-nstart call and every existing saved analytics
     # keeps its current medoids.
-    pam_nstart <- as.integer(round(nstart %||% 1))
+    pam_nstart <- as.integer(base::round(nstart %||% 1))
     raw <- if (!is.na(pam_nstart) && pam_nstart > 1) {
       cluster::pam(
         mat, k = centers, metric = distance, stand = FALSE,

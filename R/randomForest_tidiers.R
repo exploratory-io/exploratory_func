@@ -2029,7 +2029,7 @@ exp_balance <- function(df,
     # https://github.com/scikit-learn-contrib/imbalanced-learn/issues/154
     # TODO: Consider SMOTE-NC.
     for(col in integer_cols) {
-      df_balanced[[col]] <- round(df_balanced[[col]])
+      df_balanced[[col]] <- base::round(df_balanced[[col]])
     }
 
     df_balanced
@@ -3675,7 +3675,7 @@ exp_rpart <- function(df,
                       pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                       seed = 1,
                       minsplit = 20, # The minimum number of observations that must exist in a node in order for a split to be attempted. Passed down to rpart()
-                      minbucket = round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
+                      minbucket = base::round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
                       cp = 0.01, # Complexity parameter. Any split that does not decrease the overall lack of fit by a factor of cp is not attempted. Passed down to rpart()
                       maxdepth = 30, # Set the maximum depth of any node of the final tree, with the root node counted as depth 0. Passed down to rpart()
                       test_rate = 0.0,

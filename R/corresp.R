@@ -236,7 +236,7 @@ exp_mca_aggregated <- function(df, row_category, ...,
     row_labels[is.na(row_labels)] <- "NA"
     row_levels <- unique(row_labels[order(match(row_labels,
                                                 ca_get_category_levels(counts_df[[row_col]])))])
-    contingency_table <- rowsum(round(count_values), group = factor(row_labels, levels = row_levels),
+    contingency_table <- rowsum(base::round(count_values), group = factor(row_labels, levels = row_levels),
                                 reorder = FALSE)
     dimnames(contingency_table) <- list(rownames(contingency_table), value_cols)
     storage.mode(contingency_table) <- "integer"
@@ -321,7 +321,7 @@ exp_mca_aggregated <- function(df, row_category, ...,
   }
   # Chi-square residuals, the Fisher exact test and the Monte Carlo p-value all
   # require whole counts. Weighted (fractional) counts are not supported.
-  if (any(abs(count_values - round(count_values)) > 1e-8)) {
+  if (any(abs(count_values - base::round(count_values)) > 1e-8)) {
     stop("The aggregated counts must be whole numbers.")
   }
   invisible(TRUE)
@@ -395,7 +395,7 @@ exp_mca_aggregated_long <- function(df, row_category, column_category, count,
     contingency_table <- xtabs(
       counts ~ factor(row_labels, levels = row_levels) + factor(col_labels, levels = col_levels)
     )
-    contingency_table <- round(contingency_table)
+    contingency_table <- base::round(contingency_table)
     dimnames(contingency_table) <- list(row_levels, col_levels)
     storage.mode(contingency_table) <- "integer"
     names(dimnames(contingency_table)) <- c("", "")

@@ -40,7 +40,7 @@ do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregat
       ungroup()
     # calculate period. (0th period represents the first floored time a row from the cohort belongs to.)
     # division and round is for "month" case where a month can vary from 28 to 31 days.
-    ret <- ret %>% mutate(period = round(as.numeric(as.Date(.time) - as.Date(.start_time))/switch(time_unit, day = 1, week = 7, month = (365.25/12), quarter = (365.25/4), year = 365.25)))
+    ret <- ret %>% mutate(period = base::round(as.numeric(as.Date(.time) - as.Date(.start_time))/switch(time_unit, day = 1, week = 7, month = (365.25/12), quarter = (365.25/4), year = 365.25)))
     # aggregate value.
     ret <- ret %>% group_by(.cohort, period) %>%
       dplyr::summarise(.value = fun.aggregate(.value), .time = first(.time))

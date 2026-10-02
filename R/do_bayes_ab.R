@@ -279,8 +279,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
     data_a_total <- sum(data_a[[total_count_col]], na.rm = TRUE)
     data_b_total <- sum(data_b[[total_count_col]], na.rm = TRUE)
     # calculate sum of success count
-    data_a_conv_total <- sum(round(data_a[[total_count_col]] * data_a[[conversion_rate_col]]), na.rm = TRUE)
-    data_b_conv_total <- sum(round(data_b[[total_count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
+    data_a_conv_total <- sum(base::round(data_a[[total_count_col]] * data_a[[conversion_rate_col]]), na.rm = TRUE)
+    data_b_conv_total <- sum(base::round(data_b[[total_count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
 
     # expand the data to TRUE and FALSE raw data
     bin_a <- c(rep(1, data_a_conv_total), rep(0, data_a_total - data_a_conv_total))
