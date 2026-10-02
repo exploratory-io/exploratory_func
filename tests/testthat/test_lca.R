@@ -550,6 +550,58 @@ test_that("exp_lca reports factor categories in their declared order", {
 })
 
 # ---------------------------------------------------------------------------
+# tam#39280 -- a category confined to a row excluded by NA in ANOTHER
+# indicator must not survive into the fitted category count
+# ---------------------------------------------------------------------------
+
+test_that("exp_lca realigns indicator categories to the complete-case rows actually fit (tam#39280)", {
+  # `a` has 8 categories. Every category but one ("a3") appears 7 times, which
+  # survives complete-case filtering on its own. "a3" appears on exactly ONE
+  # row, and that row is also the only row with NA in `b` -- a DIFFERENT
+  # indicator column. When that row is dropped as an incomplete case, "a3"
+  # disappears entirely from the data poLCA is actually fit on.
+  #
+  # Before the fix, `a`'s categories (and therefore the integer codes handed
+  # to poLCA) were derived from the column BEFORE this filtering, so poLCA
+  # still carried "a3" as a real (empty) response category -- an interior,
+  # not boundary, gap in the 1..8 coding, which poLCA keeps rather than
+  # rejects. `lca_profile_table()`'s displayed categories, however, come
+  # from the FILTERED column, which no longer has "a3" -- 7 categories
+  # there against 8 columns in `fit$probs`, exactly the "Tibble columns
+  # must have compatible sizes" mismatch (Size 7 vs Size 8) from the issue.
+  other_levels <- c("a1", "a2", "a4", "a5", "a6", "a7", "a8")
+  a <- c(rep(other_levels, each = 7), "a3")
+  # Deterministic (no sample()) so the fixture needs no fixed seed: every "a"
+  # category pairs with both "b" values, which keeps `used` past the ">= 2
+  # categories per variable" guard regardless of which row ends up excluded.
+  b <- rep(c("x", "y"), length.out = length(a))
+  na_row <- length(a) # the lone "a3" row
+  b[na_row] <- NA
+  df <- data.frame(a = a, b = b, stringsAsFactors = FALSE)
+
+  model <- exp_lca(df, a, b, min_nclass = 2, max_nclass = 2,
+                   nrep = 1, maxiter = 200, seed = 1)$model[[1]]
+  expect_equal(model$excluded_nrow, 1)
+  expect_equal(model$n_used, length(a) - 1)
+
+  # tidy(..., "profiles") is where the production tibble() mismatch threw.
+  profiles <- tidy(model, type = "profiles")
+  a_categories <- unique(as.character(profiles$category[profiles$variable == "a"]))
+  expect_equal(sort(a_categories), sort(other_levels))
+  expect_false("a3" %in% a_categories)
+  # Every category column must agree on how many rows it contributes.
+  expect_equal(length(profiles$category[profiles$variable == "a"]),
+               length(profiles$probability[profiles$variable == "a"]))
+
+  # lca_class_composition_table() combines the same observed-levels / fit$probs
+  # pair the same way, so it is exposed to the identical mismatch.
+  distribution <- tidy(model, type = "class_distribution")
+  dist_a_categories <- unique(as.character(distribution$category[distribution$variable == "a"]))
+  expect_equal(sort(dist_a_categories), sort(other_levels))
+  expect_false("a3" %in% dist_a_categories)
+})
+
+# ---------------------------------------------------------------------------
 # tam#38689 -- numeric indicators, converted to categories the way K-Modes does
 # ---------------------------------------------------------------------------
 
