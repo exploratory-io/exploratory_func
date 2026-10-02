@@ -4548,14 +4548,38 @@ within_date_range <- function(date_column, operator){
 
 }
 
+#'Resolves the FRED API key to use for a load_fred() query.
+#'If the caller supplied a non-empty password (a real Connection's own API key
+#'entered by the user), it is used as-is. Otherwise -- which is what the
+#'Desktop app sends for the "Default" connection placeholder, since it never
+#'has (or sends) a real per-user key -- fall back to Exploratory's own FRED
+#'API key, which is seeded per R session as user_env$token_info[["fred-api-key"]]
+#'via setTokenInfo("fred-api-key", ...) (see RIO.setFredAPIKey on the desktop
+#'side and interactivesvc.buildFredAPIKeyFragment on the server side), the same
+#'way OAuth-backed data sources (Google Analytics, Google Sheets, etc., see
+#'oauth.R) read their own token via getTokenInfo() from inside the R function.
+#'@param password - the FRED API key entered on a real Connection, or "" / NULL for the "Default" connection.
+#'@export
+resolveFredAPIKey <- function(password) {
+  if (!is.null(password) && password != "") {
+    return(password)
+  }
+  key <- exploratory::getTokenInfo('fred-api-key')
+  if (is.null(key) || key == "") {
+    stop("FRED API key is not available. Please set up a FRED connection with your own API key.")
+  }
+  key
+}
+
 #'API to load economic data from FRED (Federal Reserve Bank Economic Data)
 #'@param series_ids - e.g. c("UNRATE", "CPIAUCSL", "DGS10")
 #'@param date_start - Start Date for the query. This is optional field.
 #'@param date_end - End Date for the query. By default it's today.
+#'@param password - the FRED API key from a real Connection, or "" / NULL to use the "Default" connection's Exploratory-provided key (see resolveFredAPIKey()).
 #'@export
-load_fred <- function(series_ids, date_start = "", date_end = "", password) {
+load_fred <- function(series_ids, date_start = "", date_end = "", password = "") {
   loadNamespace("fredr")
-  fredr::fredr_set_key(password)
+  fredr::fredr_set_key(resolveFredAPIKey(password))
   # Desktop passes empty string if end date is not selected. For this case fallback to today.
   if (date_end == "") {
     date_end <- lubridate::today()
