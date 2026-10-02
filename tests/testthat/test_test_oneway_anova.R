@@ -251,3 +251,68 @@ test_that("Test One-way ANOVA", {
   expect_equal(nrow(ret.prob_dist), 3006)  # 1002 rows for each facet level
   expect_equal(ncol(ret.prob_dist), 8)  # Including facet column
 })
+
+test_that("One-way ANOVA with equal variances when a level loses all its rows to target NAs (tam#39339)", {
+  set.seed(1)
+  data <- data.frame(y = rnorm(60), g = rep(c("A", "B", "C"), 20))
+  data$y[data$g == "C"] <- NA # All the values of the target for level C are NA.
+
+  ret <- data %>% exp_anova(y, g, var.equal = TRUE)
+  ret.model <- ret %>% tidy_rowwise(model, type = "model")
+
+  aov_summary <- summary(aov(y ~ g, data = data[!is.na(data$y), ]))[[1]]
+  expect_equal(ret.model$`Type of Variance`, c("g", "(Residuals)", "(Total)"))
+  # Group row and residuals row. Compare with aov, which does not count the empty level.
+  expect_equal(ret.model$DF[1:2], aov_summary$Df, tolerance = 1e-8)
+  expect_equal(ret.model$DF[3], 39)
+  expect_equal(ret.model$`Sum of Squares`[1:2], aov_summary$`Sum Sq`, tolerance = 1e-8)
+  expect_equal(ret.model$`Sum of Squares`[3], sum(aov_summary$`Sum Sq`), tolerance = 1e-8)
+  expect_equal(ret.model$`Mean Square`[1:2], aov_summary$`Mean Sq`, tolerance = 1e-8)
+  expect_equal(ret.model$`F Value`[1], aov_summary$`F value`[1], tolerance = 1e-8)
+  expect_equal(ret.model$`P Value`[1], aov_summary$`Pr(>F)`[1], tolerance = 1e-8)
+
+  # Post-hoc test works with the remaining levels, and the empty level is absent.
+  ret.pairs <- ret %>% tidy_rowwise(model, type = "pairs")
+  expect_equal(nrow(ret.pairs), 1)
+  expect_equal(c(ret.pairs$`Group 1`, ret.pairs$`Group 2`), c("A", "B"))
+})
+
+test_that("One-way ANOVA with equal variances when a level loses all its rows to outlier removal (tam#39339)", {
+  set.seed(2)
+  data <- data.frame(y = c(rnorm(20), rnorm(20, mean = 1), c(1000, 1001, 1002, 1000, 1001, 1002)),
+                     g = c(rep("A", 20), rep("B", 20), rep("C", 6)))
+  data$y[1:3] <- NA
+  ret <- data %>% exp_anova(y, g, var.equal = TRUE, outlier_filter_type = "iqr", outlier_filter_threshold = 1.5)
+  ret.model <- ret %>% tidy_rowwise(model, type = "model")
+  model_df <- ret$model[[1]]
+  analyzed <- model_df$lm.model$model # Rows actually analyzed. Columns are renamed internally: 1st is the target, 2nd is the group.
+  expect_equal(nrow(analyzed), 37)
+  expect_equal(nlevels(factor(analyzed[[2]])), 2) # Level C is gone by the outlier removal.
+  aov_summary <- summary(aov(analyzed[[1]] ~ factor(analyzed[[2]])))[[1]]
+  expect_equal(ret.model$DF[1:2], aov_summary$Df, tolerance = 1e-8)
+  expect_equal(ret.model$`Sum of Squares`[1:2], aov_summary$`Sum Sq`, tolerance = 1e-8)
+  expect_equal(ret.model$`Mean Square`[1:2], aov_summary$`Mean Sq`, tolerance = 1e-8)
+})
+
+test_that("One-way ANOVA with equal variances and all levels present is unchanged by tam#39339 fix", {
+  set.seed(1)
+  data <- data.frame(y = rnorm(60), g = rep(c("A", "B", "C"), 20))
+  ret.model <- data %>% exp_anova(y, g, var.equal = TRUE) %>% tidy_rowwise(model, type = "model")
+  aov_summary <- summary(aov(y ~ g, data = data))[[1]]
+  expect_equal(ret.model$DF[1:2], aov_summary$Df, tolerance = 1e-8)
+  expect_equal(ret.model$`Sum of Squares`[1:2], aov_summary$`Sum Sq`, tolerance = 1e-8)
+  expect_equal(ret.model$`Mean Square`[1:2], aov_summary$`Mean Sq`, tolerance = 1e-8)
+})
+
+test_that("One-way ANOVA with unequal variances is not affected by an empty level (tam#39339)", {
+  set.seed(1)
+  data <- data.frame(y = rnorm(60), g = rep(c("A", "B", "C"), 20))
+  data$y[data$g == "C"] <- NA
+  ret.model <- data %>% exp_anova(y, g, var.equal = FALSE) %>% tidy_rowwise(model, type = "model")
+  ow <- oneway.test(y ~ g, data = data[!is.na(data$y), ], var.equal = FALSE)
+  expect_equal(ret.model$`F Value`[1], unname(ow$statistic), tolerance = 1e-8)
+  expect_equal(ret.model$`P Value`[1], ow$p.value, tolerance = 1e-8)
+  expect_equal(ret.model$DF[1], 1)
+  expect_equal(ret.model$DF[2], unname(ow$parameter[2]), tolerance = 1e-8)
+  expect_false(any(is.na(ret.model$`Sum of Squares`[1:3])))
+})
