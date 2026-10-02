@@ -170,18 +170,22 @@ test_that("dplyr::mutate in the global environment resolves round to the mask", 
 })
 
 # ---------------------------------------------------------------------------
-# Guard: discovery-based. Every bare round( in R/*.R must be a known DISPLAY site.
-# Computation sites must call base::round( so the user's rounding setting can
+# Guard: discovery-based. Every bare round( in R/*.R must be a known site that
+# deliberately follows the user's rounding setting (display text, or a
+# user-facing count). Computation sites must call base::round( so the setting can
 # never change a model. A new bare round( fails here and forces a decision.
 # ---------------------------------------------------------------------------
 
-# Display-only sites: number -> text for labels and report tables. They follow the
-# user's rounding mode on purpose. file -> expected number of bare round( calls.
-ROUND_DISPLAY_SITES <- c(
+# Sites that follow the user's rounding mode on purpose: display text for labels and
+# report tables, plus user-facing counts (Bayes A/B conversion totals, corresp
+# contingency-table frequencies). file -> expected number of bare round( calls.
+ROUND_FOLLOW_SITES <- c(
   "build_lm.R" = 1L,            # "Test (N%)" validation label
   "build_polr.R" = 1L,          # "Test (N%)" validation label
   "chaid.R" = 1L,               # format_chaid_distribution label
+  "corresp.R" = 3L,             # aggregated contingency-table frequencies (counts, not model math)
   "corresp_report.R" = 4L,      # report matrix coordinate / contribution / cos2 columns
+  "do_bayes_ab.R" = 2L,         # per-group conversion totals (total count * conversion rate)
   "factanal.R" = 2L,            # KMO / explained % display strings
   "google_cloud_storage.R" = 1L,# human readable file size
   "prcomp.R" = 3L,              # scale ratio / excluded % / variance % display strings
@@ -214,24 +218,24 @@ find_bare_round_calls <- function(r_dir) {
   do.call(rbind, hits)
 }
 
-test_that("guard: every bare round( in R/ is an allow-listed display site", {
+test_that("guard: every bare round( in R/ is an allow-listed follow-the-setting site", {
   r_dir <- testthat::test_path("..", "..", "R")
   skip_if_not(dir.exists(r_dir), "R/ sources are not available (installed-package test run)")
   hits <- find_bare_round_calls(r_dir)
   counts <- table(hits$file)
   found <- stats::setNames(as.integer(counts), names(counts))
 
-  unexpected_files <- setdiff(names(found), names(ROUND_DISPLAY_SITES))
+  unexpected_files <- setdiff(names(found), names(ROUND_FOLLOW_SITES))
   if (length(unexpected_files) > 0) {
     detail <- hits[hits$file %in% unexpected_files, ]
     fail(paste0(
-      "Bare round( in a file that is not an allow-listed display site. ",
-      "If it affects computation use base::round(; if it only formats a number for display, add the file to ROUND_DISPLAY_SITES: ",
+      "Bare round( in a file that is not an allow-listed follow-the-setting site. ",
+      "If it affects computation use base::round(; if it only formats a number for display or rounds a user-facing count, add the file to ROUND_FOLLOW_SITES: ",
       paste0(detail$file, ":", detail$line, collapse = ", ")
     ))
   }
-  for (f in names(ROUND_DISPLAY_SITES)) {
+  for (f in names(ROUND_FOLLOW_SITES)) {
     actual <- if (f %in% names(found)) found[[f]] else 0L
-    expect_equal(actual, ROUND_DISPLAY_SITES[[f]], info = paste("bare round( count in", f))
+    expect_equal(actual, ROUND_FOLLOW_SITES[[f]], info = paste("bare round( count in", f))
   }
 })

@@ -128,3 +128,26 @@ test_that("test calc_beta_prior", {
   ret <- calc_beta_prior(full_data, click_rate)
   expect_equal(nrow(ret), 2)
 })
+
+test_that("do_bayes_ab conversion totals follow exploratory.round_mode (tam#25465)", {
+  # total * conversion rate is exactly x.5 for both groups: 12.5 and 22.5.
+  df <- data.frame(
+    group = c("a", "b"),
+    access_count = c(1000, 1000),
+    click_rate = c(0.0125, 0.0225),
+    stringsAsFactors = FALSE
+  )
+  # bayesAB keeps the expanded 0/1 observations, so their sum is the conversion total.
+  conv_totals <- function(mode) {
+    withr::with_options(list(exploratory.round_mode = mode), {
+      model <- (do_bayes_ab(df, group, access_count, click_rate, type = "model"))$model[[1]]
+      c(a = sum(model$inputs$A_data$A), b = sum(model$inputs$B_data$B))
+    })
+  }
+  half_up <- conv_totals("half_up")
+  half_even <- conv_totals("half_even")
+  expect_equal(unname(half_up), c(13, 23))
+  expect_equal(unname(half_even), c(12, 22))
+  # Default (option unset) is round half up.
+  expect_equal(conv_totals(NULL), half_up)
+})
