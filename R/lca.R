@@ -127,11 +127,21 @@ exp_lca <- function(df, ...,
     indicator_df <- lca_prepare_indicators(original, selected_cols,
                                            numeric_handling = numeric_handling,
                                            numeric_bins = numeric_bins)
-    indicators <- lca_encode_indicators(indicator_df, selected_cols)
-    complete_rows <- stats::complete.cases(indicators)
-    used <- indicators[complete_rows, , drop = FALSE]
+    # tam#39280: encode categories from the rows actually fit (after NA filtering), not from
+    # every row. A category whose only occurrences sit in rows excluded by NA in a DIFFERENT
+    # indicator column would otherwise still be counted when building the integer codes poLCA
+    # fits on, so poLCA keeps it as a real (but empty) response category -- a gap `lca_indicator_
+    # levels()` does not see when it later computes display categories from the filtered data
+    # alone (it drops any level with zero rows). The fitted model then reports one MORE category
+    # for that variable than the report's category list has, and dplyr::bind_cols -- called once
+    # with the two misaligned lengths, in lca_profile_table() and lca_class_composition_table()
+    # alike -- fails with "Tibble columns must have compatible sizes". Filtering first keeps the
+    # encoding and the display levels built from the exact same data, the same ordering K-Modes'
+    # exp_kmodes() already uses (encode levels_by_col from the post-complete.cases prepared_df).
+    complete_rows <- stats::complete.cases(indicator_df[selected_cols])
     used_row_ids <- original$.lca_row_id[complete_rows]
     excluded_nrow <- sum(!complete_rows)
+    used <- lca_encode_indicators(indicator_df[complete_rows, selected_cols, drop = FALSE], selected_cols)
     if (!nrow(used)) {
       stop("There is no row left after removing rows with missing values in the selected variables.")
     }
