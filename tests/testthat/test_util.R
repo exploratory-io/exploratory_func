@@ -349,6 +349,110 @@ test_that("test upper_gather with vector diag true", {
   expect_equal(nrow(result), 10)
 })
 
+test_that("upper_gather output contract for the pairwise callers", {
+  # do_dist.kv_, do_kl_dist.kv_ and do_dist.cols all call upper_gather with
+  # na.rm = FALSE and zero.rm = FALSE, which means nothing is dropped and the
+  # result is the full n x n grid in row major order, with values only on the
+  # strict upper half. Downstream display and do_cmdscale_ depend on that
+  # shape, so pin it here.
+  names <- c("a", "b", "c", "d")
+  vec <- seq(6)
+
+  res <- upper_gather(vec, names, diag = NULL,
+                      cnames = c("Var1", "Var2", "value"),
+                      na.rm = FALSE, zero.rm = FALSE)
+  expect_equal(nrow(res), 16)
+  expect_equal(colnames(res), c("Var1", "Var2", "value"))
+  expect_true(is.character(res[[1]]))
+  expect_true(is.character(res[[2]]))
+  expect_true(is.numeric(res[[3]]))
+  # row major: the first name varies slowly, the second one fast
+  expect_equal(res[[1]], rep(names, each = 4))
+  expect_equal(res[[2]], rep(names, times = 4))
+  # values sit on the strict upper half, in the order stats::dist stores them
+  expect_equal(res[[3]][c(2, 3, 4, 7, 8, 12)], as.numeric(vec))
+  expect_equal(which(is.na(res[[3]])), c(1L, 5L, 6L, 9L, 10L, 11L, 13L, 14L, 15L, 16L))
+
+  # diag = 0 is what those callers pass when the diagonal is requested
+  res_diag <- upper_gather(vec, names, diag = 0,
+                           cnames = c("Var1", "Var2", "value"),
+                           na.rm = FALSE, zero.rm = FALSE)
+  expect_equal(nrow(res_diag), 16)
+  expect_equal(res_diag[[3]][c(1, 6, 11, 16)], rep(0, 4))
+
+  # do_cosine_sim.kv uses the matrix path with the same na.rm / zero.rm
+  sim <- matrix(c(1, 0.5, 0, 0.2, 0.5, 1, 0.3, 0, 0, 0.3, 1, 0.9, 0.2, 0, 0.9, 1), nrow = 4)
+  dimnames(sim) <- list(names, names)
+  res_mat <- upper_gather(sim, names, diag = FALSE,
+                          cnames = c("Var1", "Var2", "value"),
+                          na.rm = FALSE, zero.rm = FALSE)
+  # zeros are kept because zero.rm is FALSE
+  expect_equal(nrow(res_mat), 6)
+  expect_equal(res_mat[[1]], c("a", "a", "a", "b", "b", "c"))
+  expect_equal(res_mat[[2]], c("b", "c", "d", "c", "d", "d"))
+  expect_equal(res_mat[[3]], c(0.5, 0, 0.2, 0.3, 0, 0.9))
+
+  # pair_count_ uses the matrix path with the defaults, where zeros and NAs go
+  cm <- Matrix::Matrix(c(3, 1, 0, 2, 1, 4, 0, 0, 0, 0, 2, 1, 2, 0, 1, 5),
+                       nrow = 4, sparse = TRUE)
+  dimnames(cm) <- list(names, names)
+  res_pc <- upper_gather(cm, diag = FALSE, cnames = c("v.x", "v.y", "value"))
+  expect_equal(nrow(res_pc), 3)
+  expect_equal(res_pc[[1]], c("a", "a", "c"))
+  expect_equal(res_pc[[2]], c("b", "d", "d"))
+  expect_equal(res_pc[[3]], c(1, 2, 1))
+  res_pc_diag <- upper_gather(cm, diag = TRUE, cnames = c("v.x", "v.y", "value"))
+  expect_equal(nrow(res_pc_diag), 7)
+})
+
+test_that("upper_gather degenerate and awkward dimension names", {
+  names <- c("a", "b", "c", "d")
+  vec <- seq(6)
+
+  # n = 1 (empty dist vector) must not fall over
+  res1 <- upper_gather(numeric(0), NULL, diag = NULL,
+                       cnames = c("Var1", "Var2", "value"),
+                       na.rm = FALSE, zero.rm = FALSE)
+  expect_equal(nrow(res1), 1)
+  expect_true(is.na(res1[[3]][1]))
+  expect_equal(nrow(upper_gather(numeric(0), NULL)), 0)
+
+  # n = 2
+  res2 <- upper_gather(2.5, c("x", "y"), diag = NULL,
+                       cnames = c("Var1", "Var2", "value"),
+                       na.rm = FALSE, zero.rm = FALSE)
+  expect_equal(nrow(res2), 4)
+  expect_equal(res2[[3]][2], 2.5)
+
+  # every value NA
+  expect_equal(nrow(upper_gather(rep(NA_real_, 6), names, diag = NULL,
+                                 cnames = c("Var1", "Var2", "value"),
+                                 na.rm = FALSE, zero.rm = FALSE)), 16)
+  expect_equal(nrow(upper_gather(rep(NA_real_, 6), names)), 0)
+
+  # a name count that does not match the vector length is still an error
+  expect_error(upper_gather(vec, c("a", "b")))
+
+  # dimension names are used as output values, so they must survive verbatim,
+  # including multibyte characters, punctuation and near collisions
+  stress <- c("航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_`{|}~ 表",
+              "col", "col ", "col\n")
+  res_s <- upper_gather(vec, stress, diag = NULL,
+                        cnames = c("Var1", "Var2", "value"),
+                        na.rm = FALSE, zero.rm = FALSE)
+  expect_equal(unique(res_s[[1]]), stress)
+  expect_equal(res_s[[2]][1:4], stress)
+
+  # duplicated names must not be mangled or rejected
+  dup <- c("a", "a", "b", "c")
+  res_d <- upper_gather(vec, dup, diag = NULL,
+                        cnames = c("Var1", "Var2", "value"),
+                        na.rm = FALSE, zero.rm = FALSE)
+  expect_equal(nrow(res_d), 16)
+  expect_equal(res_d[[1]], rep(dup, each = 4))
+  expect_equal(res_d[[2]], rep(dup, times = 4))
+})
+
 test_that("sparse_cast", {
   test_df <- data.frame(
     row = rep(paste("row", 6-seq(5)), each=4),
