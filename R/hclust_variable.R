@@ -106,7 +106,9 @@
 
 .hclust_variable_analysis_conditions <- function(x) {
   tibble::tibble(
-    Metric = c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Used for Correlation (Min)',
+    # tam#38536 follow-up: "Row Count" -> "Number of Rows", consistently with every other
+    # analytics type's analysis_conditions table (see tam docs/plans/design/38536_design.md).
+    Metric = c('Number of Variables', 'Variable Names', 'Number of Rows', 'Rows Used for Correlation (Min)',
                'Non-finite Values (Treated as Missing)', 'Number of Clusters',
                'Correlation Method', 'Distance', 'Linkage', 'Missing Values'),
     Value = c(

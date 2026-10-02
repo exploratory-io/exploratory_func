@@ -863,7 +863,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # small-but-above-threshold p (0.0002 rendered as "2e-04").
     bart_val <- if (is.na(p)) "N/A" else if (p < 0.0001) "< 0.0001" else formatC(p, format = "f", digits = 4)
     # tam#37402: Rows Used / Variables Used are already shown in analysis_method
-    # (Number of Variables / Row Count), so keep this table to KMO + Bartlett only.
+    # (Number of Variables / Number of Rows), so keep this table to KMO + Bartlett only.
     res <- tibble::tibble(
       Metric = c("KMO", "Bartlett's Test of Sphericity (P Value)"),
       Value = c(kmo_val, bart_val),
@@ -905,12 +905,18 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
       # their own relative order after them, including the Parallel Analysis Method row (tam#37332).
       # NOTE on the two count keys: they were "Target Variables" / "Data Rows" while the shorter
       # "Variables" / "Rows" were already bound to other wordings in the client's shared
-      # translation map (#26623). They are now "Number of Variables" / "Row Count" -- keys the map
-      # ALREADY carries with exactly the wanted JA (変数の数 / 行数) from PCA's analysis_conditions
-      # table (#37268), so no new translation key is needed. Do NOT use "Number of Rows": that key
-      # is bound to 行の数 elsewhere in the same map.
-      # tam#37402: "Rows Removed" sits directly under "Row Count", before Correlation.
-      Item = c("Number of Variables", "Row Count", "Rows Removed", "Correlation",
+      # translation map (#26623). They are now "Number of Variables" / "Number of Rows" -- keys
+      # the map ALREADY carries with exactly the wanted JA (変数の数 / 行数) from PCA's
+      # analysis_conditions table (#37268).
+      # tam#38536 follow-up: renamed from "Row Count" to "Number of Rows", consistently with
+      # every other analytics type's analysis_conditions/reliability table -- the commenter
+      # asked for this rename across all of them, not just Prediction Models. The client-side
+      # VizUtil.js "Number of Rows" direct-map key maps to 行数 in 'ja' (matching "Row Count"'s
+      # own 行数, so no visible JA change) and, after a companion tam fix for an unrelated
+      # EN-only collision with the "# of Rows" chart-measure pseudo-column's own short axis
+      # label, passes through unchanged in 'en' too (see tam docs/plans/design/38536_design.md).
+      # tam#37402: "Rows Removed" sits directly under "Number of Rows", before Correlation.
+      Item = c("Number of Variables", "Number of Rows", "Rows Removed", "Correlation",
                "Factor Extraction Method", "Rotation", "Parallel Analysis Method"),
       Value = c(
         if (length(x$n_variables) == 1L && !is.na(x$n_variables)) as.character(x$n_variables) else "N/A",

@@ -1703,11 +1703,15 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
 # purpose (the analysis_conditions branches in prcomp.R / kmodes.R / kmedoids.R / hclust*.R) --
 # this is one more sibling of that established pattern, not a new mechanism.
 #
-# Rows Removed (削除された行数) comes from x$excluded_nrow, which build_lm.fast() records per
+# Rows Excluded (除外された行数) comes from x$excluded_nrow, which build_lm.fast() records per
 # model at fit time (rows dropped by NA/Inf filtering, the outlier filter and lm/glm's own
 # na.action; sampling, the test split and SMOTE are not removals), the same field name the
 # kmeans/kmodes/kmedoids/hclust/lca models use. It is always shown, even when 0, like those
 # precedents. Models built before this field existed render "N/A" rather than a made-up 0.
+# tam#38536 follow-up: renamed from "Rows Removed" to match PCA's own analysis_conditions
+# branch (prcomp.R, "Rows Excluded") instead of K-Means' (same file, "Rows Removed") -- PCA's
+# term was already the established one for this exact concept, see the design doc's
+# "Why this diverged" section for how the two diverged in the first place.
 #
 # カテゴリの順序 (category order) is also out of scope here on purpose -- that only applies to
 # Ordered Logistic Regression (MASS::polr, a different model class entirely), also a follow-up.
@@ -1732,10 +1736,21 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
     values <- c(values, "2")
   }
 
+  # tam#38536 follow-up: "# of Explanatory Variables" (the predictor COUNT) now precedes the
+  # "Explanatory Variables" (predictor NAMES) row, mirroring how "Number of Categories" already
+  # precedes a names/levels row above and how PCA's "Number of Variables" precedes its own
+  # "Variable Names" row (factanal.R).
+  metrics <- c(metrics, "# of Explanatory Variables")
+  values <- c(values, as.character(length(predictor_orig)))
+
   # nrow(x$model), not length(x$y), since plain lm() fits do not always retain $y (glance.lm's
   # own convention -- see glance.lm_exploratory above), while $model (the fitted model frame) is
   # always kept for both lm and glm fits.
-  metrics <- c(metrics, "Explanatory Variables", "Row Count")
+  # tam#38536 follow-up: renamed from "Row Count" to "Number of Rows", consistently with every
+  # other analytics type's analysis_conditions/reliability table (factanal.R, hclust.R,
+  # hclust_variable.R, kmedoids.R, kmodes.R, prcomp.R, reliability.R, stats_wrapper.R) -- the
+  # commenter asked for this rename across all of them, not just Prediction Models.
+  metrics <- c(metrics, "Explanatory Variables", "Number of Rows")
   values <- c(values, predictor_display, as.character(nrow(x$model)))
 
   excluded_display <- if (length(x$excluded_nrow) == 1L && !is.na(x$excluded_nrow)) {
@@ -1743,7 +1758,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
   } else {
     "N/A"
   }
-  metrics <- c(metrics, "Rows Removed")
+  metrics <- c(metrics, "Rows Excluded")
   values <- c(values, excluded_display)
 
   test_rate_num <- suppressWarnings(as.numeric(test_rate))
@@ -1752,7 +1767,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
   } else {
     paste0("Test (", round(test_rate_num * 100), "%)")
   }
-  metrics <- c(metrics, "Validation Data")
+  # tam#38536 follow-up: renamed from "Validation Data" to "Evaluation", matching the WIDE
+  # ml_report_basic_info() table's own established "Evaluation" column (public/lib/library.r in
+  # tam) -- same concept, same JA text (検証データ), previously undiscovered duplicate wording.
+  metrics <- c(metrics, "Evaluation")
   values <- c(values, validation_display)
 
   tibble::tibble(Metric = metrics, Value = values)

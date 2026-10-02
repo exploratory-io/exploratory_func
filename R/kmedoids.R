@@ -660,16 +660,18 @@
 #' Every value is a plain string -- a count or a comma-joined name list -- so the viz side
 #' needs no per-column number formatting.
 #'
-#' Row Count is the number of rows actually clustered and Rows Removed the number dropped
+#' Number of Rows is the number of rows actually clustered and Rows Removed the number dropped
 #' for missing/non-finite values, matching the sibling implementations. Both come from the
 #' model rather than being re-derived client-side so the table has one source of truth.
+#' tam#38536 follow-up: renamed from "Row Count" to "Number of Rows", consistently with every
+#' other analytics type's analysis_conditions table.
 #' @param x A pam_exploratory model.
 #' @return A tibble with `Metric` and `Value` columns.
 .kmedoids_analysis_conditions <- function(x) {
   variable_names <- as.character(x$selected_cols)
   n_variables <- length(variable_names)
   tibble::tibble(
-    Metric = c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+    Metric = c("Number of Variables", "Variable Names", "Number of Rows", "Rows Removed",
                "Number of Clusters"),
     Value = c(
       as.character(n_variables),
