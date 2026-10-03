@@ -415,6 +415,79 @@ ceiling <- function(x, digits = 0) {
   }
 }
 
+#' Round numbers with a configurable rule for halves.
+#'
+#' Masks base::round. How a value exactly halfway between two candidates is
+#' rounded comes from getOption("exploratory.round_mode"):
+#' \itemize{
+#'   \item "half_up" (default): halves go away from zero, 2.5 -> 3, -2.5 -> -3.
+#'     Same results as janitor::round_half_up, so 2.675 -> 2.68 at 2 digits.
+#'   \item "half_down": halves go toward zero, 2.5 -> 2, -2.5 -> -2.
+#'   \item "half_even": base::round (IEC 60559, banker's rounding).
+#' }
+#' Any other option value (unset, NA, NULL, length != 1, unknown name) means "half_up".
+#' Negative numbers are rounded by magnitude, as base::round does.
+#' Integer, Date, POSIXct, difftime and other classed or non-double input is passed to base::round.
+#' @param x Numeric vector.
+#' @param digits Integer number of decimal places (negative allowed, may be a vector).
+#' @param ... Passed to base::round for non-double or classed input, e.g. units = "mins" for POSIXct.
+#' @export
+round <- function(x, digits = 0, ...) {
+  mode <- .exploratory_round_mode()
+  if (mode == "half_even" || !is.double(x) || is.object(x)) {
+    # Call base::round the way the caller did: round.POSIXt has no `digits` formal, so passing
+    # the default digits = 0 along would fail for a bare round(<POSIXct>).
+    return(if (missing(digits)) base::round(x, ...) else base::round(x, digits, ...))
+  }
+  n <- max(length(x), length(digits))
+  if (length(x) == 0 || length(digits) == 0) {
+    return(base::round(x, digits))
+  }
+  keep_attributes <- length(x) == n
+  if (!keep_attributes) {
+    x <- rep_len(x, n)
+  }
+  # Same digits handling as base::round: nearest integer, clamped to what a double can express.
+  d <- rep_len(pmax(pmin(floor(digits + 0.5), 308), -308), n)
+  eps <- sqrt(.Machine$double.eps)
+  # A value is rounded up when its fractional part, after scaling to whole units, reaches the
+  # threshold. This is janitor::round_half_up's trunc(z + 0.5 + eps) rewritten on the fraction,
+  # which is exact; adding eps to z itself loses it to float spacing once z > ~1e8.
+  # half_down is the mirror image: the fudge goes the other way so exact halves round toward zero.
+  threshold <- if (mode == "half_down") 0.5 + eps else 0.5 - eps
+  p <- 10^abs(d)
+  shrink <- d < 0
+  any_shrink <- isTRUE(any(shrink))
+  ax <- abs(x)
+  # Negative digits divide by a power of ten instead of multiplying by 10^-k, which is not exact.
+  z <- if (any_shrink) ifelse(shrink, ax / p, ax * p) else ax * p
+  whole <- floor(z)
+  z <- whole + ((z - whole) >= threshold)
+  res <- if (any_shrink) ifelse(shrink, z * p, z / p) else z / p
+  res <- res * sign(x)
+  # NA, NaN, Inf, and values whose scaled form overflows are returned as they are, as base::round does.
+  unscalable <- !is.finite(res)
+  if (any(unscalable, na.rm = TRUE)) {
+    res[unscalable] <- x[unscalable]
+  }
+  # NA digits give NA, like base::round.
+  res[is.na(d)] <- NA_real_
+  if (keep_attributes) {
+    attributes(res) <- attributes(x)
+  }
+  res
+}
+
+# The effective rounding rule: the exploratory.round_mode option, or "half_up" when it is
+# unset or not one of the supported names.
+.exploratory_round_mode <- function() {
+  mode <- getOption("exploratory.round_mode", "half_up")
+  if (!is.character(mode) || length(mode) != 1 || is.na(mode) || !(mode %in% c("half_up", "half_down", "half_even"))) {
+    mode <- "half_up"
+  }
+  mode
+}
+
 #' Not %in% function
 #' @export
 `%nin%` <- function (x, table) match(x, table, nomatch = 0L) == 0L

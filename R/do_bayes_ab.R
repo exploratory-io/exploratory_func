@@ -279,6 +279,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
     data_a_total <- sum(data_a[[total_count_col]], na.rm = TRUE)
     data_b_total <- sum(data_b[[total_count_col]], na.rm = TRUE)
     # calculate sum of success count
+    # Bare round() on purpose: the conversion count is user-facing, so it follows
+    # options(exploratory.round_mode) (default round half up) (tam#25465).
     data_a_conv_total <- sum(round(data_a[[total_count_col]] * data_a[[conversion_rate_col]]), na.rm = TRUE)
     data_b_conv_total <- sum(round(data_b[[total_count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
 
