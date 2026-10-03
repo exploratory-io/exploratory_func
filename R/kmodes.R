@@ -900,7 +900,9 @@ kmodes_summary_table <- function(x, with_excluded_rows = FALSE) {
 kmodes_analysis_conditions_table <- function(x) {
   variable_names_display <- paste(x$selected_cols, collapse = ", ")
   tibble::tibble(
-    Metric = c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+    # tam#38536 follow-up: "Row Count" -> "Number of Rows", consistently with every other
+    # analytics type's analysis_conditions table (see tam docs/plans/design/38536_design.md).
+    Metric = c("Number of Variables", "Variable Names", "Number of Rows", "Rows Removed",
                "Number of Clusters"),
     Value = c(
       as.character(x$n_variables),
