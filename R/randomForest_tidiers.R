@@ -1336,7 +1336,13 @@ ranger.find_na_index <- function(variables, data) {
 predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
   # We assume threshold is given only for binary case.
   if (is.null(threshold)) { # multiclass case. Return the value with maximum probability.
-    to_same_type(levels_var[apply(pred, 1, which.max)], y_value)
+    # tam#39338: Pick the label by the column name of pred. levels_var has all the levels of the target,
+    # but pred has columns only for the classes seen in training, so mapping by position can shift the labels.
+    labels <- colnames(pred)
+    if (is.null(labels)) {
+      labels <- levels_var
+    }
+    to_same_type(labels[max.col(as.matrix(pred), ties.method = "first")], y_value)
   }
   else { # binary case
     # pred (x$predictions) is 2-diminsional matrix with 2 columns for the 2 categories.
@@ -2695,6 +2701,11 @@ calc_feature_imp <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$y <- model.response(model_df)
+      if (smote_applied && !smote_keep_synthetic) {
+        # tam#39340: prediction_training was made on the original training rows (model_df_original), so
+        # the actual values that tidy / glance compare it with must come from the same rows, not the SMOTE-resampled ones.
+        model$y <- model.response(model_df_original)
+      }
       model$df <- model_df
       # To avoid saving a huge environment when caching with RDS.
       attr(attr(model$df, "terms"), ".Environment") <- NULL

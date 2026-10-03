@@ -1966,6 +1966,12 @@ exp_anova <- function(df, var1, var2, covariates = NULL, func2 = NULL, covariate
       # estimable with an unbalanced design containing a singleton cell.
       # tam#38168.
       if (is.null(covariates) && length(var2_col) == 1 && !with_repeated_measures) {
+        # tam#39339: The factor levels were fixed before the NA / outlier filtering above, so a level can have no
+        # rows left here. nlevels() and tapply() below (var.equal = TRUE) would count it, giving wrong DF and NA SS / MS.
+        # Drop such levels. Two-way ANOVA has the same exposure, but it is not handled here.
+        if (is.factor(df[[var2_col]])) {
+          df[[var2_col]] <- droplevels(df[[var2_col]])
+        }
         count_df <- df %>% group_by(!!!rlang::syms(as.character(var2_col))) %>% summarize(n=n()) %>% ungroup() %>% summarize(min_n=min(n),tot_n=sum(n))
         if (count_df$min_n <= 1) {
           e <- simpleError("Every group needs to have 2 or more rows.")
