@@ -1898,6 +1898,24 @@ test_that("count_if - 1-arg form (condition only)", {
   expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
 })
 
+test_that("count_if works when the value column is re-used as an earlier output name in the same summarize_group() call (tam#37945)", {
+  # Regression test for tam#37945: a value column (hp) is summed into an output
+  # column of the SAME name earlier in the same summarize_group() call, then
+  # used again as count_if()'s value-column argument. dplyr's summarize()
+  # sequentially replaces later references to `hp` with the already-computed
+  # scalar sum, which used to shrink aggregate_if()'s internal tibble to 1 row
+  # while the (unrelated, non-shadowed) condition column still evaluated to the
+  # full per-group length, throwing "exp_internal_condition_col must be size 1,
+  # not N". count_if() never reads the value column's actual values, so this
+  # must keep returning the same counts as the non-colliding case.
+  df <- mtcars %>% exploratory::summarize_group(
+    group_cols = c(cyl = "cyl"), group_funs = c("none"),
+    hp = sum(hp, na.rm = TRUE),
+    custom = exploratory::count_if(hp, mpg > 15, na.rm = F)
+  )
+  expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
+})
+
 test_that("count_if_ratio", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if_ratio(hp, mpg > 15, na.rm = F))
   expect_equal(df %>% dplyr::pull(custom), c(1, 1, 8/14)) # 11/11, 7/7, 8/14
