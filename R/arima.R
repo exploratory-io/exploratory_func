@@ -690,7 +690,7 @@ exp_arima <- function(df, time, valueColumn,
     degree_of_freedom <- length(m$coef) # Definition of modeldf.Arima in forecast package.
     # Logic used inside checkresiduals to automatically determine lag.
     lag <- ifelse(freq > 1, 2 * freq, 10)
-    lag <- min(lag, round(length(residuals)/5))
+    lag <- min(lag, base::round(length(residuals)/5))
     lag <- max(degree_of_freedom + 3, lag)
     residual_test <- feasts::ljung_box(residuals, lag=lag, dof=degree_of_freedom)
     residual_test <- tibble::tibble(statistic=residual_test[[1]], p.value=residual_test[[2]], lag=lag, dof=degree_of_freedom)
@@ -726,7 +726,7 @@ exp_arima <- function(df, time, valueColumn,
       degree_of_freedom <- length(m$coef) # Definition of modeldf.Arima in forecast package.
       # Logic used inside checkresiduals to automatically determine lag.
       lag <- ifelse(freq > 1, 2 * freq, 10)
-      lag <- min(lag, round(length(residuals)/5))
+      lag <- min(lag, base::round(length(residuals)/5))
       lag <- max(degree_of_freedom + 3, lag)
     
       result <- data.frame(data=I(purrr::map(as.list(1:lag), function(i){forecast::checkresiduals(m, lag = i, plot=FALSE)})))

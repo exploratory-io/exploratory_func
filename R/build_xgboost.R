@@ -1512,7 +1512,9 @@ exp_xgboost <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       # model$y <- model.response(df) TODO: what was this??
-      model$df <- df
+      # tam#39340: prediction_training was made on the original training rows (df_train_original) when SMOTE was applied
+      # without keeping the synthetic rows. extract_actual() reads the actual values from model$df, so it has to hold the same rows.
+      model$df <- if (smote_applied && !smote_keep_synthetic) df_train_original else df
       model$formula_terms <- terms(fml)
       # To avoid saving a huge environment when caching with RDS.
       attr(model$formula_terms,".Environment")<-NULL

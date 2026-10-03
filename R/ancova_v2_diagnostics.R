@@ -491,7 +491,7 @@ compute_qq_data <- function(standardized_residual, model = NULL) {
 
   idx <- seq_len(n)
   if (n > ANCOVA_QQ_MAX_POINTS) {
-    idx <- unique(round(seq(1, n, length.out = ANCOVA_QQ_MAX_POINTS)))
+    idx <- unique(base::round(seq(1, n, length.out = ANCOVA_QQ_MAX_POINTS)))
   }
 
   points <- tibble::tibble(theoretical = theoretical[idx], observed = z[idx])

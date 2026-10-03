@@ -1969,7 +1969,9 @@ exp_lightgbm <- function(df,
       model$orig_levels <- orig_levels
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
-      model$df <- df
+      # tam#39340: prediction_training was made on the original training rows (df_train_original) when SMOTE was applied
+      # without keeping the synthetic rows. extract_actual() reads the actual values from model$df, so it has to hold the same rows.
+      model$df <- if (smote_applied && !smote_keep_synthetic) df_train_original else df
       model$formula_terms <- terms(fml)
       attr(model$formula_terms, ".Environment") <- NULL
       model$sampled_nrow <- clean_df_ret$sampled_nrow
