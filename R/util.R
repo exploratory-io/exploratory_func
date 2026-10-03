@@ -2880,6 +2880,12 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
   # condition itself is perfectly valid (tam#37945). Evaluating the condition on its
   # own sidesteps x's (possibly stale) length entirely.
   condition <- rlang::eval_tidy(flatten_conditions_exprs)
+  # Preserve mutate()'s recycling behavior for scalar conditions. Conditions
+  # that refer to group columns already have the full group length and must
+  # remain independent of x, which may be a scalar after summarize() shadowing.
+  if (length(condition) == 1L) {
+    condition <- rep(condition, length(x))
+  }
 
   if (aggregateFunc == "sum") {
     sum(x[condition], na.rm = na.rm)
