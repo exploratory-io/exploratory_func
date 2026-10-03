@@ -216,11 +216,11 @@ test_that("analysis_method and cor_diagnostics tidy types (issue #26623)", {
                        parallel_n_iter = 5)$model[[1]]
 
   method_tbl <- tidy(poly, type = "analysis_method")
-  # #37340: the data counts lead the table ("Number of Variables" / "Row Count" -- keys whose JA the
+  # #37340: the data counts lead the table ("Number of Variables" / "Number of Rows" -- keys whose JA the
   # client already carries), then the method rows, which keep their own order including the
   # Parallel Analysis Method row (tam#37332). Values are asserted BY ITEM NAME so a future reorder
   # does not silently pass with the wrong value.
-  expect_equal(method_tbl$Item, c("Number of Variables", "Row Count", "Rows Removed", "Correlation",
+  expect_equal(method_tbl$Item, c("Number of Variables", "Number of Rows", "Rows Removed", "Correlation",
                                   "Factor Extraction Method", "Rotation", "Parallel Analysis Method"))
   method_value <- function(tbl, item) tbl$Value[[which(tbl$Item == item)]]
   expect_equal(method_value(method_tbl, "Correlation"), "Polychoric Correlation")
@@ -229,7 +229,7 @@ test_that("analysis_method and cor_diagnostics tidy types (issue #26623)", {
   # exp_factanal() was not passed parallel_method, so the default (issue tam#37332) applies.
   expect_equal(method_value(method_tbl, "Parallel Analysis Method"), "Factor Model")
   expect_equal(method_value(method_tbl, "Number of Variables"), "6")
-  expect_equal(method_value(method_tbl, "Row Count"), as.character(nrow(df)))
+  expect_equal(method_value(method_tbl, "Number of Rows"), as.character(nrow(df)))
   # Complete ordinal fixture -- no rows dropped for missing values. (tam#37402)
   expect_equal(method_value(method_tbl, "Rows Removed"), "0 (0.0%)")
   # Hidden columns the client binds the report explanation from.
