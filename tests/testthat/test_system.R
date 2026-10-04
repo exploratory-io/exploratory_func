@@ -1046,10 +1046,10 @@ test_that("test exp_cut edge cases", {
   result_empty <- exploratory:::exp_cut(numeric(0))
   expect_equal(length(result_empty), 0)
 
-  # All same values (all zeros) - returns a single-element factor "(0,0]"
-  # because the all-zeros special case returns one factor level without replication
+  # All same values (all zeros) - returns a factor as long as x, all "(0,0]"
   result_zeros <- exploratory:::exp_cut(c(0, 0, 0), breaks = 5)
-  expect_equal(length(result_zeros), 1)
+  expect_equal(length(result_zeros), 3)
+  expect_true(all(as.character(result_zeros) == "(0,0]"))
 
   # All same non-zero values
   result_same <- exploratory:::exp_cut(c(5, 5, 5), breaks = 5)
