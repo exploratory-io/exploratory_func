@@ -163,6 +163,85 @@ test_that("exp_cut upper/lower range support", {
   expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, upper.range=80, include.outside.range=F)), c("[-Inf,4]",    "(4,29.3]",    "(29.3,54.7]", "(54.7,80]",   "(80, Inf]"))
 })
 
+test_that("exp_cut all zero / all NA fast path", {
+  # All values zero and no NA. One level, and one value per element of x.
+  res <- exploratory::exp_cut(c(0, 0, 0), breaks=5)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 3)
+  expect_equal(levels(res), c("(0,0]"))
+  expect_equal(as.character(res), c("(0,0]", "(0,0]", "(0,0]"))
+
+  # Length 1 all zero input.
+  res <- exploratory::exp_cut(c(0), breaks=5)
+  expect_equal(levels(res), c("(0,0]"))
+  expect_equal(as.character(res), c("(0,0]"))
+
+  # Zero mixed with NA. The NA positions have to stay NA, and the result has
+  # to be as long as x rather than a length 1 factor.
+  res <- exploratory::exp_cut(c(0, 0, NA), breaks=5)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 3)
+  expect_equal(levels(res), c("(0,0]"))
+  expect_equal(as.character(res), c("(0,0]", "(0,0]", NA))
+
+  # NaN is handled the same way as NA.
+  res <- exploratory::exp_cut(c(0, NaN, 0, NA), breaks=5)
+  expect_equal(as.character(res), c("(0,0]", NA, "(0,0]", NA))
+
+  # Inside mutate, a length 1 return value would be recycled to every row and
+  # turn the NA row into '(0,0]'. This is the original symptom.
+  df <- dplyr::mutate(tibble::tibble(x=c(0, 0, NA)), b=exploratory::exp_cut(x, breaks=5))
+  expect_equal(as.character(df$b), c("(0,0]", "(0,0]", NA))
+
+  # An entirely NA vector must not be classified as all zero. all(x == 0,
+  # na.rm = TRUE) is TRUE for it because na.rm drops every value.
+  res <- exploratory::exp_cut(as.numeric(c(NA, NA, NA)), breaks=5)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 3)
+  expect_equal(levels(res), character(0))
+  expect_true(all(is.na(res)))
+
+  # Same through mutate.
+  df <- dplyr::mutate(tibble::tibble(x=as.numeric(c(NA, NA))), b=exploratory::exp_cut(x, breaks=5))
+  expect_true(is.factor(df$b))
+  expect_true(all(is.na(df$b)))
+
+  # Because NA arrives as NA, the caller side can still turn it into an
+  # explicit bucket. This is what makes an '(NA)' legend / facet entry
+  # possible for an all NA or zero-and-NA numeric column.
+  res <- forcats::fct_na_value_to_level(exploratory::exp_cut(as.numeric(c(NA, NA)), breaks=5), level="(NA)")
+  expect_equal(as.character(res), c("(NA)", "(NA)"))
+  res <- forcats::fct_na_value_to_level(exploratory::exp_cut(c(0, NA), breaks=5), level="(NA)")
+  expect_equal(as.character(res), c("(0,0]", "(NA)"))
+})
+
+test_that("exp_cut all zero / all NA fast path with labels", {
+  # labels=FALSE returns the center bucket index, and keeps NA as NA.
+  expect_equal(exploratory::exp_cut(c(0, NA, 0, NA), breaks=5, labels=FALSE), c(3L, NA, 3L, NA))
+  expect_equal(exploratory::exp_cut(c(0, 0), breaks=5, labels=FALSE), c(3L, 3L))
+  expect_equal(exploratory::exp_cut(c(0, 0), breaks=4, labels=FALSE), c(2L, 2L))
+
+  # An entirely NA vector with labels=FALSE returns all NA of the same length,
+  # as an integer vector since that is what cut(labels=FALSE) returns.
+  expect_equal(exploratory::exp_cut(as.numeric(c(NA, NA)), breaks=5, labels=FALSE), c(NA_integer_, NA_integer_))
+
+  # An explicit labels vector keeps the given levels, uses the center label
+  # for the zero values, and keeps NA as NA.
+  lbls <- c("a", "b", "c", "d", "e")
+  res <- exploratory::exp_cut(c(0, NA, 0), breaks=5, labels=lbls)
+  expect_true(is.factor(res))
+  expect_equal(levels(res), lbls)
+  expect_equal(as.character(res), c("c", NA, "c"))
+
+  # An entirely NA vector with an explicit labels vector keeps the levels but
+  # assigns none of them.
+  res <- exploratory::exp_cut(as.numeric(c(NA, NA)), breaks=5, labels=lbls)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 2)
+  expect_equal(levels(res), lbls)
+  expect_true(all(is.na(res)))
+})
+
 test_that("_tam_cut_by_step", {
   # Without range.
 
