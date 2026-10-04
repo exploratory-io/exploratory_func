@@ -219,18 +219,57 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       }
     }
 
-    # create a triangler matrix to melt
-    # use NA_real_ for performance
-    trimat <- matrix(data=NA_real_, nrow=length(names), ncol=length(names))
-    # fill only lower half of the matrix (transpose later to keep the order)
-    trimat[row(trimat)>col(trimat)] <- as.numeric(mat)
-    colnames(trimat) <- names
-    rownames(trimat) <- names
+    # Build the long form directly, without ever allocating an n x n matrix.
+    # The previous implementation created a dense n x n triangular matrix, its
+    # row()/col() index matrices, a logical mask, a transpose, and a data frame
+    # copy inside mat_to_df. That is 6 n x n allocations (about 60 * n^2 bytes),
+    # which is what made this the dominant cost of the pairwise functions.
+    #
+    # Output contract that is reproduced here exactly:
+    #   - one row per cell of the full n x n grid, in row major order, so the
+    #     first name varies slowly and the second name varies fast
+    #   - the value is filled only on the strict upper half (i < j); the rest
+    #     stays NA unless diag is given
+    #   - stats::dist stores the lower half in column major order, which is the
+    #     same sequence as the upper half in row major order, so the values of
+    #     mat are placed in their original order
+    n <- length(names)
+    names_chr <- as.character(names)
+
+    value <- rep(NA_real_, n * n)
+    if (n >= 2L) {
+      # i is the slow index, j the fast one, over the strict upper half
+      i <- rep.int(seq_len(n - 1L), times = (n - 1L):1L)
+      j <- sequence(nvec = (n - 1L):1L, from = 2:n)
+      value[(i - 1L) * n + j] <- as.numeric(mat)
+    }
     if(!is.null(diag)){
       # fill diagonal elements
-      trimat[row(trimat)==col(trimat)] = rep(diag, length(names))
+      value[seq.int(from = 1L, by = n + 1L, length.out = n)] <- rep(diag, length.out = n)
     }
-    mat_to_df(t(trimat), na.rm=na.rm, cnames=cnames, zero.rm = zero.rm)
+
+    var1 <- rep(names_chr, each = n)
+    var2 <- rep.int(names_chr, times = n)
+
+    # mat_to_df() applies na.rm first and zero.rm after it; both keep the row
+    # order, so a single combined mask gives the same result.
+    keep <- NULL
+    if(na.rm){
+      keep <- !is.na(value)
+    }
+    if(zero.rm){
+      not_zero <- is.na(value) | value != 0
+      keep <- if(is.null(keep)) not_zero else keep & not_zero
+    }
+    if(!is.null(keep)){
+      var1 <- var1[keep]
+      var2 <- var2[keep]
+      value <- value[keep]
+    }
+
+    df <- tibble::tibble(Var1 = var1, Var2 = var2, value = value)
+    colnames(df) <- cnames
+    df
   } else {
     # diag can be NULL or FALSE
     if(is.null(diag)){
@@ -247,34 +286,53 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       r_names <- seq(nrow(tmat))
     }
 
-    # remove 0 if zero.rm is TRUE
-    ind_mat <- if(zero.rm){
-      tmat != 0
-    } else {
-      is.na(tmat) | !is.na(tmat) # Just return matrix of same shape with TRUE for all the values.
-    }
-    # preserve NA if na.rm is FALSE
-    if(!na.rm){
-      ind_mat <- is.na(ind_mat) | ind_mat
-    }
-    # get indice of matrix
-    ind <- Matrix::which(ind_mat, arr.ind = TRUE)
+    if(zero.rm){
+      # remove 0. tmat != 0 keeps a sparse matrix sparse, so this stays cheap.
+      ind_mat <- tmat != 0
+      # preserve NA if na.rm is FALSE
+      if(!na.rm){
+        ind_mat <- is.na(ind_mat) | ind_mat
+      }
+      # get indice of matrix
+      ind <- Matrix::which(ind_mat, arr.ind = TRUE)
 
-    # remove duplicated pairs
-    # by comparing indice
-    filtered <- if(diag) {
-      ind[ind[,2] <= ind[,1], ]
-    } else {
-      ind[ind[,2] < ind[,1], ]
-    }
+      # remove duplicated pairs
+      # by comparing indice
+      filtered <- if(diag) {
+        ind[ind[,2] <= ind[,1], ]
+      } else {
+        ind[ind[,2] < ind[,1], ]
+      }
 
-    # when there is only one index pairs,
-    # filtered becomes a vector, not matrix
-    # but matrix is expected later
-    # so should be converted to matrix with
-    # one row
-    if(is.vector(filtered)){
-      filtered <- t(as.matrix(filtered))
+      # when there is only one index pairs,
+      # filtered becomes a vector, not matrix
+      # but matrix is expected later
+      # so should be converted to matrix with
+      # one row
+      if(is.vector(filtered)){
+        filtered <- t(as.matrix(filtered))
+      }
+    } else {
+      # zero.rm FALSE means "keep the zeros too", so every cell is selected and
+      # na.rm cannot remove anything either. The previous implementation spelled
+      # that out as is.na(tmat) | !is.na(tmat), an all TRUE matrix of the same
+      # shape, and then called which() on it, which materialises every one of
+      # the n^2 cells (for a sparse input it even forces the sparse class to
+      # store all of them) and builds an n^2 x 2 index matrix on top.
+      # The selected indices are known in closed form, so build only the half
+      # that survives the row/column comparison below.
+      # Matrix::which(, arr.ind = TRUE) walks in column major order, so the
+      # pairs are ordered by column and then by row, which is reproduced here.
+      n_row <- nrow(tmat)
+      n_col <- ncol(tmat)
+      col_seq <- seq_len(n_col)
+      first_row <- if(diag) col_seq else col_seq + 1L
+      counts <- pmax(n_row - first_row + 1L, 0L)
+      has_any <- counts > 0L
+      filtered <- cbind(
+        row = sequence(nvec = counts[has_any], from = first_row[has_any]),
+        col = rep.int(col_seq[has_any], times = counts[has_any])
+      )
     }
 
     # this creates pairs of row and column indices
