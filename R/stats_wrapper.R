@@ -533,6 +533,66 @@ resolve_correlation_method <- function(mat, method) {
   "pearson"
 }
 
+# Largest number of distinct values a variable may have for the polychoric model of
+# trend_line_cor(). Polychoric maximum likelihood is meant for ordinal scales (e.g. Likert 1-11) and its
+# run time grows steeply with the number of levels: on 5,000 rows it took about 0.2s at 5 levels,
+# 2.3s at 11, 4.3s at 15 and over 20s at 100. Beyond this the result is NA instead of a long wait.
+TREND_LINE_COR_MAX_LEVELS <- 11L
+
+# Make a trend line variable comparable by resolve_correlation_method(): dates become numbers
+# (they are not is.numeric), text becomes a factor (the categorical X of a chart).
+trend_line_cor_as_variable <- function(v) {
+  if (inherits(v, c("Date", "POSIXt"))) {
+    as.numeric(v)
+  } else if (is.character(v)) {
+    factor(v)
+  } else {
+    v
+  }
+}
+
+#' Correlation coefficient of one trend line (x against y) for a chosen model.
+#'
+#' The "auto" model picks the coefficient from the variable types with the same rule as
+#' \code{do_cor}: two numeric variables give Pearson, two ordinal ones polychoric, a mix of
+#' both a mixed (polyserial) coefficient. Pearson and Spearman never touch the polycor package.
+#' Anything that cannot be computed (fewer than 2 complete rows, a constant variable, polycor not
+#' installed, polychoric on a variable with more than TREND_LINE_COR_MAX_LEVELS distinct values)
+#' gives NA instead of an error, so that one group cannot stop the whole chart.
+#'
+#' @param x The predictor. Date and POSIXct are treated as numbers, character as a factor.
+#' @param y The response.
+#' @param method One of "auto", "pearson", "spearman", "polychoric", "mixed".
+#' @return A single number, or NA_real_.
+#' @export
+trend_line_cor <- function(x, y, method = "auto") {
+  tryCatch({
+    mat <- data.frame(x = trend_line_cor_as_variable(x), y = trend_line_cor_as_variable(y))
+    mat <- mat[stats::complete.cases(mat), , drop = FALSE]
+    if (nrow(mat) < 2) {
+      return(NA_real_)
+    }
+    resolved <- resolve_correlation_method(mat, method)
+    if (!resolved %in% c("pearson", "spearman", "polychoric", "mixed")) {
+      return(NA_real_)
+    }
+    if (resolved %in% c("pearson", "spearman")) {
+      return(suppressWarnings(as.numeric(stats::cor(as.numeric(mat$x), as.numeric(mat$y), method = resolved))))
+    }
+    if (!requireNamespace("polycor", quietly = TRUE)) {
+      return(NA_real_)
+    }
+    if (identical(resolved, "polychoric") &&
+        max(length(unique(mat$x)), length(unique(mat$y))) > TREND_LINE_COR_MAX_LEVELS) {
+      return(NA_real_)
+    }
+    het <- suppressWarnings(polycor::hetcor(
+      as_hetcor_data_frame(mat, force_ordinal = identical(resolved, "polychoric")),
+      ML = TRUE, std.err = FALSE, use = "pairwise.complete.obs"))
+    as.numeric(het$correlations[1, 2])
+  }, error = function(e) NA_real_)
+}
+
 as_numeric_correlation_matrix <- function(df) {
   as.matrix(as.data.frame(lapply(df, function(x) {
     if (is.logical(x)) {
