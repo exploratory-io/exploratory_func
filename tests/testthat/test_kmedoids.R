@@ -634,3 +634,17 @@ test_that('profile variable_order keeps the peak cluster primary when a z-score 
   expect_equal(ordered$variable, c('early_peak', 'late_peak'))
   expect_equal(ordered$order, c(1, 2))
 })
+
+test_that('profile carries each cluster\'s row count as cluster_size (tam#39474)', {
+  data <- tibble::tibble(
+    a = c(1, 1.1, 0.9, 1, 1.2, 0.8, 10, 10.1, 9.9, 10),
+    b = c(5, 5.1, 4.9, 5, 5.2, 4.8, 0, 0.1, -0.1, 0)
+  )
+  model <- exploratory:::exp_kmedoids(data, a, b, centers = 2, elbow_method_mode = 'none', seed = 1)$model[[1]]
+  rows <- broom::tidy(model, type = 'profile')
+  expect_true('cluster_size' %in% names(rows))
+  expect_true(is.integer(rows$cluster_size))
+  sizes <- rows %>% dplyr::distinct(cluster, cluster_size) %>% dplyr::arrange(cluster)
+  expect_equal(sizes$cluster_size, as.integer(table(model$clustering)))
+  expect_equal(sum(sizes$cluster_size), nrow(data))
+})

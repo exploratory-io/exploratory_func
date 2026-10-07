@@ -326,7 +326,10 @@
       cluster_median = as.numeric(original_cluster_median),
       cluster_mean = as.numeric(original_cluster_mean),
       overall_median = as.numeric(overall_median),
-      overall_mean = as.numeric(original_overall_mean)
+      overall_mean = as.numeric(original_overall_mean),
+      # tam#39474: the radar tooltip quotes how many rows the cluster holds. The same
+      # value on every variable of the cluster, taken before any top-N narrowing.
+      cluster_size = as.integer(length(index))
     )
   })
   variable_order <- .kmedoids_profile_variable_order(rows)
