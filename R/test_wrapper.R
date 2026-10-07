@@ -2281,6 +2281,11 @@ get_pairwise_contrast_df <- function(x, formula, pairs_adjust) {
 
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95, pairs_adjust="none", levene_test_center="median", shapiro_seed=1, sort_factor_levels=FALSE) {
+  if (type == "covariate_coefficients") {
+    # exp_ancova() with no covariates degrades to a one-way ANOVA, so there is
+    # no covariate to report (tam#39478). Same columns as the ANCOVA V2 type.
+    return(ancova_v2_covariate_coefficients_empty())
+  }
   if (type %in% c("model", "between", "within")) {
     if ("error" %in% class(x)) {
       if (is.null(x$message) || x$message == "") {
