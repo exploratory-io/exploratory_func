@@ -474,8 +474,10 @@ cor_analysis_conditions <- function(mat, requested_method, use) {
   rows_removed <- max(0L, as.integer(total_rows - rows_used))
   removed_pct <- if (total_rows > 0) rows_removed / total_rows * 100 else 0
   tibble::tibble(
+    # tam#38536 follow-up: "Row Count" -> "Number of Rows", consistently with every other
+    # analytics type's analysis_conditions table (see tam docs/plans/design/38536_design.md).
     Metric = c("Number of Variables", "Variable Names", "Excluded Variables",
-               "Row Count", "Rows Removed", "Correlation"),
+               "Number of Rows", "Rows Removed", "Correlation"),
     Value = c(
       as.character(length(variable_names)),
       if (length(variable_names) == 0) "N/A" else paste(variable_names, collapse = ", "),
