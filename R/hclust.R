@@ -298,7 +298,10 @@
       cluster_median = as.numeric(apply(raw, 2L, stats::median)),
       cluster_mean = as.numeric(colMeans(raw)),
       overall_median = as.numeric(apply(original, 2L, stats::median)),
-      overall_mean = as.numeric(colMeans(original))
+      overall_mean = as.numeric(colMeans(original)),
+      # tam#39474: the radar tooltip quotes how many rows the cluster holds. The same
+      # value on every variable of the cluster, taken before any top-N narrowing.
+      cluster_size = as.integer(length(index))
     )
   })
   rows <- rows %>% dplyr::group_by(cluster) %>%

@@ -354,3 +354,24 @@ test_that('distribution carries the same importance_order as the Characteristic 
   expect_equal(distinct_order$importance_order[match(names(expected_order), distinct_order$variable)],
                unname(expected_order))
 })
+
+test_that('radar/profile carries each cluster\'s row count as cluster_size (tam#39474)', {
+  # 6 + 4 rows with a clean split, so the two cluster sizes are known without trusting the tidier.
+  data <- tibble::tibble(
+    a = c(1, 1.1, 0.9, 1, 1.2, 0.8, 10, 10.1, 9.9, 10),
+    b = c(5, 5.1, 4.9, 5, 5.2, 4.8, 0, 0.1, -0.1, 0)
+  )
+  model <- exploratory:::exp_hclust(data, a, b, centers = 2, elbow_method_mode = 'none', seed = 1)$model[[1]]
+  rows <- broom::tidy(model, type = 'radar')
+  expect_true('cluster_size' %in% names(rows))
+  expect_true(is.integer(rows$cluster_size))
+  sizes <- rows %>% dplyr::distinct(cluster, cluster_size) %>% dplyr::arrange(cluster)
+  expected <- as.integer(table(model$clustering))
+  expect_equal(sizes$cluster_size, expected)
+  expect_equal(sum(sizes$cluster_size), nrow(data))
+  # Same value on every variable of a cluster, and it does not depend on the top-N narrowing.
+  narrowed <- exploratory:::exp_hclust(data, a, b, centers = 2, profile_show_all = FALSE, profile_top_n = 1,
+                                       elbow_method_mode = 'none', seed = 1)$model[[1]]
+  narrowed_sizes <- broom::tidy(narrowed, type = 'radar') %>% dplyr::distinct(cluster, cluster_size) %>% dplyr::arrange(cluster)
+  expect_equal(narrowed_sizes$cluster_size, expected[narrowed_sizes$cluster])
+})
