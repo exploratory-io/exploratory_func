@@ -597,12 +597,53 @@ ancova_v2_slope_covariate_tests_table <- function(x) {
   )
 }
 
+#' Covariate coefficients (tam#39478): one row per covariate from the ADDITIVE
+#' (common-slope) model -- the change in the target per 1-unit increase of the
+#' covariate, holding the group and the other covariates fixed.
+#'
+#' Read from `internals$model_additive`, the same fit the ANCOVA table's
+#' covariate rows come from. The covariates are grand-mean centered inside the
+#' fit (`.ancova_xc_<j>`), but centering only moves the intercept: a slope on
+#' the centered covariate IS the slope on the original scale. Rows are mapped
+#' back to the user's covariate names by position (`safe_xc` is built in the
+#' same order as `covariates`), so no internal name can leak.
+#' The interval is t-based (`confint.lm`) at the analysis's `1 - alpha`.
+#' @noRd
+ancova_v2_covariate_coefficients_empty <- function() {
+  tibble::tibble(`Covariate` = character(), `Coefficient` = double(),
+                 `Standard Error` = double(), `Conf Low` = double(),
+                 `Conf High` = double(), `P Value` = double())
+}
+
+#' @noRd
+ancova_v2_covariate_coefficients_table <- function(x) {
+  covariates <- x$covariates
+  model_additive <- x$internals$model_additive
+  safe_xc <- x$internals$safe_xc
+  if (length(covariates) == 0 || is.null(model_additive) || length(safe_xc) == 0) {
+    return(ancova_v2_covariate_coefficients_empty())
+  }
+  conf_level <- x$result$metadata$confidence_level
+  if (is.null(conf_level)) conf_level <- 0.95
+  coefs <- summary(model_additive)$coefficients
+  ci <- stats::confint(model_additive, parm = safe_xc, level = conf_level)
+  tibble::tibble(
+    `Covariate` = covariates,
+    `Coefficient` = unname(coefs[safe_xc, "Estimate"]),
+    `Standard Error` = unname(coefs[safe_xc, "Std. Error"]),
+    `Conf Low` = unname(ci[safe_xc, 1]),
+    `Conf High` = unname(ci[safe_xc, 2]),
+    `P Value` = unname(coefs[safe_xc, "Pr(>|t|)"])
+  )
+}
+
 #' Tidy an ANCOVA V2 model for the Analytics View.
 #'
 #' Supported types: "model" (ANCOVA table), "emmeans" (adjusted + unadjusted
 #' means), "pairs", "prob_dist", "levene", "shapiro", and "data" (the analysis
 #' rows), plus the Phase 2 diagnostics (tam#38389): "slope_homogeneity",
-#' "slope_covariate_tests", "relationship", "residual_fitted" and "qq". Any
+#' "slope_covariate_tests", "relationship", "residual_fitted" and "qq", and
+#' "covariate_coefficients" (tam#39478). Any
 #' unrecognized type returns the data, matching tidy.anova_exploratory()'s own
 #' catch-all.
 #'
@@ -628,6 +669,9 @@ tidy.ancova_v2_exploratory <- function(x, type = "model", conf_level = 0.95,
     message <- if (is.null(x$message) || x$message == "") as.character(x) else x$message
     if (type %in% c("model", "between", "within")) {
       return(tibble::tibble(Note = message))
+    }
+    if (type == "covariate_coefficients") {
+      return(ancova_v2_covariate_coefficients_empty())
     }
     return(tibble::tibble())
   }
@@ -658,6 +702,9 @@ tidy.ancova_v2_exploratory <- function(x, type = "model", conf_level = 0.95,
   }
   else if (type == "relationship") {
     ancova_v2_relationship_table(x, covariate)
+  }
+  else if (type == "covariate_coefficients") {
+    ancova_v2_covariate_coefficients_table(x)
   }
   else if (type == "residual_fitted") {
     ancova_v2_residual_fitted_table(x)

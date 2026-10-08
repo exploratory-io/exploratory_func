@@ -1074,3 +1074,54 @@ test_that("tidy.cor_exploratory errors on an unsupported type instead of returni
   expect_error(model_df %>% tidy_rowwise(model, type = "no_such_type"),
                "Unsupported tidy type for a correlation model")
 })
+
+test_that("trend_line_cor matches cor() bit for bit for pearson and auto on numbers", {
+  x <- 1:6
+  y <- c(1, 2, 3, 4, 5, 100)
+  expect_identical(trend_line_cor(x, y, "pearson"), cor(as.numeric(x), as.numeric(y)))
+  expect_identical(trend_line_cor(x, y, "auto"), cor(as.numeric(x), as.numeric(y)))
+  expect_equal(round(trend_line_cor(x, y, "pearson"), 6), 0.681215)
+  expect_equal(trend_line_cor(x, y, "spearman"), 1)
+})
+
+test_that("trend_line_cor polychoric and mixed agree with do_cor", {
+  skip_if_not_installed("polycor")
+  set.seed(1)
+  z <- rnorm(300)
+  x <- factor(cut(z + rnorm(300), 5, labels = FALSE))
+  y <- factor(cut(z + rnorm(300), 5, labels = FALSE))
+  df <- data.frame(a = x, b = y)
+  oracle <- do_cor(df, a, b, method = "polychoric")
+  expect_equal(trend_line_cor(x, y, "polychoric"), oracle$correlation[1], tolerance = 1e-6)
+  expect_equal(trend_line_cor(x, y, "auto"), oracle$correlation[1], tolerance = 1e-6)
+
+  num <- z + rnorm(300)
+  oracle_mixed <- do_cor(data.frame(a = x, b = num), a, b, method = "mixed")
+  expect_equal(trend_line_cor(x, num, "mixed"), oracle_mixed$correlation[1], tolerance = 1e-6)
+  # auto on a categorical X and a numeric Y is the mixed coefficient
+  expect_equal(trend_line_cor(x, num, "auto"), trend_line_cor(x, num, "mixed"))
+})
+
+test_that("trend_line_cor treats a Date or POSIXct X as numbers without warnings", {
+  d <- as.Date("2024-01-01") + 0:9
+  y <- c(3, 1, 4, 1, 5, 9, 2, 6, 5, 3)
+  expect_silent(r <- trend_line_cor(d, y, "auto"))
+  expect_identical(r, trend_line_cor(as.numeric(d), y, "pearson"))
+  expect_silent(trend_line_cor(as.POSIXct(d), y, "spearman"))
+})
+
+test_that("trend_line_cor returns NA instead of failing", {
+  expect_true(is.na(trend_line_cor(1, 2, "auto")))
+  expect_true(is.na(trend_line_cor(c(1, 2, 3), c(5, 5, 5), "pearson")))
+  expect_true(is.na(trend_line_cor(c(NA, 1, NA), c(1, NA, 2), "auto")))
+  expect_true(is.na(trend_line_cor(1:5, 1:5, "no_such_model")))
+})
+
+test_that("trend_line_cor polychoric is NA above the level cap and does not need polycor for pearson", {
+  skip_if_not_installed("polycor")
+  n <- TREND_LINE_COR_MAX_LEVELS + 1L
+  x <- factor(rep(seq_len(n), 3))
+  y <- factor(rep(seq_len(n), 3)[c(2:(3 * n), 1)])
+  expect_true(is.na(trend_line_cor(x, y, "polychoric")))
+  expect_false(is.na(trend_line_cor(as.numeric(x), as.numeric(y), "pearson")))
+})
