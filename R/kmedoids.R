@@ -634,15 +634,32 @@
     )
   })
   result <- dplyr::bind_rows(result, vectors)
-  eigenvalues <- coordinates$eig[coordinates$eig > 0]
-  representation_rate <- if (length(eigenvalues) == 0) c(0, 0) else {
-    cumsum(eigenvalues)[seq_len(min(2, length(eigenvalues)))] / sum(eigenvalues)
-  }
-  x$representation_rate <- c(representation_rate, rep(0, 2 - length(representation_rate)))
-  attr(result, 'representation_rate') <- x$representation_rate
+  rates <- .pcoa_representation_rates(coordinates$eig)
+  x$representation_rate <- rates$per_axis
+  attr(result, 'representation_rate') <- rates$per_axis
+  attr(result, 'cumulative_representation_rate') <- rates$cumulative
   attr(result, 'map_sample_size') <- length(map_indices)
   attr(result, 'map_sampled') <- length(map_indices) < x$valid_nrow
   result
+}
+
+# Representation rates of the first two PCoA axes, shared by exp_kmedoids() and exp_hclust() (tam#39564).
+# Both are divided by the sum of the POSITIVE eigenvalues, so they stay on the 0..1 scale even for a
+# non-Euclidean distance whose spectrum has negative eigenvalues. Returns two length-2 numeric vectors:
+#   per_axis   -- each axis' OWN share, c(e1, e2) / sum(e). Sums to <= 1. Same convention as pct_variance in do_prcomp.
+#   cumulative -- c(share of axis 1, share of axes 1 + 2), cmdscale's own goodness-of-fit. Same as cum_pct_variance.
+# A missing second dimension is padded with 0 in BOTH vectors (cumulative = c(e1, 0), not c(e1, e1)); tam reads a
+# second element of exactly 0 as "no second dimension".
+.pcoa_representation_rates <- function(eig) {
+  eig <- eig[is.finite(eig) & eig > 0]
+  if (length(eig) == 0L) {
+    return(list(per_axis = c(0, 0), cumulative = c(0, 0)))
+  }
+  n <- min(2L, length(eig))
+  per_axis <- eig[seq_len(n)] / sum(eig)
+  cumulative <- cumsum(eig)[seq_len(n)] / sum(eig)
+  pad <- rep(0, 2L - n)
+  list(per_axis = c(per_axis, pad), cumulative = c(cumulative, pad))
 }
 
 .kmedoids_medoid_details <- function(x) {

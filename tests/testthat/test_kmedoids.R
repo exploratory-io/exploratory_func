@@ -497,7 +497,12 @@ test_that('the cached PCoA map keeps its full contract after replacing cmdscale(
   expect_length(rate, 2)
   expect_true(all(is.finite(rate)))
   expect_true(all(rate >= 0 & rate <= 1))
-  expect_gte(rate[2], rate[1])
+  # representation_rate is each axis' OWN share; the cumulative pair is a separate attribute (tam#39564).
+  cumulative <- attr(map, 'cumulative_representation_rate')
+  expect_length(cumulative, 2)
+  expect_lte(sum(rate), 1 + 1e-9)
+  expect_equal(cumulative, c(rate[1], rate[1] + rate[2]))
+  expect_gte(cumulative[2], cumulative[1])
 
   # Same seed -> byte-identical cached map (reproducibility of the randomized sketch).
   result2 <- df %>% exploratory:::exp_kmedoids(

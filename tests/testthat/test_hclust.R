@@ -93,6 +93,25 @@ test_that('gathered data is observation-variable long data and augment works by 
   expect_true('.cluster' %in% colnames(augmented))
 })
 
+test_that('map exposes per-axis representation_rate and the cumulative pair separately (tam#39564)', {
+  for (distance in c('euclidean', 'manhattan')) {
+    result <- mtcars %>% exploratory:::exp_hclust(
+      mpg, disp, hp, wt, centers = 3, distance = distance, linkage = 'average', elbow_method_mode = 'none', seed = 1
+    )
+    map <- broom::tidy(result$model[[1]], type = 'map')
+    rate <- attr(map, 'representation_rate')
+    cumulative <- attr(map, 'cumulative_representation_rate')
+
+    expect_length(rate, 2)
+    expect_length(cumulative, 2)
+    expect_true(all(is.finite(rate)))
+    expect_true(all(rate >= 0 & rate <= 1))
+    expect_lte(sum(rate), 1 + 1e-9)
+    expect_equal(cumulative, c(rate[1], rate[1] + rate[2]))
+    expect_gte(cumulative[2], cumulative[1])
+  }
+})
+
 test_that('invalid numeric inputs fail with interpretable messages', {
   expect_error(
     exploratory:::exp_hclust(iris, Species, centers = 2),

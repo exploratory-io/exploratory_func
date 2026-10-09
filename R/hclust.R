@@ -398,12 +398,9 @@
     )
   })
   result <- dplyr::bind_rows(result, vectors)
-  eig <- pcoa$eig[pcoa$eig > 0]
-  rate <- if (length(eig) == 0L) c(0, 0) else {
-    values <- cumsum(eig) / sum(eig)
-    c(values[seq_len(min(2L, length(values)))], rep(0, 2L))
-  }
-  attr(result, 'representation_rate') <- rate[seq_len(2L)]
+  rates <- .pcoa_representation_rates(pcoa$eig)
+  attr(result, 'representation_rate') <- rates$per_axis
+  attr(result, 'cumulative_representation_rate') <- rates$cumulative
   attr(result, 'map_sample_size') <- length(map_indices)
   attr(result, 'map_sampled') <- length(map_indices) < n
   result
