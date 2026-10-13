@@ -704,9 +704,12 @@ exp_cronbach_alpha <- function(df, ..., correlation_method = "auto", check_keys 
     #     Factor Analysis and PCA tables, which is exactly the wanted wording.
     #   * "Variable Names", "Correlation" and "Reliability Metric" are new. Correlation's reason
     #     used to live in the separate correlation_method table, which the report drops.
+    #   * tam#38536 follow-up: "Row Count" -> "Number of Rows", consistently with every other
+    #     analytics type's analysis_conditions/reliability table. "Rows Removed" is untouched
+    #     here (that rename was scoped to Prediction Models only).
     summary_table <- tibble::tibble(
       Metric = c(coefficient_name, "Standardized Alpha", "95% CI",
-                 "Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+                 "Number of Variables", "Variable Names", "Number of Rows", "Rows Removed",
                  "Correlation", "Reliability Metric",
                  "Total Missing Cells", "Average Inter-item Correlation", "Flagged Item"),
       Value = c(as.character(round(display_alpha, 3)),

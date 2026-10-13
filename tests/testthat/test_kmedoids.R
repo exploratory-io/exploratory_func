@@ -139,12 +139,12 @@ test_that('analysis_conditions returns the shared Metric/Value shape', {
   # exact string match, so the wording is part of the contract.
   expect_equal(colnames(conditions), c('Metric', 'Value'))
   expect_equal(conditions$Metric,
-    c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed',
+    c('Number of Variables', 'Variable Names', 'Number of Rows', 'Rows Removed',
       'Number of Clusters'))
   expect_true(is.character(conditions$Value))
   expect_equal(conditions$Value[[1]], '3')
   expect_equal(conditions$Value[[2]], 'x, y, z')
-  # Row Count is the rows actually clustered, Rows Removed the ones dropped for the NA.
+  # Number of Rows is the rows actually clustered, Rows Removed the ones dropped for the NA.
   expect_equal(conditions$Value[[3]], '6')
   expect_equal(conditions$Value[[4]], '1')
   expect_equal(conditions$Value[[5]], '2')

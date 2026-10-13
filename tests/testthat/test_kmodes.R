@@ -291,7 +291,7 @@ test_that("analysis_conditions reports variable count, names, row count, rows re
                          elbow_method_mode = "none")
   res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
   expect_equal(colnames(res), c("Metric", "Value"))
-  expect_equal(res$Metric, c("Number of Variables", "Variable Names", "Row Count",
+  expect_equal(res$Metric, c("Number of Variables", "Variable Names", "Number of Rows",
                             "Rows Removed", "Number of Clusters"))
   expect_equal(res$Value[[1]], "3")
   expect_true(grepl("利用目的", res$Value[[2]], fixed = TRUE))

@@ -84,7 +84,7 @@ test_that('report tables have the documented columns and consistent values', {
   expect_equal(sum(summary$n_variables), 7L)
 
   conditions <- broom::tidy(model, type = 'analysis_conditions')
-  expect_equal(conditions$Metric, c('Number of Variables', 'Variable Names', 'Row Count',
+  expect_equal(conditions$Metric, c('Number of Variables', 'Variable Names', 'Number of Rows',
                                     'Rows Used for Correlation (Min)',
                                     'Non-finite Values (Treated as Missing)',
                                     'Number of Clusters', 'Correlation Method', 'Distance',
@@ -143,7 +143,7 @@ test_that('pairwise missing values, dropped and constant variables, and bounds',
   # y's Inf is counted and treated as missing; every pair then shares 4 of the 6 rows.
   expect_equal(conditions$Value[conditions$Metric == 'Non-finite Values (Treated as Missing)'], '1')
   expect_equal(conditions$Value[conditions$Metric == 'Rows Used for Correlation (Min)'], '4')
-  expect_equal(conditions$Value[conditions$Metric == 'Row Count'], '6')
+  expect_equal(conditions$Value[conditions$Metric == 'Number of Rows'], '6')
 
   expect_error(exploratory:::exp_hclust_variable(tibble::tibble(a = 1:5, b = 1), a, b, centers = 2),
                'b has the same value in every row')

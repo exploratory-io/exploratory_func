@@ -956,8 +956,14 @@ prettify_polr_factor_terms <- function(term, xlevels) {
 #' polr_report_basic_info() (above) already reads for its own WIDE table's "Category Order"
 #' column -- lm/glm has no equivalent since neither target is an ordered factor.
 #'
-#' Rows Removed (削除された行数) comes from x$excluded_nrow, recorded per group in build_polr()
+#' Rows Excluded (除外された行数) comes from x$excluded_nrow, recorded per group in build_polr()
 #' before its NA target/predictor filter. Models saved before this field existed render "N/A".
+#' tam#38536 follow-up: label renames -- "Row Count" -> "Number of Rows" (every
+#' analysis_conditions-style table, per the issue), "Rows Removed" -> "Rows Excluded" and
+#' "Validation Data" -> "Evaluation" (Prediction Models only, to match established sibling
+#' terms already used elsewhere -- see tam's docs/plans/design/38536_design.md "Why this
+#' diverged"). Also adds a "# of Explanatory Variables" count row before "Explanatory
+#' Variables".
 #' @param x A model built by build_polr(), with class clm_exploratory_0.
 #' @param test_mode Whether Test Mode was on for this run.
 #' @param test_rate Ratio for Test Data (0-1), only meaningful when test_mode is TRUE.
@@ -982,7 +988,10 @@ prettify_polr_factor_terms <- function(term, xlevels) {
     values <- c(values, paste(lvls, collapse = " < "))
   }
 
-  metrics <- c(metrics, "Explanatory Variables", "Row Count")
+  metrics <- c(metrics, "# of Explanatory Variables")
+  values <- c(values, as.character(length(predictor_orig)))
+
+  metrics <- c(metrics, "Explanatory Variables", "Number of Rows")
   values <- c(values, predictor_display, as.character(nrow(x$model)))
 
   excluded_display <- if (length(x$excluded_nrow) == 1L && !is.na(x$excluded_nrow)) {
@@ -990,7 +999,7 @@ prettify_polr_factor_terms <- function(term, xlevels) {
   } else {
     "N/A"
   }
-  metrics <- c(metrics, "Rows Removed")
+  metrics <- c(metrics, "Rows Excluded")
   values <- c(values, excluded_display)
 
   test_rate_num <- suppressWarnings(as.numeric(test_rate))
@@ -999,7 +1008,7 @@ prettify_polr_factor_terms <- function(term, xlevels) {
   } else {
     paste0("Test (", round(test_rate_num * 100), "%)")
   }
-  metrics <- c(metrics, "Validation Data")
+  metrics <- c(metrics, "Evaluation")
   values <- c(values, validation_display)
 
   tibble::tibble(Metric = metrics, Value = values)
