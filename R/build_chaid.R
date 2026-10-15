@@ -38,7 +38,7 @@
 #' @param pd_with_bin_means Whether to overlay binned actual means on PD charts.
 #' @param seed Random seed for sampling / splitting reproducibility.
 #' @param test_rate Fraction of rows held out as test data.
-#' @param test_split_type `random` or `ordered`.
+#' @param test_split_type `random`, `ordered`, or `stratified` (stratified by the target).
 #' @return A rowwise model data frame with `model`, `.test_index`, `source.data`.
 #' @export
 exp_chaid <- function(df,
@@ -77,7 +77,7 @@ exp_chaid <- function(df,
   } else if (test_rate == 1) {
     stop("test_rate must be less than 1")
   }
-  test_split_type <- match.arg(test_split_type, c("random", "ordered"))
+  test_split_type <- match.arg(test_split_type, TEST_SPLIT_TYPES)
 
   # NSE column selection, mirroring exp_rpart.
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
@@ -154,7 +154,8 @@ exp_chaid <- function(df,
       # Split training and test data.
       source_data <- df
       test_index <- sample_df_index(source_data, rate = test_rate,
-                                    ordered = (test_split_type == "ordered"))
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
 
       # tam #38166 spec section 36: a numeric target with a single distinct

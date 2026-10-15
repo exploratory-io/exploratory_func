@@ -1166,8 +1166,10 @@ exp_xgboost <- function(df,
                         # boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                         seed = 1,
                         test_rate = 0.0,
-                        test_split_type = "random" # "random" or "ordered"
+                        test_split_type = "random" # "random", "ordered", or "stratified"
                         ){
+  validate_test_split_type(test_split_type)
+  validate_test_split_type(test_split_type)
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1){
@@ -1288,7 +1290,9 @@ exp_xgboost <- function(df,
       # Split training and test data BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)

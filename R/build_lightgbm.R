@@ -1612,6 +1612,7 @@ exp_lightgbm <- function(df,
                          seed = 1,
                          test_rate = 0.0,
                          test_split_type = "random") {
+  validate_test_split_type(test_split_type)
   loadNamespace("lightgbm")
 
   if (test_rate < 0 | 1 < test_rate) {
@@ -1719,7 +1720,9 @@ exp_lightgbm <- function(df,
       # Split data into train/test BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
       
       # Extract test data if test_rate > 0 (needed for smote_keep_synthetic logic)
