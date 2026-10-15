@@ -746,7 +746,13 @@ stratum_ids_for_sampling <- function(y) {
 #' Pick test row indices so that every stratum contributes in proportion to its size.
 #'
 #' The total test size is floor(n * rate), the same as the plain random split. It is divided among
-#' strata by the largest remainder method on n_k * rate. Every stratum keeps at least one training row.
+#' strata by the largest remainder method on n_k * rate. While rows are being divided, every stratum
+#' keeps at least one training row (its allocation is capped at n_k - 1). When many strata are
+#' singletons the capped allocation falls short of floor(n * rate); the shortfall is then filled by
+#' drawing uniformly at random from the rows not yet selected, lifting the cap, so a singleton class
+#' enters the test set only when that is needed to reach the size. With no shortfall no extra random
+#' number is drawn. The size is below floor(n * rate) only if reaching it would empty the training set
+#' (rate >= 1).
 #' @param strata Integer stratum id per row (see stratum_ids_for_sampling).
 #' @param rate Fraction of rows to put in the test set.
 #' @return Sorted integer vector of test row indices.
@@ -786,6 +792,15 @@ sample_stratified_index <- function(strata, rate) {
     # sample.int, not sample(idx, ...): sample() treats a length-1 idx as 1:idx.
     idx[sample.int(length(idx), alloc[k])]
   }))
+  # The n_k - 1 cap can leave the total short (e.g. many singleton classes). Fill the shortfall with a
+  # uniform draw from the unselected rows, lifting the cap. No draw happens when there is no shortfall.
+  shortfall <- total - length(picked)
+  if (shortfall > 0) {
+    remaining <- setdiff(seq_len(n), picked)
+    shortfall <- min(shortfall, length(remaining))
+    # sample.int, not sample(remaining, ...): sample() treats a length-1 vector as 1:remaining.
+    picked <- c(picked, remaining[sample.int(length(remaining), shortfall)])
+  }
   sort(as.integer(picked))
 }
 
@@ -812,7 +827,10 @@ validate_test_split_type <- function(test_split_type) {
 #' @param stratify_by Optional vector with one value per row of df. When given, the random sample is
 #'   stratified on it so that each value (or, for numeric/date, each quantile bin) keeps about the
 #'   same share in the sample as in df. NULL (default) gives the plain random sample, with exactly
-#'   the same draws as before this argument existed. Ignored when ordered is TRUE.
+#'   the same draws as before this argument existed. Ignored when ordered is TRUE. The sample size is
+#'   always floor(nrow(df) * rate), as for the plain random sample: each stratum is first allocated a
+#'   proportional share (leaving at least one training row per stratum), and any shortfall caused by
+#'   many single-row strata is filled with random rows from the rest.
 #' @export
 sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE, stratify_by = NULL) {
   # Return NULL (empty vector) for rate 0 case. If we go on, ordered case would return the index for the last row.

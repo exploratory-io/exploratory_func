@@ -1885,6 +1885,45 @@ test_that("sample_df_index stratified keeps a single-row class in training", {
   }
 })
 
+test_that("sample_df_index stratified keeps the test size at floor(n * rate) when many classes are singletons", {
+  # 100 unique labels: every stratum is capped at 0, yet the test size must still be 30 like the random split.
+  y_unique <- sprintf("id%03d", 1:100)
+  for (seed in 1:5) {
+    test_index <- sample_df_index(data.frame(v = 1:100), 0.3, seed = seed, stratify_by = y_unique)
+    expect_equal(length(test_index), 30)
+    expect_equal(length(unique(test_index)), 30)
+    expect_true(all(test_index >= 1 & test_index <= 100))
+    expect_false(is.unsorted(test_index))
+    # Same seed, same result.
+    expect_identical(test_index, sample_df_index(data.frame(v = 1:100), 0.3, seed = seed, stratify_by = y_unique))
+  }
+  # 90 singletons plus one class of 10: the capped allocation alone gives 9, the target is 30.
+  y_mixed <- c(sprintf("s%02d", 1:90), rep("big", 10))
+  for (seed in 1:5) {
+    test_index <- sample_df_index(data.frame(v = 1:100), 0.3, seed = seed, stratify_by = y_mixed)
+    expect_equal(length(test_index), 30)
+    expect_equal(length(unique(test_index)), 30)
+    # The proportional part is still there: the big class contributes its 3 rows.
+    expect_gte(sum(test_index > 90), 3)
+    expect_lt(length(test_index), 100)
+  }
+  # 5 all-distinct rows at rate 0.3: floor(1.5) = 1 row ... and at rate 0.4: 2 rows.
+  expect_equal(length(sample_df_index(data.frame(v = 1:5), 0.4, seed = 1, stratify_by = letters[1:5])), 2)
+  expect_equal(length(sample_df_index(data.frame(v = 1:5), 0.3, seed = 1, stratify_by = letters[1:5])), 1)
+})
+
+test_that("sample_df_index stratified reaches floor(n * rate) at a very high rate", {
+  y <- rep(c("a", "b"), each = 50)
+  for (seed in 1:5) {
+    test_index <- sample_df_index(data.frame(v = 1:100), 0.99, seed = seed, stratify_by = y)
+    expect_equal(length(test_index), 99)
+    expect_equal(length(unique(test_index)), 99)
+  }
+  y2 <- sprintf("id%03d", 1:100)
+  test_index2 <- sample_df_index(data.frame(v = 1:100), 0.99, seed = 1, stratify_by = y2)
+  expect_equal(length(test_index2), 99)
+})
+
 test_that("sample_df_index stratified falls back to random for a constant target", {
   df <- data.frame(v = 1:100)
   test_index <- sample_df_index(df, 0.3, seed = 1, stratify_by = rep("a", 100))
