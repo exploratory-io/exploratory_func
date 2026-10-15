@@ -752,12 +752,13 @@ stratum_ids_for_sampling <- function(y) {
 #' The total test size is floor(n * rate), the same as the plain random split. Strata with a single row
 #' cannot be split, so when there are two or more of them they are pooled into one combined stratum
 #' first; the pool then takes its proportional share like any other stratum (a lone single-row stratum
-#' is left as it is). The total is divided among strata by the largest remainder method on n_k * rate.
+#' is left as it is). The total is divided among strata by the largest remainder method on n_k * rate;
+#' strata with equal remainders are ranked by a random priority drawn from the seed, so which of them gets
+#' the extra row does not depend on the order of the rows (as in scikit-learn's stratified split).
 #' While rows are being divided, every stratum keeps at least one training row (its allocation is capped
 #' at n_k - 1). If the capped allocation still falls short of floor(n * rate) (only when a lone
 #' single-row stratum is left, or at a very high rate), the shortfall is filled by drawing uniformly at
-#' random from the rows not yet selected, lifting the cap. With no pooling and no shortfall no extra
-#' random number is drawn. The size is below floor(n * rate) only if reaching it would empty the
+#' random from the rows not yet selected, lifting the cap. The size is below floor(n * rate) only if reaching it would empty the
 #' training set (rate >= 1). All per-stratum work is done in one pass over the rows, so the cost is
 #' linear in the number of rows plus strata.
 #' @param strata Integer stratum id per row (see stratum_ids_for_sampling).
@@ -779,12 +780,15 @@ sample_stratified_index <- function(strata, rate) {
   # Cap at n_k - 1 so a stratum is never entirely moved to the test set.
   cap <- group_sizes - 1
   alloc <- pmin(floor(exact), cap)
-  remainder <- exact - floor(exact)
+  # Rounded so that remainders equal in exact arithmetic (0.6 vs 3 * 0.2) tie despite floating point noise.
+  remainder <- round(exact - floor(exact), 9)
+  # Ties on the remainder are broken uniformly at random (a random priority per stratum), never by class order.
+  tie_break <- sample.int(length(group_sizes))
 
   # Floating point can make the sum of per-stratum floors exceed floor(n * rate) by one. Trim it.
   while (sum(alloc) > total) {
     trimmable <- which(alloc > 0)
-    drop_at <- trimmable[order(remainder[trimmable], trimmable)][1]
+    drop_at <- trimmable[order(remainder[trimmable], tie_break[trimmable])][1]
     alloc[drop_at] <- alloc[drop_at] - 1
   }
 
@@ -793,7 +797,7 @@ sample_stratified_index <- function(strata, rate) {
   while (left > 0) {
     with_room <- which(alloc < cap)
     if (length(with_room) == 0) break
-    by_remainder <- with_room[order(-remainder[with_room], with_room)]
+    by_remainder <- with_room[order(-remainder[with_room], tie_break[with_room])]
     chosen <- by_remainder[seq_len(min(left, length(by_remainder)))]
     alloc[chosen] <- alloc[chosen] + 1
     left <- left - length(chosen)
