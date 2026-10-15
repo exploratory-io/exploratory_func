@@ -1996,6 +1996,45 @@ test_that("sample_df_index stratified falls back to random for a constant target
   expect_equal(length(test_index_num), 30)
 })
 
+test_that("sample_df_index stratified breaks remainder ties at random, not by class order", {
+  # 50 classes x 2 rows at rate 0.3: every class has the same remainder 0.6, and exactly 10 classes get no test row.
+  y <- rep(paste0("c", 1:50), each = 2)
+  df <- data.frame(v = seq_along(y))
+  n_seeds <- 200
+  hits <- setNames(numeric(50), paste0("c", 1:50))
+  for (seed in seq_len(n_seeds)) {
+    ti <- sample_df_index(df, 0.3, seed = seed, stratify_by = y)
+    expect_equal(length(ti), 30)
+    hits <- hits + as.numeric(table(factor(y[ti], levels = names(hits))))
+  }
+  # Share of each class's rows that landed in the test set: expected 0.3 for every class, decided by the
+  # seed and not by the row order (before the fix c1..c30 were always 0.5 and c31..c50 always 0).
+  freq <- hits / n_seeds / 2
+  expect_true(all(freq > 0.15 & freq < 0.45))
+})
+
+test_that("sample_df_index stratified gives the extra test row to each tied class on some seeds", {
+  y <- rep(c("A", "B", "C"), each = 5)
+  df <- data.frame(v = seq_along(y))
+  extra <- setNames(numeric(3), c("A", "B", "C"))
+  for (seed in 1:100) {
+    ti <- sample_df_index(df, 0.5, seed = seed, stratify_by = y)
+    expect_equal(length(ti), 7)
+    counts <- table(factor(y[ti], levels = c("A", "B", "C")))
+    expect_true(all(counts >= 2 & counts <= 3))
+    extra <- extra + (counts == 3)
+  }
+  expect_true(all(extra > 0))
+  expect_true(all(extra < 100))
+})
+
+test_that("sample_df_index stratified tie-breaking is deterministic under a seed", {
+  y <- rep(paste0("c", 1:50), each = 2)
+  df <- data.frame(v = seq_along(y))
+  expect_identical(sample_df_index(df, 0.3, seed = 7, stratify_by = y), sample_df_index(df, 0.3, seed = 7, stratify_by = y))
+  expect_false(identical(sample_df_index(df, 0.3, seed = 7, stratify_by = y), sample_df_index(df, 0.3, seed = 8, stratify_by = y)))
+})
+
 test_that("validate_test_split_type accepts the three split types and rejects anything else", {
   for (type in c("random", "ordered", "stratified")) {
     expect_silent(validate_test_split_type(type))
