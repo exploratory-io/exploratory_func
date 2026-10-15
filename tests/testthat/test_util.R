@@ -1903,13 +1903,75 @@ test_that("sample_df_index stratified keeps the test size at floor(n * rate) whe
     test_index <- sample_df_index(data.frame(v = 1:100), 0.3, seed = seed, stratify_by = y_mixed)
     expect_equal(length(test_index), 30)
     expect_equal(length(unique(test_index)), 30)
-    # The proportional part is still there: the big class contributes its 3 rows.
-    expect_gte(sum(test_index > 90), 3)
+    # Singletons are pooled, so the big class gets exactly its proportional 3 rows (not 9).
+    expect_equal(sum(test_index > 90), 3)
     expect_lt(length(test_index), 100)
   }
   # 5 all-distinct rows at rate 0.3: floor(1.5) = 1 row ... and at rate 0.4: 2 rows.
   expect_equal(length(sample_df_index(data.frame(v = 1:5), 0.4, seed = 1, stratify_by = letters[1:5])), 2)
   expect_equal(length(sample_df_index(data.frame(v = 1:5), 0.3, seed = 1, stratify_by = letters[1:5])), 1)
+})
+
+test_that("sample_df_index stratified pools single-row classes so the larger classes stay proportional", {
+  # 800/100/50 plus 50 singleton classes at 0.4: 320/40/20 from the big classes and 20 from the pool.
+  y1 <- c(rep("A", 800), rep("B", 100), rep("C", 50), sprintf("s%02d", 1:50))
+  # 60/20 plus 20 singleton classes at 0.5: 30/10 and 10 from the pool.
+  y2 <- c(rep("A", 60), rep("B", 20), sprintf("s%02d", 1:20))
+  for (seed in 1:10) {
+    ti <- sample_df_index(data.frame(v = seq_along(y1)), 0.4, seed = seed, stratify_by = y1)
+    expect_equal(length(ti), 400)
+    expect_equal(length(unique(ti)), 400)
+    expect_equal(as.numeric(table(factor(y1[ti], levels = c("A", "B", "C")))), c(320, 40, 20))
+    expect_equal(sum(startsWith(y1[ti], "s")), 20)
+
+    ti2 <- sample_df_index(data.frame(v = seq_along(y2)), 0.5, seed = seed, stratify_by = y2)
+    expect_equal(length(ti2), 50)
+    expect_equal(as.numeric(table(factor(y2[ti2], levels = c("A", "B")))), c(30, 10))
+    expect_equal(sum(startsWith(y2[ti2], "s")), 10)
+  }
+})
+
+test_that("sample_df_index stratified allocation stays fast with hundreds of thousands of classes", {
+  # Every label unique: all rows pool into one stratum, so this is a plain random sample of floor(n * rate).
+  n <- 200000
+  elapsed <- system.time(
+    ti <- sample_df_index(data.frame(v = seq_len(n)), 0.3, seed = 1, stratify_by = sprintf("id%07d", seq_len(n)))
+  )[["elapsed"]]
+  expect_lt(elapsed, 5)
+  expect_equal(length(ti), floor(n * 0.3))
+  expect_equal(length(unique(ti)), floor(n * 0.3))
+  # 50k classes of 2 rows each on 100k rows.
+  y <- rep(sprintf("c%05d", seq_len(50000)), 2)
+  elapsed2 <- system.time(
+    ti2 <- sample_df_index(data.frame(v = seq_along(y)), 0.3, seed = 1, stratify_by = y)
+  )[["elapsed"]]
+  expect_lt(elapsed2, 5)
+  expect_equal(length(ti2), 30000)
+  expect_equal(length(unique(ti2)), 30000)
+  # No class is entirely in the test set.
+  expect_equal(sum(table(y[ti2]) == 2), 0)
+})
+
+test_that("sample_df_index stratified treats numerics with up to 10 distinct values as discrete strata", {
+  set.seed(3)
+  counts7 <- c(100, 200, 300, 150, 100, 100, 50)
+  y7 <- sample(rep(1:7, counts7))
+  ti7 <- sample_df_index(data.frame(v = seq_along(y7)), 0.3, seed = 2, stratify_by = y7)
+  expect_equal(length(ti7), 300)
+  expect_true(all(abs(as.numeric(table(y7[ti7])) - counts7 * 0.3) <= 1))
+
+  counts10 <- c(20, 40, 60, 80, 100, 120, 140, 160, 180, 100)
+  y10 <- sample(rep(1:10, counts10))
+  ti10 <- sample_df_index(data.frame(v = seq_along(y10)), 0.25, seed = 2, stratify_by = y10)
+  expect_equal(length(ti10), 250)
+  expect_true(all(abs(as.numeric(table(y10[ti10])) - counts10 * 0.25) <= 1))
+  # Same for dates.
+  d <- as.Date("2020-01-01") + (y7 - 1)
+  tid <- sample_df_index(data.frame(v = seq_along(d)), 0.3, seed = 2, stratify_by = d)
+  expect_true(all(abs(as.numeric(table(d[tid])) - counts7 * 0.3) <= 1))
+  # 11 distinct values are still cut into 5 quantile bins.
+  y11 <- sample(rep(1:11, 100))
+  expect_equal(length(unique(stratum_ids_for_sampling(y11))), 5)
 })
 
 test_that("sample_df_index stratified reaches floor(n * rate) at a very high rate", {
