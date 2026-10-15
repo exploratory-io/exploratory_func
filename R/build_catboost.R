@@ -1009,6 +1009,7 @@ exp_catboost <- function(df,
                          test_rate = 0.0,
                          test_split_type = "random",
                          watchlist_rate = 0) {
+  validate_test_split_type(test_split_type)
   loadNamespace("catboost")
 
   if (test_rate < 0 | 1 < test_rate) {
@@ -1097,7 +1098,9 @@ exp_catboost <- function(df,
       }
 
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
 
       df_test_temp <- NULL

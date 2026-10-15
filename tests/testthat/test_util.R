@@ -1794,6 +1794,123 @@ test_that("test sameple_df_index", {
   expect_equal(length(test_index), 30)
 })
 
+test_that("sample_df_index with stratify_by = NULL keeps the pre-change random draws", {
+  df <- data.frame(x = 1:99, y = 1:99)
+  for (seed in c(1, 2, 7, 42, 123)) {
+    set.seed(seed)
+    old_index <- sample(seq(nrow(df)), nrow(df) * 0.3)
+    expect_identical(sample_df_index(df, 0.3, seed = seed), old_index)
+    expect_identical(sample_df_index(df, 0.3, seed = seed, stratify_by = NULL), old_index)
+  }
+})
+
+test_that("sample_df_index stratified keeps the rare TRUE share of the issue example on every seed", {
+  df <- data.frame(x = 1:1470)
+  y <- c(rep(TRUE, 27), rep(FALSE, 1470 - 27))
+  for (seed in 1:200) {
+    test_index <- sample_df_index(df, 0.4, seed = seed, stratify_by = y)
+    expect_equal(length(test_index), 588)
+    expect_equal(sum(y[test_index]), 11)
+    expect_false(is.unsorted(test_index))
+    expect_equal(length(unique(test_index)), 588)
+  }
+})
+
+test_that("sample_df_index stratified preserves factor class proportions in test and train", {
+  y <- factor(c(rep("a", 600), rep("b", 300), rep("c", 100)))
+  df <- data.frame(x = seq_along(y))
+  test_index <- sample_df_index(df, 0.3, seed = 3, stratify_by = y)
+  expect_equal(length(test_index), 300)
+  test_counts <- as.numeric(table(y[test_index]))
+  train_counts <- as.numeric(table(y[-test_index]))
+  expect_true(all(abs(test_counts - c(180, 90, 30)) <= 1))
+  expect_true(all(abs(train_counts - c(420, 210, 70)) <= 1))
+})
+
+test_that("sample_df_index stratified works for character targets", {
+  y <- c(rep("x", 80), rep("y", 20))
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.25, seed = 1, stratify_by = y)
+  expect_equal(length(test_index), 25)
+  expect_equal(sum(y[test_index] == "y"), 5)
+})
+
+test_that("sample_df_index stratified bins a numeric target by quantile", {
+  set.seed(10)
+  y <- c(rexp(995, 0.1), 5000, 6000, 7000, 8000, 9000) # heavy tail
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.4, seed = 1, stratify_by = y)
+  expect_equal(length(test_index), 400)
+  # Each of the 5 equal-count quintiles contributes the same number of test rows (200 rows * 0.4 = 80).
+  bins <- dplyr::ntile(y, 5)
+  expect_equal(as.numeric(table(bins[test_index])), rep(80, 5))
+})
+
+test_that("sample_df_index stratified handles few distinct numeric values and ties", {
+  y <- c(rep(0, 70), rep(1, 30))
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.2, seed = 5, stratify_by = y)
+  expect_equal(length(test_index), 20)
+  # Few-valued numerics keep their values as strata: 20 test rows = 14 zeros + 6 ones.
+  expect_equal(sum(y[test_index] == 1), 6)
+
+  y3 <- rep(c(1, 2, 3), length.out = 90)
+  test_index3 <- sample_df_index(data.frame(v = seq_along(y3)), 0.2, seed = 5, stratify_by = y3)
+  expect_equal(length(test_index3), 18)
+  expect_equal(as.numeric(table(y3[test_index3])), c(6, 6, 6))
+})
+
+test_that("sample_df_index stratified treats NA as its own stratum", {
+  y <- c(rep("a", 80), rep(NA, 20))
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.5, seed = 2, stratify_by = y)
+  expect_equal(length(test_index), 50)
+  expect_equal(sum(is.na(y[test_index])), 10)
+
+  yn <- c(rep(c(1, 2, 3, 4), 25), rep(NA_real_, 20))
+  test_index_n <- sample_df_index(data.frame(v = seq_along(yn)), 0.5, seed = 2, stratify_by = yn)
+  expect_equal(length(test_index_n), 60)
+  expect_equal(sum(is.na(yn[test_index_n])), 10)
+})
+
+test_that("sample_df_index stratified keeps a single-row class in training", {
+  y <- c(rep("a", 50), "rare", rep("b", 49))
+  df <- data.frame(v = seq_along(y))
+  for (seed in 1:50) {
+    test_index <- sample_df_index(df, 0.9, seed = seed, stratify_by = y)
+    expect_equal(length(test_index), 90)
+    expect_false(51 %in% test_index)
+    # Every stratum keeps at least one training row.
+    expect_true(all(c("a", "b", "rare") %in% y[-test_index]))
+  }
+})
+
+test_that("sample_df_index stratified falls back to random for a constant target", {
+  df <- data.frame(v = 1:100)
+  test_index <- sample_df_index(df, 0.3, seed = 1, stratify_by = rep("a", 100))
+  expect_equal(length(test_index), 30)
+  set.seed(1)
+  expect_identical(test_index, sample(seq(100), 100 * 0.3))
+  test_index_num <- sample_df_index(df, 0.3, seed = 1, stratify_by = rep(2.5, 100))
+  expect_equal(length(test_index_num), 30)
+})
+
+test_that("validate_test_split_type accepts the three split types and rejects anything else", {
+  for (type in c("random", "ordered", "stratified")) {
+    expect_silent(validate_test_split_type(type))
+  }
+  expect_error(validate_test_split_type("stratfied"), "test_split_type must be one of")
+  expect_error(validate_test_split_type(NULL), "test_split_type must be one of")
+  expect_error(validate_test_split_type(c("random", "ordered")), "test_split_type must be one of")
+  expect_error(validate_test_split_type(NA_character_), "test_split_type must be one of")
+})
+
+test_that("sample_df_index stratified returns NULL for rate 0 and rejects a wrong-length stratify_by", {
+  df <- data.frame(v = 1:10)
+  expect_null(sample_df_index(df, 0, stratify_by = rep(c("a", "b"), 5)))
+  expect_error(sample_df_index(df, 0.3, stratify_by = c("a", "b")), "stratify_by")
+})
+
 test_that("test sameple_rows", {
   df <-data.frame(x=c(1,NA,3),y=c(2,3,NA))
   df <-setNames(df,c("x 1", "col 2"))

@@ -427,8 +427,9 @@ build_coxph.fast <- function(df,
                     predictor_outlier_filter_threshold = NULL,
                     seed = 1,
                     test_rate = 0.0,
-                    test_split_type = "random" # "random" or "ordered"
+                    test_split_type = "random" # "random", "ordered", or "stratified"
                     ){
+  validate_test_split_type(test_split_type)
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm.
 
   # using the new way of NSE column selection evaluation
@@ -600,7 +601,9 @@ build_coxph.fast <- function(df,
 
       # split training and test data
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_status_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)

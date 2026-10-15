@@ -38,8 +38,8 @@
 #'   group (used for Repeat By in Analytics View).
 #' @param seed Random seed used for sampling / test-data split.
 #' @param test_rate Fraction of rows held out as test data. 0 means no split.
-#' @param test_split_type "random" or "ordered", same convention as
-#'   build_lm.fast().
+#' @param test_split_type "random", "ordered", or "stratified" (stratified by the
+#'   target), same convention as build_lm.fast().
 #' @param keep.source Whether to retain the (pre-split) source data in the
 #'   source.data column.
 #' @param max_pd_vars Maximum number of predictors to compute partial dependence
@@ -65,6 +65,7 @@ build_polr <- function(df,
                         pd_sample_size = 500,
                         keep.source = TRUE) {
   validate_empty_data(df)
+  validate_test_split_type(test_split_type)
 
   target_col <- tidyselect::vars_select(names(df), !!rlang::enquo(target))
   orig_selected_cols <- tidyselect::vars_select(names(df), !!!rlang::quos(...))
@@ -211,7 +212,11 @@ build_polr <- function(df,
       data <- data %>% sample_rows(max_nrow)
     }
 
-    test_index <- sample_df_index(data, rate = test_rate, ordered = (test_split_type == "ordered"))
+    test_index <- sample_df_index(data, rate = test_rate,
+
+                                  ordered = (test_split_type == "ordered"),
+
+                                  stratify_by = if (test_split_type == "stratified") data[[target_col]] else NULL)
     train_data <- safe_slice(data, test_index, remove = TRUE)
     test_data <- if (test_rate > 0) safe_slice(data, test_index, remove = FALSE) else NULL
 

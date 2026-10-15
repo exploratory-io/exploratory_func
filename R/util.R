@@ -719,14 +719,117 @@ expand_args <- function(call, exclude = c()) {
   }
 }
 
+#' Maximum number of quantile bins used to stratify a numeric (or date) target.
+STRATIFY_MAX_NUMERIC_BINS <- 5
+
+#' Assign every element of a vector to a stratum id (1..K) for stratified sampling.
+#'
+#' logical / character / factor values are their own strata. numeric and date values are their own
+#' strata when there are at most STRATIFY_MAX_NUMERIC_BINS distinct values (e.g. a 0/1 status column);
+#' otherwise they are cut into STRATIFY_MAX_NUMERIC_BINS equal-count quantile bins (dplyr::ntile).
+#' NA is its own stratum in every case.
+#' @param y A vector to stratify on.
+#' @return An integer vector of the same length as y with the stratum id of each element.
+#' @noRd
+stratum_ids_for_sampling <- function(y) {
+  key <- as.character(y)
+  if (is.numeric(y) || inherits(y, c("Date", "POSIXt"))) {
+    # ntile() splits tied values across bins by position, so few-valued numerics keep their values as strata.
+    if (dplyr::n_distinct(y, na.rm = TRUE) > STRATIFY_MAX_NUMERIC_BINS) {
+      key <- dplyr::ntile(y, STRATIFY_MAX_NUMERIC_BINS)
+    }
+  }
+  # match() maps NA to NA's own position, so NA forms one stratum like any other value.
+  match(key, unique(key))
+}
+
+#' Pick test row indices so that every stratum contributes in proportion to its size.
+#'
+#' The total test size is floor(n * rate), the same as the plain random split. It is divided among
+#' strata by the largest remainder method on n_k * rate. Every stratum keeps at least one training row.
+#' @param strata Integer stratum id per row (see stratum_ids_for_sampling).
+#' @param rate Fraction of rows to put in the test set.
+#' @return Sorted integer vector of test row indices.
+#' @noRd
+sample_stratified_index <- function(strata, rate) {
+  n <- length(strata)
+  total <- floor(n * rate)
+  group_ids <- sort(unique(strata))
+  group_sizes <- vapply(group_ids, function(g) sum(strata == g), numeric(1))
+  exact <- group_sizes * rate
+  # Cap at n_k - 1 so a stratum is never entirely moved to the test set.
+  cap <- group_sizes - 1
+  alloc <- pmin(floor(exact), cap)
+  remainder <- exact - floor(exact)
+
+  # Floating point can make the sum of per-stratum floors exceed floor(n * rate) by one. Trim it.
+  while (sum(alloc) > total) {
+    trimmable <- which(alloc > 0)
+    drop_at <- trimmable[order(remainder[trimmable], trimmable)][1]
+    alloc[drop_at] <- alloc[drop_at] - 1
+  }
+
+  # Hand out the leftover rows by largest remainder, only to strata that still have room.
+  left <- total - sum(alloc)
+  while (left > 0) {
+    with_room <- which(alloc < cap)
+    if (length(with_room) == 0) break
+    by_remainder <- with_room[order(-remainder[with_room], with_room)]
+    chosen <- by_remainder[seq_len(min(left, length(by_remainder)))]
+    alloc[chosen] <- alloc[chosen] + 1
+    left <- left - length(chosen)
+  }
+
+  picked <- unlist(lapply(seq_along(group_ids), function(k) {
+    if (alloc[k] < 1) return(integer(0))
+    idx <- which(strata == group_ids[k])
+    # sample.int, not sample(idx, ...): sample() treats a length-1 idx as 1:idx.
+    idx[sample.int(length(idx), alloc[k])]
+  }))
+  sort(as.integer(picked))
+}
+
+#' Allowed values of test_split_type for the Analytics functions that support Test Mode.
+TEST_SPLIT_TYPES <- c("random", "ordered", "stratified")
+
+#' Stop with a clear message unless test_split_type is one of TEST_SPLIT_TYPES.
+#' @param test_split_type The value to check.
+#' @return The value, invisibly.
+#' @noRd
+validate_test_split_type <- function(test_split_type) {
+  if (!is.character(test_split_type) || length(test_split_type) != 1 || is.na(test_split_type) ||
+      !(test_split_type %in% TEST_SPLIT_TYPES)) {
+    stop(paste0("test_split_type must be one of ", paste0('"', TEST_SPLIT_TYPES, '"', collapse = ", "), "."))
+  }
+  invisible(test_split_type)
+}
+
 #' get sampled indice from data frame
+#' @param df Data frame to split.
+#' @param rate Fraction of rows to return (the test set share).
+#' @param seed Optional seed for the random draw.
+#' @param ordered If TRUE, return the last rows (by order) instead of a random sample.
+#' @param stratify_by Optional vector with one value per row of df. When given, the random sample is
+#'   stratified on it so that each value (or, for numeric/date, each quantile bin) keeps about the
+#'   same share in the sample as in df. NULL (default) gives the plain random sample, with exactly
+#'   the same draws as before this argument existed. Ignored when ordered is TRUE.
 #' @export
-sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
+sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE, stratify_by = NULL) {
   # Return NULL (empty vector) for rate 0 case. If we go on, ordered case would return the index for the last row.
   if (rate == 0) return(NULL)
   if (!ordered) {
     if(!is.null(seed)){
       set.seed(seed)
+    }
+    if (!is.null(stratify_by)) {
+      if (length(stratify_by) != nrow(df)) {
+        stop("stratify_by must have one value per row of the data frame.")
+      }
+      strata <- stratum_ids_for_sampling(stratify_by)
+      # With fewer than 2 strata there is nothing to stratify; use the plain random sample below.
+      if (length(unique(strata)) >= 2) {
+        return(sample_stratified_index(strata, rate))
+      }
     }
     sample(seq(nrow(df)), nrow(df) * rate)
   }

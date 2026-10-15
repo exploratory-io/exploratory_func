@@ -691,8 +691,9 @@ build_lm.fast <- function(df,
                     pd_grid_resolution = 20,
                     seed = 1,
                     test_rate = 0.0,
-                    test_split_type = "random" # "random" or "ordered"
+                    test_split_type = "random" # "random", "ordered", or "stratified"
                     ){
+  validate_test_split_type(test_split_type)
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -927,7 +928,9 @@ build_lm.fast <- function(df,
         # Split training and test data BEFORE applying SMOTE
         # This ensures test data remains pure and doesn't contain synthetic samples
         source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        test_index <- sample_df_index(source_data, rate = test_rate,
+                                      ordered = (test_split_type == "ordered"),
+                                      stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
@@ -1096,7 +1099,9 @@ build_lm.fast <- function(df,
       else { # model_type == "lm"
         # split training and test data
         source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        test_index <- sample_df_index(source_data, rate = test_rate,
+                                      ordered = (test_split_type == "ordered"),
+                                      stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
