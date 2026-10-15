@@ -719,15 +719,19 @@ expand_args <- function(call, exclude = c()) {
   }
 }
 
-#' Maximum number of quantile bins used to stratify a numeric (or date) target.
-STRATIFY_MAX_NUMERIC_BINS <- 5
+#' Number of distinct values up to which a numeric (or date) target is stratified on its own values.
+#' More distinct values than this are cut into STRATIFY_NUMERIC_BINS quantile bins.
+STRATIFY_MAX_DISCRETE_VALUES <- 10
+
+#' Number of equal-count quantile bins used to stratify a numeric (or date) target with many distinct values.
+STRATIFY_NUMERIC_BINS <- 5
 
 #' Assign every element of a vector to a stratum id (1..K) for stratified sampling.
 #'
 #' logical / character / factor values are their own strata. numeric and date values are their own
-#' strata when there are at most STRATIFY_MAX_NUMERIC_BINS distinct values (e.g. a 0/1 status column);
-#' otherwise they are cut into STRATIFY_MAX_NUMERIC_BINS equal-count quantile bins (dplyr::ntile).
-#' NA is its own stratum in every case.
+#' strata when there are at most STRATIFY_MAX_DISCRETE_VALUES distinct values (e.g. a 0/1 status column
+#' or a 1-10 rating); otherwise they are cut into STRATIFY_NUMERIC_BINS equal-count quantile bins
+#' (dplyr::ntile). NA is its own stratum in every case.
 #' @param y A vector to stratify on.
 #' @return An integer vector of the same length as y with the stratum id of each element.
 #' @noRd
@@ -735,8 +739,8 @@ stratum_ids_for_sampling <- function(y) {
   key <- as.character(y)
   if (is.numeric(y) || inherits(y, c("Date", "POSIXt"))) {
     # ntile() splits tied values across bins by position, so few-valued numerics keep their values as strata.
-    if (dplyr::n_distinct(y, na.rm = TRUE) > STRATIFY_MAX_NUMERIC_BINS) {
-      key <- dplyr::ntile(y, STRATIFY_MAX_NUMERIC_BINS)
+    if (dplyr::n_distinct(y, na.rm = TRUE) > STRATIFY_MAX_DISCRETE_VALUES) {
+      key <- dplyr::ntile(y, STRATIFY_NUMERIC_BINS)
     }
   }
   # match() maps NA to NA's own position, so NA forms one stratum like any other value.
@@ -745,14 +749,17 @@ stratum_ids_for_sampling <- function(y) {
 
 #' Pick test row indices so that every stratum contributes in proportion to its size.
 #'
-#' The total test size is floor(n * rate), the same as the plain random split. It is divided among
-#' strata by the largest remainder method on n_k * rate. While rows are being divided, every stratum
-#' keeps at least one training row (its allocation is capped at n_k - 1). When many strata are
-#' singletons the capped allocation falls short of floor(n * rate); the shortfall is then filled by
-#' drawing uniformly at random from the rows not yet selected, lifting the cap, so a singleton class
-#' enters the test set only when that is needed to reach the size. With no shortfall no extra random
-#' number is drawn. The size is below floor(n * rate) only if reaching it would empty the training set
-#' (rate >= 1).
+#' The total test size is floor(n * rate), the same as the plain random split. Strata with a single row
+#' cannot be split, so when there are two or more of them they are pooled into one combined stratum
+#' first; the pool then takes its proportional share like any other stratum (a lone single-row stratum
+#' is left as it is). The total is divided among strata by the largest remainder method on n_k * rate.
+#' While rows are being divided, every stratum keeps at least one training row (its allocation is capped
+#' at n_k - 1). If the capped allocation still falls short of floor(n * rate) (only when a lone
+#' single-row stratum is left, or at a very high rate), the shortfall is filled by drawing uniformly at
+#' random from the rows not yet selected, lifting the cap. With no pooling and no shortfall no extra
+#' random number is drawn. The size is below floor(n * rate) only if reaching it would empty the
+#' training set (rate >= 1). All per-stratum work is done in one pass over the rows, so the cost is
+#' linear in the number of rows plus strata.
 #' @param strata Integer stratum id per row (see stratum_ids_for_sampling).
 #' @param rate Fraction of rows to put in the test set.
 #' @return Sorted integer vector of test row indices.
@@ -760,8 +767,14 @@ stratum_ids_for_sampling <- function(y) {
 sample_stratified_index <- function(strata, rate) {
   n <- length(strata)
   total <- floor(n * rate)
-  group_ids <- sort(unique(strata))
-  group_sizes <- vapply(group_ids, function(g) sum(strata == g), numeric(1))
+  # Relabel to 1..K in ascending id order, then pool the single-row strata (if there are two or more).
+  strata <- match(strata, sort(unique(strata)))
+  single_row <- tabulate(strata)[strata] == 1L
+  if (sum(single_row) >= 2) {
+    strata[single_row] <- max(strata) + 1L
+    strata <- match(strata, sort(unique(strata)))
+  }
+  group_sizes <- tabulate(strata)
   exact <- group_sizes * rate
   # Cap at n_k - 1 so a stratum is never entirely moved to the test set.
   cap <- group_sizes - 1
@@ -786,13 +799,15 @@ sample_stratified_index <- function(strata, rate) {
     left <- left - length(chosen)
   }
 
-  picked <- unlist(lapply(seq_along(group_ids), function(k) {
-    if (alloc[k] < 1) return(integer(0))
-    idx <- which(strata == group_ids[k])
+  # Row indices of every stratum in one pass (ascending within a stratum, strata in id order).
+  rows_by_stratum <- split(seq_len(n), strata)
+  drawing <- which(alloc >= 1)
+  picked <- unlist(lapply(drawing, function(k) {
+    idx <- rows_by_stratum[[k]]
     # sample.int, not sample(idx, ...): sample() treats a length-1 idx as 1:idx.
     idx[sample.int(length(idx), alloc[k])]
   }))
-  # The n_k - 1 cap can leave the total short (e.g. many singleton classes). Fill the shortfall with a
+  # A lone single-row stratum (or a very high rate) can leave the total short. Fill the shortfall with a
   # uniform draw from the unselected rows, lifting the cap. No draw happens when there is no shortfall.
   shortfall <- total - length(picked)
   if (shortfall > 0) {
@@ -825,12 +840,13 @@ validate_test_split_type <- function(test_split_type) {
 #' @param seed Optional seed for the random draw.
 #' @param ordered If TRUE, return the last rows (by order) instead of a random sample.
 #' @param stratify_by Optional vector with one value per row of df. When given, the random sample is
-#'   stratified on it so that each value (or, for numeric/date, each quantile bin) keeps about the
-#'   same share in the sample as in df. NULL (default) gives the plain random sample, with exactly
+#'   stratified on it so that each value (or, for numeric/date with more than 10 distinct values, each
+#'   of 5 quantile bins) keeps about the same share in the sample as in df. NULL (default) gives the plain random sample, with exactly
 #'   the same draws as before this argument existed. Ignored when ordered is TRUE. The sample size is
 #'   always floor(nrow(df) * rate), as for the plain random sample: each stratum is first allocated a
-#'   proportional share (leaving at least one training row per stratum), and any shortfall caused by
-#'   many single-row strata is filled with random rows from the rest.
+#'   proportional share (leaving at least one training row per stratum). Single-row strata are pooled
+#'   into one combined stratum so they take their share together; a lone remaining shortfall is
+#'   filled with random rows from the rest.
 #' @export
 sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE, stratify_by = NULL) {
   # Return NULL (empty vector) for rate 0 case. If we go on, ordered case would return the index for the last row.
