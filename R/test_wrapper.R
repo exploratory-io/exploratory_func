@@ -234,6 +234,19 @@ generate_signrank_density_data <- function(stat, p.value, n, sig_level = 0.05, a
   ret
 }
 
+# Raises the standard error for an explanatory variable whose number of
+# unique values is not exactly 2, naming the ACTUAL count found. tam#39839:
+# the un-parameterized message ("...needs to have 2 unique values.") never
+# told the user whether they had too few (1, filter less) or too many (3+,
+# filter more / use a multi-group test instead), nor what R actually saw.
+# Kept as a shared helper (instead of 9 hand-copied sprintf() calls across
+# exp_ttest/exp_ttest_aggregated/exp_wilcox/exp_two_sample_prop_test) so the
+# wording -- and the exact prefix tam's RErrorMessage.js regex-matches on --
+# never drifts between call sites.
+stop_explanatory_variable_needs_2_unique_values <- function(n_distinct_count) {
+  stop(sprintf("The explanatory variable needs to have 2 unique values, but it has %d.", n_distinct_count))
+}
+
 #' wrapper for t.test, which compares means
 #' @export
 do_t.test <- function(df, ...){
@@ -882,7 +895,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
     }
     else {
-      stop("The explanatory variable needs to have 2 unique values.")
+      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
     }
   }
 
@@ -901,7 +914,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
       # wrong (a hand-copied sibling of the same bug).
       n_distinct_res_each <- n_distinct(df[[var2_col]])
       if (n_distinct_res_each != 2) {
-        stop("The explanatory variable needs to have 2 unique values.")
+        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
       }
       # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
       # Check it here, rather than handling it later.
@@ -1061,7 +1074,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
     }
     else {
-      stop("The explanatory variable needs to have 2 unique values.")
+      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
     }
   }
   # Use a different syntax for paired in R4.4.
@@ -1108,7 +1121,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       # calculate_cohens_d()'s raw "subscript out of bounds".
       n_distinct_res_each <- n_distinct(df[[var2_col]])
       if (n_distinct_res_each != 2) {
-        stop("The explanatory variable needs to have 2 unique values.")
+        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
       }
       # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
       # Check it here, rather than handling it later.
@@ -1170,8 +1183,9 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         # by the category of the explanatory variable (var2_col).
         
         # First, we should check that the var2_col has only two categories.
-        if (n_distinct(df[[var2_col]]) != 2) {
-          stop("The explanatory variable needs to have 2 unique values.")
+        n_distinct_res_paired <- n_distinct(df[[var2_col]])
+        if (n_distinct_res_paired != 2) {
+          stop_explanatory_variable_needs_2_unique_values(n_distinct_res_paired)
         }
 
         paired_vectors <- paired_test_vectors(
@@ -1519,7 +1533,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
     }
     else {
-      stop("The explanatory variable needs to have 2 unique values.")
+      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
     }
   }
 
@@ -1546,7 +1560,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
       # group.
       n_distinct_res_each <- n_distinct(df[[var2_col]])
       if (n_distinct_res_each != 2) {
-        stop("The explanatory variable needs to have 2 unique values.")
+        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
       }
       # Adjust the factor levels since t.test consideres the 2nd level to be the base, which is not what we want.
       # We keep the original df as is, since we want to keep the original factor order for display purpose.
@@ -3466,7 +3480,7 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
     if (n_distinct_res == 3 && any(is.na(df[[exp_col]]))) {
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(exp_col)))
     } else {
-      stop("The explanatory variable needs to have 2 unique values.")
+      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
     }
   }
 
@@ -3482,8 +3496,9 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
       # the ungrouped path falls through to a raw "missing value where
       # TRUE/FALSE needed" once the collapsed group's lv[2] resolves to NA.
       # tam#38168.
-      if (n_distinct(df[[exp_col]]) != 2) {
-        stop("The explanatory variable needs to have 2 unique values.")
+      n_distinct_res_each <- n_distinct(df[[exp_col]])
+      if (n_distinct_res_each != 2) {
+        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
       }
 
       vec <- as.logical(df[[var_col]])
