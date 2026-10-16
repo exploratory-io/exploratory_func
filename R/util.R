@@ -781,7 +781,7 @@ sample_stratified_index <- function(strata, rate) {
   cap <- group_sizes - 1
   alloc <- pmin(floor(exact), cap)
   # Rounded so that remainders equal in exact arithmetic (0.6 vs 3 * 0.2) tie despite floating point noise.
-  remainder <- round(exact - floor(exact), 9)
+  remainder <- base::round(exact - floor(exact), 9)
   # Ties on the remainder are broken uniformly at random (a random priority per stratum), never by class order.
   tie_break <- sample.int(length(group_sizes))
 
