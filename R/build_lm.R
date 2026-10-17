@@ -1592,9 +1592,280 @@ get_var_min_pvalue <- function(var, coef_df, x) {
   min(coef_df$p.value[coef_df$term %in% terms], na.rm=TRUE)
 }
 
+# ---------------------------------------------------------------------------
+# tam#39813: R-squared breakdown (LMG), standardized coefficients, importance x rating.
+# All of this is computed lazily inside tidy.lm_exploratory(); build_lm.fast() never runs it.
+# ---------------------------------------------------------------------------
+
+# Largest number of original predictor variables the exact LMG is computed for.
+# Exact LMG needs the R-squared of every subset of variables (2^p of them), so the cost doubles
+# with each variable. Above the cap the result is a refusal, never an approximation.
+# Override with options(exploratory.lmg.max.predictors = N).
+# Measured on 600 rows, one call (Apple M5 Pro, R 4.6.1; numeric predictors / three of them
+# four-level factors): p=14 0.05s / 0.08s, p=15 0.11s / 0.16s, p=16 0.24s / 0.30s,
+# p=18 1.06s / 1.38s, p=19 2.3s / 2.9s, p=20 4.5s / 5.6s. 18 keeps a worst case near a second
+# and a half, leaving headroom for slower machines and for the report asking more than once.
+LM_LMG_MAX_PREDICTORS_DEFAULT <- 18
+
+# R-squared below this is treated as zero: the share of a zero total is meaningless.
+LM_LMG_R2_ZERO_TOLERANCE <- 1e-8
+
+# predictor_funs that only re-code a column into another single column (date parts, numeric
+# to category). They do not change what the variable means, so LMG still splits the model
+# over the variables the user picked. Any other function (log, sqrt, user functions, ...)
+# makes the model's terms differ from the selected variables, so LMG is refused.
+LM_LMG_RECODING_FUNS <- c("none",
+  "fltoyear", "rtoyear", "fltohalfyear", "rtohalfyear", "fltoquarter", "rtoq", "fltobimonth",
+  "rtobimon", "fltomonth", "rtomon", "fltoweek", "rtoweek", "fltoday", "rtoday", "rtohour",
+  "rtomin", "rtosec", "year", "halfyear", "quarter", "bimonth", "bimon", "month", "mon",
+  "monthname", "monname", "monthnamelong", "monnamelong", "monthname_with_year", "week",
+  "week_of_month", "week_of_quarter", "dayofyear", "dayofquarter", "dayofweek", "day", "wday",
+  "wdaylong", "weekend", "hour", "minute", "second", "asnum", "asint", "asintby10", "aschar")
+
+# Names of the statuses of the "lmg" tidy type. A refusal carries one of these and a reason.
+LM_LMG_STATUS <- c("ok", "no_predictors", "r2_zero", "aliased", "too_many_predictors",
+                   "unsupported_spec", "fit_failed")
+
+# Is one predictor_funs entry (possibly a list of them) something other than a plain re-coding?
+# @param f an element of predictor_funs
+.lm_predictor_fun_transforms <- function(f) {
+  if (is.list(f)) {
+    return(any(vapply(f, .lm_predictor_fun_transforms, logical(1))))
+  }
+  if (is.function(f) || is.call(f)) return(TRUE)
+  if (length(f) == 0 || is.na(f[[1]])) return(FALSE)
+  !(as.character(f[[1]]) %in% LM_LMG_RECODING_FUNS)
+}
+
+# Why the fitted model is outside what LMG supports, or NULL when it is supported.
+# Weights, a missing intercept, interactions and transformed terms are outside it.
+# @param x lm_exploratory model
+.lm_lmg_unsupported_reason <- function(x) {
+  if (!is.null(x[["weights"]])) return("Weighted regression is not supported.")
+  tt <- stats::terms(x)
+  if (attr(tt, "intercept") != 1L) return("A model without an intercept is not supported.")
+  model_vars <- as.list(attr(tt, "variables"))[-1]
+  if (!all(vapply(model_vars, is.name, logical(1)))) {
+    return("A model with transformed terms is not supported.")
+  }
+  factors <- attr(tt, "factors")
+  if (length(factors) > 0 && any(colSums(factors > 0) > 1)) {
+    return("A model with interaction terms is not supported.")
+  }
+  if (!is.null(x[["predictor_funs"]]) && .lm_predictor_fun_transforms(unclass(x[["predictor_funs"]]))) {
+    return("A model with transformed predictors is not supported.")
+  }
+  NULL
+}
+
+# R-squared of every subset of the variables, by depth-first enumeration.
+# Each variable owns a set of columns of the centered design matrix. All columns are first
+# reduced to a small triangular matrix R (X = QR), so a subset costs one tiny least squares
+# fit on columns of R instead of one fit on the n data rows.
+# @param r_mat upper triangular R factor of the centered design (k x k)
+# @param effects Q'y of the centered response (length k)
+# @param group_cols list; element j = column indices (of r_mat) belonging to variable j
+# @param syy sum of squares of the centered response
+# @return list(r2, size): r2[mask + 1] is the R-squared of the variables whose bit is set in mask
+#   (bit j-1 = variable j); size[mask + 1] = number of variables in the subset.
+.lm_lmg_subset_r2 <- function(r_mat, effects, group_cols, syy) {
+  p <- length(group_cols)
+  n_subsets <- 2^p
+  r2 <- numeric(n_subsets)
+  size <- integer(n_subsets)
+  visit <- function(cols, mask, n_in, next_var) {
+    if (next_var > p) return(invisible(NULL))
+    for (j in next_var:p) {
+      new_cols <- c(cols, group_cols[[j]])
+      new_mask <- mask + 2^(j - 1)
+      fit <- .lm.fit(r_mat[, new_cols, drop = FALSE], effects)
+      r2[new_mask + 1] <<- sum(fit$effects[seq_len(fit$rank)]^2) / syy
+      size[new_mask + 1] <<- n_in + 1L
+      visit(new_cols, new_mask, n_in + 1L, j + 1L)
+    }
+    invisible(NULL)
+  }
+  visit(integer(0), 0, 0L, 1L)
+  list(r2 = r2, size = size)
+}
+
+# Exact LMG (Lindeman-Merenda-Gold) of every variable from the subset R-squared table.
+# LMG_i = sum over subsets S without i of  |S|! (p-|S|-1)! / p!  *  (R2(S + i) - R2(S)).
+# @param r2,size output of .lm_lmg_subset_r2
+# @param p number of variables
+.lm_lmg_from_subset_r2 <- function(r2, size, p) {
+  masks <- seq_along(r2) - 1
+  weight <- factorial(0:(p - 1)) * factorial(p - 1 - 0:(p - 1)) / factorial(p)
+  vapply(seq_len(p), function(i) {
+    bit <- 2^(i - 1)
+    without <- masks[bitwAnd(masks, bit) == 0]
+    sum(weight[size[without + 1] + 1] * (r2[without + bit + 1] - r2[without + 1]))
+  }, numeric(1))
+}
+
+# A refusal of the "lmg" tidy type: status and reason, and no number at all.
+.lm_lmg_refusal <- function(status, reason) {
+  data.frame(status = status, reason = reason, stringsAsFactors = FALSE)
+}
+
+# The "lmg" tidy type: exact R-squared breakdown over the ORIGINAL predictor variables
+# (a factor / character variable is one variable however many dummy columns it has).
+# @param x lm_exploratory model
+# @param max_predictors refuse above this many variables
+# @return data frame: variable, lmg, lmg_share, r_squared, n, status, reason on success;
+#   status and reason only on refusal.
+.lm_lmg_tidy <- function(x, max_predictors = getOption("exploratory.lmg.max.predictors", LM_LMG_MAX_PREDICTORS_DEFAULT)) {
+  tryCatch({
+    reason <- .lm_lmg_unsupported_reason(x)
+    if (!is.null(reason)) return(.lm_lmg_refusal("unsupported_spec", reason))
+
+    labels <- attr(stats::terms(x), "term.labels")
+    p <- length(labels)
+    if (p == 0) return(.lm_lmg_refusal("no_predictors", "The model has no predictor variable."))
+    if (p > max_predictors) {
+      return(.lm_lmg_refusal("too_many_predictors", paste0(
+        "The model has ", p, " predictor variables, more than the ", max_predictors,
+        " the exact R-squared breakdown is computed for.")))
+    }
+
+    mf <- x[["model"]]
+    y <- as.numeric(stats::model.response(mf))
+    yc <- y - mean(y)
+    syy <- sum(yc^2)
+    if (is.na(syy) || syy <= 0 || length(y) < 3) {
+      return(.lm_lmg_refusal("r2_zero", "The target variable does not vary, so R-squared is undefined."))
+    }
+
+    design <- stats::model.matrix(x)
+    assign <- attr(design, "assign")
+    keep <- assign > 0
+    xc <- design[, keep, drop = FALSE]
+    xc <- sweep(xc, 2, colMeans(xc))
+    var_of_col <- assign[keep]
+
+    qr_full <- qr(xc)
+    k <- ncol(xc)
+    effects <- qr.qty(qr_full, yc)[seq_len(k)]
+    r2_full <- sum(effects[seq_len(qr_full$rank)]^2) / syy
+    if (is.na(r2_full) || r2_full < LM_LMG_R2_ZERO_TOLERANCE) {
+      return(.lm_lmg_refusal("r2_zero", "R-squared is zero, so it cannot be broken down."))
+    }
+    if (qr_full$rank < k || anyNA(stats::coef(x))) {
+      return(.lm_lmg_refusal("aliased",
+        "A coefficient could not be estimated (perfect multicollinearity), so the R-squared cannot be split reliably."))
+    }
+
+    r_mat <- qr.R(qr_full)
+    group_cols <- lapply(seq_len(p), function(i) which(var_of_col == i))
+    subsets <- .lm_lmg_subset_r2(r_mat, effects, group_cols, syy)
+    lmg <- .lm_lmg_from_subset_r2(subsets$r2, subsets$size, p)
+
+    data.frame(
+      variable = .lm_glm_map_orig_names(labels, x$terms_mapping),
+      lmg = lmg,
+      lmg_share = lmg / r2_full * 100,
+      r_squared = r2_full,
+      n = nrow(mf),
+      status = "ok",
+      reason = NA_character_,
+      stringsAsFactors = FALSE)
+  }, error = function(e) {
+    .lm_lmg_refusal("fit_failed", paste0("The R-squared breakdown could not be computed: ", conditionMessage(e)))
+  })
+}
+
+# Scale factor SD(x) / SD(y) of every numeric main-effect term, over the rows the model used
+# (the training rows in Test Mode). NA where a standardized value is not defined: a factor,
+# character, ordered or logical term, SD(x) = 0, SD(y) = 0, or a weighted model.
+# @param x lm_exploratory model
+# @return numeric vector named by term label (the model's own column name)
+.lm_std_scales <- function(x) {
+  labels <- attr(stats::terms(x), "term.labels")
+  mf <- x[["model"]]
+  if (length(labels) == 0 || is.null(mf) || !is.null(x[["weights"]])) {
+    return(stats::setNames(rep(NA_real_, length(labels)), labels))
+  }
+  sd_y <- stats::sd(mf[[1]])
+  scales <- vapply(labels, function(label) {
+    col <- mf[[label]]
+    if (is.null(col) || !is.numeric(col) || !is.null(dim(col))) return(NA_real_)
+    sd_x <- stats::sd(col)
+    if (is.na(sd_x) || sd_x == 0 || is.na(sd_y) || sd_y == 0) return(NA_real_)
+    sd_x / sd_y
+  }, numeric(1))
+  stats::setNames(scales, labels)
+}
+
+# Append std.estimate, std.conf.low and std.conf.high to a coefficient table.
+# standardized coefficient = estimate * SD(x) / SD(y); the interval is the existing
+# conf.low / conf.high scaled the same way. No refit.
+# @param ret coefficient table with term (model column name, before mapping to the original name),
+#   estimate, conf.low, conf.high
+# @param x lm_exploratory model
+.lm_add_std_columns <- function(ret, x) {
+  scales <- .lm_std_scales(x)
+  scale <- unname(scales[as.character(ret$term)])
+  if (length(scale) == 0) scale <- numeric(0)
+  ret$std.estimate <- ret$estimate * scale
+  ret$std.conf.low <- ret$conf.low * scale
+  ret$std.conf.high <- ret$conf.high * scale
+  ret
+}
+
+# The "importance_rating" tidy type: for each selected variable that is a numeric predictor
+# of the model, its mean over the model rows beside its standardized coefficient, interval
+# and P value. A selected variable that is not a numeric predictor, was dropped, or has no
+# standardized coefficient is left out (the reason is kept in attr(, "excluded")).
+# @param x lm_exploratory model
+# @param vars selected variables, by their original column names
+.lm_importance_rating <- function(x, vars) {
+  ret <- data.frame(variable = character(0), mean_value = numeric(0), std.estimate = numeric(0),
+                    std.conf.low = numeric(0), std.conf.high = numeric(0), p.value = numeric(0),
+                    n = integer(0), stringsAsFactors = FALSE)
+  excluded <- data.frame(variable = character(0), reason = character(0), stringsAsFactors = FALSE)
+  vars <- unique(as.character(vars))
+  if (length(vars) > 0) {
+    labels <- attr(stats::terms(x), "term.labels")
+    orig <- .lm_glm_map_orig_names(labels, x$terms_mapping)
+    mf <- x[["model"]]
+    coef_df <- broom:::tidy.glm(x)
+    coef_df <- coef_df %>% dplyr::mutate(conf.low = estimate - 1.96 * std.error, conf.high = estimate + 1.96 * std.error)
+    coef_df <- .lm_add_std_columns(coef_df %>% dplyr::mutate(term = as.character(term)), x)
+    rows <- list()
+    for (v in vars) {
+      idx <- match(v, orig)
+      reason <- NULL
+      if (is.na(idx)) {
+        reason <- "Not a predictor variable of the model."
+      } else if (!is.numeric(mf[[labels[idx]]]) || !is.null(dim(mf[[labels[idx]]]))) {
+        reason <- "Not a numeric variable."
+      } else {
+        hit <- coef_df[coef_df$term == labels[idx], , drop = FALSE]
+        if (nrow(hit) == 0) {
+          reason <- "The coefficient could not be estimated."
+        } else if (is.na(hit$std.estimate[1])) {
+          reason <- "The standardized coefficient is not defined."
+        }
+      }
+      if (!is.null(reason)) {
+        excluded <- rbind(excluded, data.frame(variable = v, reason = reason, stringsAsFactors = FALSE))
+        next
+      }
+      rows[[length(rows) + 1]] <- data.frame(
+        variable = v, mean_value = mean(mf[[labels[idx]]]),
+        std.estimate = hit$std.estimate[1], std.conf.low = hit$std.conf.low[1],
+        std.conf.high = hit$std.conf.high[1], p.value = hit$p.value[1], n = nrow(mf),
+        stringsAsFactors = FALSE)
+    }
+    if (length(rows) > 0) ret <- do.call(rbind, rows)
+  }
+  attr(ret, "excluded") <- excluded
+  ret
+}
+
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
-tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, test_mode = FALSE, test_rate = 0, ...) { #TODO: add test
+tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, test_mode = FALSE, test_rate = 0, vars = NULL, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -1622,6 +1893,9 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
           ret <- ret %>% rename(Note=note)
         }
       }
+      # Standardized coefficient and interval (tam#39813). Appended last so that every existing column keeps its place.
+      # This has to be done before term is mapped back to the original name, since scales are looked up by model column name.
+      ret <- .lm_add_std_columns(ret, x)
       # Map coefficient names back to original.
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
@@ -1629,9 +1903,20 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, t
                               `t Value`=statistic, `P Value`=p.value,
                               `Conf Low`=conf.low,
                               `Conf High`=conf.high,
-                              `Base Level`=base.level)
+                              `Base Level`=base.level,
+                              `Std. Coefficient`=std.estimate,
+                              `Std. Conf Low`=std.conf.low,
+                              `Std. Conf High`=std.conf.high)
       }
       ret
+    },
+    lmg = {
+      # Exact R-squared breakdown (LMG) over the original predictor variables (tam#39813).
+      .lm_lmg_tidy(x)
+    },
+    importance_rating = {
+      # Mean and standardized coefficient of the selected numeric predictors (tam#39813).
+      .lm_importance_rating(x, vars)
     },
     vif = {
       if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
