@@ -341,6 +341,8 @@ test_that("rows with a missing target or numeric predictor are not model rows: n
   rating <- tidy(m, type = "importance_rating", vars = c("x1", "x2"))
   expect_equal(rating$mean_value, c(mean(used$x1), mean(used$x2)), tolerance = 1e-12)
   expect_false(isTRUE(all.equal(rating$mean_value[1], mean(d$x1, na.rm = TRUE), tolerance = 1e-12)))
+  expect_equal(rating$min_value, c(min(used$x1), min(used$x2)), tolerance = 1e-12)
+  expect_equal(rating$max_value, c(max(used$x1), max(used$x2)), tolerance = 1e-12)
   expect_equal(unique(rating$n), nrow(used))
 })
 
@@ -393,7 +395,12 @@ test_that("importance_rating: selected numeric predictors only, in the selected 
   d$k <- 1
   m <- fit_lm(d, y, x1, x2, x4, g, k)$model
   rating <- tidy(m, type = "importance_rating", vars = c("x2", "g", "x1", "x4", "k", "nope"))
-  expect_equal(names(rating), c("variable", "mean_value", "std.estimate", "std.conf.low", "std.conf.high", "p.value", "n"))
+  # min_value / max_value are appended LAST so every pre-existing column keeps its place.
+  expect_equal(names(rating), c("variable", "mean_value", "std.estimate", "std.conf.low", "std.conf.high", "p.value", "n",
+                                "min_value", "max_value"))
+  # observed range over the model rows, independent of the fit
+  expect_equal(rating$min_value, unname(vapply(rating$variable, function(v) min(d[[v]]), numeric(1))))
+  expect_equal(rating$max_value, unname(vapply(rating$variable, function(v) max(d[[v]]), numeric(1))))
   # x4 is the inestimable alias, g is a factor, k was dropped as a constant, nope is unknown.
   aliased_term <- tidy(m)$term[!is.na(tidy(m)$note)]
   expect_equal(rating$variable, setdiff(c("x2", "x1"), aliased_term))

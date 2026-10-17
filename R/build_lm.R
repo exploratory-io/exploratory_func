@@ -1814,14 +1814,16 @@ LM_LMG_STATUS <- c("ok", "no_predictors", "r2_zero", "aliased", "too_many_predic
 
 # The "importance_rating" tidy type: for each selected variable that is a numeric predictor
 # of the model, its mean over the model rows beside its standardized coefficient, interval
-# and P value. A selected variable that is not a numeric predictor, was dropped, or has no
+# and P value, and (appended last) the smallest and largest value it takes over those rows,
+# which is what tells the report whether the selected variables share one rating scale.
+# A selected variable that is not a numeric predictor, was dropped, or has no
 # standardized coefficient is left out (the reason is kept in attr(, "excluded")).
 # @param x lm_exploratory model
 # @param vars selected variables, by their original column names
 .lm_importance_rating <- function(x, vars) {
   ret <- data.frame(variable = character(0), mean_value = numeric(0), std.estimate = numeric(0),
                     std.conf.low = numeric(0), std.conf.high = numeric(0), p.value = numeric(0),
-                    n = integer(0), stringsAsFactors = FALSE)
+                    n = integer(0), min_value = numeric(0), max_value = numeric(0), stringsAsFactors = FALSE)
   excluded <- data.frame(variable = character(0), reason = character(0), stringsAsFactors = FALSE)
   vars <- unique(as.character(vars))
   if (length(vars) > 0) {
@@ -1855,6 +1857,7 @@ LM_LMG_STATUS <- c("ok", "no_predictors", "r2_zero", "aliased", "too_many_predic
         variable = v, mean_value = mean(mf[[labels[idx]]]),
         std.estimate = hit$std.estimate[1], std.conf.low = hit$std.conf.low[1],
         std.conf.high = hit$std.conf.high[1], p.value = hit$p.value[1], n = nrow(mf),
+        min_value = min(mf[[labels[idx]]]), max_value = max(mf[[labels[idx]]]),
         stringsAsFactors = FALSE)
     }
     if (length(rows) > 0) ret <- do.call(rbind, rows)
