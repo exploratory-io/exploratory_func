@@ -176,6 +176,12 @@
     set.seed(seed)
   }
   if (algorithm == 'pam') {
+    # pamonce = 0 (the original PAM swap), never the faster 1..6 variants (tam#39875):
+    # cluster::pam() 2.1.8.2 with pamonce 1..6 can loop forever on tied distances -- a 0/1 or
+    # few-level column (an ordered factor, a binary numeric) next to a continuous one -- with
+    # CPU at 100% and no way to interrupt it from R, so the analytics never returns. pamonce 0
+    # never hung in 60 trials of those shapes; it costs ~4x on the 5,000-row PAM cap.
+    #
     # medoids = if(is.numeric(nstart)) "random" -- cluster::pam() switches from
     # its default deterministic "build" algorithm to random-start search the
     # instant ANY numeric nstart is passed. Forward nstart only when the user
@@ -186,13 +192,13 @@
     raw <- if (!is.na(pam_nstart) && pam_nstart > 1) {
       cluster::pam(
         mat, k = centers, metric = distance, stand = FALSE,
-        keep.diss = FALSE, keep.data = FALSE, pamonce = 5,
+        keep.diss = FALSE, keep.data = FALSE, pamonce = 0,
         medoids = 'random', nstart = pam_nstart
       )
     } else {
       cluster::pam(
         mat, k = centers, metric = distance, stand = FALSE,
-        keep.diss = FALSE, keep.data = FALSE, pamonce = 5
+        keep.diss = FALSE, keep.data = FALSE, pamonce = 0
       )
     }
     silhouette <- .kmedoids_silhouette_components(raw)
