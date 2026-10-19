@@ -151,9 +151,11 @@ test_that('analysis_conditions returns the shared Metric/Value shape', {
 })
 
 test_that('non-numeric variables are rejected clearly', {
+  # iris$Species is a PLAIN factor, so it gets the unordered-factor message (tam#39875).
   expect_error(
     iris %>% exploratory:::exp_kmedoids(Species, Sepal.Length, centers = 2),
-    'requires numeric variables'
+    "Column Species is an unordered factor. Use Set Value Order with 'Ordered' checked, or use K-Modes for unordered categories.",
+    fixed = TRUE
   )
 })
 
@@ -652,4 +654,396 @@ test_that('profile carries each cluster\'s row count as cluster_size (tam#39474)
   sizes <- rows %>% dplyr::distinct(cluster, cluster_size) %>% dplyr::arrange(cluster)
   expect_equal(sizes$cluster_size, as.integer(table(model$clustering)))
   expect_equal(sum(sizes$cluster_size), nrow(data))
+})
+
+# ---------------------------------------------------------------------------------------------
+# Ordered-factor (ordinal) variables, tam#39875
+# ---------------------------------------------------------------------------------------------
+
+.kmed_agree_levels <- c('Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree')
+.kmed_room_levels <- c('Small', 'Medium', 'Large')
+
+# Two well-separated archetypes (12 rows each). Level POSITIONS are hand-written so the tests
+# never go through factor()/as.integer() to learn what the expected position is.
+.kmed_likert_positions <- function() {
+  list(
+    agree = c(c(1, 2, 1, 2, 1, 2, 2, 1, 1, 2, 1, 2), c(5, 4, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4)),
+    room = c(c(1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 1), c(3, 3, 2, 3, 3, 2, 3, 3, 3, 2, 3, 3)),
+    x = c(seq(1, 3.2, length.out = 12), seq(7, 9.2, length.out = 12))
+  )
+}
+
+.kmed_likert_fixture <- function() {
+  pos <- .kmed_likert_positions()
+  tibble::tibble(
+    id = seq_along(pos$x),
+    q_agree = factor(.kmed_agree_levels[pos$agree], levels = .kmed_agree_levels, ordered = TRUE),
+    q_room = factor(.kmed_room_levels[pos$room], levels = .kmed_room_levels, ordered = TRUE),
+    x = pos$x
+  )
+}
+
+# Independent expectation: (position - 1) / (L - 1), L == 1 -> 0, position found with match().
+.kmed_expected_encoding <- function(col) {
+  levs <- levels(col)
+  position <- match(as.character(col), levs)
+  if (length(levs) == 1) return(ifelse(is.na(position), NA_real_, 0))
+  (position - 1) / (length(levs) - 1)
+}
+
+test_that('ordered-only variables fit, are encoded to 0-1 positions, and keep levels on the model (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  pos <- .kmed_likert_positions()
+  model <- exploratory:::exp_kmedoids(data, q_agree, q_room, centers = 2, seed = 1)$model[[1]]
+
+  expect_s3_class(model, 'pam_exploratory')
+  expect_equal(model$ordinal_levels, list(q_agree = .kmed_agree_levels, q_room = .kmed_room_levels))
+  expect_equal(unname(model$mat[, 'q_agree']), (pos$agree - 1) / 4)
+  expect_equal(unname(model$mat[, 'q_room']), (pos$room - 1) / 2)
+  # Ordinal columns are NEVER standardized, even though normalize_data defaults to TRUE.
+  expect_true(all(model$mat >= 0 & model$mat <= 1))
+  # original_fit_mat keeps the raw positions 1..L.
+  expect_true(is.numeric(model$original_fit_mat))
+  expect_equal(unname(model$original_fit_mat[, 'q_agree']), pos$agree)
+  expect_equal(unname(model$original_fit_mat[, 'q_room']), pos$room)
+  # The two archetypes land in two different clusters.
+  expect_equal(length(unique(model$clustering[1:12])), 1)
+  expect_equal(length(unique(model$clustering[13:24])), 1)
+  expect_false(model$clustering[[1]] == model$clustering[[13]])
+})
+
+test_that('mixed numeric + ordered: numeric is z-scored, ordinal stays 0-1 (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  pos <- .kmed_likert_positions()
+  model <- exploratory:::exp_kmedoids(data, q_agree, x, q_room, centers = 2, seed = 1)$model[[1]]
+
+  expect_equal(unname(model$mat[, 'x']), as.numeric(scale(pos$x)))
+  expect_equal(unname(model$mat[, 'q_agree']), (pos$agree - 1) / 4)
+  expect_equal(unname(model$mat[, 'q_room']), (pos$room - 1) / 2)
+  # original_fit_mat: raw numeric value for x, positions for the ordinal columns.
+  expect_equal(unname(model$original_fit_mat[, 'x']), pos$x)
+  expect_equal(unname(model$original_fit_mat[, 'q_agree']), pos$agree)
+  expect_equal(names(model$ordinal_levels), c('q_agree', 'q_room'))
+
+  raw <- exploratory:::exp_kmedoids(data, q_agree, x, q_room, centers = 2, seed = 1,
+    normalize_data = FALSE)$model[[1]]
+  expect_equal(unname(raw$mat[, 'x']), pos$x)
+  expect_equal(unname(raw$mat[, 'q_agree']), (pos$agree - 1) / 4)
+})
+
+test_that('a plain factor is rejected with the unordered-factor message (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  data$q_plain <- factor(as.character(data$q_agree))
+  expect_error(
+    exploratory:::exp_kmedoids(data, q_agree, q_plain, x, centers = 2),
+    "Column q_plain is an unordered factor. Use Set Value Order with 'Ordered' checked, or use K-Modes for unordered categories.",
+    fixed = TRUE
+  )
+})
+
+test_that('character, logical and Date columns get the numeric-or-ordered message (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  msg <- 'K-Medoids requires numeric or ordered factor variables.'
+  data$ch <- as.character(data$q_agree)
+  data$lg <- data$x > 5
+  data$dt <- as.Date('2026-01-01') + seq_len(nrow(data))
+  for (col in c('ch', 'lg', 'dt')) {
+    expect_error(
+      exploratory:::exp_kmedoids(data, q_agree, !!rlang::sym(col), centers = 2),
+      msg, fixed = TRUE
+    )
+  }
+})
+
+test_that('values outside the levels become NA, are excluded and are counted in Rows Removed (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  answers <- as.character(data$q_agree)
+  answers[c(3, 15)] <- "Don't know"
+  data$q_agree <- factor(answers, levels = .kmed_agree_levels, ordered = TRUE)
+  expect_equal(sum(is.na(data$q_agree)), 2)
+
+  model <- exploratory:::exp_kmedoids(data, q_agree, x, q_room, centers = 2, seed = 1)$model[[1]]
+  expect_equal(model$excluded_nrow, 2)
+  expect_equal(model$valid_nrow, 22)
+  expect_equal(nrow(model$mat), 22)
+  expect_equal(nrow(model$original_fit_mat), 22)
+  expect_equal(model$valid_indices, setdiff(1:24, c(3, 15)))
+
+  conditions <- broom::tidy(model, type = 'analysis_conditions')
+  expect_equal(conditions$Value[conditions$Metric == 'Rows Removed'], '2')
+  expect_equal(conditions$Value[conditions$Metric == 'Row Count'], '22')
+
+  summary_data <- broom::tidy(model, type = 'summary', with_excluded_rows = TRUE)
+  excluded <- summary_data[is.na(summary_data$cluster), , drop = FALSE]
+  expect_equal(excluded$size, 2)
+})
+
+test_that('unused middle and unused top levels keep their positions (tam#39875)', {
+  levs <- c('a', 'b', 'c', 'd', 'e')
+  # 'c' (middle) and 'e' (top) are never answered; L stays 5.
+  answers <- c('a', 'b', 'a', 'b', 'a', 'b', 'd', 'd', 'd', 'b', 'a', 'd')
+  data <- tibble::tibble(
+    q = factor(answers, levels = levs, ordered = TRUE),
+    x = c(1, 2, 1, 2, 1, 2, 9, 9.5, 9, 2, 1, 9.5)
+  )
+  expect_false(any(c('c', 'e') %in% answers))
+  model <- exploratory:::exp_kmedoids(data, q, x, centers = 2, seed = 1)$model[[1]]
+
+  expected_position <- c(1, 2, 1, 2, 1, 2, 4, 4, 4, 2, 1, 4)
+  expect_equal(unname(model$original_fit_mat[, 'q']), expected_position)
+  expect_equal(unname(model$mat[, 'q']), (expected_position - 1) / 4)
+  expect_equal(unname(model$mat[, 'q']), .kmed_expected_encoding(data$q))
+  expect_equal(max(model$mat[, 'q']), 0.75) # top used level is 'd' = 3/4, not 1
+  expect_equal(model$ordinal_levels$q, levs)
+})
+
+test_that('a single-level ordered column encodes to 0 (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  data$q_one <- factor(rep('Only', nrow(data)), levels = 'Only', ordered = TRUE)
+  model <- exploratory:::exp_kmedoids(data, q_agree, q_one, x, centers = 2, seed = 1)$model[[1]]
+  expect_true(all(model$mat[, 'q_one'] == 0))
+  expect_true(all(model$original_fit_mat[, 'q_one'] == 1))
+})
+
+test_that('summary and medoid_details show level labels for ordinal medoid columns (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  pos <- .kmed_likert_positions()
+  model <- exploratory:::exp_kmedoids(data, q_agree, x, q_room, centers = 2, seed = 1)$model[[1]]
+  medoids <- model$medoid_indices
+
+  for (type in c('summary', 'medoid_details')) {
+    tbl <- broom::tidy(model, type = type)
+    expect_true(is.character(tbl$q_agree), info = type)
+    expect_true(is.character(tbl$q_room), info = type)
+    expect_true(is.numeric(tbl$x), info = type)
+    expect_equal(tbl$q_agree, .kmed_agree_levels[pos$agree[medoids]], info = type)
+    expect_equal(tbl$q_room, .kmed_room_levels[pos$room[medoids]], info = type)
+    expect_equal(tbl$x, pos$x[medoids], info = type)
+    expect_true(all(tbl$q_agree %in% .kmed_agree_levels), info = type)
+  }
+})
+
+test_that('representative_values and profile carry ordinal labels, positions and lower medians (tam#39875)', {
+  # Cluster B has an EVEN size (4) with positions 4,4,5,5 -> lower median is position 4 ('Agree'),
+  # never the non-level 4.5. Cluster A (6 rows) is clearly separate.
+  data <- tibble::tibble(
+    q = factor(.kmed_agree_levels[c(1, 1, 2, 1, 2, 1, 4, 4, 5, 5)], levels = .kmed_agree_levels,
+      ordered = TRUE),
+    x = c(1, 1.1, 0.9, 1, 1.2, 0.8, 9, 9.1, 8.9, 9)
+  )
+  model <- exploratory:::exp_kmedoids(data, q, x, centers = 2, elbow_method_mode = 'none',
+    seed = 1)$model[[1]]
+  big <- model$clustering[[10]]
+  expect_equal(sum(model$clustering == big), 4)
+  small <- setdiff(1:2, big)
+
+  for (type in c('representative_values', 'profile')) {
+    tbl <- broom::tidy(model, type = type)
+    expect_true(all(c('is_ordinal', 'medoid_label', 'cluster_median_label',
+      'overall_median_label') %in% colnames(tbl)), info = type)
+    expect_true(is.logical(tbl$is_ordinal), info = type)
+    expect_true(is.character(tbl$medoid_label), info = type)
+    expect_true(is.numeric(tbl$medoid), info = type)
+    expect_true(is.numeric(tbl$cluster_median), info = type)
+
+    q_big <- tbl[tbl$variable == 'q' & tbl$cluster == big, , drop = FALSE]
+    expect_true(q_big$is_ordinal, info = type)
+    expect_equal(unname(q_big$cluster_median), 4, info = type)            # lower median position
+    expect_equal(q_big$cluster_median_label, 'Agree', info = type)
+    expect_equal(unname(q_big$cluster_mean), 4.5, info = type)            # mean stays an average position
+    expect_equal(q_big$medoid_label, .kmed_agree_levels[unname(q_big$medoid)], info = type)
+    # overall: positions 1,1,2,1,2,1,4,4,5,5 -> sorted 1 1 1 1 2 2 4 4 5 5, n = 10, lower median = 2.
+    expect_equal(unname(q_big$overall_median), 2, info = type)
+    expect_equal(q_big$overall_median_label, 'Disagree', info = type)
+    expect_equal(unname(q_big$overall_mean), 2.6, info = type)
+
+    q_small <- tbl[tbl$variable == 'q' & tbl$cluster == small, , drop = FALSE]
+    expect_equal(unname(q_small$cluster_median), 1, info = type)          # 1,1,1,1,2,2 -> lower median 1
+    expect_equal(q_small$cluster_median_label, 'Strongly disagree', info = type)
+
+    x_rows <- tbl[tbl$variable == 'x', , drop = FALSE]
+    expect_false(any(x_rows$is_ordinal), info = type)
+    expect_true(all(is.na(x_rows$medoid_label)), info = type)
+    expect_true(all(is.na(x_rows$cluster_median_label)), info = type)
+    expect_true(all(is.na(x_rows$overall_median_label)), info = type)
+  }
+})
+
+test_that('distribution standardized_value is a per-column z-score for ordinal columns when normalizing (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  pos <- .kmed_likert_positions()
+  model <- exploratory:::exp_kmedoids(data, q_agree, x, centers = 2, seed = 1,
+    normalize_data = TRUE)$model[[1]]
+  distribution <- broom::tidy(model, type = 'distribution')
+
+  agree_rows <- distribution[distribution$variable == 'q_agree', , drop = FALSE]
+  expect_equal(agree_rows$value, pos$agree)                       # value = original positions
+  expect_equal(agree_rows$standardized_value, as.numeric(scale(pos$agree)))
+  expect_equal(mean(agree_rows$standardized_value), 0, tolerance = 1e-8)
+  expect_equal(stats::sd(agree_rows$standardized_value), 1, tolerance = 1e-8)
+  x_rows <- distribution[distribution$variable == 'x', , drop = FALSE]
+  expect_equal(x_rows$standardized_value, as.numeric(scale(pos$x)))
+
+  raw <- exploratory:::exp_kmedoids(data, q_agree, x, centers = 2, seed = 1,
+    normalize_data = FALSE)$model[[1]]
+  raw_dist <- broom::tidy(raw, type = 'distribution')
+  expect_equal(raw_dist$standardized_value, raw_dist$value)
+  expect_equal(raw_dist$value[raw_dist$variable == 'q_agree'], pos$agree)
+})
+
+test_that('distribution z-score of a constant ordinal column is 0, not NaN (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  data$q_one <- factor(rep('Only', nrow(data)), levels = 'Only', ordered = TRUE)
+  model <- exploratory:::exp_kmedoids(data, q_agree, q_one, x, centers = 2, seed = 1)$model[[1]]
+  distribution <- broom::tidy(model, type = 'distribution')
+  expect_false(any(is.nan(distribution$standardized_value)))
+  expect_true(all(distribution$standardized_value[distribution$variable == 'q_one'] == 0))
+})
+
+test_that('analysis_conditions gains "Number of Ordinal Variables" only when an ordinal variable is used (tam#39875)', {
+  data <- .kmed_likert_fixture()
+  mixed <- broom::tidy(
+    exploratory:::exp_kmedoids(data, q_agree, x, q_room, centers = 2, seed = 1)$model[[1]],
+    type = 'analysis_conditions'
+  )
+  expect_true('Number of Ordinal Variables' %in% mixed$Metric)
+  expect_equal(mixed$Value[mixed$Metric == 'Number of Ordinal Variables'], '2')
+  expect_equal(mixed$Value[mixed$Metric == 'Number of Variables'], '3')
+  expect_true(all(c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed',
+    'Number of Clusters') %in% mixed$Metric))
+
+  numeric_only <- broom::tidy(
+    exploratory:::exp_kmedoids(data, x, id, centers = 2, seed = 1)$model[[1]],
+    type = 'analysis_conditions'
+  )
+  expect_equal(numeric_only$Metric,
+    c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed', 'Number of Clusters'))
+})
+
+test_that('a complex column name works end to end for an ordered factor (tam#39875)', {
+  weird <- '航空 会社 !"#$%&\'()*+, -./:;<=>?@[]^_\'{|}~ 表'
+  data <- .kmed_likert_fixture()
+  names(data)[names(data) == 'q_agree'] <- weird
+  model <- exploratory:::exp_kmedoids(data, !!rlang::sym(weird), x, centers = 2, seed = 1)$model[[1]]
+  pos <- .kmed_likert_positions()
+
+  expect_equal(names(model$ordinal_levels), weird)
+  expect_equal(unname(model$mat[, weird]), (pos$agree - 1) / 4)
+  for (type in c('summary', 'medoid_details')) {
+    tbl <- broom::tidy(model, type = type)
+    expect_true(weird %in% colnames(tbl), info = type)
+    expect_true(is.character(tbl[[weird]]), info = type)
+    expect_true(all(tbl[[weird]] %in% .kmed_agree_levels), info = type)
+  }
+  for (type in c('profile', 'representative_values', 'distribution', 'variable_importance')) {
+    tbl <- broom::tidy(model, type = type)
+    expect_true(weird %in% tbl$variable, info = type)
+  }
+  profile <- broom::tidy(model, type = 'profile')
+  expect_true(all(profile$is_ordinal[profile$variable == weird]))
+  conditions <- broom::tidy(model, type = 'analysis_conditions')
+  expect_match(conditions$Value[conditions$Metric == 'Variable Names'], weird, fixed = TRUE)
+  for (type in c('map', 'cohesion', 'counts', 'data', 'silhouette')) {
+    expect_true(is.data.frame(broom::tidy(model, type = type)), info = type)
+  }
+})
+
+test_that('PCoA map, variable importance and silhouette run on mixed data (tam#39875)', {
+  # Replicated past the 50-row exact-cmdscale threshold so the randomized PCoA path runs too.
+  base <- .kmed_likert_fixture()
+  data <- dplyr::bind_rows(base, base, base)
+  data$x <- data$x + rep(c(0, 0.05, 0.1), each = nrow(base))
+  for (rows in list(base, data)) {
+    model <- exploratory:::exp_kmedoids(rows, q_agree, x, q_room, centers = 2, seed = 1,
+      elbow_method_mode = 'silhouette', max_centers = 4)$model[[1]]
+    map <- broom::tidy(model, type = 'map')
+    expect_true(nrow(map) > 0)
+    expect_true(all(is.finite(map$Dim1)) && all(is.finite(map$Dim2)))
+    rate <- attr(map, 'representation_rate')
+    expect_equal(length(rate), 2)
+    expect_true(all(rate >= 0))
+    expect_true(sum(rate) <= 1 + 1e-9)
+
+    importance <- broom::tidy(model, type = 'variable_importance')
+    expect_equal(sort(importance$variable), sort(c('q_agree', 'x', 'q_room')))
+    expect_true(all(is.finite(importance$eta_squared)))
+    expect_true(all(importance$eta_squared >= 0 & importance$eta_squared <= 1))
+
+    silhouette <- broom::tidy(model, type = 'silhouette')
+    expect_true(nrow(silhouette) > 0)
+    expect_true(is.finite(model$silhouette_avg))
+  }
+})
+
+test_that('models saved before ordinal support (no ordinal_levels / original_fit_mat) still tidy (tam#39875)', {
+  model <- mtcars %>% exploratory:::exp_kmedoids(mpg, disp, hp, centers = 3, seed = 1)
+  model <- model$model[[1]]
+  current <- lapply(c('summary', 'profile', 'representative_values', 'distribution', 'medoid_details'),
+    function(type) broom::tidy(model, type = type))
+  model$ordinal_levels <- NULL
+  model$original_fit_mat <- NULL
+  model$map_result <- NULL
+  legacy <- lapply(c('summary', 'profile', 'representative_values', 'distribution', 'medoid_details'),
+    function(type) broom::tidy(model, type = type))
+  for (i in seq_along(current)) {
+    expect_equal(legacy[[i]], current[[i]])
+  }
+  expect_equal(broom::tidy(model, type = 'analysis_conditions')$Metric,
+    c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed', 'Number of Clusters'))
+})
+
+test_that('numeric-only output is identical to the pre-ordinal implementation apart from the new columns (tam#39875)', {
+  golden <- readRDS(testthat::test_path('kmedoids_numeric_golden.rds'))
+  new_columns <- list(
+    profile = c('is_ordinal', 'medoid_label', 'cluster_median_label', 'overall_median_label'),
+    representative_values = c('is_ordinal', 'medoid_label', 'cluster_median_label',
+      'overall_median_label')
+  )
+  fixture <- iris
+  fixture$n_int <- as.integer(round(fixture$Petal.Width * 10))
+  fixture$const <- 1
+  for (mode in c('normalized', 'raw')) {
+    model <- exploratory:::exp_kmedoids(
+      fixture, Sepal.Length, Petal.Length, n_int, const, centers = 3,
+      normalize_data = identical(mode, 'normalized'), seed = 1,
+      elbow_method_mode = 'silhouette', max_centers = 5
+    )$model[[1]]
+    expected <- golden[[mode]]
+    expect_identical(model$ordinal_levels, list())
+    expect_identical(model$clustering, expected$clustering)
+    expect_identical(model$medoid_indices, expected$medoid_indices)
+    # The golden was written on macOS ARM; scale() / colMeans() / BLAS differ in the last bits
+    # on other platforms (Jenkins Linux), so floating-point values compare with a tight tolerance.
+    # Integer outputs above (clustering, medoids) and every class below stay exact.
+    expect_equal(unclass(model$mat), expected$mat, tolerance = 1e-10)
+    expect_equal(model$original_fit_mat, expected$original_fit_mat, tolerance = 1e-10)
+    for (type in c('summary', 'analysis_conditions', 'profile', 'variable_importance',
+                   'representative_values', 'distribution', 'cohesion', 'counts', 'data',
+                   'silhouette', 'medoid_details')) {
+      actual <- broom::tidy(model, type = type)
+      before <- expected[[type]]
+      # Same columns in the same relative order once the new columns are dropped...
+      kept <- setdiff(colnames(actual), new_columns[[type]])
+      expect_identical(kept, colnames(before), info = paste(mode, type))
+      # ...with the same classes, and the same values up to floating-point noise, in every old column.
+      expect_identical(lapply(as.data.frame(actual)[kept], class), lapply(as.data.frame(before), class),
+        info = paste(mode, type))
+      expect_equal(as.data.frame(actual)[kept], as.data.frame(before), tolerance = 1e-10,
+        info = paste(mode, type))
+    }
+    # Numeric-only rows: the new columns exist but are inert.
+    for (type in names(new_columns)) {
+      actual <- broom::tidy(model, type = type)
+      expect_true(all(new_columns[[type]] %in% colnames(actual)), info = type)
+      expect_false(any(actual$is_ordinal), info = type)
+      expect_true(all(is.na(actual$medoid_label)), info = type)
+      expect_true(all(is.na(actual$cluster_median_label)), info = type)
+      expect_true(all(is.na(actual$overall_median_label)), info = type)
+    }
+    # The map is deterministic up to eigenvector sign.
+    map <- broom::tidy(model, type = 'map')
+    expect_equal(abs(map$Dim1), abs(expected$map$Dim1))
+    expect_equal(abs(map$Dim2), abs(expected$map$Dim2))
+    expect_equal(attr(map, 'representation_rate'), attr(expected$map, 'representation_rate'))
+  }
 })
