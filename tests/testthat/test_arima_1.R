@@ -1,6 +1,7 @@
 context("test ARIMA functions")
 test_that("exp_arima with aggregation", {
   Sys.setenv(TZ="UTC") # set time zone for test stability for tests with time unit smaller than day.
+  set.seed(1) # Fixed data keeps the model search, and with it the run time, the same on every run.
   raw_data <- data.frame(
     timestamp = seq(as.POSIXct("2010-01-01 00:00:00", tz = "UTC"), by = "hour", length.out = 1440),
     count = as.integer(runif(1440, min = 100, max = 3000))
@@ -26,9 +27,11 @@ test_that("exp_arima with aggregation", {
   ret <- raw_data %>% tail(100) %>%
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "minute", na_fill_type = "previous")
   # Test both "sec" and "second". na_fill_type is needed to exercise complete_data function.
-  ret <- raw_data %>% tail(100) %>%
+  # Use only 3 hourly rows: complete_data fills every second in between, so 3 rows already become
+  # about 7,200 points, while 100 rows became about 356,000 and took minutes to fit.
+  ret <- raw_data %>% tail(3) %>%
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "sec", na_fill_type = "previous")
-  ret <- raw_data %>% tail(100) %>%
+  ret <- raw_data %>% tail(3) %>%
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "second", na_fill_type = "previous")
 
   # test for test mode.
