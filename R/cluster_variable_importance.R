@@ -31,11 +31,23 @@ cluster_variable_importance_anova <- function(mat, cluster_ids) {
     eta_squared <- if (total > 0) between / total else 0
     fit <- tryCatch(stats::aov(value ~ ids), error = function(e) NULL)
     fit_table <- if (is.null(fit)) NULL else summary(fit)[[1]]
+    test_statistic <- if (is.null(fit_table)) NA_real_ else fit_table[['F value']][[1]]
+    p_value <- if (is.null(fit_table)) NA_real_ else fit_table[['Pr(>F)']][[1]]
+    # tam#39875: when the clusters separate the variable perfectly (every cluster is constant
+    # on it), the within-cluster sum of squares is 0 and F is undefined (infinite). aov()
+    # reports floating-point noise (~1e-30) there instead, which turned F into ~1e29 and showed
+    # as "8.22e+29" in the report. Report F as NA (the report shows it blank) and P as 0.
+    # Common with 2-level ordered factors, but a perfectly separated numeric variable hits it too.
+    within <- total - between
+    if (total > 0 && within <= sqrt(.Machine$double.eps) * total) {
+      test_statistic <- NA_real_
+      p_value <- 0
+    }
     tibble::tibble(
       variable = colnames(mat)[[index]],
       eta_squared = eta_squared,
-      test_statistic = if (is.null(fit_table)) NA_real_ else fit_table[['F value']][[1]],
-      p_value = if (is.null(fit_table)) NA_real_ else fit_table[['Pr(>F)']][[1]]
+      test_statistic = test_statistic,
+      p_value = p_value
     )
   })
 }
