@@ -104,7 +104,7 @@
   labels <- rep(NA_character_, length(positions))
   for (variable in names(ordinal_levels)) {
     index <- which(variables == variable)
-    labels[index] <- ordinal_levels[[variable]][as.integer(round(positions[index]))]
+    labels[index] <- ordinal_levels[[variable]][as.integer(base::round(positions[index]))]
   }
   labels
 }

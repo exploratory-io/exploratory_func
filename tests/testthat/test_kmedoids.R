@@ -1012,8 +1012,11 @@ test_that('numeric-only output is identical to the pre-ordinal implementation ap
     expect_identical(model$ordinal_levels, list())
     expect_identical(model$clustering, expected$clustering)
     expect_identical(model$medoid_indices, expected$medoid_indices)
-    expect_identical(unclass(model$mat), expected$mat)
-    expect_identical(model$original_fit_mat, expected$original_fit_mat)
+    # The golden was written on macOS ARM; scale() / colMeans() / BLAS differ in the last bits
+    # on other platforms (Jenkins Linux), so floating-point values compare with a tight tolerance.
+    # Integer outputs above (clustering, medoids) and every class below stay exact.
+    expect_equal(unclass(model$mat), expected$mat, tolerance = 1e-10)
+    expect_equal(model$original_fit_mat, expected$original_fit_mat, tolerance = 1e-10)
     for (type in c('summary', 'analysis_conditions', 'profile', 'variable_importance',
                    'representative_values', 'distribution', 'cohesion', 'counts', 'data',
                    'silhouette', 'medoid_details')) {
@@ -1022,8 +1025,11 @@ test_that('numeric-only output is identical to the pre-ordinal implementation ap
       # Same columns in the same relative order once the new columns are dropped...
       kept <- setdiff(colnames(actual), new_columns[[type]])
       expect_identical(kept, colnames(before), info = paste(mode, type))
-      # ...and byte-identical values / classes in every old column.
-      expect_identical(as.data.frame(actual)[kept], as.data.frame(before), info = paste(mode, type))
+      # ...with the same classes, and the same values up to floating-point noise, in every old column.
+      expect_identical(lapply(as.data.frame(actual)[kept], class), lapply(as.data.frame(before), class),
+        info = paste(mode, type))
+      expect_equal(as.data.frame(actual)[kept], as.data.frame(before), tolerance = 1e-10,
+        info = paste(mode, type))
     }
     # Numeric-only rows: the new columns exist but are inert.
     for (type in names(new_columns)) {
