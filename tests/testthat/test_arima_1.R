@@ -28,7 +28,7 @@ test_that("exp_arima with aggregation", {
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "minute", na_fill_type = "previous")
   # Test both "sec" and "second". na_fill_type is needed to exercise complete_data function.
   # Use only 3 hourly rows: complete_data fills every second in between, so 3 rows already become
-  # about 7,200 points, while 100 rows became about 356,000 and took minutes to fit.
+  # about 7,200 points, while 100 rows became about 356,000 and took about 20 seconds per call to fit.
   ret <- raw_data %>% tail(3) %>%
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "sec", na_fill_type = "previous")
   ret <- raw_data %>% tail(3) %>%
