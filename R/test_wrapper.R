@@ -44,6 +44,11 @@ generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 
     start <- -3.5
     end <- ncp+3.5
   }
+  # Keep the critical t value on the chart even for a huge effect (a tiny sample).
+  if (is.finite(t)) {
+    start <- min(start, -abs(t) - 1)
+    end <- max(end, abs(t) + 1)
+  }
   x <- seq(from=start,to=end,by=(end-start)/500 )
   ret <- tibble::tibble(x=x, y=dt(x, df=df), ncp=0, type="Null")
 
@@ -3367,7 +3372,14 @@ validate_power_common_args <- function(power, sig.level, a_ratio) {
 
 # Adjusts n_start/n_end so that the smaller group always has at least 2 observations, and returns the total sample sizes to plot.
 power_analysis_n_sequence <- function(a_ratio, n_start, n_end, n_step) {
-  n_start <- max(n_start, 2/min(a_ratio, 1-a_ratio))
+  n_start <- power_required_number(n_start, "Start of the sample size range")
+  n_end <- power_required_number(n_end, "End of the sample size range")
+  n_step <- power_required_number(n_step, "Step of the sample size range")
+  if (n_step <= 0) {
+    stop("Step of the sample size range must be greater than 0.")
+  }
+  # Whole numbers only: with a_ratio = 0.15 the lower bound 2/0.15 is 13.33.
+  n_start <- ceiling(max(n_start, 2/min(a_ratio, 1-a_ratio)))
   n_end <- max(n_end, n_start)
   seq(n_start, n_end, by=n_step)
 }
@@ -3598,6 +3610,9 @@ calculate_two_prop_required_n <- function(p1, p2, power, sig.level, alternative,
   se_alt_component <- sqrt(p1 * (1 - p1) + (p2 * (1 - p2)) / ratio)
 
   n_baseline_raw <- ((z_alpha * se_null_component + z_power * se_alt_component)^2) / diff_abs^2
+  if (!is.finite(n_baseline_raw) || n_baseline_raw > POWER_ANALYSIS_MAX_N) {
+    stop("Could not reach the target power within the sample size limit. Try a larger difference or a lower Desired Power.")
+  }
   n_baseline <- ceiling(n_baseline_raw)
   n_comparison <- power_other_group_size(n_baseline, ratio)
   achieved_power <- calculate_two_prop_power(p1, p2, n_baseline, n_comparison, sig.level, alternative)
@@ -3616,8 +3631,9 @@ generate_two_prop_density_data_for_power <- function(p1, p2, n1, n2, sig.level =
 
   z_crit <- if (alternative == "two.sided") qnorm(1 - sig.level / 2) else qnorm(1 - sig.level)
   # Cover 3.5 sd of both distributions.
-  start <- min(-3.5, ncp - 3.5 * alt_sd)
-  end <- max(3.5, ncp + 3.5 * alt_sd)
+  # The critical value must stay on the chart even for a huge effect (a tiny sample).
+  start <- min(-3.5, ncp - 3.5 * alt_sd, -z_crit - 1)
+  end <- max(3.5, ncp + 3.5 * alt_sd, z_crit + 1)
   x <- seq(from=start, to=end, by=(end-start)/500)
 
   ret <- tibble::tibble(x=x, y=dnorm(x), ncp=0, type="Null")

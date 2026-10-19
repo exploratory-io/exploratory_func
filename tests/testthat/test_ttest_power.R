@@ -193,3 +193,17 @@ test_that("exp_ttest_power group 2 size has no floating point noise for slider g
     }
   }
 })
+
+test_that("exp_ttest_power sample size range stays whole numbers and rejects a bad step (#36528)", {
+  res <- data.frame(x = 1) %>% exp_ttest_power(a_ratio = 0.15, diff_to_detect = 5, common_sd = 20, n_start = 10, n_end = 100, n_step = 10) %>% tidy_rowwise(model, type = "n_to_power")
+  expect_true(all(res$n == round(res$n)))
+  expect_true(min(res$n) >= 14)
+  expect_error(data.frame(x = 1) %>% exp_ttest_power(diff_to_detect = 5, common_sd = 20, n_step = 0), "Step of the sample size range")
+  expect_error(data.frame(x = 1) %>% exp_ttest_power(diff_to_detect = 5, common_sd = 20, n_step = NA_real_), "Step of the sample size range is required")
+})
+
+test_that("exp_ttest_power keeps the critical t value on the density chart for a huge effect (#36528)", {
+  dens <- data.frame(x = 1) %>% exp_ttest_power(diff_to_detect = 100, common_sd = 1) %>% tidy_rowwise(model, type = "density")
+  crit_row <- dens %>% dplyr::filter(!is.na(statistic) & statistic)
+  expect_true(min(dens$x) <= -abs(crit_row$x[1]) && max(dens$x) >= abs(crit_row$x[1]))
+})

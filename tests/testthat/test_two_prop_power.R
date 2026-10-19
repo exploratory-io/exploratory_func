@@ -162,3 +162,16 @@ test_that("exp_two_prop_power group 2 size has no floating point noise for slide
     }
   }
 })
+
+test_that("exp_two_prop_power refuses a difference that needs more than the sample size limit (#36528)", {
+  expect_error(data.frame(x = 1) %>% exp_two_prop_power(baseline_prop = 0.3, diff_to_detect = 1e-6), "Could not reach")
+})
+
+test_that("exp_two_prop_power sample size range stays whole numbers and keeps the critical z on the chart (#36528)", {
+  res <- data.frame(x = 1) %>% exp_two_prop_power(baseline_prop = 0.3, diff_to_detect = 0.05, a_ratio = 0.15, n_start = 10, n_end = 100, n_step = 10) %>% tidy_rowwise(model, type = "n_to_power")
+  expect_true(all(res$n == round(res$n)))
+  expect_error(data.frame(x = 1) %>% exp_two_prop_power(baseline_prop = 0.3, diff_to_detect = 0.05, n_step = -5), "Step of the sample size range")
+  dens <- data.frame(x = 1) %>% exp_two_prop_power(baseline_prop = 0.01, diff_to_detect = 0.98, sig.level = 0.001) %>% tidy_rowwise(model, type = "density")
+  crit_row <- dens %>% dplyr::filter(!is.na(statistic) & statistic)
+  expect_true(min(dens$x) <= -abs(crit_row$x[1]) && max(dens$x) >= abs(crit_row$x[1]))
+})
