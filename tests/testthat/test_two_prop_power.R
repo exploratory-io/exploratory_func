@@ -59,7 +59,7 @@ test_that("two prop power: a_ratio != 0.5 uses allocation_ratio = (1 - a_ratio) 
     res <- mtcars %>% exp_two_prop_power(baseline_prop = 0.30, diff_to_detect = 0.05, a_ratio = a) %>% tidy_rowwise(model, type = "summary")
     n1 <- res$`Required Sample Size (Group 1)`
     n2 <- res$`Required Sample Size (Group 2)`
-    expect_equal(n2, ceiling(n1 * ratio), info = a)
+    expect_equal(n2, ceiling(round(n1 * ratio, 8)), info = as.character(a))
     expect_equal(res$`Required Sample Size`, n1 + n2, info = a)
     # Achieved power matches the independent calculation and reaches the target.
     expect_equal(res$`Achieved Power`, ref_prop_power(0.30, 0.35, n1, n2, 0.05, "two.sided"), tolerance = 1e-8, info = a)
@@ -149,4 +149,16 @@ test_that("two prop power: grouped data frame yields one model per group", {
   expect_equal(nrow(model_df), 2)
   res <- model_df %>% tidy_rowwise(model, type = "summary")
   expect_equal(nrow(res), 2)
+})
+
+test_that("exp_two_prop_power group 2 size has no floating point noise for slider group size ratios (#36528)", {
+  for (a in c(0.3, 0.35, 0.45, 0.6, 0.7, 0.85, 0.95)) {
+    for (diff in c(0.03, 0.05, 0.1)) {
+      res <- data.frame(x = 1) %>% exp_two_prop_power(a_ratio = a, baseline_prop = 0.3, diff_to_detect = diff) %>% tidy_rowwise(model, type = "summary")
+      n1 <- res[["Required Sample Size (Group 1)"]]
+      n2 <- res[["Required Sample Size (Group 2)"]]
+      num <- round((1 - a) * 100); den <- round(a * 100)
+      expect_equal(n2, (n1 * num + den - 1) %/% den, info = paste("a_ratio", a, "diff", diff))
+    }
+  }
 })

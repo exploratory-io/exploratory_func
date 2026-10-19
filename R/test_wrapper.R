@@ -3409,13 +3409,19 @@ calculate_ttest_power <- function(n1, n2, effect_size, sig.level = 0.05, alterna
   ifelse(valid, ret, 0)
 }
 
+# Size of the other group for a group size ratio. The ratio comes from a slider step (0.7 -> 0.3 / 0.7), so
+# n1 * ratio can land a hair above an exact integer (180.00000000000003) and ceiling() would add a subject.
+power_other_group_size <- function(n_group1, ratio) {
+  ceiling(round(n_group1 * ratio, 8))
+}
+
 # Required sample size of the two sample t test. Group 1 size is searched with uniroot on the noncentral t power,
-# group 2 size is ceiling(n_group1 * allocation_ratio).
+# group 2 size is power_other_group_size(n_group1, allocation_ratio).
 # The root of the (step-shaped) power function is then polished to the smallest integer group 1 size that reaches the target power.
 calculate_ttest_required_n <- function(effect_size, power, sig.level, alternative, allocation_ratio, var_equal, max_n = POWER_ANALYSIS_MAX_N) {
   power_for_n1 <- function(n_group1) {
     n_group1 <- ceiling(n_group1)
-    calculate_ttest_power(n_group1, ceiling(n_group1 * allocation_ratio), effect_size, sig.level, alternative, var_equal)
+    calculate_ttest_power(n_group1, power_other_group_size(n_group1, allocation_ratio), effect_size, sig.level, alternative, var_equal)
   }
   objective <- function(n_group1) power_for_n1(n_group1) - power
 
@@ -3441,7 +3447,7 @@ calculate_ttest_required_n <- function(effect_size, power, sig.level, alternativ
       n_group1 <- n_group1 + 1
     }
   }
-  n_group2 <- ceiling(n_group1 * allocation_ratio)
+  n_group2 <- power_other_group_size(n_group1, allocation_ratio)
   list(n_group1 = n_group1,
        n_group2 = n_group2,
        achieved_power = power_for_n1(n_group1),
@@ -3593,7 +3599,7 @@ calculate_two_prop_required_n <- function(p1, p2, power, sig.level, alternative,
 
   n_baseline_raw <- ((z_alpha * se_null_component + z_power * se_alt_component)^2) / diff_abs^2
   n_baseline <- ceiling(n_baseline_raw)
-  n_comparison <- ceiling(n_baseline * ratio)
+  n_comparison <- power_other_group_size(n_baseline, ratio)
   achieved_power <- calculate_two_prop_power(p1, p2, n_baseline, n_comparison, sig.level, alternative)
   list(n_group1=n_baseline, n_group2=n_comparison, achieved_power=achieved_power)
 }

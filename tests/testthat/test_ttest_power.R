@@ -5,7 +5,7 @@ context("test ttest power analysis")
 ref_min_n1_pwr <- function(d, power, sig.level, alternative, allocation_ratio) {
   d_signed <- if (alternative == "less") -abs(d) else abs(d)
   for (n1 in 2:200000) {
-    n2 <- ceiling(n1 * allocation_ratio)
+    n2 <- ceiling(round(n1 * allocation_ratio, 8))  # exact: 0.7 -> 0.3/0.7 must not become 181 for n1 = 420
     if (n2 < 2) next
     p <- pwr::pwr.t2n.test(n1 = n1, n2 = n2, d = d_signed, sig.level = sig.level, alternative = alternative)$power
     if (p >= power) return(n1)
@@ -66,10 +66,10 @@ test_that("ttest power: a_ratio != 0.5 uses allocation_ratio = (1 - a_ratio) / a
     model_df <- mtcars %>% exp_ttest_power(a_ratio = a, diff_to_detect = 5, common_sd = 20)
     res <- model_df %>% tidy_rowwise(model, type = "summary")
     n1 <- ref_min_n1_pwr(0.25, 0.8, 0.05, "two.sided", ratio)
-    expect_equal(res$`Required Sample Size (Group 1)`, n1, info = a)
-    expect_equal(res$`Required Sample Size (Group 2)`, ceiling(n1 * ratio), info = a)
-    expect_equal(res$`Required Sample Size`, n1 + ceiling(n1 * ratio), info = a)
-    p <- pwr::pwr.t2n.test(n1 = n1, n2 = ceiling(n1 * ratio), d = 0.25, sig.level = 0.05)$power
+    expect_equal(res$`Required Sample Size (Group 1)`, n1, info = as.character(a))
+    expect_equal(res$`Required Sample Size (Group 2)`, ceiling(round(n1 * ratio, 8)), info = as.character(a))
+    expect_equal(res$`Required Sample Size`, n1 + ceiling(round(n1 * ratio, 8)), info = as.character(a))
+    p <- pwr::pwr.t2n.test(n1 = n1, n2 = ceiling(round(n1 * ratio, 8)), d = 0.25, sig.level = 0.05)$power
     expect_equal(res$`Achieved Power`, p, tolerance = 1e-6)
   }
 })
@@ -179,4 +179,17 @@ test_that("ttest power: grouped data frame yields one model per group", {
 test_that("generate_ttest_density_data_for_power helper is unchanged", {
   res <- exploratory:::generate_ttest_density_data_for_power(0.2, 100, 100, 2, 100)
   expect_equal(colnames(res), c("x", "y", "ncp", "type", "critical", "df", "statistic"))
+})
+
+test_that("exp_ttest_power group 2 size has no floating point noise for slider group size ratios (#36528)", {
+  # a_ratio comes from a 0.05-step slider. Group 2 must be the smallest integer >= n1 * (1 - a) / a, computed exactly.
+  for (a in c(0.3, 0.35, 0.45, 0.6, 0.7, 0.85, 0.95)) {
+    for (d in c(0.2, 0.35, 0.5, 0.8)) {
+      res <- data.frame(x = 1) %>% exp_ttest_power(a_ratio = a, diff_to_detect = d, common_sd = 1) %>% tidy_rowwise(model, type = "summary")
+      n1 <- res[["Required Sample Size (Group 1)"]]
+      n2 <- res[["Required Sample Size (Group 2)"]]
+      num <- round((1 - a) * 100); den <- round(a * 100)  # exact integer ratio, e.g. 30/70
+      expect_equal(n2, (n1 * num + den - 1) %/% den, info = paste("a_ratio", a, "d", d))
+    }
+  }
 })
