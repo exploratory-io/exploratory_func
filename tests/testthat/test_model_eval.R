@@ -492,13 +492,13 @@ test_that("evaluate_binary_training_and_test report_metrics adds ROC/PR/Balanced
     base <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
     with_metrics <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE, report_metrics = TRUE)
   })
-  expect_false(any(c("PR AUC", "Balanced Accuracy", "Specificity", "ROC AUC") %in% colnames(base)))
-  expect_true(all(c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity") %in% colnames(with_metrics)))
+  expect_false(any(c("PR AUC", "Average Precision", "Balanced Accuracy", "Specificity", "ROC AUC") %in% colnames(base)))
+  expect_true(all(c("ROC AUC", "PR AUC", "Average Precision", "Balanced Accuracy", "Specificity") %in% colnames(with_metrics)))
   expect_false("AUC" %in% colnames(with_metrics))
   # Statistical model metrics stay present alongside the new prediction metrics.
   expect_true(all(c("P Value", "AIC", "BIC", "Log Likelihood") %in% colnames(with_metrics)))
   expect_equal(nrow(with_metrics), 2)
-  expect_false(any(is.na(with_metrics[, c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity"), drop = FALSE])))
+  expect_false(any(is.na(with_metrics[, c("ROC AUC", "PR AUC", "Average Precision", "Balanced Accuracy", "Specificity"), drop = FALSE])))
   # Default output columns keep the same values.
   kept <- intersect(colnames(base), colnames(with_metrics))
   expect_equal(as.data.frame(base)[, kept, drop = FALSE],

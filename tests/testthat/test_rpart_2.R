@@ -524,7 +524,7 @@ test_that("exp_rpart report_metrics adds metrics without changing the default ou
                     binary = rlang::sym("is delayed"),
                     multiclass = rlang::sym("ORI GIN"))
   expected_added <- list(regression = c("MAE", "Mean Error"),
-                         binary = c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity"),
+                         binary = c("ROC AUC", "PR AUC", "Average Precision", "Balanced Accuracy", "Specificity"),
                          multiclass = c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC"))
 
   data <- flight %>% dplyr::mutate(`is delayed` = `ARR DELAY` > 0)
@@ -557,10 +557,10 @@ test_that("exp_rpart report_metrics adds metrics without changing the default ou
   expect_false("AUC" %in% colnames(with_metrics))
   # #37252: Balanced Accuracy between F1 and Accuracy; Specificity after Recall.
   expect_equal(
-    intersect(c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+    intersect(c("ROC AUC", "PR AUC", "Average Precision", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
                 "Misclass. Rate", "Precision", "Recall", "Specificity"),
               colnames(with_metrics)),
-    c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+    c("ROC AUC", "PR AUC", "Average Precision", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
       "Misclass. Rate", "Precision", "Recall", "Specificity"))
   # Balanced accuracy is the mean of recall and specificity, by definition.
   expect_equal(with_metrics$`Balanced Accuracy`[[1]],
