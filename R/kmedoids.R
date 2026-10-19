@@ -155,6 +155,44 @@
   }
 }
 
+# Input for cluster::pam(pamonce = 5) on which the FastPAM swap is guaranteed to terminate.
+# tam#39875: FastPAM accepts a swap when its estimated change is below
+# -16 * DBL_EPSILON * (current objective). The estimate is a sum of differences of distances,
+# including distances to the OTHER clusters, so its rounding noise scales with those distances
+# rather than with the objective. When the clusters are tight but far apart (a 0/1 or ordered
+# column that the clusters split exactly, next to a continuous one) the noise (~1e-14) exceeds
+# that tolerance, a "-2e-14" swap is accepted, its reverse is accepted next, and pam() loops
+# forever at 100% CPU with no way to interrupt it from R.
+#
+# Snapping every distance onto a power-of-two grid makes every sum FastPAM forms exact in
+# double precision: each accepted swap then lowers the objective for real, so the swap loop
+# must end. The grid step is chosen so that a sum of up to 4 * n distances still fits in 50
+# bits of mantissa, which leaves the step at ~1e-15 * n of the largest distance -- far below
+# any difference that matters, so medoids match the unsnapped fit outside exact near-ties.
+# Manhattan distances of grid values are themselves exact, so the data is snapped and pam()
+# still computes the distances in C; Euclidean distances go through sqrt(), so the distance
+# matrix itself is snapped and passed with diss = TRUE.
+.kmedoids_exact_grid_step <- function(bound) {
+  2^(ceiling(log2(bound)) - 50)
+}
+
+.kmedoids_pam_input <- function(mat, distance) {
+  if (identical(distance, 'manhattan')) {
+    max_abs <- max(abs(mat))
+    if (!is.finite(max_abs) || max_abs == 0) return(mat)
+    # Every Manhattan distance is at most ncol * 2 * max_abs.
+    step <- .kmedoids_exact_grid_step(4 * nrow(mat) * ncol(mat) * 2 * max_abs)
+    return(base::round(mat / step) * step)
+  }
+  dissimilarity <- stats::dist(mat, method = distance)
+  max_dist <- max(dissimilarity)
+  if (is.finite(max_dist) && max_dist > 0) {
+    step <- .kmedoids_exact_grid_step(4 * nrow(mat) * max_dist)
+    dissimilarity[] <- base::round(unclass(dissimilarity) / step) * step
+  }
+  dissimilarity
+}
+
 .kmedoids_fit <- function(mat, centers, distance, seed = NULL,
                           algorithm = 'pam', clara_samples = 20,
                           clara_sample_size = NULL, nstart = 1,
@@ -176,29 +214,41 @@
     set.seed(seed)
   }
   if (algorithm == 'pam') {
+    # FastPAM swap (pamonce = 5) on grid-snapped input: fast, and cannot loop forever on
+    # tight, well-separated clusters (tam#39875) -- see .kmedoids_pam_input().
+    #
     # medoids = if(is.numeric(nstart)) "random" -- cluster::pam() switches from
     # its default deterministic "build" algorithm to random-start search the
     # instant ANY numeric nstart is passed. Forward nstart only when the user
     # asked for more than one trial, so nstart = 1 (the default) stays
     # byte-identical to the pre-nstart call and every existing saved analytics
     # keeps its current medoids.
+    pam_input <- .kmedoids_pam_input(mat, distance)
+    run_pam <- function(...) {
+      if (inherits(pam_input, 'dist')) {
+        cluster::pam(
+          pam_input, k = centers, diss = TRUE,
+          keep.diss = FALSE, keep.data = FALSE, pamonce = 5, ...
+        )
+      } else {
+        cluster::pam(
+          pam_input, k = centers, metric = distance, stand = FALSE,
+          keep.diss = FALSE, keep.data = FALSE, pamonce = 5, ...
+        )
+      }
+    }
     pam_nstart <- as.integer(base::round(nstart %||% 1))
     raw <- if (!is.na(pam_nstart) && pam_nstart > 1) {
-      cluster::pam(
-        mat, k = centers, metric = distance, stand = FALSE,
-        keep.diss = FALSE, keep.data = FALSE, pamonce = 5,
-        medoids = 'random', nstart = pam_nstart
-      )
+      run_pam(medoids = 'random', nstart = pam_nstart)
     } else {
-      cluster::pam(
-        mat, k = centers, metric = distance, stand = FALSE,
-        keep.diss = FALSE, keep.data = FALSE, pamonce = 5
-      )
+      run_pam()
     }
     silhouette <- .kmedoids_silhouette_components(raw)
     silhouette_widths <- silhouette$widths
     silhouette_row_indices <- silhouette$indices
     medoid_indices <- raw$id.med
+    # The medoid rows of the ORIGINAL data, not of the grid-snapped copy pam() saw.
+    medoids <- mat[medoid_indices, , drop = FALSE]
   } else {
     if (is.null(clara_sample_size)) {
       clara_sample_size <- min(nrow(mat), max(100L, 40L + 2L * centers))
@@ -216,13 +266,14 @@
     silhouette_widths <- silhouette$widths
     silhouette_row_indices <- silhouette$indices
     medoid_indices <- raw$i.med
+    medoids <- raw$medoids
   }
   list(
     raw = raw,
     algorithm = algorithm,
     is_approximate = identical(algorithm, 'clara'),
     clustering = as.integer(raw$clustering),
-    medoids = raw$medoids,
+    medoids = medoids,
     medoid_indices = as.integer(medoid_indices),
     objective = raw$objective,
     silhouette_widths = silhouette_widths,
