@@ -3550,6 +3550,62 @@ aupr <- function(score, bool) {
   sum((recall - previous_recall) * (precision + previous_precision) / 2)
 }
 
+#' Calculates Average Precision, the same as scikit-learn's average_precision_score.
+#' Unlike aupr(), which takes the trapezoid area under the PR curve, this is the
+#' step sum of (R_n - R_(n-1)) * P_n over the distinct score thresholds. Cases with
+#' the same score are grouped into one threshold.
+#' @param score - Vector of predicted score/probability for the positive class.
+#' @param bool - Logical vector. TRUE is the positive class.
+#' @return Average Precision, or NA when it is undefined (no positive or no
+#'   negative case, or nothing left after removing NAs).
+#' @noRd
+average_precision_score <- function(score, bool) {
+  not_na <- !(is.na(score) | is.na(bool)) # Index to filter out score-bool pairs with NA in either of them.
+  bool <- as.logical(bool[not_na])
+  score <- score[not_na]
+  if (length(bool) == 0 || !any(bool) || all(bool)) {
+    return(NA_real_)
+  }
+  ordered <- order(score, decreasing = TRUE)
+  bool <- bool[ordered]
+  score <- score[ordered]
+  tp <- cumsum(bool)
+  fp <- cumsum(!bool)
+  # Keep only the last case of each group of tied scores, so that ties form one threshold.
+  last_of_tie <- c(score[-1] != score[-length(score)], TRUE)
+  tp <- tp[last_of_tie]
+  fp <- fp[last_of_tie]
+  recall <- tp / sum(bool)
+  precision <- tp / (tp + fp)
+  sum(diff(c(0, recall)) * precision)
+}
+
+#' Returns an XGBoost custom_metric function that calculates Average Precision.
+#' XGBoost has the built-in "aucpr" (PR AUC) but no Average Precision.
+#' It is for xgb.train(custom_metric = , maximize = TRUE) with
+#' disable_default_eval_metric = TRUE. The name shows up in the evaluation log
+#' as e.g. "validation_average_precision".
+#' @noRd
+xgb_custom_binary_metric <- function(name = "average_precision") {
+  force(name)
+  function(preds, dmatrix) {
+    label <- xgboost::getinfo(dmatrix, "label")
+    list(metric = name, value = average_precision_score(preds, label == 1))
+  }
+}
+
+#' Returns a LightGBM eval function that calculates PR AUC (trapezoid) with aupr().
+#' LightGBM has the built-in "average_precision" but no PR AUC.
+#' It is for lgb.train(eval = ) with params metric = "None".
+#' @noRd
+lgb_custom_binary_metric <- function(name = "pr_auc") {
+  force(name)
+  function(preds, dataset) {
+    label <- lightgbm::get_field(dataset, "label")
+    list(name = name, value = aupr(preds, label == 1), higher_better = TRUE)
+  }
+}
+
 #' Calculates time-dependent AUC for survival prediction.
 #' score - Vector of predicted risk of event
 #' time - Vector of survival time
