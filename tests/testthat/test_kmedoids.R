@@ -180,7 +180,7 @@ test_that('PAM silhouette scores retain their original row indexes', {
   model <- result$model[[1]]
   reference <- cluster::pam(
     model$mat, k = 3, metric = 'manhattan', stand = FALSE,
-    keep.diss = FALSE, keep.data = FALSE, pamonce = 0
+    keep.diss = FALSE, keep.data = FALSE, pamonce = 5
   )
   expect_equal(
     model$silhouette_row_indices,
@@ -323,7 +323,7 @@ test_that('PAM with the default nstart matches calling cluster::pam() with no ns
   set.seed(5)
   fit_default <- exploratory:::.kmedoids_fit(mat, centers = 3, distance = 'euclidean', algorithm = 'pam')
   set.seed(5)
-  raw <- cluster::pam(mat, k = 3, metric = 'euclidean', stand = FALSE, keep.diss = FALSE, keep.data = FALSE, pamonce = 0)
+  raw <- cluster::pam(mat, k = 3, metric = 'euclidean', stand = FALSE, keep.diss = FALSE, keep.data = FALSE, pamonce = 5)
 
   expect_identical(as.integer(fit_default$clustering), as.integer(raw$clustering))
   expect_identical(fit_default$medoid_indices, as.integer(raw$id.med))
@@ -1026,9 +1026,11 @@ test_that('numeric-only output is identical to the pre-ordinal implementation ap
       kept <- setdiff(colnames(actual), new_columns[[type]])
       expect_identical(kept, colnames(before), info = paste(mode, type))
       # ...with the same classes, and the same values up to floating-point noise, in every old column.
+      # PAM now fits on grid-snapped distances (.kmedoids_pam_input), which moves silhouette
+      # widths by ~1e-9 relative, hence 1e-8 here rather than the 1e-10 used for the matrices.
       expect_identical(lapply(as.data.frame(actual)[kept], class), lapply(as.data.frame(before), class),
         info = paste(mode, type))
-      expect_equal(as.data.frame(actual)[kept], as.data.frame(before), tolerance = 1e-10,
+      expect_equal(as.data.frame(actual)[kept], as.data.frame(before), tolerance = 1e-8,
         info = paste(mode, type))
     }
     # Numeric-only rows: the new columns exist but are inert.
@@ -1048,30 +1050,58 @@ test_that('numeric-only output is identical to the pre-ordinal implementation ap
   }
 })
 
-test_that('K-Medoids never calls cluster::pam with a fast-swap pamonce (tam#39875)', {
-  # cluster::pam() 2.1.8.2 with pamonce = 1..6 can loop forever on tied distances (a 0/1 or
-  # few-level column next to a continuous one); only the original swap (pamonce = 0) never
-  # hung in 60 trials. Guard the source so a later "performance" change cannot reintroduce it.
+test_that('PAM input is snapped onto a power-of-two grid so the FastPAM swap sums are exact (tam#39875)', {
+  # cluster::pam(pamonce = 5) looped forever when the rounding noise of its swap estimate beat
+  # its tolerance. On grid values every sum it forms is exact, so the swap loop must end.
+  set.seed(3)
+  mat <- cbind(g = rep(c(0, 1), each = 20), x = c(stats::rnorm(20, 0, 0.1), stats::rnorm(20, 5, 0.1)))
+
+  snapped <- exploratory:::.kmedoids_pam_input(mat, 'manhattan')
+  expect_equal(dim(snapped), dim(mat))
+  expect_lt(max(abs(snapped - mat)), 1e-9)
+  step <- exploratory:::.kmedoids_exact_grid_step(4 * nrow(mat) * ncol(mat) * 2 * max(abs(mat)))
+  expect_true(all(snapped / step == round(snapped / step)))
+
+  # Euclidean distances go through sqrt(), so the distance matrix itself is snapped.
+  snapped_dist <- exploratory:::.kmedoids_pam_input(mat, 'euclidean')
+  expect_s3_class(snapped_dist, 'dist')
+  plain_dist <- stats::dist(mat)
+  expect_lt(max(abs(as.numeric(snapped_dist) - as.numeric(plain_dist))), 1e-9)
+  step_dist <- exploratory:::.kmedoids_exact_grid_step(4 * nrow(mat) * max(plain_dist))
+  expect_true(all(as.numeric(snapped_dist) / step_dist == round(as.numeric(snapped_dist) / step_dist)))
+
+  # .kmedoids_fit must hand pam() the snapped input, not the raw matrix.
   fit_src <- paste(deparse(exploratory:::.kmedoids_fit), collapse = '\n')
-  expect_false(grepl('pamonce\\s*=\\s*[1-9]', fit_src))
-  expect_true(grepl('pamonce\\s*=\\s*0', fit_src))
+  expect_true(grepl('.kmedoids_pam_input(mat, distance)', fit_src, fixed = TRUE))
 })
 
-test_that('K-Medoids finishes on tie-heavy data that made the FastPAM swap loop forever (tam#39875)', {
+test_that('K-Medoids finishes on well-separated data that made the FastPAM swap loop forever (tam#39875)', {
   skip_if_not_installed('callr')
-  # Seed 4 of this exact shape hung exp_kmedoids() forever with pamonce = 5. Run it in a child
-  # R process with a timeout so a regression fails here instead of hanging the whole suite.
+  # Seeds 4, 5, 6 and 8 of this exact shape hung exp_kmedoids() forever with pamonce = 5 on the
+  # raw data. Run them in a child R process with a timeout so a regression fails here instead
+  # of hanging the whole suite.
   pkg_dir <- normalizePath(testthat::test_path('..', '..'))
   res <- tryCatch(callr::r(function(pkg_dir) {
-    suppressMessages(pkgload::load_all(pkg_dir, quiet = TRUE))
-    set.seed(4)
-    df <- tibble::tibble(
-      g = factor(rep(c('a', 'b'), each = 20), levels = c('a', 'b'), ordered = TRUE),
-      x = c(stats::rnorm(20, 0, 0.1), stats::rnorm(20, 5, 0.1))
-    )
-    m <- exp_kmedoids(df, g, x, centers = 2, seed = 1)$model[[1]]
-    sort(unique(m$clustering))
-  }, args = list(pkg_dir = pkg_dir), libpath = .libPaths(), timeout = 120),
+    if (file.exists(file.path(pkg_dir, 'DESCRIPTION'))) {
+      suppressMessages(pkgload::load_all(pkg_dir, quiet = TRUE))
+    } else {
+      # R CMD check runs the tests outside the source tree; use the installed package.
+      suppressMessages(library(exploratory))
+    }
+    clusters <- list()
+    for (s in c(4, 5, 6, 8)) {
+      for (distance in c('manhattan', 'euclidean')) {
+        set.seed(s)
+        df <- tibble::tibble(
+          g = factor(rep(c('a', 'b'), each = 20), levels = c('a', 'b'), ordered = TRUE),
+          x = c(stats::rnorm(20, 0, 0.1), stats::rnorm(20, 5, 0.1))
+        )
+        m <- exp_kmedoids(df, g, x, centers = 2, seed = 1, distance = distance)$model[[1]]
+        clusters[[paste(s, distance)]] <- sort(unique(m$clustering))
+      }
+    }
+    unique(unname(clusters))
+  }, args = list(pkg_dir = pkg_dir), libpath = .libPaths(), timeout = 300),
   error = function(e) conditionMessage(e))
-  expect_identical(res, 1:2)
+  expect_identical(res, list(1:2))
 })
