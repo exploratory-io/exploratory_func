@@ -139,12 +139,12 @@ test_that('analysis_conditions returns the shared Metric/Value shape', {
   # exact string match, so the wording is part of the contract.
   expect_equal(colnames(conditions), c('Metric', 'Value'))
   expect_equal(conditions$Metric,
-    c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed',
+    c('Number of Variables', 'Variable Names', 'Number of Rows', 'Rows Removed',
       'Number of Clusters'))
   expect_true(is.character(conditions$Value))
   expect_equal(conditions$Value[[1]], '3')
   expect_equal(conditions$Value[[2]], 'x, y, z')
-  # Row Count is the rows actually clustered, Rows Removed the ones dropped for the NA.
+  # Number of Rows is the rows actually clustered, Rows Removed the ones dropped for the NA.
   expect_equal(conditions$Value[[3]], '6')
   expect_equal(conditions$Value[[4]], '1')
   expect_equal(conditions$Value[[5]], '2')
@@ -771,7 +771,7 @@ test_that('values outside the levels become NA, are excluded and are counted in 
 
   conditions <- broom::tidy(model, type = 'analysis_conditions')
   expect_equal(conditions$Value[conditions$Metric == 'Rows Removed'], '2')
-  expect_equal(conditions$Value[conditions$Metric == 'Row Count'], '22')
+  expect_equal(conditions$Value[conditions$Metric == 'Number of Rows'], '22')
 
   summary_data <- broom::tidy(model, type = 'summary', with_excluded_rows = TRUE)
   excluded <- summary_data[is.na(summary_data$cluster), , drop = FALSE]
@@ -909,7 +909,7 @@ test_that('analysis_conditions gains "Number of Ordinal Variables" only when an 
   expect_true('Number of Ordinal Variables' %in% mixed$Metric)
   expect_equal(mixed$Value[mixed$Metric == 'Number of Ordinal Variables'], '2')
   expect_equal(mixed$Value[mixed$Metric == 'Number of Variables'], '3')
-  expect_true(all(c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed',
+  expect_true(all(c('Number of Variables', 'Variable Names', 'Number of Rows', 'Rows Removed',
     'Number of Clusters') %in% mixed$Metric))
 
   numeric_only <- broom::tidy(
@@ -917,7 +917,7 @@ test_that('analysis_conditions gains "Number of Ordinal Variables" only when an 
     type = 'analysis_conditions'
   )
   expect_equal(numeric_only$Metric,
-    c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed', 'Number of Clusters'))
+    c('Number of Variables', 'Variable Names', 'Number of Rows', 'Rows Removed', 'Number of Clusters'))
 })
 
 test_that('a complex column name works end to end for an ordered factor (tam#39875)', {
@@ -989,7 +989,7 @@ test_that('models saved before ordinal support (no ordinal_levels / original_fit
     expect_equal(legacy[[i]], current[[i]])
   }
   expect_equal(broom::tidy(model, type = 'analysis_conditions')$Metric,
-    c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed', 'Number of Clusters'))
+    c('Number of Variables', 'Variable Names', 'Number of Rows', 'Rows Removed', 'Number of Clusters'))
 })
 
 test_that('numeric-only output is identical to the pre-ordinal implementation apart from the new columns (tam#39875)', {

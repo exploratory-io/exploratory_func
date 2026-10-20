@@ -182,7 +182,9 @@
     'No'
   }
   tibble::tibble(
-    Metric = c('Number of Variables', 'Variable Names', 'Row Count', 'Rows Removed',
+    # tam#38536 follow-up: "Row Count" -> "Number of Rows", consistently with every other
+    # analytics type's analysis_conditions table (see tam docs/plans/design/38536_design.md).
+    Metric = c('Number of Variables', 'Variable Names', 'Number of Rows', 'Rows Removed',
                'Number of Clusters', 'Distance', 'Linkage', 'Sampling'),
     Value = c(
       as.character(length(x$selected_cols)), paste(x$selected_cols, collapse = ', '),

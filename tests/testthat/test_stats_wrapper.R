@@ -973,7 +973,7 @@ test_that("do_cor analysis_conditions returns the report's 6-row conditions tabl
   res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
 
   expect_equal(res$Metric, c("Number of Variables", "Variable Names", "Excluded Variables",
-                             "Row Count", "Rows Removed", "Correlation"))
+                             "Number of Rows", "Rows Removed", "Correlation"))
   expect_equal(res$Value[[1]], "3")
   expect_equal(res$Value[[2]], "a, b, c")
   expect_equal(res$Value[[3]], "None")
