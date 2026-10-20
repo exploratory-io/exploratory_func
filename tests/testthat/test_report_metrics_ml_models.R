@@ -17,7 +17,7 @@ make_binary_df <- function(n = 150, seed = 42) {
     dplyr::mutate(x1 = x1 + ifelse(y, 1.2, 0))
 }
 
-expected_binary <- c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity")
+expected_binary <- c("ROC AUC", "PR AUC", "Average Precision", "Balanced Accuracy", "Specificity")
 
 expect_report_metrics_binary <- function(model_df, label) {
   base <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)

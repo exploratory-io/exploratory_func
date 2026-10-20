@@ -414,6 +414,7 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
           specificity <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
           sensitivity <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
           test_ret$pr_auc <- aupr(pred_prob, actual_for_roc)
+          test_ret$average_precision <- average_precision_score(pred_prob, actual_for_roc)
           test_ret$balanced_accuracy <- if (is.na(specificity) || is.na(sensitivity)) NA_real_ else (specificity + sensitivity) / 2
           test_ret$specificity <- specificity
         }
@@ -437,7 +438,7 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
   # sort column order
   if (isTRUE(report_metrics)) {
     ret <- ret %>% dplyr::select(dplyr::any_of(c(
-      "auc", "roc_auc", "pr_auc", "f_score", "balanced_accuracy", "accuracy_rate",
+      "auc", "roc_auc", "pr_auc", "average_precision", "f_score", "balanced_accuracy", "accuracy_rate",
       "misclassification_rate", "precision", "recall", "specificity",
       "p.value", "positives", "negatives", "n", "logLik", "AIC", "BIC",
       "deviance", "null.deviance", "df.null", "df.residual")),
@@ -472,6 +473,7 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
     if (isTRUE(report_metrics)) {
       colnames(ret)[colnames(ret) == "auc"] <- "ROC AUC"
       colnames(ret)[colnames(ret) == "pr_auc"] <- "PR AUC"
+      colnames(ret)[colnames(ret) == "average_precision"] <- "Average Precision"
       colnames(ret)[colnames(ret) == "balanced_accuracy"] <- "Balanced Accuracy"
       colnames(ret)[colnames(ret) == "specificity"] <- "Specificity"
     } else {
