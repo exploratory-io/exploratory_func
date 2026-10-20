@@ -3424,7 +3424,7 @@ calculate_ttest_power <- function(n1, n2, effect_size, sig.level = 0.05, alterna
 # Size of the other group for a group size ratio. The ratio comes from a slider step (0.7 -> 0.3 / 0.7), so
 # n1 * ratio can land a hair above an exact integer (180.00000000000003) and ceiling() would add a subject.
 power_other_group_size <- function(n_group1, ratio) {
-  ceiling(round(n_group1 * ratio, 8))
+  ceiling(base::round(n_group1 * ratio, 8))
 }
 
 # Required sample size of the two sample t test. Group 1 size is searched with uniroot on the noncentral t power,
@@ -3493,7 +3493,7 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, diff_to_detect, common_sd, sig.l
     stop("Min. Detectable Difference must not be 0.")
   }
 
-  beta <- round(1.0 - power, 10)
+  beta <- base::round(1.0 - power, 10)
   cohens_d <- diff_to_detect / common_sd
   # Absolute effect size. Direction is handled by the alternative hypothesis.
   effect_size <- abs(cohens_d)
@@ -3697,7 +3697,7 @@ exp_two_prop_power <- function(dummy, baseline_prop, diff_to_detect, sig.level=0
     stop("For the alternative hypothesis 'Group 2 is less than Group 1', Min. Detectable Difference must be less than 0.")
   }
 
-  beta <- round(1.0 - power, 10)
+  beta <- base::round(1.0 - power, 10)
   allocation_ratio <- (1 - a_ratio) / a_ratio
   n <- power_analysis_n_sequence(a_ratio, n_start, n_end, n_step)
 
