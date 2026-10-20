@@ -212,3 +212,102 @@ test_that("lightgbm evaluation_log names of the built-in metrics are unchanged",
     expect_equal(nrow(ret), 10, info = metric)
   }
 })
+
+# ---- Average Precision column in the binary Model Metrics table (tam#39807) ----
+
+# Independent sklearn-style Average Precision, written as a threshold-by-threshold loop
+# so that it shares no code with average_precision_score():
+# AP = sum over distinct thresholds t (descending) of (recall_t - recall_prev) * precision_t,
+# where a case is predicted positive when score >= t.
+hand_average_precision <- function(score, truth) {
+  total_pos <- sum(truth)
+  ap <- 0
+  prev_recall <- 0
+  for (th in sort(unique(score), decreasing = TRUE)) {
+    selected <- score >= th
+    recall <- sum(truth & selected) / total_pos
+    precision <- sum(truth & selected) / sum(selected)
+    ap <- ap + (recall - prev_recall) * precision
+    prev_recall <- recall
+  }
+  ap
+}
+
+test_that("hand_average_precision agrees with the sklearn reference values", {
+  expect_equal(hand_average_precision(c(0.1, 0.4, 0.35, 0.8), c(FALSE, FALSE, TRUE, TRUE)), 5 / 6)
+  expect_equal(hand_average_precision(c(0.9, 0.8, 0.8, 0.7, 0.6, 0.5), c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE)), 34 / 45)
+})
+
+make_ap_column_data <- function(n = 400) {
+  set.seed(3)
+  tibble::tibble(x1 = rnorm(n), x2 = rnorm(n)) %>%
+    dplyr::mutate(y = (x1 + 0.5 * x2 + rnorm(n)) > 0.5)
+}
+
+# Asserts the table has the Average Precision column right after PR AUC, with real values equal to the
+# hand-computed AP of the model's own predictions, on the training row and on the test row.
+expect_average_precision_column <- function(ret, train_pred, test_pred, info) {
+  # Placement: ROC AUC, PR AUC, Average Precision.
+  cols <- colnames(ret)
+  expect_equal(match("Average Precision", cols), match("PR AUC", cols) + 1, info = info)
+  expect_equal(match("PR AUC", cols), match("ROC AUC", cols) + 1, info = info)
+  expect_equal(nrow(ret), 2, info = info)
+  train_row <- ret[1, ]
+  test_row <- ret[2, ]
+  # The actual column is logical for glm and a TRUE/FALSE factor for ranger.
+  is_true <- function(y) as.character(y) %in% c("TRUE", "1")
+  expect_equal(train_row[["Average Precision"]],
+               hand_average_precision(train_pred$predicted_probability, is_true(train_pred$y)), info = info)
+  expect_equal(test_row[["Average Precision"]],
+               hand_average_precision(test_pred$predicted_probability, is_true(test_pred$y)), info = info)
+  # AP is not PR AUC: both are real but they are different measures.
+  expect_false(is.na(train_row[["Average Precision"]]), info = info)
+  expect_false(is.na(test_row[["Average Precision"]]), info = info)
+  expect_false(isTRUE(all.equal(train_row[["Average Precision"]], train_row[["PR AUC"]], tolerance = 1e-12)), info = info)
+}
+
+test_that("logistic regression (glm) Model Metrics has Average Precision after PR AUC on training and test rows", {
+  d <- make_ap_column_data()
+  model_df <- suppressWarnings(d %>% build_lm.fast(y, x1, x2, family = "binomial", model_type = "glm", test_rate = 0.3))
+  ret <- suppressWarnings(evaluate_binary_training_and_test(model_df, y, pretty.name = TRUE, report_metrics = TRUE))
+  train_pred <- suppressWarnings(prediction_binary(model_df, data = "training"))
+  test_pred <- suppressWarnings(prediction_binary(model_df, data = "test"))
+  expect_average_precision_column(ret, train_pred, test_pred, "glm")
+
+  # Raw column name, immediately after pr_auc.
+  raw <- suppressWarnings(evaluate_binary_training_and_test(model_df, y, pretty.name = FALSE, report_metrics = TRUE))
+  expect_equal(match("average_precision", colnames(raw)), match("pr_auc", colnames(raw)) + 1)
+  expect_equal(raw$average_precision, ret[["Average Precision"]])
+
+  # Default (report_metrics = FALSE) is untouched.
+  base <- suppressWarnings(evaluate_binary_training_and_test(model_df, y, pretty.name = TRUE))
+  expect_false("Average Precision" %in% colnames(base))
+})
+
+test_that("logistic regression (glm) without test mode has Average Precision on the training row", {
+  d <- make_ap_column_data()
+  model_df <- suppressWarnings(d %>% build_lm.fast(y, x1, x2, family = "binomial", model_type = "glm", test_rate = 0))
+  ret <- suppressWarnings(evaluate_binary_training_and_test(model_df, y, pretty.name = TRUE, report_metrics = TRUE))
+  train_pred <- suppressWarnings(prediction_binary(model_df, data = "training"))
+  expect_equal(nrow(ret), 1)
+  expect_equal(match("Average Precision", colnames(ret)), match("PR AUC", colnames(ret)) + 1)
+  expect_equal(ret[["Average Precision"]], hand_average_precision(train_pred$predicted_probability, as.logical(train_pred$y)))
+})
+
+test_that("ranger (calc_feature_imp) Model Metrics has Average Precision after PR AUC on training and test rows", {
+  d <- make_ap_column_data()
+  model_df <- suppressWarnings(d %>% calc_feature_imp(y, x1, x2, test_rate = 0.3))
+  ret <- suppressWarnings(rf_evaluation_training_and_test(model_df, pretty.name = TRUE, report_metrics = TRUE))
+  train_pred <- suppressWarnings(prediction(model_df, data = "training"))
+  test_pred <- suppressWarnings(prediction(model_df, data = "test"))
+  expect_average_precision_column(ret, train_pred, test_pred, "ranger")
+
+  # Raw column name, immediately after pr_auc.
+  raw <- suppressWarnings(rf_evaluation_training_and_test(model_df, pretty.name = FALSE, report_metrics = TRUE))
+  expect_equal(match("average_precision", colnames(raw)), match("pr_auc", colnames(raw)) + 1)
+  expect_equal(raw$average_precision, ret[["Average Precision"]])
+
+  # Default (report_metrics = FALSE) is untouched.
+  base <- suppressWarnings(rf_evaluation_training_and_test(model_df, pretty.name = TRUE))
+  expect_false("Average Precision" %in% colnames(base))
+})

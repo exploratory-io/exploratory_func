@@ -3068,6 +3068,8 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   # specificity and balanced accuracy describe the currently configured threshold.
   if (report_metrics) {
     pr_auc <- aupr(predicted_probability, actual_for_roc)
+    # Average Precision (sklearn average_precision_score) is shown right after PR AUC (tam#39807).
+    ap <- average_precision_score(predicted_probability, actual_for_roc)
     # Specificity = TN / (TN + FP). actual_for_roc is TRUE for the positive class,
     # so the negative side is its complement. predicted is a label vector, which is
     # compared against the same positive class used for actual_for_roc.
@@ -3083,9 +3085,9 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     if (pretty.name) {
       # Spec renames AUC to ROC AUC so it reads as a pair with PR AUC.
       # #37252 column order (from issue screenshots):
-      # ROC AUC, PR AUC, F1, Balanced Accuracy, Accuracy..Recall, Specificity, Rows…
+      # ROC AUC, PR AUC, Average Precision, F1, Balanced Accuracy, Accuracy..Recall, Specificity, Rows…
       ret <- dplyr::bind_cols(
-        tibble::tibble(`ROC AUC` = auc, `PR AUC` = pr_auc),
+        tibble::tibble(`ROC AUC` = auc, `PR AUC` = pr_auc, `Average Precision` = ap),
         ret,
         tibble::tibble(`Balanced Accuracy` = balanced_accuracy, `Specificity` = specificity))
       cols <- names(ret)
@@ -3101,7 +3103,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     }
     else {
       ret <- dplyr::bind_cols(
-        tibble::tibble(roc_auc = auc, pr_auc = pr_auc),
+        tibble::tibble(roc_auc = auc, pr_auc = pr_auc, average_precision = ap),
         ret,
         tibble::tibble(balanced_accuracy = balanced_accuracy, specificity = specificity))
       cols <- names(ret)
