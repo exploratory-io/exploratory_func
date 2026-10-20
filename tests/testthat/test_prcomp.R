@@ -93,11 +93,11 @@ test_that("new report tidy types return expected columns and tokens", {
   model_df <- mtcars %>% do_prcomp(mpg, cyl, disp, hp, drat, wt)
   res <- model_df %>% tidy_rowwise(model, type = "analysis_conditions")
   expect_equal(colnames(res), c("Metric", "Value", "Description", "status"))
-  expect_true(all(c("Row Count","Number of Variables","Normalization","SD Ratio (Max/Min)") %in% res$Metric))
+  expect_true(all(c("Number of Rows","Number of Variables","Normalization","SD Ratio (Max/Min)") %in% res$Metric))
   expect_false("Rows vs Variables" %in% res$Metric)
   expect_false("Rows Used" %in% res$Metric)
   expect_false("Variables Used" %in% res$Metric)
-  expect_false("Number of Rows" %in% res$Metric)
+  expect_false("Row Count" %in% res$Metric)
   # #37268: empty excluded-variables cell is "None" (JA: なし), not "-".
   excluded_row <- res[res$Metric == "Excluded Variables", , drop = FALSE]
   if (nrow(excluded_row) == 1 && identical(excluded_row$status, "na")) {
@@ -123,7 +123,7 @@ test_that("new report tidy types return empty typed tibbles for kmeans fits (exc
   ac <- km %>% tidy_rowwise(model, type = "analysis_conditions")
   expect_equal(colnames(ac), c("Metric", "Value"))
   expect_equal(nrow(ac), 5)
-  expect_equal(ac$Metric, c("Number of Variables", "Variable Names", "Row Count",
+  expect_equal(ac$Metric, c("Number of Variables", "Variable Names", "Number of Rows",
                             "Rows Removed", "Number of Clusters"))
   expect_true(all(c("mpg", "cyl", "disp") %in% strsplit(ac$Value[ac$Metric == "Variable Names"], ", ")[[1]]))
   expect_equal(ac$Value[ac$Metric == "Number of Variables"], "3")
@@ -151,8 +151,8 @@ test_that("kmeans analysis conditions use per-group row metadata", {
   conditions <- km %>% tidy_rowwise(model, type = "analysis_conditions")
   values_by_group <- split(conditions$Value, conditions$segment)
 
-  expect_equal(values_by_group$a[conditions$Metric[conditions$segment == "a"] == "Row Count"], "4")
-  expect_equal(values_by_group$b[conditions$Metric[conditions$segment == "b"] == "Row Count"], "4")
+  expect_equal(values_by_group$a[conditions$Metric[conditions$segment == "a"] == "Number of Rows"], "4")
+  expect_equal(values_by_group$b[conditions$Metric[conditions$segment == "b"] == "Number of Rows"], "4")
   expect_equal(values_by_group$a[conditions$Metric[conditions$segment == "a"] == "Rows Removed"], "1")
   expect_equal(values_by_group$b[conditions$Metric[conditions$segment == "b"] == "Rows Removed"], "1")
 })

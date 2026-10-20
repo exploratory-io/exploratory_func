@@ -630,7 +630,7 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
 
   # --- analysis_method: counts first, then the method rows (#37340).
   method_tbl <- tidy(fit, type = "analysis_method")
-  expect_equal(method_tbl$Item, c("Number of Variables", "Row Count", "Rows Removed", "Correlation",
+  expect_equal(method_tbl$Item, c("Number of Variables", "Number of Rows", "Rows Removed", "Correlation",
                                   "Factor Extraction Method", "Rotation", "Parallel Analysis Method"))
   expect_equal(method_tbl$Value[[1]], as.character(n_var))
   expect_equal(method_tbl$Value[[2]], as.character(nrow(mtcars)))
@@ -659,7 +659,7 @@ test_that("report part 3: variances_judged, suitability P value format, analysis
   expect_equal(tidy(fake, type = "suitability")$Value[[2]], "N/A")
 })
 
-test_that("analysis_method reports Rows Removed under Row Count (tam#37402)", {
+test_that("analysis_method reports Rows Removed under Number of Rows (tam#37402)", {
   # Inject missing values so preprocess_factanal_data_before_sample drops rows. Sampling is
   # NOT counted as removed -- only the NA/Inf filter is.
   df <- mtcars[, c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec")]
@@ -669,7 +669,7 @@ test_that("analysis_method reports Rows Removed under Row Count (tam#37402)", {
   expect_equal(fit$n_rows_excluded, 5L)
   expect_equal(fit$n_rows_used, nrow(df) - 5L)
   method_tbl <- tidy(fit, type = "analysis_method")
-  expect_equal(method_tbl$Item[[2]], "Row Count")
+  expect_equal(method_tbl$Item[[2]], "Number of Rows")
   expect_equal(method_tbl$Item[[3]], "Rows Removed")
   expect_equal(method_tbl$Item[[4]], "Correlation")
   expect_equal(method_tbl$Value[[2]], as.character(nrow(df) - 5L))

@@ -378,7 +378,7 @@ test_that("exp_cronbach_alpha summary carries the six Analysis Conditions rows",
   model_df <- exp_cronbach_alpha(df, dplyr::everything(), correlation_method = "pearson")
   summary <- model_df %>% tidy_rowwise(model, type = "summary")
 
-  wanted <- c("Number of Variables", "Variable Names", "Row Count", "Rows Removed",
+  wanted <- c("Number of Variables", "Variable Names", "Number of Rows", "Rows Removed",
               "Correlation", "Reliability Metric")
   expect_true(all(wanted %in% summary$Metric))
   # The row set the report's OTHER section (the reliability coefficients) filters on must survive.
@@ -401,7 +401,7 @@ test_that("exp_cronbach_alpha reports Rows Removed as a count and a rate", {
   value_of <- function(metric) summary$Value[[match(metric, summary$Metric)]]
 
   total <- nrow(df)
-  expect_equal(value_of("Row Count"), as.character(total - 2))
+  expect_equal(value_of("Number of Rows"), as.character(total - 2))
   # "N (P%)", matching the Factor Analysis / PCA rows this table is standardized against.
   expect_equal(value_of("Rows Removed"),
                paste0("2 (", format(round(2 / total * 100, 1), nsmall = 1), "%)"))

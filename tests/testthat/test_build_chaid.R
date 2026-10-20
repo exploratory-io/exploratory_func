@@ -132,7 +132,7 @@ test_that("numeric CHAID produces finite held-out regression metrics", {
 })
 
 test_that("exp_chaid report_metrics adds ROC AUC / PR AUC like CART", {
-  expected_binary <- c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity")
+  expected_binary <- c("ROC AUC", "PR AUC", "Average Precision", "Balanced Accuracy", "Specificity")
   expected_multi <- c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC")
 
   for (test_rate in c(0, 0.3)) {
@@ -149,10 +149,10 @@ test_that("exp_chaid report_metrics adds ROC AUC / PR AUC like CART", {
     expect_equal(nrow(with_metrics), if (test_rate > 0) 2 else 1, info = label)
     expect_false(any(is.na(with_metrics[, expected_binary, drop = FALSE])), info = label)
     expect_equal(
-      intersect(c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+      intersect(c("ROC AUC", "PR AUC", "Average Precision", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
                   "Misclass. Rate", "Precision", "Recall", "Specificity"),
                 colnames(with_metrics)),
-      c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+      c("ROC AUC", "PR AUC", "Average Precision", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
         "Misclass. Rate", "Precision", "Recall", "Specificity"),
       info = label
     )

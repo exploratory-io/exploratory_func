@@ -44,6 +44,11 @@ generate_ttest_density_data_for_power <- function(d, n1, n2, t, df, sig_level = 
     start <- -3.5
     end <- ncp+3.5
   }
+  # Keep the critical t value on the chart even for a huge effect (a tiny sample).
+  if (is.finite(t)) {
+    start <- min(start, -abs(t) - 1)
+    end <- max(end, abs(t) + 1)
+  }
   x <- seq(from=start,to=end,by=(end-start)/500 )
   ret <- tibble::tibble(x=x, y=dt(x, df=df), ncp=0, type="Null")
 
@@ -3338,75 +3343,197 @@ tidy.chisq_power_exploratory <- function(x, type="summary") {
   ret
 }
 
-#' dummy - Data frame. Since it is just ignored, it is named dummy here.
-#' @export
-exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2, alternative="two.sided", paired=FALSE, n_start=10, n_end=1000, n_step=10) {
-  power <- 1.0 - beta
-  # Adjust n_start and n_end so that they are not too small. The smaller of s_start*a_ratio and n_start*(1-a_ratio) should be greater than 2.
-  n_start <- max(n_start, 2/min(a_ratio,1-a_ratio))
+# Upper limit of the sample size (per group 1) searched by the power analysis functions.
+POWER_ANALYSIS_MAX_N <- 1e7
+
+# Validates an argument that must be a single non-missing number. Returns the value.
+power_required_number <- function(x, label) {
+  if (is.null(x) || length(x) != 1 || !is.numeric(x) || is.na(x)) {
+    stop(paste0(label, " is required."))
+  }
+  x
+}
+
+# Validates the arguments shared by the Two Sample t Test and Two Sample Proportion Test power analyses.
+validate_power_common_args <- function(power, sig.level, a_ratio) {
+  power <- power_required_number(power, "Desired Power")
+  sig.level <- power_required_number(sig.level, "Significance Level")
+  a_ratio <- power_required_number(a_ratio, "Group Size Ratio")
+  if (power <= 0 || power >= 1) {
+    stop("Desired Power must be between 0 and 1.")
+  }
+  if (sig.level <= 0 || sig.level >= 1) {
+    stop("Significance Level must be between 0 and 1.")
+  }
+  if (a_ratio <= 0 || a_ratio >= 1) {
+    stop("Group Size Ratio must be greater than 0 and less than 1.")
+  }
+}
+
+# Adjusts n_start/n_end so that the smaller group always has at least 2 observations, and returns the total sample sizes to plot.
+power_analysis_n_sequence <- function(a_ratio, n_start, n_end, n_step) {
+  n_start <- power_required_number(n_start, "Start of the sample size range")
+  n_end <- power_required_number(n_end, "End of the sample size range")
+  n_step <- power_required_number(n_step, "Step of the sample size range")
+  if (n_step <= 0) {
+    stop("Step of the sample size range must be greater than 0.")
+  }
+  # Whole numbers only: with a_ratio = 0.15 the lower bound 2/0.15 is 13.33.
+  n_start <- ceiling(max(n_start, 2/min(a_ratio, 1-a_ratio)))
   n_end <- max(n_end, n_start)
-  n = seq(n_start, n_end, by=n_step)
-  n1 = a_ratio*n
-  n2 = (1-a_ratio)*n
-  if (alternative == "less") {
-    d_signed <- -d
+  seq(n_start, n_end, by=n_step)
+}
+
+# Degrees of freedom of the two sample t test.
+# var_equal = TRUE  - Student's t test (pooled variance).
+# var_equal = FALSE - Welch-Satterthwaite approximation, assuming the expected SD is the same in both groups.
+calculate_ttest_power_df <- function(n1, n2, var_equal = TRUE) {
+  if (var_equal) {
+    n1 + n2 - 2
   }
   else {
-    d_signed <- d
+    (1/n1 + 1/n2)^2 / ((1/n1)^2/(n1 - 1) + (1/n2)^2/(n2 - 1))
   }
+}
+
+# Power of the two sample t test, based on the noncentral t distribution.
+# Vectorized over n1 and n2. Group sizes are not rounded here. Power is 0 where either group has fewer than 2 observations.
+# effect_size - Absolute Cohen's d. The direction is handled by the alternative hypothesis.
+# alternative - "two.sided", "greater" or "less"
+calculate_ttest_power <- function(n1, n2, effect_size, sig.level = 0.05, alternative = "two.sided", var_equal = TRUE) {
+  valid <- n1 >= 2 & n2 >= 2
+  n1v <- ifelse(valid, n1, 2)
+  n2v <- ifelse(valid, n2, 2)
+  ncp <- effect_size / sqrt(1/n1v + 1/n2v)
+  df <- calculate_ttest_power_df(n1v, n2v, var_equal)
+  if (alternative == "greater") {
+    t_crit <- qt(1 - sig.level, df = df)
+    ret <- 1 - pt(t_crit, df = df, ncp = ncp)
+  }
+  else if (alternative == "less") {
+    t_crit <- qt(sig.level, df = df)
+    ret <- pt(t_crit, df = df, ncp = -ncp)
+  }
+  else { # "two.sided"
+    t_crit <- qt(1 - sig.level/2, df = df)
+    ret <- (1 - pt(t_crit, df = df, ncp = ncp)) + pt(-t_crit, df = df, ncp = ncp)
+  }
+  ifelse(valid, ret, 0)
+}
+
+# Size of the other group for a group size ratio. The ratio comes from a slider step (0.7 -> 0.3 / 0.7), so
+# n1 * ratio can land a hair above an exact integer (180.00000000000003) and ceiling() would add a subject.
+power_other_group_size <- function(n_group1, ratio) {
+  ceiling(base::round(n_group1 * ratio, 8))
+}
+
+# Required sample size of the two sample t test. Group 1 size is searched with uniroot on the noncentral t power,
+# group 2 size is power_other_group_size(n_group1, allocation_ratio).
+# The root of the (step-shaped) power function is then polished to the smallest integer group 1 size that reaches the target power.
+calculate_ttest_required_n <- function(effect_size, power, sig.level, alternative, allocation_ratio, var_equal, max_n = POWER_ANALYSIS_MAX_N) {
+  power_for_n1 <- function(n_group1) {
+    n_group1 <- ceiling(n_group1)
+    calculate_ttest_power(n_group1, power_other_group_size(n_group1, allocation_ratio), effect_size, sig.level, alternative, var_equal)
+  }
+  objective <- function(n_group1) power_for_n1(n_group1) - power
+
+  lower_n <- 2
+  upper_n <- 4
+  if (objective(lower_n) >= 0) {
+    n_group1 <- lower_n
+  }
+  else {
+    # Expand upper bound until target power is reached
+    while (objective(upper_n) < 0 && upper_n < max_n) {
+      upper_n <- upper_n * 2
+    }
+    if (objective(upper_n) < 0) {
+      stop("Could not reach the target power within the sample size limit. Try a larger difference to detect, a smaller standard deviation, or a lower desired power.")
+    }
+    n_group1 <- ceiling(uniroot(objective, lower = lower_n, upper = upper_n)$root)
+    # uniroot's tolerance can leave the root on either side of the integer step. Make it the smallest n that reaches the target.
+    while (n_group1 > lower_n && power_for_n1(n_group1 - 1) >= power) {
+      n_group1 <- n_group1 - 1
+    }
+    while (power_for_n1(n_group1) < power) {
+      n_group1 <- n_group1 + 1
+    }
+  }
+  n_group2 <- power_other_group_size(n_group1, allocation_ratio)
+  list(n_group1 = n_group1,
+       n_group2 = n_group2,
+       achieved_power = power_for_n1(n_group1),
+       df = calculate_ttest_power_df(n_group1, n_group2, var_equal))
+}
+
+#' Two Sample t Test power analysis.
+#'
+#' Estimates the sample size required to detect a difference in group means.
+#' @param dummy Data frame. Since it is just ignored, it is named dummy here.
+#' @param a_ratio Share of Group 1 in the total sample size (Group Size Ratio). Between 0 and 1 exclusive. Group 2 / Group 1 = (1 - a_ratio) / a_ratio.
+#' @param diff_to_detect Minimum difference in group means to detect (Min. Detectable Difference). Its sign is ignored; the direction is given by alternative.
+#' @param common_sd Expected standard deviation of the target variable (Expected Std. Deviation).
+#' @param sig.level Significance level.
+#' @param power Desired power.
+#' @param alternative "two.sided", "greater" (Group 2 is greater than Group 1) or "less".
+#' @param var_equal TRUE for equal variance (Student), FALSE for unequal variance (Welch).
+#' @param n_start,n_end,n_step Range of the total sample size for the sample size vs power data.
+#' @export
+exp_ttest_power <- function(dummy, a_ratio=0.5, diff_to_detect, common_sd, sig.level=0.05, power=0.8, alternative="two.sided", var_equal=TRUE, n_start=10, n_end=1000, n_step=10) {
+  if (missing(diff_to_detect)) diff_to_detect <- NULL
+  if (missing(common_sd)) common_sd <- NULL
+  diff_to_detect <- power_required_number(diff_to_detect, "Min. Detectable Difference")
+  common_sd <- power_required_number(common_sd, "Expected Std. Deviation")
+  validate_power_common_args(power, sig.level, a_ratio)
+  alternative <- match.arg(alternative, c("two.sided", "greater", "less"))
+  if (common_sd <= 0) {
+    stop("Expected Std. Deviation must be greater than 0.")
+  }
+  if (diff_to_detect == 0) {
+    stop("Min. Detectable Difference must not be 0.")
+  }
+
+  beta <- base::round(1.0 - power, 10)
+  cohens_d <- diff_to_detect / common_sd
+  # Absolute effect size. Direction is handled by the alternative hypothesis.
+  effect_size <- abs(cohens_d)
+  allocation_ratio <- (1 - a_ratio) / a_ratio
+  n <- power_analysis_n_sequence(a_ratio, n_start, n_end, n_step)
 
   ttest_power_each <- function(dummy) {
     # Sample size vs power calculation
-    if (!paired) {
-      n_to_power_res <- pwr::pwr.t2n.test(n1=n1, n2=n2, d=d_signed, sig.level=sig.level, alternative = alternative)
-    }
-    else {
-      n_to_power_res <- pwr::pwr.t.test(n=n, d=d_signed, sig.level=sig.level, type="paired", alternative = alternative)
-    }
-    n_to_power <- tibble::tibble(n=n, power = n_to_power_res$power)
+    n_to_power <- tibble::tibble(n=n, power=calculate_ttest_power(a_ratio*n, (1-a_ratio)*n, effect_size, sig.level, alternative, var_equal))
 
     # Required sample size calculation
-    if (!paired) {
-      required_n <- (pwr::pwr.t2nr.test(r=a_ratio, d=d_signed, sig.level=sig.level, power=power, alternative = alternative))$n
-    }
-    else {
-      required_n <- (pwr::pwr.t.test(d=d_signed, sig.level=sig.level, power=power, type="paired", alternative = alternative))$n
-    }
+    req <- calculate_ttest_required_n(effect_size, power, sig.level, alternative, allocation_ratio, var_equal)
 
-
-    if (!paired) {
-      df <- required_n - 2 # Assuming Student's independent samples t-test sinde Welch's requires standard deviations as extra inputs.
-    }
-    else {
-      df <- required_n - 1
-    }
     if (alternative == "greater") {
-      crit <- qt(1-sig.level, df=df) # The t statistic that corresponds to the significance level.
+      crit <- qt(1-sig.level, df=req$df) # The t statistic that corresponds to the significance level.
     }
     else if (alternative == "less") {
-      crit <- qt(sig.level, df=df)
+      crit <- qt(sig.level, df=req$df)
     }
     else { # "two.sided" case
-      crit <- qt(1-sig.level/2, df=df)
+      crit <- qt(1-sig.level/2, df=req$df)
     }
-
-    if (!paired) {
-      n1 = a_ratio*required_n
-      n2 = (1-a_ratio)*required_n
-    }
-    else {
-      n1 = required_n
-      n2 = required_n
-    }
-    density <- generate_ttest_density_data_for_power(d=d, n1=n1, n2=n2, t=crit, df=df, sig_level = sig.level, alternative = alternative, paired = paired)
+    density <- generate_ttest_density_data_for_power(d=effect_size, n1=req$n_group1, n2=req$n_group2, t=crit, df=req$df, sig_level = sig.level, alternative = alternative, paired = FALSE)
 
     model <- list(n_to_power=n_to_power,
-                  df=df,
-                  d=d,
+                  df=req$df,
+                  d=cohens_d,
+                  diff_to_detect=diff_to_detect,
+                  common_sd=common_sd,
                   sig.level=sig.level,
                   beta=beta,
                   power=power,
-                  required_n=required_n,
+                  achieved_power=req$achieved_power,
+                  alternative=alternative,
+                  a_ratio=a_ratio,
+                  allocation_ratio=allocation_ratio,
+                  var_equal=var_equal,
+                  required_n_group1=req$n_group1,
+                  required_n_group2=req$n_group2,
+                  required_n=req$n_group1 + req$n_group2,
                   density=density)
     class(model) <- c("ttest_power_exploratory")
     model
@@ -3417,12 +3544,208 @@ exp_ttest_power <- function(dummy, a_ratio=0.5, d=0.2, sig.level=0.05, beta=0.2,
 #' @export
 tidy.ttest_power_exploratory <- function(x, type="summary") {
   if (type == "summary") {
-    ret <- tibble::tibble(sig.level=x$sig.level, beta=x$beta, power=x$power, d=x$d, df=x$df, n=x$required_n)
-    ret <- ret %>% dplyr::rename(any_of(c(`Type 1 Error`="sig.level",
+    ret <- tibble::tibble(diff_to_detect=x$diff_to_detect, common_sd=x$common_sd, d=x$d,
+                          sig.level=x$sig.level, beta=x$beta, power=x$power, achieved_power=x$achieved_power, df=x$df,
+                          n1=x$required_n_group1, n2=x$required_n_group2, n=x$required_n)
+    ret <- ret %>% dplyr::rename(any_of(c(`Min. Detectable Difference`="diff_to_detect",
+                                          `Expected Std. Deviation`="common_sd",
+                                          `Cohen's D`="d",
+                                          `Type 1 Error`="sig.level",
                                           `Type 2 Error`="beta",
                                           `Power`="power",
-                                          `Cohen's D`="d",
+                                          `Achieved Power`="achieved_power",
                                           `DF`="df",
+                                          `Required Sample Size (Group 1)`="n1",
+                                          `Required Sample Size (Group 2)`="n2",
+                                          `Required Sample Size`="n")))
+  }
+  else if (type == "n_to_power") {
+    ret <- x$n_to_power
+  }
+  else if (type == "density") {
+    ret <- x$density
+  }
+  ret
+}
+
+# Power of the two sample proportion test (normal approximation) for given proportions and group sizes.
+# Vectorized over n1 and n2. Group 1 is the baseline group, p2 is the proportion of group 2.
+calculate_two_prop_power <- function(p1, p2, n1, n2, sig.level = 0.05, alternative = c("two.sided", "greater", "less")) {
+  alternative <- match.arg(alternative)
+  diff <- p2 - p1
+
+  # Pooled proportion under H0
+  p_pool <- (n1 * p1 + n2 * p2) / (n1 + n2)
+  se_null <- sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+  se_alt <- sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+
+  if (alternative == "two.sided") {
+    z_alpha <- qnorm(1 - sig.level / 2)
+    upper_cutoff <- z_alpha * se_null
+    lower_cutoff <- -z_alpha * se_null
+    ret <- pnorm(lower_cutoff, mean = diff, sd = se_alt) + (1 - pnorm(upper_cutoff, mean = diff, sd = se_alt))
+  }
+  else if (alternative == "greater") {
+    z_alpha <- qnorm(1 - sig.level)
+    cutoff <- z_alpha * se_null
+    ret <- 1 - pnorm(cutoff, mean = diff, sd = se_alt)
+  }
+  else { # "less"
+    z_alpha <- qnorm(1 - sig.level)
+    cutoff <- -z_alpha * se_null
+    ret <- pnorm(cutoff, mean = diff, sd = se_alt)
+  }
+  ret
+}
+
+# Required sample size of the two sample proportion test. Group 1 is the baseline group, n2 = ceiling(n1 * ratio).
+calculate_two_prop_required_n <- function(p1, p2, power, sig.level, alternative, ratio) {
+  diff_abs <- abs(p2 - p1)
+  z_alpha <- if (alternative == "two.sided") qnorm(1 - sig.level / 2) else qnorm(1 - sig.level)
+  z_power <- qnorm(power)
+
+  # Weighted pooled proportion under H0. This accounts for unequal group allocation.
+  p_pool <- (p1 + ratio * p2) / (1 + ratio)
+  se_null_component <- sqrt(p_pool * (1 - p_pool) * (1 + 1 / ratio))
+  se_alt_component <- sqrt(p1 * (1 - p1) + (p2 * (1 - p2)) / ratio)
+
+  n_baseline_raw <- ((z_alpha * se_null_component + z_power * se_alt_component)^2) / diff_abs^2
+  if (!is.finite(n_baseline_raw) || n_baseline_raw > POWER_ANALYSIS_MAX_N) {
+    stop("Could not reach the target power within the sample size limit. Try a larger difference or a lower Desired Power.")
+  }
+  n_baseline <- ceiling(n_baseline_raw)
+  n_comparison <- power_other_group_size(n_baseline, ratio)
+  achieved_power <- calculate_two_prop_power(p1, p2, n_baseline, n_comparison, sig.level, alternative)
+  list(n_group1=n_baseline, n_group2=n_comparison, achieved_power=achieved_power)
+}
+
+# Generates data for the probability density chart of the two sample proportion power analysis.
+# The x axis is the z statistic. The null distribution is N(0, 1); the alternative one is centered at diff / se_null.
+generate_two_prop_density_data_for_power <- function(p1, p2, n1, n2, sig.level = 0.05, alternative = "two.sided") {
+  diff <- p2 - p1
+  p_pool <- (n1 * p1 + n2 * p2) / (n1 + n2)
+  se_null <- sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+  se_alt <- sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+  ncp <- diff / se_null      # Center of the alternative distribution on the z scale.
+  alt_sd <- se_alt / se_null # Its standard deviation on the z scale.
+
+  z_crit <- if (alternative == "two.sided") qnorm(1 - sig.level / 2) else qnorm(1 - sig.level)
+  # Cover 3.5 sd of both distributions.
+  # The critical value must stay on the chart even for a huge effect (a tiny sample).
+  start <- min(-3.5, ncp - 3.5 * alt_sd, -z_crit - 1)
+  end <- max(3.5, ncp + 3.5 * alt_sd, z_crit + 1)
+  x <- seq(from=start, to=end, by=(end-start)/500)
+
+  ret <- tibble::tibble(x=x, y=dnorm(x), ncp=0, type="Null")
+  ret2 <- tibble::tibble(x=x, y=dnorm(x, mean=ncp, sd=alt_sd), ncp=ncp, type="Alternative")
+  if (alternative == "two.sided") {
+    ret <- ret %>% dplyr::mutate(critical=(x>=z_crit | x<=-z_crit))
+    ret2 <- ret2 %>% dplyr::mutate(critical=(x<z_crit & x>-z_crit))
+    stat_x <- z_crit
+  }
+  else if (alternative == "greater") {
+    ret <- ret %>% dplyr::mutate(critical=(x>=z_crit))
+    ret2 <- ret2 %>% dplyr::mutate(critical=(x<z_crit))
+    stat_x <- z_crit
+  }
+  else { # "less"
+    ret <- ret %>% dplyr::mutate(critical=(x<=-z_crit))
+    ret2 <- ret2 %>% dplyr::mutate(critical=(x>-z_crit))
+    stat_x <- -z_crit
+  }
+  ret <- ret %>% dplyr::mutate(df=NA_real_)
+  ret3 <- tibble::tibble(x=stat_x, y=dnorm(stat_x), type="Null", statistic=TRUE)
+  ret <- dplyr::bind_rows(ret, ret2, ret3)
+  ret <- ret %>% dplyr::mutate(type=factor(type, levels=c("Null", "Alternative")))
+  ret
+}
+
+#' Two Sample Proportion Test power analysis.
+#'
+#' Estimates the sample size required to detect a difference between the proportions of two groups.
+#' Group 1 is the baseline group. The proportion of Group 2 is baseline_prop + diff_to_detect.
+#' @param dummy Data frame. Since it is just ignored, it is named dummy here.
+#' @param baseline_prop Proportion of the baseline group (Group 1), between 0 and 1 exclusive.
+#' @param diff_to_detect Minimum difference to detect, in proportion points (0.05 means 5 percentage points).
+#' @param sig.level Significance level.
+#' @param power Desired power.
+#' @param alternative "two.sided", "greater" (Group 2 is greater than Group 1) or "less".
+#' @param a_ratio Share of Group 1 in the total sample size (Group Size Ratio). Group 2 / Group 1 = (1 - a_ratio) / a_ratio.
+#' @param n_start,n_end,n_step Range of the total sample size for the sample size vs power data.
+#' @export
+exp_two_prop_power <- function(dummy, baseline_prop, diff_to_detect, sig.level=0.05, power=0.8, alternative="two.sided", a_ratio=0.5, n_start=10, n_end=1000, n_step=10) {
+  if (missing(baseline_prop)) baseline_prop <- NULL
+  if (missing(diff_to_detect)) diff_to_detect <- NULL
+  baseline_prop <- power_required_number(baseline_prop, "Baseline Proportion")
+  diff_to_detect <- power_required_number(diff_to_detect, "Min. Detectable Difference")
+  validate_power_common_args(power, sig.level, a_ratio)
+  alternative <- match.arg(alternative, c("two.sided", "greater", "less"))
+  if (baseline_prop <= 0 || baseline_prop >= 1) {
+    stop("Baseline Proportion must be between 0 and 1.")
+  }
+  if (diff_to_detect == 0) {
+    stop("Min. Detectable Difference must not be 0.")
+  }
+  comparison_prop <- baseline_prop + diff_to_detect
+  if (comparison_prop <= 0 || comparison_prop >= 1) {
+    stop("The calculated comparison proportion must be between 0 and 1. Check Baseline Proportion and Min. Detectable Difference.")
+  }
+  if (alternative == "greater" && comparison_prop <= baseline_prop) {
+    stop("For the alternative hypothesis 'Group 2 is greater than Group 1', Min. Detectable Difference must be greater than 0.")
+  }
+  if (alternative == "less" && comparison_prop >= baseline_prop) {
+    stop("For the alternative hypothesis 'Group 2 is less than Group 1', Min. Detectable Difference must be less than 0.")
+  }
+
+  beta <- base::round(1.0 - power, 10)
+  allocation_ratio <- (1 - a_ratio) / a_ratio
+  n <- power_analysis_n_sequence(a_ratio, n_start, n_end, n_step)
+
+  two_prop_power_each <- function(dummy) {
+    # Sample size vs power calculation
+    n_to_power <- tibble::tibble(n=n, power=calculate_two_prop_power(baseline_prop, comparison_prop, a_ratio*n, (1-a_ratio)*n, sig.level, alternative))
+
+    # Required sample size calculation
+    req <- calculate_two_prop_required_n(baseline_prop, comparison_prop, power, sig.level, alternative, allocation_ratio)
+
+    density <- generate_two_prop_density_data_for_power(baseline_prop, comparison_prop, req$n_group1, req$n_group2, sig.level, alternative)
+
+    model <- list(n_to_power=n_to_power,
+                  baseline_prop=baseline_prop,
+                  comparison_prop=comparison_prop,
+                  diff_to_detect=diff_to_detect,
+                  sig.level=sig.level,
+                  beta=beta,
+                  power=power,
+                  achieved_power=req$achieved_power,
+                  alternative=alternative,
+                  a_ratio=a_ratio,
+                  allocation_ratio=allocation_ratio,
+                  required_n_group1=req$n_group1,
+                  required_n_group2=req$n_group2,
+                  required_n=req$n_group1 + req$n_group2,
+                  density=density)
+    class(model) <- c("two_prop_power_exploratory")
+    model
+  }
+  do_on_each_group(dummy, two_prop_power_each, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.two_prop_power_exploratory <- function(x, type="summary") {
+  if (type == "summary") {
+    ret <- tibble::tibble(baseline_prop=x$baseline_prop, comparison_prop=x$comparison_prop, diff_to_detect=x$diff_to_detect,
+                          sig.level=x$sig.level, beta=x$beta, power=x$power, achieved_power=x$achieved_power,
+                          n1=x$required_n_group1, n2=x$required_n_group2, n=x$required_n)
+    ret <- ret %>% dplyr::rename(any_of(c(`Baseline Proportion`="baseline_prop",
+                                          `Comparison Proportion`="comparison_prop",
+                                          `Min. Detectable Difference`="diff_to_detect",
+                                          `Type 1 Error`="sig.level",
+                                          `Type 2 Error`="beta",
+                                          `Power`="power",
+                                          `Achieved Power`="achieved_power",
+                                          `Required Sample Size (Group 1)`="n1",
+                                          `Required Sample Size (Group 2)`="n2",
                                           `Required Sample Size`="n")))
   }
   else if (type == "n_to_power") {

@@ -617,7 +617,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       n_excluded <- if (!is.null(x$excluded_nrow)) x$excluded_nrow else NA_integer_
       n_clusters <- length(unique(x$kmeans$cluster))
       res <- tibble::tibble(
-        Metric = c("Number of Variables", "Variable Names", "Row Count", "Rows Removed", "Number of Clusters"),
+        # tam#38536 follow-up: "Row Count" -> "Number of Rows", consistently with every other
+        # analytics type's analysis_conditions table (see tam docs/plans/design/38536_design.md).
+        Metric = c("Number of Variables", "Variable Names", "Number of Rows", "Rows Removed", "Number of Clusters"),
         Value = c(
           as.character(n_variables),
           variable_names_display,
@@ -661,7 +663,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
         "Preserve Component Variance"
       }
       res <- tibble::tibble(
-        Metric = c("Row Count", "Rows Excluded", "Number of Variables", "Excluded Variables",
+        # tam#38536 follow-up: "Row Count" -> "Number of Rows", consistently with every other
+        # analytics type's analysis_conditions table (see tam docs/plans/design/38536_design.md).
+        # "Rows Excluded" was already this PCA branch's own established term (unlike K-Means'
+        # "Rows Removed" above, which this rename leaves untouched).
+        Metric = c("Number of Rows", "Rows Excluded", "Number of Variables", "Excluded Variables",
                    "Normalization", "Score Scale", "SD Ratio (Max/Min)"),
         Value = c(
           as.character(d$analyzed_row_count),
