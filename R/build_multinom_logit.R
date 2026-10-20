@@ -32,7 +32,7 @@ MULTINOM_LOGIT_MAX_CATEGORIES <- 20
 #' @param group_cols Optional grouping columns (Repeat By).
 #' @param seed Random seed used for sampling / test-data split.
 #' @param test_rate Fraction of rows held out as test data. 0 means no split.
-#' @param test_split_type "random" or "ordered".
+#' @param test_split_type "random", "ordered", or "stratified" (stratified by the target).
 #' @param max_pd_vars Maximum number of predictors to compute partial dependence for.
 #' @param pd_grid_resolution Number of grid points per predictor for partial dependence.
 #' @param pd_sample_size Maximum number of rows sampled for partial dependence.
@@ -57,6 +57,7 @@ build_multinom_logit <- function(df,
                                  maxit = 200,
                                  keep.source = TRUE) {
   validate_empty_data(df)
+  validate_test_split_type(test_split_type)
 
   target_col <- unname(tidyselect::vars_select(names(df), !!rlang::enquo(target)))
   orig_selected_cols <- unname(tidyselect::vars_select(names(df), !!!rlang::quos(...)))
@@ -188,7 +189,11 @@ build_multinom_logit <- function(df,
       data <- data %>% sample_rows(max_nrow)
     }
 
-    test_index <- sample_df_index(data, rate = test_rate, ordered = (test_split_type == "ordered"))
+    test_index <- sample_df_index(data, rate = test_rate,
+
+                                  ordered = (test_split_type == "ordered"),
+
+                                  stratify_by = if (test_split_type == "stratified") data[[target_col]] else NULL)
     train_data <- safe_slice(data, test_index, remove = TRUE)
     test_data <- if (test_rate > 0) safe_slice(data, test_index, remove = FALSE) else NULL
 

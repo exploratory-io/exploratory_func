@@ -1009,6 +1009,7 @@ exp_catboost <- function(df,
                          test_rate = 0.0,
                          test_split_type = "random",
                          watchlist_rate = 0) {
+  validate_test_split_type(test_split_type)
   loadNamespace("catboost")
 
   if (test_rate < 0 | 1 < test_rate) {
@@ -1097,7 +1098,9 @@ exp_catboost <- function(df,
       }
 
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
 
       df_test_temp <- NULL
@@ -1304,7 +1307,9 @@ exp_catboost <- function(df,
       model$orig_levels <- orig_levels
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
-      model$df <- df
+      # tam#39340: prediction_training was made on the original training rows (df_train_original) when SMOTE was applied
+      # without keeping the synthetic rows. extract_actual() reads the actual values from model$df, so it has to hold the same rows.
+      model$df <- if (smote_applied && !smote_keep_synthetic) df_train_original else df
       model$formula_terms <- terms(fml)
       attr(model$formula_terms, ".Environment") <- NULL
       model$sampled_nrow <- clean_df_ret$sampled_nrow

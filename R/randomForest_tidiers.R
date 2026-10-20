@@ -1336,7 +1336,13 @@ ranger.find_na_index <- function(variables, data) {
 predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
   # We assume threshold is given only for binary case.
   if (is.null(threshold)) { # multiclass case. Return the value with maximum probability.
-    to_same_type(levels_var[apply(pred, 1, which.max)], y_value)
+    # tam#39338: Pick the label by the column name of pred. levels_var has all the levels of the target,
+    # but pred has columns only for the classes seen in training, so mapping by position can shift the labels.
+    labels <- colnames(pred)
+    if (is.null(labels)) {
+      labels <- levels_var
+    }
+    to_same_type(labels[max.col(as.matrix(pred), ties.method = "first")], y_value)
   }
   else { # binary case
     # pred (x$predictions) is 2-diminsional matrix with 2 columns for the 2 categories.
@@ -2029,7 +2035,7 @@ exp_balance <- function(df,
     # https://github.com/scikit-learn-contrib/imbalanced-learn/issues/154
     # TODO: Consider SMOTE-NC.
     for(col in integer_cols) {
-      df_balanced[[col]] <- round(df_balanced[[col]])
+      df_balanced[[col]] <- base::round(df_balanced[[col]])
     }
 
     df_balanced
@@ -2332,8 +2338,9 @@ calc_feature_imp <- function(df,
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                              seed = 1,
                              test_rate = 0.0,
-                             test_split_type = "random" # "random" or "ordered"
+                             test_split_type = "random" # "random", "ordered", or "stratified"
                              ){
+  validate_test_split_type(test_split_type)
 
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
@@ -2468,7 +2475,9 @@ calc_feature_imp <- function(df,
       # Split training and test data BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
@@ -2695,6 +2704,11 @@ calc_feature_imp <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$y <- model.response(model_df)
+      if (smote_applied && !smote_keep_synthetic) {
+        # tam#39340: prediction_training was made on the original training rows (model_df_original), so
+        # the actual values that tidy / glance compare it with must come from the same rows, not the SMOTE-resampled ones.
+        model$y <- model.response(model_df_original)
+      }
       model$df <- model_df
       # To avoid saving a huge environment when caching with RDS.
       attr(attr(model$df, "terms"), ".Environment") <- NULL
@@ -3054,6 +3068,8 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   # specificity and balanced accuracy describe the currently configured threshold.
   if (report_metrics) {
     pr_auc <- aupr(predicted_probability, actual_for_roc)
+    # Average Precision (sklearn average_precision_score) is shown right after PR AUC (tam#39807).
+    ap <- average_precision_score(predicted_probability, actual_for_roc)
     # Specificity = TN / (TN + FP). actual_for_roc is TRUE for the positive class,
     # so the negative side is its complement. predicted is a label vector, which is
     # compared against the same positive class used for actual_for_roc.
@@ -3069,9 +3085,9 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     if (pretty.name) {
       # Spec renames AUC to ROC AUC so it reads as a pair with PR AUC.
       # #37252 column order (from issue screenshots):
-      # ROC AUC, PR AUC, F1, Balanced Accuracy, Accuracy..Recall, Specificity, Rows…
+      # ROC AUC, PR AUC, Average Precision, F1, Balanced Accuracy, Accuracy..Recall, Specificity, Rows…
       ret <- dplyr::bind_cols(
-        tibble::tibble(`ROC AUC` = auc, `PR AUC` = pr_auc),
+        tibble::tibble(`ROC AUC` = auc, `PR AUC` = pr_auc, `Average Precision` = ap),
         ret,
         tibble::tibble(`Balanced Accuracy` = balanced_accuracy, `Specificity` = specificity))
       cols <- names(ret)
@@ -3087,7 +3103,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     }
     else {
       ret <- dplyr::bind_cols(
-        tibble::tibble(roc_auc = auc, pr_auc = pr_auc),
+        tibble::tibble(roc_auc = auc, pr_auc = pr_auc, average_precision = ap),
         ret,
         tibble::tibble(balanced_accuracy = balanced_accuracy, specificity = specificity))
       cols <- names(ret)
@@ -3675,12 +3691,13 @@ exp_rpart <- function(df,
                       pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                       seed = 1,
                       minsplit = 20, # The minimum number of observations that must exist in a node in order for a split to be attempted. Passed down to rpart()
-                      minbucket = round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
+                      minbucket = base::round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
                       cp = 0.01, # Complexity parameter. Any split that does not decrease the overall lack of fit by a factor of cp is not attempted. Passed down to rpart()
                       maxdepth = 30, # Set the maximum depth of any node of the final tree, with the root node counted as depth 0. Passed down to rpart()
                       test_rate = 0.0,
-                      test_split_type = "random" # "random" or "ordered"
+                      test_split_type = "random" # "random", "ordered", or "stratified"
                       ) {
+  validate_test_split_type(test_split_type)
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1){
@@ -3768,7 +3785,9 @@ exp_rpart <- function(df,
       # Split training and test data BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)

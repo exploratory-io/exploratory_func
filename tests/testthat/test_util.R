@@ -163,6 +163,85 @@ test_that("exp_cut upper/lower range support", {
   expect_equal(levels(exp_cut(c(4*1:25, Inf, -Inf), breaks=5, upper.range=80, include.outside.range=F)), c("[-Inf,4]",    "(4,29.3]",    "(29.3,54.7]", "(54.7,80]",   "(80, Inf]"))
 })
 
+test_that("exp_cut all zero / all NA fast path", {
+  # All values zero and no NA. One level, and one value per element of x.
+  res <- exploratory::exp_cut(c(0, 0, 0), breaks=5)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 3)
+  expect_equal(levels(res), c("(0,0]"))
+  expect_equal(as.character(res), c("(0,0]", "(0,0]", "(0,0]"))
+
+  # Length 1 all zero input.
+  res <- exploratory::exp_cut(c(0), breaks=5)
+  expect_equal(levels(res), c("(0,0]"))
+  expect_equal(as.character(res), c("(0,0]"))
+
+  # Zero mixed with NA. The NA positions have to stay NA, and the result has
+  # to be as long as x rather than a length 1 factor.
+  res <- exploratory::exp_cut(c(0, 0, NA), breaks=5)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 3)
+  expect_equal(levels(res), c("(0,0]"))
+  expect_equal(as.character(res), c("(0,0]", "(0,0]", NA))
+
+  # NaN is handled the same way as NA.
+  res <- exploratory::exp_cut(c(0, NaN, 0, NA), breaks=5)
+  expect_equal(as.character(res), c("(0,0]", NA, "(0,0]", NA))
+
+  # Inside mutate, a length 1 return value would be recycled to every row and
+  # turn the NA row into '(0,0]'. This is the original symptom.
+  df <- dplyr::mutate(tibble::tibble(x=c(0, 0, NA)), b=exploratory::exp_cut(x, breaks=5))
+  expect_equal(as.character(df$b), c("(0,0]", "(0,0]", NA))
+
+  # An entirely NA vector must not be classified as all zero. all(x == 0,
+  # na.rm = TRUE) is TRUE for it because na.rm drops every value.
+  res <- exploratory::exp_cut(as.numeric(c(NA, NA, NA)), breaks=5)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 3)
+  expect_equal(levels(res), character(0))
+  expect_true(all(is.na(res)))
+
+  # Same through mutate.
+  df <- dplyr::mutate(tibble::tibble(x=as.numeric(c(NA, NA))), b=exploratory::exp_cut(x, breaks=5))
+  expect_true(is.factor(df$b))
+  expect_true(all(is.na(df$b)))
+
+  # Because NA arrives as NA, the caller side can still turn it into an
+  # explicit bucket. This is what makes an '(NA)' legend / facet entry
+  # possible for an all NA or zero-and-NA numeric column.
+  res <- forcats::fct_na_value_to_level(exploratory::exp_cut(as.numeric(c(NA, NA)), breaks=5), level="(NA)")
+  expect_equal(as.character(res), c("(NA)", "(NA)"))
+  res <- forcats::fct_na_value_to_level(exploratory::exp_cut(c(0, NA), breaks=5), level="(NA)")
+  expect_equal(as.character(res), c("(0,0]", "(NA)"))
+})
+
+test_that("exp_cut all zero / all NA fast path with labels", {
+  # labels=FALSE returns the center bucket index, and keeps NA as NA.
+  expect_equal(exploratory::exp_cut(c(0, NA, 0, NA), breaks=5, labels=FALSE), c(3L, NA, 3L, NA))
+  expect_equal(exploratory::exp_cut(c(0, 0), breaks=5, labels=FALSE), c(3L, 3L))
+  expect_equal(exploratory::exp_cut(c(0, 0), breaks=4, labels=FALSE), c(2L, 2L))
+
+  # An entirely NA vector with labels=FALSE returns all NA of the same length,
+  # as an integer vector since that is what cut(labels=FALSE) returns.
+  expect_equal(exploratory::exp_cut(as.numeric(c(NA, NA)), breaks=5, labels=FALSE), c(NA_integer_, NA_integer_))
+
+  # An explicit labels vector keeps the given levels, uses the center label
+  # for the zero values, and keeps NA as NA.
+  lbls <- c("a", "b", "c", "d", "e")
+  res <- exploratory::exp_cut(c(0, NA, 0), breaks=5, labels=lbls)
+  expect_true(is.factor(res))
+  expect_equal(levels(res), lbls)
+  expect_equal(as.character(res), c("c", NA, "c"))
+
+  # An entirely NA vector with an explicit labels vector keeps the levels but
+  # assigns none of them.
+  res <- exploratory::exp_cut(as.numeric(c(NA, NA)), breaks=5, labels=lbls)
+  expect_true(is.factor(res))
+  expect_equal(length(res), 2)
+  expect_equal(levels(res), lbls)
+  expect_true(all(is.na(res)))
+})
+
 test_that("_tam_cut_by_step", {
   # Without range.
 
@@ -1715,6 +1794,263 @@ test_that("test sameple_df_index", {
   expect_equal(length(test_index), 30)
 })
 
+test_that("sample_df_index with stratify_by = NULL keeps the pre-change random draws", {
+  df <- data.frame(x = 1:99, y = 1:99)
+  for (seed in c(1, 2, 7, 42, 123)) {
+    set.seed(seed)
+    old_index <- sample(seq(nrow(df)), nrow(df) * 0.3)
+    expect_identical(sample_df_index(df, 0.3, seed = seed), old_index)
+    expect_identical(sample_df_index(df, 0.3, seed = seed, stratify_by = NULL), old_index)
+  }
+})
+
+test_that("sample_df_index stratified keeps the rare TRUE share of the issue example on every seed", {
+  df <- data.frame(x = 1:1470)
+  y <- c(rep(TRUE, 27), rep(FALSE, 1470 - 27))
+  for (seed in 1:200) {
+    test_index <- sample_df_index(df, 0.4, seed = seed, stratify_by = y)
+    expect_equal(length(test_index), 588)
+    expect_equal(sum(y[test_index]), 11)
+    expect_false(is.unsorted(test_index))
+    expect_equal(length(unique(test_index)), 588)
+  }
+})
+
+test_that("sample_df_index stratified preserves factor class proportions in test and train", {
+  y <- factor(c(rep("a", 600), rep("b", 300), rep("c", 100)))
+  df <- data.frame(x = seq_along(y))
+  test_index <- sample_df_index(df, 0.3, seed = 3, stratify_by = y)
+  expect_equal(length(test_index), 300)
+  test_counts <- as.numeric(table(y[test_index]))
+  train_counts <- as.numeric(table(y[-test_index]))
+  expect_true(all(abs(test_counts - c(180, 90, 30)) <= 1))
+  expect_true(all(abs(train_counts - c(420, 210, 70)) <= 1))
+})
+
+test_that("sample_df_index stratified works for character targets", {
+  y <- c(rep("x", 80), rep("y", 20))
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.25, seed = 1, stratify_by = y)
+  expect_equal(length(test_index), 25)
+  expect_equal(sum(y[test_index] == "y"), 5)
+})
+
+test_that("sample_df_index stratified bins a numeric target by quantile", {
+  set.seed(10)
+  y <- c(rexp(995, 0.1), 5000, 6000, 7000, 8000, 9000) # heavy tail
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.4, seed = 1, stratify_by = y)
+  expect_equal(length(test_index), 400)
+  # Each of the 5 equal-count quintiles contributes the same number of test rows (200 rows * 0.4 = 80).
+  bins <- dplyr::ntile(y, 5)
+  expect_equal(as.numeric(table(bins[test_index])), rep(80, 5))
+})
+
+test_that("sample_df_index stratified handles few distinct numeric values and ties", {
+  y <- c(rep(0, 70), rep(1, 30))
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.2, seed = 5, stratify_by = y)
+  expect_equal(length(test_index), 20)
+  # Few-valued numerics keep their values as strata: 20 test rows = 14 zeros + 6 ones.
+  expect_equal(sum(y[test_index] == 1), 6)
+
+  y3 <- rep(c(1, 2, 3), length.out = 90)
+  test_index3 <- sample_df_index(data.frame(v = seq_along(y3)), 0.2, seed = 5, stratify_by = y3)
+  expect_equal(length(test_index3), 18)
+  expect_equal(as.numeric(table(y3[test_index3])), c(6, 6, 6))
+})
+
+test_that("sample_df_index stratified treats NA as its own stratum", {
+  y <- c(rep("a", 80), rep(NA, 20))
+  df <- data.frame(v = seq_along(y))
+  test_index <- sample_df_index(df, 0.5, seed = 2, stratify_by = y)
+  expect_equal(length(test_index), 50)
+  expect_equal(sum(is.na(y[test_index])), 10)
+
+  yn <- c(rep(c(1, 2, 3, 4), 25), rep(NA_real_, 20))
+  test_index_n <- sample_df_index(data.frame(v = seq_along(yn)), 0.5, seed = 2, stratify_by = yn)
+  expect_equal(length(test_index_n), 60)
+  expect_equal(sum(is.na(yn[test_index_n])), 10)
+})
+
+test_that("sample_df_index stratified keeps a single-row class in training", {
+  y <- c(rep("a", 50), "rare", rep("b", 49))
+  df <- data.frame(v = seq_along(y))
+  for (seed in 1:50) {
+    test_index <- sample_df_index(df, 0.9, seed = seed, stratify_by = y)
+    expect_equal(length(test_index), 90)
+    expect_false(51 %in% test_index)
+    # Every stratum keeps at least one training row.
+    expect_true(all(c("a", "b", "rare") %in% y[-test_index]))
+  }
+})
+
+test_that("sample_df_index stratified keeps the test size at floor(n * rate) when many classes are singletons", {
+  # 100 unique labels: every stratum is capped at 0, yet the test size must still be 30 like the random split.
+  y_unique <- sprintf("id%03d", 1:100)
+  for (seed in 1:5) {
+    test_index <- sample_df_index(data.frame(v = 1:100), 0.3, seed = seed, stratify_by = y_unique)
+    expect_equal(length(test_index), 30)
+    expect_equal(length(unique(test_index)), 30)
+    expect_true(all(test_index >= 1 & test_index <= 100))
+    expect_false(is.unsorted(test_index))
+    # Same seed, same result.
+    expect_identical(test_index, sample_df_index(data.frame(v = 1:100), 0.3, seed = seed, stratify_by = y_unique))
+  }
+  # 90 singletons plus one class of 10: the capped allocation alone gives 9, the target is 30.
+  y_mixed <- c(sprintf("s%02d", 1:90), rep("big", 10))
+  for (seed in 1:5) {
+    test_index <- sample_df_index(data.frame(v = 1:100), 0.3, seed = seed, stratify_by = y_mixed)
+    expect_equal(length(test_index), 30)
+    expect_equal(length(unique(test_index)), 30)
+    # Singletons are pooled, so the big class gets exactly its proportional 3 rows (not 9).
+    expect_equal(sum(test_index > 90), 3)
+    expect_lt(length(test_index), 100)
+  }
+  # 5 all-distinct rows at rate 0.3: floor(1.5) = 1 row ... and at rate 0.4: 2 rows.
+  expect_equal(length(sample_df_index(data.frame(v = 1:5), 0.4, seed = 1, stratify_by = letters[1:5])), 2)
+  expect_equal(length(sample_df_index(data.frame(v = 1:5), 0.3, seed = 1, stratify_by = letters[1:5])), 1)
+})
+
+test_that("sample_df_index stratified pools single-row classes so the larger classes stay proportional", {
+  # 800/100/50 plus 50 singleton classes at 0.4: 320/40/20 from the big classes and 20 from the pool.
+  y1 <- c(rep("A", 800), rep("B", 100), rep("C", 50), sprintf("s%02d", 1:50))
+  # 60/20 plus 20 singleton classes at 0.5: 30/10 and 10 from the pool.
+  y2 <- c(rep("A", 60), rep("B", 20), sprintf("s%02d", 1:20))
+  for (seed in 1:10) {
+    ti <- sample_df_index(data.frame(v = seq_along(y1)), 0.4, seed = seed, stratify_by = y1)
+    expect_equal(length(ti), 400)
+    expect_equal(length(unique(ti)), 400)
+    expect_equal(as.numeric(table(factor(y1[ti], levels = c("A", "B", "C")))), c(320, 40, 20))
+    expect_equal(sum(startsWith(y1[ti], "s")), 20)
+
+    ti2 <- sample_df_index(data.frame(v = seq_along(y2)), 0.5, seed = seed, stratify_by = y2)
+    expect_equal(length(ti2), 50)
+    expect_equal(as.numeric(table(factor(y2[ti2], levels = c("A", "B")))), c(30, 10))
+    expect_equal(sum(startsWith(y2[ti2], "s")), 10)
+  }
+})
+
+test_that("sample_df_index stratified allocation stays fast with hundreds of thousands of classes", {
+  # Every label unique: all rows pool into one stratum, so this is a plain random sample of floor(n * rate).
+  n <- 200000
+  elapsed <- system.time(
+    ti <- sample_df_index(data.frame(v = seq_len(n)), 0.3, seed = 1, stratify_by = sprintf("id%07d", seq_len(n)))
+  )[["elapsed"]]
+  expect_lt(elapsed, 5)
+  expect_equal(length(ti), floor(n * 0.3))
+  expect_equal(length(unique(ti)), floor(n * 0.3))
+  # 50k classes of 2 rows each on 100k rows.
+  y <- rep(sprintf("c%05d", seq_len(50000)), 2)
+  elapsed2 <- system.time(
+    ti2 <- sample_df_index(data.frame(v = seq_along(y)), 0.3, seed = 1, stratify_by = y)
+  )[["elapsed"]]
+  expect_lt(elapsed2, 5)
+  expect_equal(length(ti2), 30000)
+  expect_equal(length(unique(ti2)), 30000)
+  # No class is entirely in the test set.
+  expect_equal(sum(table(y[ti2]) == 2), 0)
+})
+
+test_that("sample_df_index stratified treats numerics with up to 10 distinct values as discrete strata", {
+  set.seed(3)
+  counts7 <- c(100, 200, 300, 150, 100, 100, 50)
+  y7 <- sample(rep(1:7, counts7))
+  ti7 <- sample_df_index(data.frame(v = seq_along(y7)), 0.3, seed = 2, stratify_by = y7)
+  expect_equal(length(ti7), 300)
+  expect_true(all(abs(as.numeric(table(y7[ti7])) - counts7 * 0.3) <= 1))
+
+  counts10 <- c(20, 40, 60, 80, 100, 120, 140, 160, 180, 100)
+  y10 <- sample(rep(1:10, counts10))
+  ti10 <- sample_df_index(data.frame(v = seq_along(y10)), 0.25, seed = 2, stratify_by = y10)
+  expect_equal(length(ti10), 250)
+  expect_true(all(abs(as.numeric(table(y10[ti10])) - counts10 * 0.25) <= 1))
+  # Same for dates.
+  d <- as.Date("2020-01-01") + (y7 - 1)
+  tid <- sample_df_index(data.frame(v = seq_along(d)), 0.3, seed = 2, stratify_by = d)
+  expect_true(all(abs(as.numeric(table(d[tid])) - counts7 * 0.3) <= 1))
+  # 11 distinct values are still cut into 5 quantile bins.
+  y11 <- sample(rep(1:11, 100))
+  expect_equal(length(unique(stratum_ids_for_sampling(y11))), 5)
+})
+
+test_that("sample_df_index stratified reaches floor(n * rate) at a very high rate", {
+  y <- rep(c("a", "b"), each = 50)
+  for (seed in 1:5) {
+    test_index <- sample_df_index(data.frame(v = 1:100), 0.99, seed = seed, stratify_by = y)
+    expect_equal(length(test_index), 99)
+    expect_equal(length(unique(test_index)), 99)
+  }
+  y2 <- sprintf("id%03d", 1:100)
+  test_index2 <- sample_df_index(data.frame(v = 1:100), 0.99, seed = 1, stratify_by = y2)
+  expect_equal(length(test_index2), 99)
+})
+
+test_that("sample_df_index stratified falls back to random for a constant target", {
+  df <- data.frame(v = 1:100)
+  test_index <- sample_df_index(df, 0.3, seed = 1, stratify_by = rep("a", 100))
+  expect_equal(length(test_index), 30)
+  set.seed(1)
+  expect_identical(test_index, sample(seq(100), 100 * 0.3))
+  test_index_num <- sample_df_index(df, 0.3, seed = 1, stratify_by = rep(2.5, 100))
+  expect_equal(length(test_index_num), 30)
+})
+
+test_that("sample_df_index stratified breaks remainder ties at random, not by class order", {
+  # 50 classes x 2 rows at rate 0.3: every class has the same remainder 0.6, and exactly 10 classes get no test row.
+  y <- rep(paste0("c", 1:50), each = 2)
+  df <- data.frame(v = seq_along(y))
+  n_seeds <- 200
+  hits <- setNames(numeric(50), paste0("c", 1:50))
+  for (seed in seq_len(n_seeds)) {
+    ti <- sample_df_index(df, 0.3, seed = seed, stratify_by = y)
+    expect_equal(length(ti), 30)
+    hits <- hits + as.numeric(table(factor(y[ti], levels = names(hits))))
+  }
+  # Share of each class's rows that landed in the test set: expected 0.3 for every class, decided by the
+  # seed and not by the row order (before the fix c1..c30 were always 0.5 and c31..c50 always 0).
+  freq <- hits / n_seeds / 2
+  expect_true(all(freq > 0.15 & freq < 0.45))
+})
+
+test_that("sample_df_index stratified gives the extra test row to each tied class on some seeds", {
+  y <- rep(c("A", "B", "C"), each = 5)
+  df <- data.frame(v = seq_along(y))
+  extra <- setNames(numeric(3), c("A", "B", "C"))
+  for (seed in 1:100) {
+    ti <- sample_df_index(df, 0.5, seed = seed, stratify_by = y)
+    expect_equal(length(ti), 7)
+    counts <- table(factor(y[ti], levels = c("A", "B", "C")))
+    expect_true(all(counts >= 2 & counts <= 3))
+    extra <- extra + (counts == 3)
+  }
+  expect_true(all(extra > 0))
+  expect_true(all(extra < 100))
+})
+
+test_that("sample_df_index stratified tie-breaking is deterministic under a seed", {
+  y <- rep(paste0("c", 1:50), each = 2)
+  df <- data.frame(v = seq_along(y))
+  expect_identical(sample_df_index(df, 0.3, seed = 7, stratify_by = y), sample_df_index(df, 0.3, seed = 7, stratify_by = y))
+  expect_false(identical(sample_df_index(df, 0.3, seed = 7, stratify_by = y), sample_df_index(df, 0.3, seed = 8, stratify_by = y)))
+})
+
+test_that("validate_test_split_type accepts the three split types and rejects anything else", {
+  for (type in c("random", "ordered", "stratified")) {
+    expect_silent(validate_test_split_type(type))
+  }
+  expect_error(validate_test_split_type("stratfied"), "test_split_type must be one of")
+  expect_error(validate_test_split_type(NULL), "test_split_type must be one of")
+  expect_error(validate_test_split_type(c("random", "ordered")), "test_split_type must be one of")
+  expect_error(validate_test_split_type(NA_character_), "test_split_type must be one of")
+})
+
+test_that("sample_df_index stratified returns NULL for rate 0 and rejects a wrong-length stratify_by", {
+  df <- data.frame(v = 1:10)
+  expect_null(sample_df_index(df, 0, stratify_by = rep(c("a", "b"), 5)))
+  expect_error(sample_df_index(df, 0.3, stratify_by = c("a", "b")), "stratify_by")
+})
+
 test_that("test sameple_rows", {
   df <-data.frame(x=c(1,NA,3),y=c(2,3,NA))
   df <-setNames(df,c("x 1", "col 2"))
@@ -1895,6 +2231,24 @@ test_that("count_if", {
 
 test_that("count_if - 1-arg form (condition only)", {
   df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl"), group_funs = c("none"),  custom = exploratory::count_if(mpg > 15))
+  expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
+})
+
+test_that("count_if works when the value column is re-used as an earlier output name in the same summarize_group() call (tam#37945)", {
+  # Regression test for tam#37945: a value column (hp) is summed into an output
+  # column of the SAME name earlier in the same summarize_group() call, then
+  # used again as count_if()'s value-column argument. dplyr's summarize()
+  # sequentially replaces later references to `hp` with the already-computed
+  # scalar sum, which used to shrink aggregate_if()'s internal tibble to 1 row
+  # while the (unrelated, non-shadowed) condition column still evaluated to the
+  # full per-group length, throwing "exp_internal_condition_col must be size 1,
+  # not N". count_if() never reads the value column's actual values, so this
+  # must keep returning the same counts as the non-colliding case.
+  df <- mtcars %>% exploratory::summarize_group(
+    group_cols = c(cyl = "cyl"), group_funs = c("none"),
+    hp = sum(hp, na.rm = TRUE),
+    custom = exploratory::count_if(hp, mpg > 15, na.rm = F)
+  )
   expect_equal(df %>% dplyr::pull(custom), c(11, 7, 8))
 })
 

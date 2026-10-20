@@ -125,7 +125,18 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
   # but specify only one so that it is clear what is used for early stopping.
-  metric_list <- list(eval_metric = eval_metric)
+  custom_metric <- NULL
+  maximize <- NULL
+  if (identical(eval_metric, "average_precision")) {
+    # XGBoost has no built-in Average Precision, so we calculate it as a custom metric.
+    # The built-in default metric (logloss) is turned off so that the custom metric alone
+    # drives early stopping, and it has to be maximized.
+    metric_list <- list(disable_default_eval_metric = TRUE)
+    custom_metric <- xgb_custom_binary_metric("average_precision")
+    maximize <- TRUE
+  } else {
+    metric_list <- list(eval_metric = eval_metric)
+  }
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
@@ -157,6 +168,8 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
                 formula = formula,
                 objective = objective,
                 params = params,
+                custom_metric = custom_metric,
+                maximize = maximize,
                 ...)
   }, error = function(e){
     if(any(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples"))) {
@@ -686,6 +699,8 @@ prettify_xgboost_evaluation_log <- function(df, pretty.name=FALSE) {
     colnames(ret)[colnames(ret) == "train_merror"] <- "Misclass. Rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "train_mlogloss"] <- "Multiclass Logloss"
     colnames(ret)[colnames(ret) == "train_auc"] <- "AUC"
+    colnames(ret)[colnames(ret) == "train_aucpr"] <- "PR AUC"
+    colnames(ret)[colnames(ret) == "train_average_precision"] <- "Average Precision"
     # this can be train_ndcg@{threshold}
     with_train_ndcg <- stringr::str_detect(colnames(ret), "^train_ndcg")
     colnames(ret)[with_train_ndcg] <- stringr::str_replace(colnames(ret)[with_train_ndcg], "^train_ndcg", "Normalized Discounted Cumulative Gain")
@@ -707,6 +722,8 @@ prettify_xgboost_evaluation_log <- function(df, pretty.name=FALSE) {
     colnames(ret)[colnames(ret) == "validation_merror"] <- "Validation Misclass. Rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "validation_mlogloss"] <- "Validation Multiclass Logloss"
     colnames(ret)[colnames(ret) == "validation_auc"] <- "Validation AUC"
+    colnames(ret)[colnames(ret) == "validation_aucpr"] <- "Validation PR AUC"
+    colnames(ret)[colnames(ret) == "validation_average_precision"] <- "Validation Average Precision"
     # this can be validation_ndcg@{threshold}
     with_validation_ndcg <- stringr::str_detect(colnames(ret), "^validation_ndcg")
     colnames(ret)[with_validation_ndcg] <- stringr::str_replace(colnames(ret)[with_validation_ndcg], "^validation_ndcg", "Validation Normalized Discounted Cumulative Gain")
@@ -731,6 +748,8 @@ prettify_xgboost_evaluation_log <- function(df, pretty.name=FALSE) {
     colnames(ret)[colnames(ret) == "train_merror"] <- "misclassification_rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "train_mlogloss"] <- "multiclass_logloss"
     colnames(ret)[colnames(ret) == "train_auc"] <- "auc"
+    colnames(ret)[colnames(ret) == "train_aucpr"] <- "pr_auc"
+    colnames(ret)[colnames(ret) == "train_average_precision"] <- "average_precision"
     # this can be train_ndcg@{threshold}
     with_train_ndcg <- stringr::str_detect(colnames(ret), "^train_ndcg")
     colnames(ret)[with_train_ndcg] <- stringr::str_replace(colnames(ret)[with_train_ndcg], "^train_ndcg", "normalized_discounted_cumulative_gain")
@@ -752,6 +771,8 @@ prettify_xgboost_evaluation_log <- function(df, pretty.name=FALSE) {
     colnames(ret)[colnames(ret) == "validation_merror"] <- "validation_misclassification_rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "validation_mlogloss"] <- "validation_multiclass_logloss"
     colnames(ret)[colnames(ret) == "validation_auc"] <- "validation_auc"
+    colnames(ret)[colnames(ret) == "validation_aucpr"] <- "validation_pr_auc"
+    colnames(ret)[colnames(ret) == "validation_average_precision"] <- "validation_average_precision"
     # this can be validation_ndcg@{threshold}
     with_validation_ndcg <- stringr::str_detect(colnames(ret), "^validation_ndcg")
     colnames(ret)[with_validation_ndcg] <- stringr::str_replace(colnames(ret)[with_validation_ndcg], "^validation_ndcg", "validation_normalized_discounted_cumulative_gain")
@@ -1166,8 +1187,10 @@ exp_xgboost <- function(df,
                         # boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                         seed = 1,
                         test_rate = 0.0,
-                        test_split_type = "random" # "random" or "ordered"
+                        test_split_type = "random" # "random", "ordered", or "stratified"
                         ){
+  validate_test_split_type(test_split_type)
+  validate_test_split_type(test_split_type)
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1){
@@ -1288,7 +1311,9 @@ exp_xgboost <- function(df,
       # Split training and test data BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
@@ -1512,7 +1537,9 @@ exp_xgboost <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       # model$y <- model.response(df) TODO: what was this??
-      model$df <- df
+      # tam#39340: prediction_training was made on the original training rows (df_train_original) when SMOTE was applied
+      # without keeping the synthetic rows. extract_actual() reads the actual values from model$df, so it has to hold the same rows.
+      model$df <- if (smote_applied && !smote_keep_synthetic) df_train_original else df
       model$formula_terms <- terms(fml)
       # To avoid saving a huge environment when caching with RDS.
       attr(model$formula_terms,".Environment")<-NULL
@@ -1783,7 +1810,11 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       # with chosen evaluation metrics
       ret <- x$evaluation_log %>% as.data.frame()
       ret <- ret %>% tidyr::pivot_longer(cols = c(-iter))
-      ret <- ret %>% tidyr::separate(col = "name", into=c("type","name"))
+      # Split only at the first "_" (train_xxx / validation_xxx), so that metric names that
+      # contain "_", such as average_precision, stay intact. Parameters after "@" (error@0.5)
+      # are dropped as before.
+      ret <- ret %>% tidyr::separate(col = "name", into=c("type","name"), sep = "_", extra = "merge", fill = "right")
+      ret <- ret %>% dplyr::mutate(name = stringr::str_remove(name, "@.*$"))
       ret
     },
     {

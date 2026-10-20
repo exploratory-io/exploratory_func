@@ -274,3 +274,30 @@ test_that("the counts entry point reproduces the row-level pairwise association"
                from_rows$residual_heatmap_data$adjusted_standardized_residual,
                tolerance = 1e-6)
 })
+
+test_that("aggregated count rounding is independent of exploratory.round_mode (tam#25465)", {
+  # The count rounding follows the setting, but validation only admits counts within
+  # 1e-8 of a whole number, so a .5 tie can never reach it: every mode must
+  # reject x.5 and treat a near-whole count as that whole number.
+  wide <- data.frame(brand = c("A", "B", "C"), x = c(10, 4, 6), y = c(3, 8, 5), z = c(7, 2, 9),
+                     stringsAsFactors = FALSE)
+  long <- tidyr::pivot_longer(wide, c(x, y, z), names_to = "age", values_to = "n")
+  near_whole <- wide
+  near_whole$x[[1]] <- 10 + 1e-9
+  near_whole_long <- tidyr::pivot_longer(near_whole, c(x, y, z), names_to = "age", values_to = "n")
+  tie <- wide
+  tie$x[[1]] <- 2.5
+  tie_long <- tidyr::pivot_longer(tie, c(x, y, z), names_to = "age", values_to = "n")
+
+  table_of <- function(m) unname(as.matrix(m$contingency_table))
+  for (mode in c("half_up", "half_down", "half_even")) {
+    withr::with_options(list(exploratory.round_mode = mode), {
+      expect_error(tie %>% exp_mca_aggregated(brand, x, y, z), "must be whole numbers", info = mode)
+      expect_error(tie_long %>% exp_mca_aggregated_long(brand, age, n), "must be whole numbers", info = mode)
+      expected <- table_of((wide %>% exp_mca_aggregated(brand, x, y, z))$model[[1]])
+      expect_equal(table_of((near_whole %>% exp_mca_aggregated(brand, x, y, z))$model[[1]]), expected, info = mode)
+      expected_long <- table_of((long %>% exp_mca_aggregated_long(brand, age, n))$model[[1]])
+      expect_equal(table_of((near_whole_long %>% exp_mca_aggregated_long(brand, age, n))$model[[1]]), expected_long, info = mode)
+    })
+  }
+})

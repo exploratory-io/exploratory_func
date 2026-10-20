@@ -4844,6 +4844,32 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
     return (rep(NA, length(x)))
   }
 
+  # If every value is NA (or NaN), there is nothing to compute breaks from.
+  # Neither path below can handle it:
+  # - The all-zero fast path would claim it, since all(x == 0, na.rm = TRUE)
+  #   drops every value and all() of an empty set is TRUE. That would label
+  #   every NA row as '(0,0]'.
+  # - The normal path cannot be used either: min()/max() with na.rm = TRUE
+  #   return Inf/-Inf for an all-NA vector, so the break points end up as
+  #   seq(Inf, -Inf, ...) == NaN and cut() fails on them.
+  # So return an all-NA result of the same length as x, which is what cut()
+  # produces for an NA value. Keeping NA as NA is what lets the caller side
+  # (e.g. forcats::fct_explicit_na) show an explicit '(NA)' bucket.
+  if (all(is.na(x))) {
+    if (identical(labels, FALSE)) {
+      # labels=FALSE makes cut() return integer bucket indices.
+      return (rep(NA_integer_, length(x)))
+    } else if (is.null(labels)) {
+      # No level can be derived from data that is entirely NA, so return a
+      # factor with no level and every value NA.
+      return (factor(rep(NA_character_, length(x))))
+    } else {
+      # Labels were given explicitly, so keep them as the level set even
+      # though no value falls into any of them.
+      return (factor(rep(NA_character_, length(x)), levels=as.character(labels)))
+    }
+  }
+
   tryCatch({
     #
     # If you run the cut function against the 1 length numeric vector which value is '0',
@@ -4861,12 +4887,21 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
     #
     #
     # If na.rm=FALSE, it return NA if it includes NA and if statement complains.
+    # At this point x has at least one non-NA value (the all-NA case returned
+    # above), so this is genuinely 'every non-NA value is zero'.
     if (all(x==0, na.rm=TRUE)) {
       if (is.null(labels)) {
         # mimics the default output like '(0,19835.25]'
-        # TODO: handle length>1 case later
-        v <- as.factor(c('(0,0]'))
-      } else {
+        # The result has to be the same length as x with NA kept as NA.
+        # Callers use this inside dplyr::mutate(), where a length-1 value
+        # gets recycled to every row and would turn NA rows into '(0,0]'.
+        #
+        # Expected output:
+        # > `_tam_cut`(c(0,NA,0,NA), breaks=5)
+        # [1] (0,0] <NA>  (0,0] <NA>
+        # Levels: (0,0]
+        v <- factor(ifelse(is.na(x), NA_character_, '(0,0]'), levels=c('(0,0]'))
+      } else if (identical(labels, FALSE)) {
         # In case of labels=FALSE case.
         # It handles NA as NA, and zero as center value of the given breaks.
         #
@@ -4875,9 +4910,17 @@ exp_cut <- function(x, breaks=5, labels=NULL, dig.lab=3, zero.to.center=FALSE, i
         # [1]  3 NA  3 NA
         # > `_tam_cut`(c(0,0), breaks=5, label=F)
         # [1] 3 3
-        # > `_tam_cut`(c(NA,NA), breaks=5, label=F)
-        # [1] NA NA
-        v <- ifelse(is.na(x), NA, as.integer(ceiling(breaks/2)))
+        v <- ifelse(is.na(x), NA_integer_, as.integer(ceiling(breaks/2)))
+      } else {
+        # Labels were given explicitly. Use the center label, which is the
+        # label of the bucket the labels=FALSE path above returns the index
+        # of, and keep the given labels as the level set. NA stays NA here
+        # too, and the result is as long as x.
+        labels.chr <- as.character(labels)
+        center <- max(1L, min(length(labels.chr), as.integer(ceiling(breaks/2))))
+        # Single bracket on purpose. For a degenerate zero-length labels
+        # argument it yields NA_character_ instead of an out-of-bounds error.
+        v <- factor(ifelse(is.na(x), NA_character_, labels.chr[center]), levels=labels.chr)
       }
       return(v)
     } else {

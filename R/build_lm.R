@@ -691,8 +691,9 @@ build_lm.fast <- function(df,
                     pd_grid_resolution = 20,
                     seed = 1,
                     test_rate = 0.0,
-                    test_split_type = "random" # "random" or "ordered"
+                    test_split_type = "random" # "random", "ordered", or "stratified"
                     ){
+  validate_test_split_type(test_split_type)
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -927,7 +928,9 @@ build_lm.fast <- function(df,
         # Split training and test data BEFORE applying SMOTE
         # This ensures test data remains pure and doesn't contain synthetic samples
         source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        test_index <- sample_df_index(source_data, rate = test_rate,
+                                      ordered = (test_split_type == "ordered"),
+                                      stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
@@ -1096,7 +1099,9 @@ build_lm.fast <- function(df,
       else { # model_type == "lm"
         # split training and test data
         source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+        test_index <- sample_df_index(source_data, rate = test_rate,
+                                      ordered = (test_split_type == "ordered"),
+                                      stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
@@ -1426,6 +1431,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     if (isTRUE(report_metrics)) {
       actual_for_roc <- as.integer(x$y) == 1
       pr_auc <- aupr(x$fitted.value, actual_for_roc)
+      ap <- average_precision_score(x$fitted.value, actual_for_roc) # Shown right after PR AUC (tam#39807).
       predicted_positive <- as.integer(predicted) == 1
       valid <- !(is.na(actual_for_roc) | is.na(predicted_positive))
       tn <- sum(!actual_for_roc[valid] & !predicted_positive[valid], na.rm = TRUE)
@@ -1437,10 +1443,12 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       balanced_accuracy <- if (is.na(specificity) || is.na(sensitivity)) NA_real_ else (specificity + sensitivity) / 2
       if (pretty.name) {
         ret$`PR AUC` <- pr_auc
+        ret$`Average Precision` <- ap
         ret$`Balanced Accuracy` <- balanced_accuracy
         ret$`Specificity` <- specificity
       } else {
         ret$pr_auc <- pr_auc
+        ret$average_precision <- ap
         ret$balanced_accuracy <- balanced_accuracy
         ret$specificity <- specificity
       }
@@ -1467,7 +1475,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
         # Pair with PR AUC like evaluate_binary_classification (#37252 order).
         colnames(ret)[colnames(ret) == "auc"] <- "ROC AUC"
         pred_cols <- intersect(
-          c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+          c("ROC AUC", "PR AUC", "Average Precision", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
             "Misclass. Rate", "Precision", "Recall", "Specificity"),
           colnames(ret))
         stat_cols <- intersect(

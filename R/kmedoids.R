@@ -11,6 +11,122 @@
 .kmedoids_pam_max_n <- 5000L
 .kmedoids_map_max_n <- 5000L
 
+# --- Ordinal (ordered factor) support, tam#39875 -------------------------------------------
+# An ordered factor is encoded as its level POSITION 1..L, scaled to 0-1 as
+# (position - 1) / (L - 1) for the fit (the per-variable difference Gower distance uses, so a
+# 5-point and a 7-point question weigh the same). Unused levels keep their slot, so the scale
+# reflects the questionnaire's design rather than the observed answers. A single-level factor
+# has no spread and encodes to 0. A value outside `levels` is already NA in an ordered
+# factor and falls to the ordinary complete-case row exclusion.
+
+#' Check that every selected column is numeric or an ordered factor.
+#'
+#' A plain (unordered) factor is rejected on purpose: R cannot tell a factor whose order the
+#' user set from one with default alphabetical levels, and reading the level order off it
+#' would silently turn "Agree, Disagree, Neutral" into 1, 2, 3.
+#' @param data A data frame holding only the selected columns.
+#' @return Invisibly `TRUE`; otherwise stops with a user-facing message.
+.kmedoids_check_variable_types <- function(data) {
+  for (column_name in names(data)) {
+    column <- data[[column_name]]
+    if (is.numeric(column) || is.ordered(column)) next
+    if (is.factor(column)) {
+      stop(
+        paste0(
+          'Column ', column_name, ' is an unordered factor. Use Set Value Order with ',
+          "'Ordered' checked, or use K-Modes for unordered categories."
+        ),
+        call. = FALSE
+      )
+    }
+    stop('K-Medoids requires numeric or ordered factor variables.', call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+#' Named list of level labels (variable -> character levels) for the ordered-factor columns.
+#' @param data A data frame holding only the selected columns.
+#' @return A named list; `list()` when no column is an ordered factor.
+.kmedoids_ordinal_levels <- function(data) {
+  is_ordinal <- vapply(data, is.ordered, logical(1))
+  levels_by_variable <- lapply(data[is_ordinal], levels)
+  if (length(levels_by_variable) == 0) return(list())
+  levels_by_variable
+}
+
+#' Replace each ordered-factor column by its numeric encoding.
+#' @param data A data frame holding only the selected columns.
+#' @param ordinal_levels The result of `.kmedoids_ordinal_levels(data)`.
+#' @return A list with `fit` (ordinal columns as 0-1 values) and `positions` (ordinal columns
+#'   as level positions 1..L). Both are `data` itself, untouched, when there is no ordinal column.
+.kmedoids_encode_ordinal <- function(data, ordinal_levels) {
+  fit <- data
+  positions <- data
+  for (column_name in names(ordinal_levels)) {
+    level_count <- length(ordinal_levels[[column_name]])
+    position <- as.numeric(as.integer(data[[column_name]]))
+    positions[[column_name]] <- position
+    fit[[column_name]] <- if (level_count > 1) {
+      (position - 1) / (level_count - 1)
+    } else {
+      ifelse(is.na(position), NA_real_, 0)
+    }
+  }
+  list(fit = fit, positions = positions)
+}
+
+#' Standardize the fit matrix. Numeric columns are z-scored (zero variance -> 0); ordinal
+#' columns stay on 0-1 so a question with little spread does not count more than one with a lot.
+#' @param mat The numeric fit matrix.
+#' @param ordinal_index Column indexes of `mat` that hold ordinal variables.
+#' @return The standardized matrix.
+.kmedoids_standardize_fit_mat <- function(mat, ordinal_index = integer()) {
+  if (length(ordinal_index) == 0) {
+    mat <- scale(mat)
+    mat[is.nan(mat)] <- 0
+    return(mat)
+  }
+  numeric_index <- setdiff(seq_len(ncol(mat)), ordinal_index)
+  if (length(numeric_index) > 0) {
+    scaled <- scale(mat[, numeric_index, drop = FALSE])
+    scaled[is.nan(scaled)] <- 0
+    mat[, numeric_index] <- scaled
+  }
+  mat
+}
+
+#' Level labels for ordinal level positions, aligned with `variables`.
+#' @param positions Numeric level positions (1..L), one per element of `variables`.
+#' @param variables Variable name for each position.
+#' @param ordinal_levels Named list variable -> levels.
+#' @return A character vector; `NA` for numeric variables and for missing positions.
+.kmedoids_position_labels <- function(positions, variables, ordinal_levels) {
+  labels <- rep(NA_character_, length(positions))
+  for (variable in names(ordinal_levels)) {
+    index <- which(variables == variable)
+    labels[index] <- ordinal_levels[[variable]][as.integer(base::round(positions[index]))]
+  }
+  labels
+}
+
+#' Per-column median of a numeric matrix. Ordinal columns use the LOWER median
+#' (`quantile(type = 1)`), so the result is always an actual level position, never a half step.
+#' @param mat A numeric matrix.
+#' @param ordinal_index Column indexes of `mat` that hold ordinal positions.
+#' @return A numeric vector, one value per column.
+.kmedoids_column_medians <- function(mat, ordinal_index = integer()) {
+  medians <- apply(mat, 2, stats::median, na.rm = TRUE)
+  for (index in ordinal_index) {
+    medians[[index]] <- stats::quantile(mat[, index], probs = 0.5, type = 1, names = FALSE, na.rm = TRUE)
+  }
+  medians
+}
+
+#' Column indexes of `mat` that are ordinal variables of the model.
+.kmedoids_ordinal_index <- function(x, mat) {
+  which(colnames(mat) %in% names(x$ordinal_levels))
+}
+
 .kmedoids_silhouette_components <- function(raw) {
   widths <- if (!is.null(raw$silinfo$widths)) {
     raw$silinfo$widths[, 'sil_width']
@@ -39,6 +155,44 @@
   }
 }
 
+# Input for cluster::pam(pamonce = 5) on which the FastPAM swap is guaranteed to terminate.
+# tam#39875: FastPAM accepts a swap when its estimated change is below
+# -16 * DBL_EPSILON * (current objective). The estimate is a sum of differences of distances,
+# including distances to the OTHER clusters, so its rounding noise scales with those distances
+# rather than with the objective. When the clusters are tight but far apart (a 0/1 or ordered
+# column that the clusters split exactly, next to a continuous one) the noise (~1e-14) exceeds
+# that tolerance, a "-2e-14" swap is accepted, its reverse is accepted next, and pam() loops
+# forever at 100% CPU with no way to interrupt it from R.
+#
+# Snapping every distance onto a power-of-two grid makes every sum FastPAM forms exact in
+# double precision: each accepted swap then lowers the objective for real, so the swap loop
+# must end. The grid step is chosen so that a sum of up to 4 * n distances still fits in 50
+# bits of mantissa, which leaves the step at ~1e-15 * n of the largest distance -- far below
+# any difference that matters, so medoids match the unsnapped fit outside exact near-ties.
+# Manhattan distances of grid values are themselves exact, so the data is snapped and pam()
+# still computes the distances in C; Euclidean distances go through sqrt(), so the distance
+# matrix itself is snapped and passed with diss = TRUE.
+.kmedoids_exact_grid_step <- function(bound) {
+  2^(ceiling(log2(bound)) - 50)
+}
+
+.kmedoids_pam_input <- function(mat, distance) {
+  if (identical(distance, 'manhattan')) {
+    max_abs <- max(abs(mat))
+    if (!is.finite(max_abs) || max_abs == 0) return(mat)
+    # Every Manhattan distance is at most ncol * 2 * max_abs.
+    step <- .kmedoids_exact_grid_step(4 * nrow(mat) * ncol(mat) * 2 * max_abs)
+    return(base::round(mat / step) * step)
+  }
+  dissimilarity <- stats::dist(mat, method = distance)
+  max_dist <- max(dissimilarity)
+  if (is.finite(max_dist) && max_dist > 0) {
+    step <- .kmedoids_exact_grid_step(4 * nrow(mat) * max_dist)
+    dissimilarity[] <- base::round(unclass(dissimilarity) / step) * step
+  }
+  dissimilarity
+}
+
 .kmedoids_fit <- function(mat, centers, distance, seed = NULL,
                           algorithm = 'pam', clara_samples = 20,
                           clara_sample_size = NULL, nstart = 1,
@@ -60,29 +214,41 @@
     set.seed(seed)
   }
   if (algorithm == 'pam') {
+    # FastPAM swap (pamonce = 5) on grid-snapped input: fast, and cannot loop forever on
+    # tight, well-separated clusters (tam#39875) -- see .kmedoids_pam_input().
+    #
     # medoids = if(is.numeric(nstart)) "random" -- cluster::pam() switches from
     # its default deterministic "build" algorithm to random-start search the
     # instant ANY numeric nstart is passed. Forward nstart only when the user
     # asked for more than one trial, so nstart = 1 (the default) stays
     # byte-identical to the pre-nstart call and every existing saved analytics
     # keeps its current medoids.
-    pam_nstart <- as.integer(round(nstart %||% 1))
+    pam_input <- .kmedoids_pam_input(mat, distance)
+    run_pam <- function(...) {
+      if (inherits(pam_input, 'dist')) {
+        cluster::pam(
+          pam_input, k = centers, diss = TRUE,
+          keep.diss = FALSE, keep.data = FALSE, pamonce = 5, ...
+        )
+      } else {
+        cluster::pam(
+          pam_input, k = centers, metric = distance, stand = FALSE,
+          keep.diss = FALSE, keep.data = FALSE, pamonce = 5, ...
+        )
+      }
+    }
+    pam_nstart <- as.integer(base::round(nstart %||% 1))
     raw <- if (!is.na(pam_nstart) && pam_nstart > 1) {
-      cluster::pam(
-        mat, k = centers, metric = distance, stand = FALSE,
-        keep.diss = FALSE, keep.data = FALSE, pamonce = 5,
-        medoids = 'random', nstart = pam_nstart
-      )
+      run_pam(medoids = 'random', nstart = pam_nstart)
     } else {
-      cluster::pam(
-        mat, k = centers, metric = distance, stand = FALSE,
-        keep.diss = FALSE, keep.data = FALSE, pamonce = 5
-      )
+      run_pam()
     }
     silhouette <- .kmedoids_silhouette_components(raw)
     silhouette_widths <- silhouette$widths
     silhouette_row_indices <- silhouette$indices
     medoid_indices <- raw$id.med
+    # The medoid rows of the ORIGINAL data, not of the grid-snapped copy pam() saw.
+    medoids <- mat[medoid_indices, , drop = FALSE]
   } else {
     if (is.null(clara_sample_size)) {
       clara_sample_size <- min(nrow(mat), max(100L, 40L + 2L * centers))
@@ -100,13 +266,14 @@
     silhouette_widths <- silhouette$widths
     silhouette_row_indices <- silhouette$indices
     medoid_indices <- raw$i.med
+    medoids <- raw$medoids
   }
   list(
     raw = raw,
     algorithm = algorithm,
     is_approximate = identical(algorithm, 'clara'),
     clustering = as.integer(raw$clustering),
-    medoids = raw$medoids,
+    medoids = medoids,
     medoid_indices = as.integer(medoid_indices),
     objective = raw$objective,
     silhouette_widths = silhouette_widths,
@@ -134,7 +301,8 @@
       variable = character(), cluster = integer(), standardized_mean = numeric(),
       effect_size = numeric(), rank = integer(), medoid = numeric(),
       cluster_median = numeric(), cluster_mean = numeric(), overall_median = numeric(),
-      overall_mean = numeric()
+      overall_mean = numeric(), is_ordinal = logical(), medoid_label = character(),
+      cluster_median_label = character(), overall_median_label = character()
     ),
     silhouette = tibble::tibble(
       center = integer(), avg_silhouette = numeric(), min_silhouette = numeric(),
@@ -151,7 +319,8 @@
     representative_values = tibble::tibble(
       cluster = integer(), variable = character(), medoid = numeric(),
       cluster_median = numeric(), cluster_mean = numeric(), overall_median = numeric(),
-      overall_mean = numeric()
+      overall_mean = numeric(), is_ordinal = logical(), medoid_label = character(),
+      cluster_median_label = character(), overall_median_label = character()
     ),
     distribution = tibble::tibble(
       cluster = integer(), variable = character(), value = numeric(), is_medoid = logical()
@@ -185,6 +354,21 @@
 .kmedoids_original_fit_mat <- function(x) {
   if (!is.null(x$original_fit_mat)) return(x$original_fit_mat)
   x$source_data[.kmedoids_valid_indices(x), , drop = FALSE] %>% as.matrix()
+}
+
+#' The medoid rows' values, one column per variable. Numeric variables keep their value;
+#' ordinal variables show the level label instead of the stored position (tam#39875).
+.kmedoids_medoid_values <- function(x) {
+  original_mat <- .kmedoids_original_fit_mat(x)
+  values <- original_mat[x$medoid_indices, , drop = FALSE] %>%
+    as.data.frame(check.names = FALSE) %>%
+    tibble::as_tibble()
+  for (variable in intersect(names(x$ordinal_levels), colnames(values))) {
+    values[[variable]] <- .kmedoids_position_labels(
+      values[[variable]], rep(variable, nrow(values)), x$ordinal_levels[variable]
+    )
+  }
+  values
 }
 
 .kmedoids_silhouette_values <- function(x) {
@@ -236,10 +420,7 @@
       medoid_row_id = x$row_ids[x$medoid_indices[[cluster_id]]]
     )
   })
-  original_mat <- .kmedoids_original_fit_mat(x)
-  medoid_values <- original_mat[x$medoid_indices, , drop = FALSE] %>%
-    as.data.frame(check.names = FALSE) %>%
-    tibble::as_tibble()
+  medoid_values <- .kmedoids_medoid_values(x)
   medoid_values$cluster <- seq_len(nrow(medoid_values))
   medoid_values <- medoid_values %>% dplyr::select(cluster, dplyr::everything())
   result <- result %>% dplyr::left_join(medoid_values, by = 'cluster')
@@ -302,16 +483,17 @@
   mat <- x$mat
   original_mat <- .kmedoids_original_fit_mat(x)
   ids <- x$clustering
+  ordinal_index <- .kmedoids_ordinal_index(x, original_mat)
   overall_mean <- colMeans(mat, na.rm = TRUE)
   overall_sd <- apply(mat, 2, stats::sd, na.rm = TRUE)
-  overall_median <- apply(original_mat, 2, stats::median, na.rm = TRUE)
+  overall_median <- .kmedoids_column_medians(original_mat, ordinal_index)
   original_overall_mean <- colMeans(original_mat, na.rm = TRUE)
   rows <- purrr::map_dfr(sort(unique(ids)), function(cluster_id) {
     index <- which(ids == cluster_id)
     cluster_mean <- colMeans(mat[index, , drop = FALSE], na.rm = TRUE)
     original_cluster <- original_mat[index, , drop = FALSE]
     original_cluster_mean <- colMeans(original_cluster, na.rm = TRUE)
-    original_cluster_median <- apply(original_cluster, 2, stats::median, na.rm = TRUE)
+    original_cluster_median <- .kmedoids_column_medians(original_cluster, ordinal_index)
     medoid_index <- x$medoid_indices[[cluster_id]]
     standardized <- ifelse(overall_sd > 0,
       (cluster_mean - overall_mean) / overall_sd,
@@ -326,7 +508,20 @@
       cluster_median = as.numeric(original_cluster_median),
       cluster_mean = as.numeric(original_cluster_mean),
       overall_median = as.numeric(overall_median),
-      overall_mean = as.numeric(original_overall_mean)
+      overall_mean = as.numeric(original_overall_mean),
+      # tam#39474: the radar tooltip quotes how many rows the cluster holds. The same
+      # value on every variable of the cluster, taken before any top-N narrowing.
+      cluster_size = as.integer(length(index)),
+      is_ordinal = colnames(mat) %in% names(x$ordinal_levels),
+      medoid_label = .kmedoids_position_labels(
+        original_mat[medoid_index, ], colnames(mat), x$ordinal_levels
+      ),
+      cluster_median_label = .kmedoids_position_labels(
+        original_cluster_median, colnames(mat), x$ordinal_levels
+      ),
+      overall_median_label = .kmedoids_position_labels(
+        overall_median, colnames(mat), x$ordinal_levels
+      )
     )
   })
   variable_order <- .kmedoids_profile_variable_order(rows)
@@ -435,17 +630,32 @@
   # tam#38491: same rank the Characteristic Variables bar sorts by, so the table can list
   # each cluster's variables in that order instead of the fitted-column order.
   importance_order <- cluster_variable_importance_order(x$mat, x$clustering, colnames(original_mat))
+  ordinal_index <- .kmedoids_ordinal_index(x, original_mat)
+  overall_median <- .kmedoids_column_medians(original_mat, ordinal_index)
   purrr::map_dfr(sort(unique(ids)), function(cluster_id) {
     index <- which(ids == cluster_id)
     medoid_index <- x$medoid_indices[[cluster_id]]
+    cluster_median <- .kmedoids_column_medians(original_mat[index, , drop = FALSE], ordinal_index)
     tibble::tibble(
       cluster = as.integer(cluster_id),
       variable = colnames(original_mat),
       medoid = as.numeric(original_mat[medoid_index, ]),
-      cluster_median = apply(original_mat[index, , drop = FALSE], 2, stats::median, na.rm = TRUE),
+      cluster_median = cluster_median,
       cluster_mean = colMeans(original_mat[index, , drop = FALSE], na.rm = TRUE),
-      overall_median = apply(original_mat, 2, stats::median, na.rm = TRUE),
-      overall_mean = colMeans(original_mat, na.rm = TRUE)
+      overall_median = overall_median,
+      overall_mean = colMeans(original_mat, na.rm = TRUE),
+      # tam#39875: ordinal variables also carry level labels; medians are LOWER medians so each
+      # is a real level. Means above stay average positions (1 = lowest level).
+      is_ordinal = colnames(original_mat) %in% names(x$ordinal_levels),
+      medoid_label = .kmedoids_position_labels(
+        original_mat[medoid_index, ], colnames(original_mat), x$ordinal_levels
+      ),
+      cluster_median_label = .kmedoids_position_labels(
+        cluster_median, colnames(original_mat), x$ordinal_levels
+      ),
+      overall_median_label = .kmedoids_position_labels(
+        overall_median, colnames(original_mat), x$ordinal_levels
+      )
     )
   }) %>%
     dplyr::left_join(importance_order, by = 'variable')
@@ -479,7 +689,18 @@
   ids <- x$clustering
   medoid_indices <- x$medoid_indices
   original_mat <- .kmedoids_original_fit_mat(x)
-  standardized_mat <- x$mat
+  # tam#39875: `x$mat` keeps ordinal columns on 0-1 even when `normalize_data` is on, but the
+  # boxplot prose says 0 is the overall average. So z-score the ordinal columns here for display.
+  # Numeric columns of `x$mat` are already z-scored (or raw when normalize_data is off), so they
+  # are used as they are -- the same values this function has always returned.
+  standardized_mat <- if (isTRUE(x$normalize_data)) x$mat else original_mat
+  if (isTRUE(x$normalize_data)) {
+    for (index in .kmedoids_ordinal_index(x, original_mat)) {
+      z <- as.numeric(scale(x$mat[, index]))
+      z[is.nan(z)] <- 0
+      standardized_mat[, index] <- z
+    }
+  }
   n <- nrow(original_mat)
   p <- ncol(original_mat)
   rows <- tibble::tibble(
@@ -631,26 +852,39 @@
     )
   })
   result <- dplyr::bind_rows(result, vectors)
-  eigenvalues <- coordinates$eig[coordinates$eig > 0]
-  representation_rate <- if (length(eigenvalues) == 0) c(0, 0) else {
-    cumsum(eigenvalues)[seq_len(min(2, length(eigenvalues)))] / sum(eigenvalues)
-  }
-  x$representation_rate <- c(representation_rate, rep(0, 2 - length(representation_rate)))
-  attr(result, 'representation_rate') <- x$representation_rate
+  rates <- .pcoa_representation_rates(coordinates$eig)
+  x$representation_rate <- rates$per_axis
+  attr(result, 'representation_rate') <- rates$per_axis
+  attr(result, 'cumulative_representation_rate') <- rates$cumulative
   attr(result, 'map_sample_size') <- length(map_indices)
   attr(result, 'map_sampled') <- length(map_indices) < x$valid_nrow
   result
 }
 
+# Representation rates of the first two PCoA axes, shared by exp_kmedoids() and exp_hclust() (tam#39564).
+# Both are divided by the sum of the POSITIVE eigenvalues, so they stay on the 0..1 scale even for a
+# non-Euclidean distance whose spectrum has negative eigenvalues. Returns two length-2 numeric vectors:
+#   per_axis   -- each axis' OWN share, c(e1, e2) / sum(e). Sums to <= 1. Same convention as pct_variance in do_prcomp.
+#   cumulative -- c(share of axis 1, share of axes 1 + 2), cmdscale's own goodness-of-fit. Same as cum_pct_variance.
+# A missing second dimension is padded with 0 in BOTH vectors (cumulative = c(e1, 0), not c(e1, e1)); tam reads a
+# second element of exactly 0 as "no second dimension".
+.pcoa_representation_rates <- function(eig) {
+  eig <- eig[is.finite(eig) & eig > 0]
+  if (length(eig) == 0L) {
+    return(list(per_axis = c(0, 0), cumulative = c(0, 0)))
+  }
+  n <- min(2L, length(eig))
+  per_axis <- eig[seq_len(n)] / sum(eig)
+  cumulative <- cumsum(eig)[seq_len(n)] / sum(eig)
+  pad <- rep(0, 2L - n)
+  list(per_axis = c(per_axis, pad), cumulative = c(cumulative, pad))
+}
+
 .kmedoids_medoid_details <- function(x) {
-  original_mat <- .kmedoids_original_fit_mat(x)
   tibble::tibble(
     cluster = seq_along(x$medoid_indices),
     row_id = x$row_ids[x$medoid_indices]
-  ) %>% dplyr::bind_cols(
-    original_mat[x$medoid_indices, , drop = FALSE] %>%
-      as.data.frame(check.names = FALSE) %>% tibble::as_tibble()
-  )
+  ) %>% dplyr::bind_cols(.kmedoids_medoid_values(x))
 }
 
 #' "Analysis Conditions and Data" table of a K-Medoids model (tam#30961). One row per
@@ -670,7 +904,7 @@
 .kmedoids_analysis_conditions <- function(x) {
   variable_names <- as.character(x$selected_cols)
   n_variables <- length(variable_names)
-  tibble::tibble(
+  conditions <- tibble::tibble(
     Metric = c("Number of Variables", "Variable Names", "Number of Rows", "Rows Removed",
                "Number of Clusters"),
     Value = c(
@@ -681,6 +915,16 @@
       as.character(x$centers)
     )
   )
+  # tam#39875: only shown when an ordered factor was used, so numeric-only output is unchanged.
+  n_ordinal <- length(x$ordinal_levels)
+  if (n_ordinal > 0) {
+    conditions <- dplyr::bind_rows(
+      conditions[1:2, ],
+      tibble::tibble(Metric = "Number of Ordinal Variables", Value = as.character(n_ordinal)),
+      conditions[3:nrow(conditions), ]
+    )
+  }
+  conditions
 }
 
 .kmedoids_counts <- function(x) {
@@ -708,7 +952,11 @@
 #' K-Medoids clustering analytics.
 #'
 #' @param df A data frame.
-#' @param ... Numeric columns selected with tidyselect.
+#' @param ... Numeric or ordered-factor columns selected with tidyselect. An ordered factor is
+#'   encoded as its level position 1..L and scaled to 0-1 as `(position - 1) / (L - 1)`, so a
+#'   5-point and a 7-point question weigh the same; levels with no rows keep their position.
+#'   Values outside the levels are `NA` and the row is excluded. A plain (unordered) factor is
+#'   rejected: use Set Value Order with Ordered checked, or K-Modes.
 #' @param centers Number of clusters.
 #' @param distance Distance metric supported by `cluster::pam`.
 #' @param takeSample Whether to sample rows when `max_nrow` is exceeded.
@@ -716,7 +964,8 @@
 #' @param iterMax Deprecated compatibility argument. It is accepted for saved
 #'   commands but is not used by `cluster::pam()` or `cluster::clara()`.
 #' @param seed Random seed.
-#' @param normalize_data Whether to standardize selected variables before fitting.
+#' @param normalize_data Whether to standardize selected variables before fitting. Applies to
+#'   numeric variables only; ordered-factor variables always stay on their 0-1 scale.
 #' @param elbow_method_mode Which optimal-cluster diagnostics to compute.
 #' @param max_centers Maximum number of centers for diagnostics.
 #' @param silhouette_sample_size Maximum number of rows used for diagnostics.
@@ -749,9 +998,7 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   if (length(selected_cols) == 0) {
     stop('At least one numeric variable is required for K-Medoids.', call. = FALSE)
   }
-  if (!all(vapply(df[selected_cols], is.numeric, logical(1)))) {
-    stop('K-Medoids requires numeric variables.', call. = FALSE)
-  }
+  .kmedoids_check_variable_types(df[selected_cols])
   centers <- .kmedoids_safe_numeric(centers)
   max_centers <- .kmedoids_safe_numeric(max_centers)
   iterMax <- .kmedoids_safe_numeric(iterMax)
@@ -830,10 +1077,15 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
     original_row_ids <- original_row_ids[selected_index]
   }
   source_data <- df[selected_cols]
-  source_mat <- as.matrix(source_data)
-  valid <- complete.cases(source_data) & rowSums(!is.finite(source_mat)) == 0
+  # tam#39875: ordered factors become numbers before anything else looks at the matrix. Validity
+  # is judged on the ENCODED columns, so a value outside the levels (NA) is excluded like any NA.
+  ordinal_levels <- .kmedoids_ordinal_levels(source_data)
+  encoded <- .kmedoids_encode_ordinal(source_data, ordinal_levels)
+  source_mat <- as.matrix(encoded$fit)
+  valid <- complete.cases(encoded$fit) & rowSums(!is.finite(source_mat)) == 0
   excluded_nrow <- sum(!valid)
-  fit_data <- source_data[valid, , drop = FALSE]
+  fit_data <- encoded$fit[valid, , drop = FALSE]
+  position_data <- encoded$positions[valid, , drop = FALSE]
   row_ids <- original_row_ids[valid]
   # cluster::pam requires k <= n-1, so asking for exactly as many clusters as
   # there are rows is already impossible. The guard used to be `<`, which let
@@ -846,15 +1098,14 @@ exp_kmedoids <- function(df, ..., centers = 3, distance = 'manhattan',
   }
   mat <- as.matrix(fit_data)
   if (isTRUE(normalize_data)) {
-    mat <- scale(mat)
-    mat[is.nan(mat)] <- 0
+    mat <- .kmedoids_standardize_fit_mat(mat, which(names(fit_data) %in% names(ordinal_levels)))
   }
   fit <- .kmedoids_fit(
     mat, centers, distance, seed, algorithm = algorithm, nstart = nstart,
     clara_samples = clara_samples, clara_sample_size = clara_sample_size
   )
   model <- list(
-    mat = mat, original_fit_mat = as.matrix(fit_data),
+    mat = mat, original_fit_mat = as.matrix(position_data), ordinal_levels = ordinal_levels,
     source_data = source_data, original_data = original_data,
     row_ids = row_ids, source_row_ids = original_row_ids, selected_cols = selected_cols,
     valid_indices = which(valid), clustering = fit$clustering,

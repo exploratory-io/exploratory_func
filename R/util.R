@@ -415,6 +415,79 @@ ceiling <- function(x, digits = 0) {
   }
 }
 
+#' Round numbers with a configurable rule for halves.
+#'
+#' Masks base::round. How a value exactly halfway between two candidates is
+#' rounded comes from getOption("exploratory.round_mode"):
+#' \itemize{
+#'   \item "half_up" (default): halves go away from zero, 2.5 -> 3, -2.5 -> -3.
+#'     Same results as janitor::round_half_up, so 2.675 -> 2.68 at 2 digits.
+#'   \item "half_down": halves go toward zero, 2.5 -> 2, -2.5 -> -2.
+#'   \item "half_even": base::round (IEC 60559, banker's rounding).
+#' }
+#' Any other option value (unset, NA, NULL, length != 1, unknown name) means "half_up".
+#' Negative numbers are rounded by magnitude, as base::round does.
+#' Integer, Date, POSIXct, difftime and other classed or non-double input is passed to base::round.
+#' @param x Numeric vector.
+#' @param digits Integer number of decimal places (negative allowed, may be a vector).
+#' @param ... Passed to base::round for non-double or classed input, e.g. units = "mins" for POSIXct.
+#' @export
+round <- function(x, digits = 0, ...) {
+  mode <- .exploratory_round_mode()
+  if (mode == "half_even" || !is.double(x) || is.object(x)) {
+    # Call base::round the way the caller did: round.POSIXt has no `digits` formal, so passing
+    # the default digits = 0 along would fail for a bare round(<POSIXct>).
+    return(if (missing(digits)) base::round(x, ...) else base::round(x, digits, ...))
+  }
+  n <- max(length(x), length(digits))
+  if (length(x) == 0 || length(digits) == 0) {
+    return(base::round(x, digits))
+  }
+  keep_attributes <- length(x) == n
+  if (!keep_attributes) {
+    x <- rep_len(x, n)
+  }
+  # Same digits handling as base::round: nearest integer, clamped to what a double can express.
+  d <- rep_len(pmax(pmin(floor(digits + 0.5), 308), -308), n)
+  eps <- sqrt(.Machine$double.eps)
+  # A value is rounded up when its fractional part, after scaling to whole units, reaches the
+  # threshold. This is janitor::round_half_up's trunc(z + 0.5 + eps) rewritten on the fraction,
+  # which is exact; adding eps to z itself loses it to float spacing once z > ~1e8.
+  # half_down is the mirror image: the fudge goes the other way so exact halves round toward zero.
+  threshold <- if (mode == "half_down") 0.5 + eps else 0.5 - eps
+  p <- 10^abs(d)
+  shrink <- d < 0
+  any_shrink <- isTRUE(any(shrink))
+  ax <- abs(x)
+  # Negative digits divide by a power of ten instead of multiplying by 10^-k, which is not exact.
+  z <- if (any_shrink) ifelse(shrink, ax / p, ax * p) else ax * p
+  whole <- floor(z)
+  z <- whole + ((z - whole) >= threshold)
+  res <- if (any_shrink) ifelse(shrink, z * p, z / p) else z / p
+  res <- res * sign(x)
+  # NA, NaN, Inf, and values whose scaled form overflows are returned as they are, as base::round does.
+  unscalable <- !is.finite(res)
+  if (any(unscalable, na.rm = TRUE)) {
+    res[unscalable] <- x[unscalable]
+  }
+  # NA digits give NA, like base::round.
+  res[is.na(d)] <- NA_real_
+  if (keep_attributes) {
+    attributes(res) <- attributes(x)
+  }
+  res
+}
+
+# The effective rounding rule: the exploratory.round_mode option, or "half_up" when it is
+# unset or not one of the supported names.
+.exploratory_round_mode <- function() {
+  mode <- getOption("exploratory.round_mode", "half_up")
+  if (!is.character(mode) || length(mode) != 1 || is.na(mode) || !(mode %in% c("half_up", "half_down", "half_even"))) {
+    mode <- "half_up"
+  }
+  mode
+}
+
 #' Not %in% function
 #' @export
 `%nin%` <- function (x, table) match(x, table, nomatch = 0L) == 0L
@@ -646,14 +719,155 @@ expand_args <- function(call, exclude = c()) {
   }
 }
 
+#' Number of distinct values up to which a numeric (or date) target is stratified on its own values.
+#' More distinct values than this are cut into STRATIFY_NUMERIC_BINS quantile bins.
+STRATIFY_MAX_DISCRETE_VALUES <- 10
+
+#' Number of equal-count quantile bins used to stratify a numeric (or date) target with many distinct values.
+STRATIFY_NUMERIC_BINS <- 5
+
+#' Assign every element of a vector to a stratum id (1..K) for stratified sampling.
+#'
+#' logical / character / factor values are their own strata. numeric and date values are their own
+#' strata when there are at most STRATIFY_MAX_DISCRETE_VALUES distinct values (e.g. a 0/1 status column
+#' or a 1-10 rating); otherwise they are cut into STRATIFY_NUMERIC_BINS equal-count quantile bins
+#' (dplyr::ntile). NA is its own stratum in every case.
+#' @param y A vector to stratify on.
+#' @return An integer vector of the same length as y with the stratum id of each element.
+#' @noRd
+stratum_ids_for_sampling <- function(y) {
+  key <- as.character(y)
+  if (is.numeric(y) || inherits(y, c("Date", "POSIXt"))) {
+    # ntile() splits tied values across bins by position, so few-valued numerics keep their values as strata.
+    if (dplyr::n_distinct(y, na.rm = TRUE) > STRATIFY_MAX_DISCRETE_VALUES) {
+      key <- dplyr::ntile(y, STRATIFY_NUMERIC_BINS)
+    }
+  }
+  # match() maps NA to NA's own position, so NA forms one stratum like any other value.
+  match(key, unique(key))
+}
+
+#' Pick test row indices so that every stratum contributes in proportion to its size.
+#'
+#' The total test size is floor(n * rate), the same as the plain random split. Strata with a single row
+#' cannot be split, so when there are two or more of them they are pooled into one combined stratum
+#' first; the pool then takes its proportional share like any other stratum (a lone single-row stratum
+#' is left as it is). The total is divided among strata by the largest remainder method on n_k * rate;
+#' strata with equal remainders are ranked by a random priority drawn from the seed, so which of them gets
+#' the extra row does not depend on the order of the rows (as in scikit-learn's stratified split).
+#' While rows are being divided, every stratum keeps at least one training row (its allocation is capped
+#' at n_k - 1). If the capped allocation still falls short of floor(n * rate) (only when a lone
+#' single-row stratum is left, or at a very high rate), the shortfall is filled by drawing uniformly at
+#' random from the rows not yet selected, lifting the cap. The size is below floor(n * rate) only if reaching it would empty the
+#' training set (rate >= 1). All per-stratum work is done in one pass over the rows, so the cost is
+#' linear in the number of rows plus strata.
+#' @param strata Integer stratum id per row (see stratum_ids_for_sampling).
+#' @param rate Fraction of rows to put in the test set.
+#' @return Sorted integer vector of test row indices.
+#' @noRd
+sample_stratified_index <- function(strata, rate) {
+  n <- length(strata)
+  total <- floor(n * rate)
+  # Relabel to 1..K in ascending id order, then pool the single-row strata (if there are two or more).
+  strata <- match(strata, sort(unique(strata)))
+  single_row <- tabulate(strata)[strata] == 1L
+  if (sum(single_row) >= 2) {
+    strata[single_row] <- max(strata) + 1L
+    strata <- match(strata, sort(unique(strata)))
+  }
+  group_sizes <- tabulate(strata)
+  exact <- group_sizes * rate
+  # Cap at n_k - 1 so a stratum is never entirely moved to the test set.
+  cap <- group_sizes - 1
+  alloc <- pmin(floor(exact), cap)
+  # Rounded so that remainders equal in exact arithmetic (0.6 vs 3 * 0.2) tie despite floating point noise.
+  remainder <- base::round(exact - floor(exact), 9)
+  # Ties on the remainder are broken uniformly at random (a random priority per stratum), never by class order.
+  tie_break <- sample.int(length(group_sizes))
+
+  # Floating point can make the sum of per-stratum floors exceed floor(n * rate) by one. Trim it.
+  while (sum(alloc) > total) {
+    trimmable <- which(alloc > 0)
+    drop_at <- trimmable[order(remainder[trimmable], tie_break[trimmable])][1]
+    alloc[drop_at] <- alloc[drop_at] - 1
+  }
+
+  # Hand out the leftover rows by largest remainder, only to strata that still have room.
+  left <- total - sum(alloc)
+  while (left > 0) {
+    with_room <- which(alloc < cap)
+    if (length(with_room) == 0) break
+    by_remainder <- with_room[order(-remainder[with_room], tie_break[with_room])]
+    chosen <- by_remainder[seq_len(min(left, length(by_remainder)))]
+    alloc[chosen] <- alloc[chosen] + 1
+    left <- left - length(chosen)
+  }
+
+  # Row indices of every stratum in one pass (ascending within a stratum, strata in id order).
+  rows_by_stratum <- split(seq_len(n), strata)
+  drawing <- which(alloc >= 1)
+  picked <- unlist(lapply(drawing, function(k) {
+    idx <- rows_by_stratum[[k]]
+    # sample.int, not sample(idx, ...): sample() treats a length-1 idx as 1:idx.
+    idx[sample.int(length(idx), alloc[k])]
+  }))
+  # A lone single-row stratum (or a very high rate) can leave the total short. Fill the shortfall with a
+  # uniform draw from the unselected rows, lifting the cap. No draw happens when there is no shortfall.
+  shortfall <- total - length(picked)
+  if (shortfall > 0) {
+    remaining <- setdiff(seq_len(n), picked)
+    shortfall <- min(shortfall, length(remaining))
+    # sample.int, not sample(remaining, ...): sample() treats a length-1 vector as 1:remaining.
+    picked <- c(picked, remaining[sample.int(length(remaining), shortfall)])
+  }
+  sort(as.integer(picked))
+}
+
+#' Allowed values of test_split_type for the Analytics functions that support Test Mode.
+TEST_SPLIT_TYPES <- c("random", "ordered", "stratified")
+
+#' Stop with a clear message unless test_split_type is one of TEST_SPLIT_TYPES.
+#' @param test_split_type The value to check.
+#' @return The value, invisibly.
+#' @noRd
+validate_test_split_type <- function(test_split_type) {
+  if (!is.character(test_split_type) || length(test_split_type) != 1 || is.na(test_split_type) ||
+      !(test_split_type %in% TEST_SPLIT_TYPES)) {
+    stop(paste0("test_split_type must be one of ", paste0('"', TEST_SPLIT_TYPES, '"', collapse = ", "), "."))
+  }
+  invisible(test_split_type)
+}
+
 #' get sampled indice from data frame
+#' @param df Data frame to split.
+#' @param rate Fraction of rows to return (the test set share).
+#' @param seed Optional seed for the random draw.
+#' @param ordered If TRUE, return the last rows (by order) instead of a random sample.
+#' @param stratify_by Optional vector with one value per row of df. When given, the random sample is
+#'   stratified on it so that each value (or, for numeric/date with more than 10 distinct values, each
+#'   of 5 quantile bins) keeps about the same share in the sample as in df. NULL (default) gives the plain random sample, with exactly
+#'   the same draws as before this argument existed. Ignored when ordered is TRUE. The sample size is
+#'   always floor(nrow(df) * rate), as for the plain random sample: each stratum is first allocated a
+#'   proportional share (leaving at least one training row per stratum). Single-row strata are pooled
+#'   into one combined stratum so they take their share together; a lone remaining shortfall is
+#'   filled with random rows from the rest.
 #' @export
-sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
+sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE, stratify_by = NULL) {
   # Return NULL (empty vector) for rate 0 case. If we go on, ordered case would return the index for the last row.
   if (rate == 0) return(NULL)
   if (!ordered) {
     if(!is.null(seed)){
       set.seed(seed)
+    }
+    if (!is.null(stratify_by)) {
+      if (length(stratify_by) != nrow(df)) {
+        stop("stratify_by must have one value per row of the data frame.")
+      }
+      strata <- stratum_ids_for_sampling(stratify_by)
+      # With fewer than 2 strata there is nothing to stratify; use the plain random sample below.
+      if (length(unique(strata)) >= 2) {
+        return(sample_stratified_index(strata, rate))
+      }
     }
     sample(seq(nrow(df)), nrow(df) * rate)
   }
@@ -2866,9 +3080,26 @@ aggregate_if <- function(x, aggregateFunc, ..., na.rm = T) {
   conditions <- dplyr:::dplyr_quosures(...)
   # iterate the if conditions and creates consolidated conditions connected with &
   flatten_conditions_exprs <- conditions %>% purrr::reduce(bind_expr)
-  # create a dummy data frame that has 2 columns (one with original x and the other with TRUE/FALSE results for specified conditions)
-  # then extract the only x column as a vector (same as doing df$x) with dplyr::pull()
-  condition <- tibble::tibble(x = x) %>% dplyr::mutate(exp_internal_condition_col = !!flatten_conditions_exprs) %>% dplyr::pull(exp_internal_condition_col)
+  # Evaluate the combined condition expression directly with tidy eval, using the
+  # quosure's own captured data mask (the per-group data inside summarize()/mutate()).
+  # Do NOT route this through a throwaway tibble(x = x) %>% mutate(...): when the
+  # value column is (intentionally) re-used as the output name of an EARLIER
+  # expression in the same summarize_group()/summarize() call -- e.g.
+  # `col = sum(col, na.rm = TRUE)` followed later by `new_col = count_if(col, cond)` --
+  # dplyr's sequential-summarise semantics replace later references to `col` with the
+  # already-computed scalar. That silently shrinks `x` to length 1 while `cond`
+  # (referencing a different, non-shadowed column) still evaluates to the full
+  # per-group length, and `tibble(x = x) %>% mutate(exp_internal_condition_col = cond)`
+  # then throws "exp_internal_condition_col must be size 1, not N" even though the
+  # condition itself is perfectly valid (tam#37945). Evaluating the condition on its
+  # own sidesteps x's (possibly stale) length entirely.
+  condition <- rlang::eval_tidy(flatten_conditions_exprs)
+  # Preserve mutate()'s recycling behavior for scalar conditions. Conditions
+  # that refer to group columns already have the full group length and must
+  # remain independent of x, which may be a scalar after summarize() shadowing.
+  if (length(condition) == 1L) {
+    condition <- rep(condition, length(x))
+  }
 
   if (aggregateFunc == "sum") {
     sum(x[condition], na.rm = na.rm)
@@ -3317,6 +3548,62 @@ aupr <- function(score, bool) {
   previous_recall <- c(0, recall[-length(recall)])
   previous_precision <- c(1, precision[-length(precision)])
   sum((recall - previous_recall) * (precision + previous_precision) / 2)
+}
+
+#' Calculates Average Precision, the same as scikit-learn's average_precision_score.
+#' Unlike aupr(), which takes the trapezoid area under the PR curve, this is the
+#' step sum of (R_n - R_(n-1)) * P_n over the distinct score thresholds. Cases with
+#' the same score are grouped into one threshold.
+#' @param score - Vector of predicted score/probability for the positive class.
+#' @param bool - Logical vector. TRUE is the positive class.
+#' @return Average Precision, or NA when it is undefined (no positive or no
+#'   negative case, or nothing left after removing NAs).
+#' @noRd
+average_precision_score <- function(score, bool) {
+  not_na <- !(is.na(score) | is.na(bool)) # Index to filter out score-bool pairs with NA in either of them.
+  bool <- as.logical(bool[not_na])
+  score <- score[not_na]
+  if (length(bool) == 0 || !any(bool) || all(bool)) {
+    return(NA_real_)
+  }
+  ordered <- order(score, decreasing = TRUE)
+  bool <- bool[ordered]
+  score <- score[ordered]
+  tp <- cumsum(bool)
+  fp <- cumsum(!bool)
+  # Keep only the last case of each group of tied scores, so that ties form one threshold.
+  last_of_tie <- c(score[-1] != score[-length(score)], TRUE)
+  tp <- tp[last_of_tie]
+  fp <- fp[last_of_tie]
+  recall <- tp / sum(bool)
+  precision <- tp / (tp + fp)
+  sum(diff(c(0, recall)) * precision)
+}
+
+#' Returns an XGBoost custom_metric function that calculates Average Precision.
+#' XGBoost has the built-in "aucpr" (PR AUC) but no Average Precision.
+#' It is for xgb.train(custom_metric = , maximize = TRUE) with
+#' disable_default_eval_metric = TRUE. The name shows up in the evaluation log
+#' as e.g. "validation_average_precision".
+#' @noRd
+xgb_custom_binary_metric <- function(name = "average_precision") {
+  force(name)
+  function(preds, dmatrix) {
+    label <- xgboost::getinfo(dmatrix, "label")
+    list(metric = name, value = average_precision_score(preds, label == 1))
+  }
+}
+
+#' Returns a LightGBM eval function that calculates PR AUC (trapezoid) with aupr().
+#' LightGBM has the built-in "average_precision" but no PR AUC.
+#' It is for lgb.train(eval = ) with params metric = "None".
+#' @noRd
+lgb_custom_binary_metric <- function(name = "pr_auc") {
+  force(name)
+  function(preds, dataset) {
+    label <- lightgbm::get_field(dataset, "label")
+    list(name = name, value = aupr(preds, label == 1), higher_better = TRUE)
+  }
 }
 
 #' Calculates time-dependent AUC for survival prediction.

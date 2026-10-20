@@ -243,3 +243,37 @@ test_that('K-Medoids representative_values carries importance_order too (tam#384
   # One row per (cluster, variable) still -- the join must not duplicate rows.
   expect_equal(nrow(rep_values), 3 * 4)
 })
+
+test_that('a variable the clusters separate perfectly gets eta_squared 1 and an undefined (NA) F, not floating-point noise (tam#39875)', {
+  # Two pure clusters: within-cluster variance is exactly 0, so F is undefined (infinite).
+  # aov() reports residual SS as ~1e-30 noise, which turned F into ~1e29 and showed as
+  # "8.22e+29" in the report table.
+  mat <- cbind(sep = c(0, 0, 0, 1, 1, 1), mixed = c(1, 2, 3, 2, 3, 4))
+  ids <- c(1, 1, 1, 2, 2, 2)
+  res <- exploratory:::cluster_variable_importance_anova(mat, ids)
+  sep <- res[res$variable == 'sep', ]
+  expect_equal(sep$eta_squared, 1)
+  expect_true(is.na(sep$test_statistic))
+  expect_equal(sep$p_value, 0)
+  # A variable with real within-cluster spread is untouched: F matches stats::aov exactly.
+  mixed <- res[res$variable == 'mixed', ]
+  expected <- summary(stats::aov(mat[, 'mixed'] ~ factor(ids)))[[1]]
+  expect_equal(mixed$test_statistic, expected[['F value']][[1]])
+  expect_equal(mixed$p_value, expected[['Pr(>F)']][[1]])
+})
+
+test_that('K-Medoids on a 2-level ordered factor that the clusters split exactly reports NA, not 1e29 (tam#39875)', {
+  # Seed BEFORE drawing the data: with unseeded data some draws make cluster::pam(pamonce = 5)
+  # loop forever (a separate, pre-existing hang -- tam#39875 follow-up), which this test is not about.
+  set.seed(1)
+  df <- tibble::tibble(
+    g = factor(rep(c('a', 'b'), each = 20), levels = c('a', 'b'), ordered = TRUE),
+    x = c(stats::rnorm(20, 0, 0.1), stats::rnorm(20, 5, 0.1))
+  )
+  model <- exploratory:::exp_kmedoids(df, g, x, centers = 2, seed = 1)$model[[1]]
+  vi <- broom::tidy(model, type = 'variable_importance')
+  g_row <- vi[vi$variable == 'g', ]
+  expect_equal(g_row$eta_squared, 1)
+  expect_true(is.na(g_row$test_statistic))
+  expect_true(all(is.na(vi$test_statistic) | abs(vi$test_statistic) < 1e15))
+})

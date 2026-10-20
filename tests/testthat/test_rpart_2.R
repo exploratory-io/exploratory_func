@@ -524,7 +524,7 @@ test_that("exp_rpart report_metrics adds metrics without changing the default ou
                     binary = rlang::sym("is delayed"),
                     multiclass = rlang::sym("ORI GIN"))
   expected_added <- list(regression = c("MAE", "Mean Error"),
-                         binary = c("ROC AUC", "PR AUC", "Balanced Accuracy", "Specificity"),
+                         binary = c("ROC AUC", "PR AUC", "Average Precision", "Balanced Accuracy", "Specificity"),
                          multiclass = c("Balanced Accuracy", "Macro ROC AUC", "Macro PR AUC"))
 
   data <- flight %>% dplyr::mutate(`is delayed` = `ARR DELAY` > 0)
@@ -557,10 +557,10 @@ test_that("exp_rpart report_metrics adds metrics without changing the default ou
   expect_false("AUC" %in% colnames(with_metrics))
   # #37252: Balanced Accuracy between F1 and Accuracy; Specificity after Recall.
   expect_equal(
-    intersect(c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+    intersect(c("ROC AUC", "PR AUC", "Average Precision", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
                 "Misclass. Rate", "Precision", "Recall", "Specificity"),
               colnames(with_metrics)),
-    c("ROC AUC", "PR AUC", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
+    c("ROC AUC", "PR AUC", "Average Precision", "F1 Score", "Balanced Accuracy", "Accuracy Rate",
       "Misclass. Rate", "Precision", "Recall", "Specificity"))
   # Balanced accuracy is the mean of recall and specificity, by definition.
   expect_equal(with_metrics$`Balanced Accuracy`[[1]],
@@ -573,4 +573,25 @@ test_that("exp_rpart report_metrics adds metrics without changing the default ou
                                               pretty.name = TRUE, report_metrics = TRUE)
   expect_true(all(c("Balanced Accuracy", "ROC AUC", "PR AUC", "Overall Share") %in% colnames(by_class)))
   expect_equal(sum(by_class$`Overall Share`), 1)
+})
+
+test_that("exp_rpart(multi) predicted labels are the same as the argmax of the probabilities (tam#39338 regression)", {
+  # predict_value_from_prob now maps labels by the probability column names. rpart returns a column for every
+  # ylevel, so the result must stay the same as the old mapping by position in ylevels.
+  set.seed(1)
+  n <- 300
+  x <- runif(n)
+  y <- ifelse(x < 0.33, "a", ifelse(x < 0.66, "b", "c"))
+  flip <- sample(n, 60)
+  y[flip] <- sample(c("a", "b", "c"), 60, replace = TRUE)
+  df <- data.frame(y = y, x = x, z = rnorm(n))
+  model_df <- df %>% exp_rpart(y, x, z, test_rate = 0.2, seed = 1)
+  fit <- model_df$model[[1]]
+  training_data <- model_df$source.data[[1]][-model_df$.test_index[[1]], ]
+  prob <- predict(fit, training_data, type = "prob")
+  expect_equal(colnames(prob), attr(fit, "ylevels"))
+  old_labels <- attr(fit, "ylevels")[apply(prob, 1, which.max)]
+  aug <- augment(fit, data = training_data, data_type = "training")
+  expect_equal(as.character(aug$predicted_label), old_labels)
+  expect_true(any(aug$predicted_probability < 1)) # Leaves are impure, i.e. the argmax check is not trivial.
 })

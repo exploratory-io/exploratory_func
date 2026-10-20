@@ -300,7 +300,10 @@
       cluster_median = as.numeric(apply(raw, 2L, stats::median)),
       cluster_mean = as.numeric(colMeans(raw)),
       overall_median = as.numeric(apply(original, 2L, stats::median)),
-      overall_mean = as.numeric(colMeans(original))
+      overall_mean = as.numeric(colMeans(original)),
+      # tam#39474: the radar tooltip quotes how many rows the cluster holds. The same
+      # value on every variable of the cluster, taken before any top-N narrowing.
+      cluster_size = as.integer(length(index))
     )
   })
   rows <- rows %>% dplyr::group_by(cluster) %>%
@@ -397,12 +400,9 @@
     )
   })
   result <- dplyr::bind_rows(result, vectors)
-  eig <- pcoa$eig[pcoa$eig > 0]
-  rate <- if (length(eig) == 0L) c(0, 0) else {
-    values <- cumsum(eig) / sum(eig)
-    c(values[seq_len(min(2L, length(values)))], rep(0, 2L))
-  }
-  attr(result, 'representation_rate') <- rate[seq_len(2L)]
+  rates <- .pcoa_representation_rates(pcoa$eig)
+  attr(result, 'representation_rate') <- rates$per_axis
+  attr(result, 'cumulative_representation_rate') <- rates$cumulative
   attr(result, 'map_sample_size') <- length(map_indices)
   attr(result, 'map_sampled') <- length(map_indices) < n
   result

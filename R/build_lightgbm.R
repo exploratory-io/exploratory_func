@@ -44,7 +44,10 @@ expand_lightgbm_metric_aliases <- function(metric_names) {
     mlogloss = c("mlogloss", "multi_logloss"),
     multi_logloss = c("multi_logloss", "mlogloss"),
     merror = c("merror", "multi_error"),
-    multi_error = c("multi_error", "merror")
+    multi_error = c("multi_error", "merror"),
+    # With metric = "None" the built-in metrics are off and only the custom eval function
+    # (lgb_custom_binary_metric, named "pr_auc") records results.
+    none = c("none", "pr_auc")
   )
 
   expanded <- unique(unlist(lapply(metric_names, function(m) {
@@ -838,7 +841,7 @@ lightgbm_build_evaluation_log <- function(model) {
 #' @param data Dataframe to create model
 #' @param formula Formula for model
 #' @param output_type Type of output. Default is "probability". Other options include "class" for class predictions
-#' @param eval_metric Evaluation metric to use. Default is "auc". Other options include "binary_logloss", "binary_error", "average_precision"
+#' @param eval_metric Evaluation metric to use. Default is "auc". Other options include "binary_logloss", "binary_error", "average_precision", and "pr_auc" (PR AUC, calculated by a custom eval function)
 #' @param params List of additional parameters to pass to LightGBM. These will be merged with the eval_metric parameter.
 #' @param ... Additional arguments passed to fml_lightgbm, such as:
 #'   \itemize{
@@ -855,7 +858,15 @@ lightgbm_binary <- function(data, formula, output_type = "probability", eval_met
   loadNamespace("lightgbm")
 
   # there can be more than 1 metric by adding to params, but keep one explicit.
-  metric_list <- list(metric = eval_metric)
+  custom_eval <- NULL
+  if (identical(eval_metric, "pr_auc")) {
+    # LightGBM has no built-in PR AUC (trapezoid), so we calculate it with a custom eval function.
+    # metric = "None" turns the built-in metrics off so that it alone drives early stopping.
+    metric_list <- list(metric = "None")
+    custom_eval <- lgb_custom_binary_metric("pr_auc")
+  } else {
+    metric_list <- list(metric = eval_metric)
+  }
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
@@ -885,6 +896,7 @@ lightgbm_binary <- function(data, formula, output_type = "probability", eval_met
     data = data,
     formula = formula,
     params = append(list(objective = objective), params),
+    eval = custom_eval,
     ...
   )
 
@@ -1612,6 +1624,7 @@ exp_lightgbm <- function(df,
                          seed = 1,
                          test_rate = 0.0,
                          test_split_type = "random") {
+  validate_test_split_type(test_split_type)
   loadNamespace("lightgbm")
 
   if (test_rate < 0 | 1 < test_rate) {
@@ -1719,7 +1732,9 @@ exp_lightgbm <- function(df,
       # Split data into train/test BEFORE applying SMOTE
       # This ensures test data remains pure and doesn't contain synthetic samples
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      test_index <- sample_df_index(source_data, rate = test_rate,
+                                    ordered = (test_split_type == "ordered"),
+                                    stratify_by = if (test_split_type == "stratified") source_data[[clean_target_col]] else NULL)
       df <- safe_slice(source_data, test_index, remove = TRUE)
       
       # Extract test data if test_rate > 0 (needed for smote_keep_synthetic logic)
@@ -1969,7 +1984,9 @@ exp_lightgbm <- function(df,
       model$orig_levels <- orig_levels
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
-      model$df <- df
+      # tam#39340: prediction_training was made on the original training rows (df_train_original) when SMOTE was applied
+      # without keeping the synthetic rows. extract_actual() reads the actual values from model$df, so it has to hold the same rows.
+      model$df <- if (smote_applied && !smote_keep_synthetic) df_train_original else df
       model$formula_terms <- terms(fml)
       attr(model$formula_terms, ".Environment") <- NULL
       model$sampled_nrow <- clean_df_ret$sampled_nrow

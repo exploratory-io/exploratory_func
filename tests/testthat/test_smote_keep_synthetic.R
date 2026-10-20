@@ -128,3 +128,72 @@ test_that("exp_xgboost with smote_keep_synthetic = FALSE excludes synthesized co
   expect_equal(nrow(source_data), n)
   expect_false("synthesized" %in% colnames(source_data))
 })
+
+# ── Tests: training evaluation with smote_keep_synthetic = FALSE (tam#39340) ──
+# The training predictions are made on the original (pre-SMOTE) training rows, so the
+# actual values used for evaluation must come from those rows too, not from the SMOTE-resampled rows.
+
+smote_no_keep_data <- local({
+  set.seed(1)
+  n <- 1000
+  x <- rnorm(n)
+  z <- rnorm(n)
+  y <- runif(n) < plogis(-3 + x) # Imbalanced logical target.
+  data.frame(y = y, x = x, z = z)
+})
+
+# Expect evaluation and confusion matrix of the training data to work on exactly the original training rows.
+expect_training_metrics_on_original_rows <- function(model_df) {
+  fit <- model_df$model[[1]]
+  n_original_train <- nrow(model_df$source.data[[1]]) - length(model_df$.test_index[[1]])
+  expect_false("synthesized" %in% colnames(model_df$source.data[[1]]))
+
+  evaluation <- tidy(fit, type = "evaluation")
+  expect_true(is.data.frame(evaluation))
+  expect_equal(nrow(evaluation), 1)
+
+  conf_mat <- tidy(fit, type = "conf_mat")
+  expect_equal(sum(conf_mat$count), n_original_train)
+
+  # Training actual values must match the original training data.
+  original_train <- model_df$source.data[[1]][-model_df$.test_index[[1]], ]
+  expect_equal(sort(tapply(conf_mat$count, conf_mat$actual_value, sum)),
+               sort(c(table(original_train$y))), ignore_attr = TRUE)
+}
+
+test_that("calc_feature_imp (ranger) with smote = TRUE and smote_keep_synthetic = FALSE evaluates on original training rows", {
+  model_df <- smote_no_keep_data %>%
+    calc_feature_imp(y, x, z, test_rate = 0.2, smote = TRUE, smote_keep_synthetic = FALSE, seed = 1)
+  expect_training_metrics_on_original_rows(model_df)
+})
+
+test_that("exp_xgboost with smote = TRUE and smote_keep_synthetic = FALSE evaluates on original training rows", {
+  model_df <- smote_no_keep_data %>%
+    exp_xgboost(y, x, z, test_rate = 0.2, smote = TRUE, smote_keep_synthetic = FALSE, nrounds = 5, seed = 1)
+  expect_training_metrics_on_original_rows(model_df)
+})
+
+test_that("exp_lightgbm with smote = TRUE and smote_keep_synthetic = FALSE evaluates on original training rows", {
+  model_df <- smote_no_keep_data %>%
+    exp_lightgbm(y, x, z, test_rate = 0.2, smote = TRUE, smote_keep_synthetic = FALSE, nrounds = 5, seed = 1)
+  expect_training_metrics_on_original_rows(model_df)
+})
+
+test_that("exp_catboost with smote = TRUE and smote_keep_synthetic = FALSE evaluates on original training rows", {
+  testthat::skip_if_not_installed("catboost")
+  model_df <- smote_no_keep_data %>%
+    exp_catboost(y, x, z, test_rate = 0.2, smote = TRUE, smote_keep_synthetic = FALSE, iterations = 5, seed = 1)
+  expect_training_metrics_on_original_rows(model_df)
+})
+
+test_that("ranger evaluation of the training data is unchanged when smote_keep_synthetic = TRUE", {
+  # The default (TRUE) path must keep working: evaluation is on the SMOTE-resampled training rows.
+  model_df <- smote_no_keep_data %>%
+    calc_feature_imp(y, x, z, test_rate = 0.2, smote = TRUE, smote_keep_synthetic = TRUE, seed = 1)
+  fit <- model_df$model[[1]]
+  source_data <- model_df$source.data[[1]]
+  n_train <- nrow(source_data) - length(model_df$.test_index[[1]])
+  expect_true("synthesized" %in% colnames(source_data))
+  expect_equal(sum(tidy(fit, type = "conf_mat")$count), n_train)
+  expect_equal(length(fit$y), n_train)
+})
