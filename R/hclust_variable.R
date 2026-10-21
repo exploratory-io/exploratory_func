@@ -114,7 +114,8 @@
     Value = c(
       as.character(length(x$selected_cols)), paste(x$selected_cols, collapse = ', '),
       as.character(x$nrow), as.character(x$min_pair_nrow %||% x$nrow),
-      as.character(x$n_nonfinite %||% 0L), as.character(x$centers), x$cor_method, '1 - Correlation',
+      as.character(x$n_nonfinite %||% 0L), as.character(x$centers), x$cor_method,
+      if (identical(x$cor_distance, 'absolute')) '1 - |Correlation|' else '1 - Correlation',
       x$linkage, 'Pairwise'
     )
   )
@@ -170,6 +171,7 @@
 #' @param ... Numeric columns selected with tidyselect.
 #' @param centers Default number of clusters shown in report tables.
 #' @param cor_method Correlation method: `pearson` or `spearman`.
+#' @param cor_distance Distance between two variables: `signed` is 1 - r (a strongly negative pair stays apart), `absolute` is 1 - abs(r) (a strongly negative pair is as close as a strongly positive one).
 #' @param linkage Linkage method: `average`, `complete`, or `single`.
 #' @param max_interactive_k Largest K for which cut roots are precomputed.
 #' @param elbow_method_mode `silhouette` computes the silhouette sweep over K, `none` skips it.
@@ -177,7 +179,7 @@
 #' @return A rowwise data frame containing a variable clustering model.
 #' @export
 exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
-                                linkage = 'average', max_interactive_k = 10,
+                                cor_distance = 'signed', linkage = 'average', max_interactive_k = 10,
                                 elbow_method_mode = 'silhouette', max_centers = 10) {
   selected_cols <- unname(tidyselect::vars_select(names(df), !!!rlang::quos(...)))
   if (length(selected_cols) == 0L) {
@@ -187,6 +189,7 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
     stop('Variable clustering requires numeric variables.', call. = FALSE)
   }
   cor_method <- match.arg(as.character(cor_method), c('pearson', 'spearman'))
+  cor_distance <- match.arg(as.character(cor_distance), c('signed', 'absolute'))
   linkage <- match.arg(as.character(linkage), c('average', 'complete', 'single'))
   elbow_method_mode <- match.arg(as.character(elbow_method_mode), c('none', 'silhouette'))
   centers <- .hclust_safe_numeric(centers)
@@ -249,10 +252,13 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
   pair_nrow <- crossprod(present)
   min_pair_nrow <- as.integer(min(pair_nrow[upper.tri(pair_nrow)]))
   dimnames(cor_mat) <- list(selected_cols, selected_cols)
-  # 1 - r, NOT 1 - abs(r): a negatively correlated pair stays apart. A pair with
+  # signed (default): 1 - r, so a negatively correlated pair stays apart.
+  # absolute: 1 - abs(r), so a strongly negative pair is as close as a strongly
+  # positive one (the variables move together, just in opposite directions).
+  # A pair with
   # no overlapping rows has no correlation; treat it as uncorrelated (distance 1)
   # -- the same choice cor_cluster_order_recursive makes for do_cor.
-  distance_mat <- 1 - cor_mat
+  distance_mat <- if (identical(cor_distance, 'absolute')) 1 - abs(cor_mat) else 1 - cor_mat
   distance_mat[!is.finite(distance_mat)] <- 1
   diag(distance_mat) <- 0
   distance_object <- stats::as.dist(distance_mat)
@@ -269,7 +275,7 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
   max_height <- if (length(hc$height)) max(hc$height) else 0
   metadata <- list(
     schemaVersion = '1.0', n = p, leafKind = 'variable', distanceMethod = 'correlation',
-    corMethod = cor_method, linkageMethod = linkage, maxHeight = max_height,
+    corMethod = cor_method, corDistance = cor_distance, linkageMethod = linkage, maxHeight = max_height,
     defaultK = centers, maxInteractiveK = max_interactive_k
   )
   nodes$metadata_json <- NA_character_
@@ -285,7 +291,7 @@ exp_hclust_variable <- function(df, ..., centers = 3, cor_method = 'pearson',
     clustering = default_info$display_membership, memberships = cut_data$memberships,
     cuts = cut_data$cuts, leaf_order = as.integer(hc$order) - 1L,
     dendrogram_nodes = nodes, valid_nrow = p,
-    centers = centers, cor_method = cor_method, linkage = linkage,
+    centers = centers, cor_method = cor_method, cor_distance = cor_distance, linkage = linkage,
     n_nonfinite = sum(infinite), min_pair_nrow = min_pair_nrow,
     max_interactive_k = max_interactive_k, elbow_method_mode = elbow_method_mode,
     max_centers = max_centers,
@@ -320,7 +326,7 @@ tidy.hclust_variable_exploratory <- function(x, type = 'summary', ...) {
 #' @export
 glance.hclust_variable_exploratory <- function(x, ...) {
   tibble::tibble(
-    centers = x$centers, cor_method = x$cor_method, linkage = x$linkage,
+    centers = x$centers, cor_method = x$cor_method, cor_distance = x$cor_distance, linkage = x$linkage,
     max_height = if (length(x$hclust$height)) max(x$hclust$height) else 0,
     n_variables = x$valid_nrow
   )
