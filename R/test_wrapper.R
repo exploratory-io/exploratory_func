@@ -252,6 +252,38 @@ stop_explanatory_variable_needs_2_unique_values <- function(n_distinct_count) {
   stop(sprintf("The explanatory variable needs to have 2 unique values, but it has %d.", n_distinct_count))
 }
 
+# tam#40039: exp_ttest/exp_ttest_aggregated/exp_wilcox/exp_two_sample_prop_test
+# all used to guard their explanatory/grouping column with a plain
+# n_distinct(df[[col]]) != 2 check. dplyr::n_distinct() counts NA as a
+# distinct value by default (na.rm = FALSE), so that raw count both
+# (a) UNDER-reports a real problem: exactly 1 real category plus some NA
+# rows counts as 2 "distinct" values, so the guard let it through
+# undetected -- the NA rows then get silently dropped by the downstream
+# as.factor()/forcats::fct_drop() conversion, leaving a true 1-level factor
+# that crashes inside base R's own check with the raw, untranslated
+# "grouping factor must have exactly 2 levels" (from t.test.formula /
+# wilcox.test.formula) instead of this function's friendly message, and
+# (b) OVER-reports the real category count by 1 whenever >= 3 real
+# categories coexist with NA rows (only the exact "3 real + NA = 4" shape
+# was special-cased before, by re-deriving the real count from the n==3
+# case alone instead of asking dplyr for it directly).
+# Counting with na.rm = TRUE first and reporting THAT count fixes both, and
+# auto-filtering NA out of `col` whenever exactly 2 real values remain
+# (matching the old n_distinct_res == 3 special case, but now applied
+# whenever the real count is 2, not just when the raw NA-inclusive count
+# happened to be exactly 3) keeps every existing passing shape working.
+#' @noRd
+filter_to_2_explanatory_levels <- function(df, col) {
+  n_distinct_real <- n_distinct(df[[col]], na.rm = TRUE)
+  if (n_distinct_real != 2) {
+    stop_explanatory_variable_needs_2_unique_values(n_distinct_real)
+  }
+  if (any(is.na(df[[col]]))) {
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
+  }
+  df
+}
+
 #' wrapper for t.test, which compares means
 #' @export
 do_t.test <- function(df, ...){
@@ -894,15 +926,7 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
     df <- df %>% dplyr::arrange(!!rlang::sym(var2_col))
   }
 
-  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
-  if (n_distinct_res != 2) {
-    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
-      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
-    }
-    else {
-      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
-    }
-  }
+  df <- filter_to_2_explanatory_levels(df, var2_col) # tam#40039: real (non-NA) count, with NA rows dropped when it is exactly 2.
 
   ttest_each <- function(df) {
     tryCatch({
@@ -917,10 +941,8 @@ exp_ttest_aggregated <- function(df, category, n, category_mean, category_sd, te
       # Re-check regardless of grouping -- see tam#38168 / the identical fix
       # in exp_ttest/exp_wilcox for why gating this on grouped_cols alone is
       # wrong (a hand-copied sibling of the same bug).
-      n_distinct_res_each <- n_distinct(df[[var2_col]])
-      if (n_distinct_res_each != 2) {
-        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
-      }
+      df <- filter_to_2_explanatory_levels(df, var2_col) # tam#40039
+
       # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
       # Check it here, rather than handling it later.
       min_n <- min(df[[n_col]], na.rm=TRUE)
@@ -1073,15 +1095,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
     df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
   }
   
-  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
-  if (n_distinct_res != 2) {
-    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
-      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
-    }
-    else {
-      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
-    }
-  }
+  df <- filter_to_2_explanatory_levels(df, var2_col) # tam#40039: real (non-NA) count, with NA rows dropped when it is exactly 2.
   # Use a different syntax for paired in R4.4.
   # https://bugs.r-project.org/show_bug.cgi?id=14359
   if (paired) {
@@ -1124,10 +1138,8 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       # grouped runs both filter outliers the same way and need the same
       # guard, or the ungrouped path falls through to
       # calculate_cohens_d()'s raw "subscript out of bounds".
-      n_distinct_res_each <- n_distinct(df[[var2_col]])
-      if (n_distinct_res_each != 2) {
-        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
-      }
+      df <- filter_to_2_explanatory_levels(df, var2_col) # tam#40039
+
       # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
       # Check it here, rather than handling it later.
       count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n())
@@ -1532,15 +1544,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
     df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
   }
   
-  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
-  if (n_distinct_res != 2) {
-    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
-      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
-    }
-    else {
-      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
-    }
-  }
+  df <- filter_to_2_explanatory_levels(df, var2_col) # tam#40039: real (non-NA) count, with NA rows dropped when it is exactly 2.
 
   # For the paired Wilcoxon test, we actually use the 2-vector interface
   # instead of the formula interface. See each_func for details.
@@ -1563,10 +1567,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05, pair
       # this each_func runs) can pass even when the target-column NA rows
       # removed just above coincide entirely with one explanatory-variable
       # group.
-      n_distinct_res_each <- n_distinct(df[[var2_col]])
-      if (n_distinct_res_each != 2) {
-        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
-      }
+      df <- filter_to_2_explanatory_levels(df, var2_col) # tam#40039
       # Adjust the factor levels since t.test consideres the 2nd level to be the base, which is not what we want.
       # We keep the original df as is, since we want to keep the original factor order for display purpose.
       if (var2_logical) {
@@ -3797,15 +3798,9 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
     df <- df %>% dplyr::mutate(!!rlang::sym(exp_col) := factor(!!rlang::sym(exp_col), levels = c("TRUE", "FALSE")))
   }
 
-  # Validate exactly 2 unique values, auto-filtering NA as a 3rd category
-  n_distinct_res <- n_distinct(df[[exp_col]])
-  if (n_distinct_res != 2) {
-    if (n_distinct_res == 3 && any(is.na(df[[exp_col]]))) {
-      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(exp_col)))
-    } else {
-      stop_explanatory_variable_needs_2_unique_values(n_distinct_res)
-    }
-  }
+  # Validate exactly 2 unique values, auto-filtering NA as a 3rd category.
+  # tam#40039: real (non-NA) count, with NA rows dropped when it is exactly 2.
+  df <- filter_to_2_explanatory_levels(df, exp_col)
 
   two_sample_prop_test_each <- function(df) {
     tryCatch({
@@ -3818,11 +3813,8 @@ exp_two_sample_prop_test <- function(df, var, explanatory, func2 = NULL,
       # both filter var_col the same way, and both need the same guard, or
       # the ungrouped path falls through to a raw "missing value where
       # TRUE/FALSE needed" once the collapsed group's lv[2] resolves to NA.
-      # tam#38168.
-      n_distinct_res_each <- n_distinct(df[[exp_col]])
-      if (n_distinct_res_each != 2) {
-        stop_explanatory_variable_needs_2_unique_values(n_distinct_res_each)
-      }
+      # tam#38168 / tam#40039.
+      df <- filter_to_2_explanatory_levels(df, exp_col)
 
       vec <- as.logical(df[[var_col]])
       grp <- df[[exp_col]]
