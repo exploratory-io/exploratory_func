@@ -76,3 +76,58 @@ test_that("exp_two_sample_prop_test: 3 unique values WITH NA still auto-filters 
   result <- exp_two_sample_prop_test(df, outcome, group)
   expect_true(!is.null(result$model[[1]]))
 })
+
+# tam#40039: a NA-masking gap in the guard above. R's dplyr::n_distinct()
+# counts NA as a distinct value by default (na.rm = FALSE), so "1 real
+# category + some NA rows" counted as 2 "distinct" values and slipped past
+# the old `n_distinct(df[[col]]) != 2` guard completely undetected -- the NA
+# rows were then silently dropped by the downstream as.factor()/fct_drop()
+# conversion, leaving a true 1-level factor that crashed inside base R's own
+# check with the raw, untranslated "grouping factor must have exactly 2
+# levels" (from t.test.formula / wilcox.test.formula) instead of this
+# file's friendly, count-bearing message. These tests pin that the real
+# (non-NA) category count is reported and the friendly stop() still fires.
+
+test_that("exp_ttest: 1 real category plus NA rows in the explanatory variable is still caught as 1, not masked as 2 (tam#40039)", {
+  df <- data.frame(val = seq(10), group = c(rep("A", 7), NA, NA, NA))
+  expect_error(
+    exp_ttest(df, val, group),
+    "The explanatory variable needs to have 2 unique values, but it has 1\\."
+  )
+})
+
+test_that("exp_ttest: 3 real categories plus NA rows reports the real count of 3, not the NA-inflated count of 4 (tam#40039)", {
+  df <- data.frame(val = seq(13), group = c(rep(c("A", "B", "C"), each = 4), NA))
+  expect_error(
+    exp_ttest(df, val, group),
+    "The explanatory variable needs to have 2 unique values, but it has 3\\."
+  )
+})
+
+test_that("exp_wilcox: 1 real category plus NA rows in the explanatory variable is still caught as 1, not masked as 2 (tam#40039)", {
+  df <- data.frame(val = seq(10), group = c(rep("A", 7), NA, NA, NA))
+  expect_error(
+    exp_wilcox(df, val, group),
+    "The explanatory variable needs to have 2 unique values, but it has 1\\."
+  )
+})
+
+test_that("exp_two_sample_prop_test: 1 real category plus NA rows in the explanatory variable is still caught as 1, not masked as 2 (tam#40039)", {
+  df <- data.frame(
+    outcome = c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, TRUE),
+    group = c(rep("A", 4), NA, NA, NA)
+  )
+  expect_error(
+    exp_two_sample_prop_test(df, outcome, group),
+    "The explanatory variable needs to have 2 unique values, but it has 1\\."
+  )
+})
+
+test_that("exp_ttest: 2 real categories plus NA rows still auto-filters NA instead of erroring (tam#40039 regression guard)", {
+  # Same shape as the exp_two_sample_prop_test "3 unique values WITH NA"
+  # guard above, mirrored for exp_ttest: 2 real groups + NA must keep
+  # succeeding (NA dropped), not regress into a false "needs 2, has N" stop.
+  df <- data.frame(val = seq(23), group = c(rep("A", 10), rep("B", 10), NA, NA, NA))
+  result <- exp_ttest(df, val, group)
+  expect_true(!is.null(result$model[[1]]))
+})
