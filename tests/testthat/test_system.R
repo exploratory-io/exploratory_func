@@ -1533,3 +1533,36 @@ test_that("oracleOCIPoolKey separates connections that differ only by additional
   withPrefetch <- exploratory:::oracleOCIPoolKey("h", 1521, "SVC", "u", "UTC", 200000, "", "prefetch=TRUE")
   expect_false(identical(base, withPrefetch))
 })
+
+# tam#32708: the Data Catalog download URL carries the API key and the user name.
+test_that("append_data_catalog_credentials appends api_key and user_name", {
+  base <- "https://exploratory.io/public/api/author/item/data"
+  expect_equal(exploratory:::append_data_catalog_credentials(base, "KEY", "Hide Kojima"),
+               paste0(base, "?api_key=KEY&user_name=Hide%20Kojima"))
+  # an existing query string is continued with &, the api key stays first-come
+  expect_equal(exploratory:::append_data_catalog_credentials(paste0(base, "?format=csv"), "KEY", "Ann"),
+               paste0(base, "?format=csv&api_key=KEY&user_name=Ann"))
+  # no name (NULL, NA, empty, blank): same URL as before the change
+  for (name in list(NULL, NA_character_, "", "   ")) {
+    expect_equal(exploratory:::append_data_catalog_credentials(base, "KEY", name), paste0(base, "?api_key=KEY"))
+  }
+  # no token: the name alone is still sent
+  expect_equal(exploratory:::append_data_catalog_credentials(base, NULL, "Ann"), paste0(base, "?user_name=Ann"))
+  # parameters the URL already has are not repeated
+  expect_equal(exploratory:::append_data_catalog_credentials(paste0(base, "?api_key=OLD&user_name=Bob"), "KEY", "Ann"),
+               paste0(base, "?api_key=OLD&user_name=Bob"))
+  # a parameter whose name only ends in user_name / api_key is not the real one
+  parsed <- httr::parse_url(exploratory:::append_data_catalog_credentials(paste0(base, "?my_user_name=x&not_api_key=y"), "KEY", "Ann"))
+  expect_equal(parsed$query$user_name, "Ann")
+  expect_equal(parsed$query$api_key, "KEY")
+})
+
+test_that("append_data_catalog_credentials round-trips a complex user name", {
+  name <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_{|}~ 表"
+  url <- exploratory:::append_data_catalog_credentials("https://exploratory.io/public/api/a/b/data", "KEY", name)
+  query <- sub("^[^?]*\\?", "", url)
+  pairs <- strsplit(query, "&", fixed = TRUE)[[1]]
+  # reserved characters of the name must not create extra parameters
+  expect_equal(length(pairs), 2)
+  expect_equal(utils::URLdecode(sub("^user_name=", "", pairs[2])), name)
+})
