@@ -321,3 +321,100 @@ test_that("group by target data frame case", {
   expect_equal("mpg" %nin% colnames(df16) , TRUE)
   expect_equal("mpg_1" %nin% colnames(df16) , TRUE)
 })
+
+# ---- #33983: dplyr `multiple` / `relationship` pass-through ----
+context("test join multiple / relationship pass-through (#33983)")
+
+mx <- data.frame(id = c(1, 2, 3, NA), xv = c("a", "b", "c", "d"), stringsAsFactors = FALSE)
+my <- data.frame(id = c(1, 1, 2, NA, NA), yv = c("p", "q", "r", "s", "t"), stringsAsFactors = FALSE)
+
+test_that("left_join forwards multiple = first / last / any / all like dplyr", {
+  for (m in c("first", "last", "any", "all")) {
+    res <- left_join(mx, my, by = "id", multiple = m)
+    expected <- dplyr::left_join(mx, my, by = "id", multiple = m, na_matches = "never")
+    expect_equal(res, expected, info = m)
+  }
+  expect_equal(nrow(left_join(mx, my, by = "id", multiple = "first")), 4)  # NA never matches: x rows 1,2,3,NA
+  expect_equal(left_join(mx, my, by = "id", multiple = "first")$yv[1], "p")
+  expect_equal(left_join(mx, my, by = "id", multiple = "last")$yv[1], "q")
+})
+
+test_that("left_join default is unchanged (all matches kept)", {
+  expect_equal(nrow(left_join(mx, my, by = "id")), 5)  # id 1 matches two rows; NA never matches
+  expect_equal(left_join(mx, my, by = "id"), dplyr::left_join(mx, my, by = "id", na_matches = "never"))
+})
+
+test_that("inner_join / right_join / full_join forward multiple", {
+  expect_equal(inner_join(mx, my, by = "id", multiple = "first"), dplyr::inner_join(mx, my, by = "id", multiple = "first", na_matches = "never"))
+  expect_equal(nrow(inner_join(mx, my, by = "id", multiple = "first")), 2)
+  expect_equal(inner_join(mx, my, by = "id", multiple = "last"), dplyr::inner_join(mx, my, by = "id", multiple = "last", na_matches = "never"))
+  expect_equal(right_join(mx, my, by = "id", multiple = "first"), dplyr::right_join(mx, my, by = "id", multiple = "first", na_matches = "never"))
+  expect_equal(full_join(mx, my, by = "id", multiple = "last"), dplyr::full_join(mx, my, by = "id", multiple = "last", na_matches = "never"))
+})
+
+test_that("multiple works with ignorecase", {
+  cx <- data.frame(k = c("A", "b", "C"), xv = 1:3, stringsAsFactors = FALSE)
+  cy <- data.frame(k = c("a", "A", "B", "c"), yv = c("p", "q", "r", "s"), stringsAsFactors = FALSE)
+  res_all <- left_join(cx, cy, by = "k", ignorecase = TRUE)
+  expect_equal(nrow(res_all), 4)
+  res_first <- left_join(cx, cy, by = "k", ignorecase = TRUE, multiple = "first")
+  expect_equal(nrow(res_first), 3)
+  expect_equal(res_first$yv, c("p", "r", "s"))
+  res_last <- left_join(cx, cy, by = "k", ignorecase = TRUE, multiple = "last")
+  expect_equal(res_last$yv, c("q", "r", "s"))
+  res_inner <- inner_join(cx, cy, by = "k", ignorecase = TRUE, multiple = "first")
+  expect_equal(nrow(res_inner), 3)
+  # right/full also go through the case-insensitive helper
+  expect_equal(nrow(right_join(cx, cy, by = "k", ignorecase = TRUE, multiple = "first")), 4)
+  expect_equal(nrow(full_join(cx, cy, by = "k", ignorecase = TRUE, multiple = "first")), 4)
+})
+
+test_that("multiple works with target_columns, na_matches and suffix", {
+  res <- left_join(mx, my, by = "id", multiple = "first", target_columns = c("id", "yv"))
+  expect_equal(nrow(res), 4)
+  res_na <- left_join(mx, my, by = "id", multiple = "first", na_matches = "na")
+  expect_equal(res_na, dplyr::left_join(mx, my, by = "id", multiple = "first", na_matches = "na"))
+  expect_equal(res_na$yv[4], "s")
+  expect_true(is.na(left_join(mx, my, by = "id", multiple = "first")$yv[4]))
+  sx <- data.frame(id = 1:2, v = c("a", "b"), stringsAsFactors = FALSE)
+  sy <- data.frame(id = c(1, 1, 2), v = c("p", "q", "r"), stringsAsFactors = FALSE)
+  res_sfx <- left_join(sx, sy, by = "id", multiple = "last", suffix = c("_src", "_tgt"))
+  expect_equal(names(res_sfx), c("id", "v_src", "v_tgt"))
+  expect_equal(res_sfx$v_tgt, c("q", "r"))
+})
+
+test_that("multiple works with join_by inequality key", {
+  ix <- data.frame(a = c(5, 10), stringsAsFactors = FALSE)
+  iy <- data.frame(b = c(1, 3, 7), stringsAsFactors = FALSE)
+  res <- left_join(ix, iy, by = dplyr::join_by(a >= b), multiple = "last")
+  expect_equal(nrow(res), 2)
+  expect_equal(res$b, c(3, 7))
+})
+
+test_that("relationship is forwarded (proves pass-through)", {
+  expect_error(left_join(mx, my, by = "id", relationship = "many-to-one"))
+  expect_equal(nrow(left_join(mx, my, by = "id", relationship = "many-to-many")), 5)
+  expect_error(left_join(mx, my, by = "id", ignorecase = TRUE, relationship = "many-to-one"))
+})
+
+test_that("multiple works for a column named with symbols and multibyte chars", {
+  nm <- "航空 会社 !\"#$%&'()*+, -./:;<=>?@[]^_'{|}~ 表"
+  sx <- stats::setNames(data.frame(c(1, 2), c("a", "b"), stringsAsFactors = FALSE), c(nm, "xv"))
+  sy <- stats::setNames(data.frame(c(1, 1, 2), c("p", "q", "r"), stringsAsFactors = FALSE), c(nm, "yv"))
+  res <- left_join(sx, sy, by = nm, multiple = "first")
+  expect_equal(nrow(res), 2)
+  expect_equal(res$yv, c("p", "r"))
+  res_ic <- left_join(sx, sy, by = nm, multiple = "last", ignorecase = TRUE)
+  expect_equal(res_ic$yv, c("q", "r"))
+})
+
+test_that("semi_join / anti_join with ignorecase still work (helper unchanged for them)", {
+  cx <- data.frame(k = c("A", "b", "z"), stringsAsFactors = FALSE)
+  cy <- data.frame(k = c("a", "B"), stringsAsFactors = FALSE)
+  expect_equal(nrow(semi_join(cx, cy, by = "k", ignorecase = TRUE)), 2)
+  expect_equal(nrow(anti_join(cx, cy, by = "k", ignorecase = TRUE)), 1)
+})
+
+test_that("a stray unknown argument is still silently ignored (no wholesale dots forwarding)", {
+  expect_equal(nrow(left_join(mx, my, by = "id", some_unknown_arg = 1)), 5)
+})
