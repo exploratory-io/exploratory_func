@@ -4155,7 +4155,11 @@ append_data_catalog_credentials <- function(url, token = NULL, user_name = NULL)
     separator <- if (stringr::str_detect(u, "\\?")) "&" else "?"
     paste0(u, separator, name, "=", utils::URLencode(enc2utf8(as.character(value)), reserved = TRUE))
   }
-  add_param(add_param(url, "api_key", token), "user_name", user_name)
+  # A #fragment is never sent to the server, so the parameters must go before it.
+  fragment <- stringr::str_extract(url, "#.*$")
+  base <- if (is.na(fragment)) url else substr(url, 1, nchar(url) - nchar(fragment))
+  result <- add_param(add_param(base, "api_key", token), "user_name", user_name)
+  if (is.na(fragment)) result else paste0(result, fragment)
 }
 
 #'Wrapper for readr::read_delim to support remote file

@@ -1566,3 +1566,13 @@ test_that("append_data_catalog_credentials round-trips a complex user name", {
   expect_equal(length(pairs), 2)
   expect_equal(utils::URLdecode(sub("^user_name=", "", pairs[2])), name)
 })
+
+test_that("append_data_catalog_credentials puts the parameters before a #fragment", {
+  base <- "https://exploratory.io/public/api/a/b/data"
+  expect_equal(exploratory:::append_data_catalog_credentials(paste0(base, "?format=csv#section"), "KEY", "Ann"),
+               paste0(base, "?format=csv&api_key=KEY&user_name=Ann#section"))
+  expect_equal(exploratory:::append_data_catalog_credentials(paste0(base, "#top"), "KEY", "Ann"),
+               paste0(base, "?api_key=KEY&user_name=Ann#top"))
+  same <- paste0(base, "?api_key=OLD&user_name=Bob#x")
+  expect_equal(exploratory:::append_data_catalog_credentials(same, "KEY", "Ann"), same)
+})
