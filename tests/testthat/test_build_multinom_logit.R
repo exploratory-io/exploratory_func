@@ -68,11 +68,11 @@ test_that("unknown reference category lists the valid categories", {
                "Choose one of: Detractor, Passive, Promoter")
 })
 
-test_that("numeric, 2-level and >20-level targets are rejected", {
+test_that("numeric, 1-level and >20-level targets are rejected", {
   df <- make_multinom_test_df()
   expect_error(df %>% build_multinom_logit(x1, plan), "must be a categorical column")
-  df2 <- df %>% dplyr::filter(nps != "Detractor")
-  expect_error(df2 %>% build_multinom_logit(nps, x1), "3 or more categories")
+  df2 <- df %>% dplyr::filter(nps == "Passive")
+  expect_error(df2 %>% build_multinom_logit(nps, x1), "2 or more categories \\(it has 1\\)")
   df3 <- df
   df3$many <- paste0("c", seq_len(nrow(df3)) %% 21)
   expect_error(df3 %>% build_multinom_logit(many, x1), "at most 20 categories")
@@ -211,4 +211,94 @@ test_that("a variable whose coefficients have no p-value keeps NA (the real unav
   model_df$model[[1]] <- model
   imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
   expect_true(all(is.na(imp_df$p.value)))
+})
+
+# ---- 2-category target (tam#40256): the model is exactly binary logistic regression ----
+
+# 2-class outcome with a complex-named character target and a multibyte predictor.
+make_two_class_test_df <- function(n = 400, seed = 7) {
+  set.seed(seed)
+  x1 <- stats::rnorm(n)
+  g <- sample(c("東", "西", "南"), n, replace = TRUE)
+  eta <- 0.3 + 1.2 * x1 - 0.4 * (g == "西") - 0.2 * (g == "南")
+  y <- ifelse(stats::runif(n) < stats::plogis(eta), "貸倒", "完済")
+  df <- data.frame(x1 = x1, stringsAsFactors = FALSE)
+  df[[COMPLEX_NAME]] <- y
+  df$`地域 名!#` <- g
+  df
+}
+
+test_that("2-category target runs and matches glm(binomial) with real standard errors", {
+  df <- make_two_class_test_df()
+  model_df <- df %>% build_multinom_logit(!!rlang::sym(COMPLEX_NAME), x1, `地域 名!#`, reference_category = "完済")
+  coef_df <- model_df %>% tidy_rowwise(model)
+  expect_equal(unique(as.character(coef_df$category)), "貸倒")
+  expect_true(all(is.finite(coef_df$std.error)))
+  expect_true(all(is.finite(coef_df$p.value)))
+  expect_true(all(is.finite(coef_df$odds.ratio[coef_df$coefficient_type == "coefficient"])))
+
+  ref_df <- data.frame(y = factor(df[[COMPLEX_NAME]], levels = c("完済", "貸倒")), x1 = df$x1,
+                       g = forcats::fct_infreq(df$`地域 名!#`))
+  ref_fit <- stats::glm(y ~ x1 + g, data = ref_df, family = stats::binomial())
+  ref_sum <- summary(ref_fit)$coefficients
+  x1_row <- coef_df %>% dplyr::filter(term == "x1")
+  expect_equal(x1_row$estimate, unname(ref_sum["x1", "Estimate"]), tolerance = 1e-4)
+  expect_equal(x1_row$std.error, unname(ref_sum["x1", "Std. Error"]), tolerance = 1e-3)
+  expect_equal(x1_row$p.value, unname(ref_sum["x1", "Pr(>|z|)"]), tolerance = 1e-3)
+
+  pretty_df <- model_df %>% tidy_rowwise(model, pretty.name = TRUE)
+  expect_true(all(!is.na(pretty_df$`P Value`)))
+})
+
+test_that("logical target and a factor with an unused declared level run with 2 categories", {
+  df <- make_two_class_test_df()
+  df$flag <- df[[COMPLEX_NAME]] == "貸倒"
+  model_df <- df %>% build_multinom_logit(flag, x1)
+  expect_equal((model_df %>% glance_rowwise(model))$n_classes, 2)
+  expect_true(all(is.finite((model_df %>% tidy_rowwise(model))$std.error)))
+
+  df$fct <- factor(df[[COMPLEX_NAME]], levels = c("完済", "貸倒", "不明"))
+  model_df2 <- df %>% build_multinom_logit(fct, x1)
+  expect_equal((model_df2 %>% glance_rowwise(model))$n_classes, 2)
+})
+
+test_that("2-category predictions return one probability column per category", {
+  df <- make_two_class_test_df()
+  model_df <- df %>% build_multinom_logit(!!rlang::sym(COMPLEX_NAME), x1, `地域 名!#`, test_rate = 0.3)
+  aug <- model_df %>% augment_rowwise(model)
+  prob_cols <- paste0("predicted_probability_", c("完済", "貸倒"))
+  expect_true(all(prob_cols %in% colnames(aug)))
+  expect_false(any(grepl("^predicted_probability_[0-9]+$", colnames(aug))))
+  expect_equal(unname(rowSums(aug[, prob_cols])), rep(1, nrow(aug)), tolerance = 1e-8)
+  expect_true(all(!is.na(aug$.fitted)))
+
+  model <- model_df$model[[1]]
+  one <- multinom_logit_predict(model, newdata = df[1, , drop = FALSE], type = "probs")
+  expect_equal(dim(one), c(1, 2))
+  expect_equal(colnames(one), model$lev)
+  expect_equal(unname(rowSums(one)), 1, tolerance = 1e-8)
+})
+
+test_that("2-category evaluation, importance, partial dependence and probabilities have values", {
+  df <- make_two_class_test_df()
+  model_df <- df %>% build_multinom_logit(!!rlang::sym(COMPLEX_NAME), x1, `地域 名!#`, test_rate = 0.3)
+  eval_df <- model_df %>% evaluate_multinom_logit(data = "training_and_test")
+  expect_equal(eval_df$`Data Type`, c("Training", "Test"))
+  expect_true(all(is.finite(eval_df$`Accuracy Rate`)))
+  expect_true(all(eval_df$`Accuracy Rate` > 0.5))
+  roc_col <- grep("ROC AUC", colnames(eval_df), value = TRUE)
+  expect_true(length(roc_col) >= 1)
+  expect_true(all(is.finite(eval_df[[roc_col[[1]]]])))
+  expect_true(all(is.finite(eval_df$`Log Loss`)))
+
+  imp_df <- model_df %>% tidy_rowwise(model, type = "importance")
+  expect_setequal(imp_df$variable, c("x1", "地域 名!#"))
+  expect_true(all(imp_df$importance > 0))
+  expect_true(all(!is.na(imp_df$p.value)))
+
+  pd_df <- model_df %>% tidy_rowwise(model, type = "partial_dependence")
+  expect_setequal(unique(pd_df$y_name), c("完済", "貸倒"))
+
+  probs <- multinom_logit_report_multiclass_probabilities(model_df)
+  expect_equal(nrow(probs), 2 * nrow(df))
 })
