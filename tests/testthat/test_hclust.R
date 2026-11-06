@@ -394,3 +394,59 @@ test_that('radar/profile carries each cluster\'s row count as cluster_size (tam#
   narrowed_sizes <- broom::tidy(narrowed, type = 'radar') %>% dplyr::distinct(cluster, cluster_size) %>% dplyr::arrange(cluster)
   expect_equal(narrowed_sizes$cluster_size, expected[narrowed_sizes$cluster])
 })
+
+# tam#39997: the column chosen for Label must be in the Data table output.
+test_that('tidy(type = "data") carries the Label column, aligned row for row', {
+  label_name <- '航空 会社 !"#$%&\'()*+, -./:;<=>?@[]^_\'{|}~ 表'
+  df <- tibble::tibble(
+    v1 = c(1, 2, 3, 10, 11, 12, NA),
+    v2 = c(1, 2, 2, 9, 10, 12, 5)
+  )
+  df[[label_name]] <- c('a', 'b', 'c', 'd', 'e', 'f', 'g')
+  df$num_label <- c(100.5, 200.5, 300.5, 400.5, 500.5, 600.5, 700.5)
+  quoted <- as.name(label_name)
+  model <- eval(bquote(exploratory:::exp_hclust(
+    df, v1, v2, centers = 2, max_interactive_k = 3, elbow_method_mode = 'none',
+    label_col = .(quoted)
+  )))$model[[1]]
+  out <- broom::tidy(model, type = 'data')
+
+  expect_equal(names(out), c(label_name, 'v1', 'v2', 'row_id', 'cluster', 'is_excluded'))
+  expect_equal(nrow(out), nrow(df))
+  expect_equal(out[[label_name]], df[[label_name]])
+  expect_true(out$is_excluded[[7]])          # NA row stays, flagged as excluded
+  expect_true(is.na(out$cluster[[7]]))
+
+  # Without a label the table is exactly what it was before.
+  plain <- exploratory:::exp_hclust(
+    df, v1, v2, centers = 2, max_interactive_k = 3, elbow_method_mode = 'none'
+  )$model[[1]]
+  expect_equal(names(broom::tidy(plain, type = 'data')), c('v1', 'v2', 'row_id', 'cluster', 'is_excluded'))
+})
+
+test_that('Label column stays aligned with its row after sampling', {
+  df <- tibble::tibble(v1 = as.numeric(1:40), v2 = as.numeric(c(1:20, 41:60)), lab = paste0('r', 1:40))
+  model <- exploratory:::exp_hclust(
+    df, v1, v2, centers = 2, max_interactive_k = 3, elbow_method_mode = 'none',
+    max_nrow = 15, label_col = lab
+  )$model[[1]]
+  out <- broom::tidy(model, type = 'data')
+  expect_equal(nrow(out), 15L)
+  # row_id is the 1-based position in the source data; the label must be that row's own.
+  expect_equal(out$lab, df$lab[as.integer(out$row_id)])
+})
+
+test_that('Label column that collides with a result column, or is also a variable, is not duplicated', {
+  df <- tibble::tibble(v1 = as.numeric(1:10), v2 = as.numeric(c(1:5, 21:25)), cluster = letters[1:10])
+  collided <- exploratory:::exp_hclust(
+    df, v1, v2, centers = 2, max_interactive_k = 3, elbow_method_mode = 'none', label_col = cluster
+  )$model[[1]]
+  out <- broom::tidy(collided, type = 'data')
+  expect_equal(names(out), c('cluster.new', 'v1', 'v2', 'row_id', 'cluster', 'is_excluded'))
+  expect_equal(out$cluster.new, letters[1:10])
+
+  same <- exploratory:::exp_hclust(
+    df, v1, v2, centers = 2, max_interactive_k = 3, elbow_method_mode = 'none', label_col = v1
+  )$model[[1]]
+  expect_equal(names(broom::tidy(same, type = 'data')), c('v1', 'v2', 'row_id', 'cluster', 'is_excluded'))
+})

@@ -553,6 +553,12 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
   # wrong row -- which is why the harness pins the alignment against the source
   # data rather than merely checking that labels appear.
   source_labels <- if (is.null(label_col_name)) NULL else as.character(df[[label_col_name]])
+  # tam#39997: the label column itself, sampled exactly like `df` (so it lines up
+  # with source_data row for row), kept in its own type for tidy(type = 'data').
+  # A label that is also one of the clustered variables is already in
+  # source_data, so it is not carried a second time.
+  label_data <- if (is.null(label_col_name) || label_col_name %in% selected_cols) NULL else
+    tibble::as_tibble(df[label_col_name], .name_repair = 'minimal')
   source_data <- df[selected_cols]
   source_mat <- as.matrix(source_data)
   valid <- complete.cases(source_data) & rowSums(!is.finite(source_mat)) == 0L
@@ -619,6 +625,7 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
   model <- list(
     hclust = hc, distance_object = distance_object, mat = mat,
     original_fit_mat = as.matrix(fit_data), source_data = source_data,
+    label_data = label_data,
     original_data = original_data, selected_cols = selected_cols,
     source_row_ids = source_row_ids, row_ids = row_ids, valid_indices = which(valid),
     clustering = default_info$display_membership, memberships = cut_data$memberships,
@@ -698,9 +705,21 @@ tidy.hclust_exploratory <- function(x, type = 'summary', with_excluded_rows = FA
     data = {
       cluster <- rep(NA_integer_, nrow(x$source_data))
       cluster[x$valid_indices] <- x$clustering
-      dplyr::bind_cols(x$source_data, tibble::tibble(
+      ids <- tibble::tibble(
         row_id = x$source_row_ids, cluster = cluster, is_excluded = is.na(cluster)
-      ))
+      )
+      out <- tibble::as_tibble(x$source_data, .name_repair = 'minimal')
+      # tam#39997: the column chosen for Label goes first, so the output table
+      # says which row each cluster assignment belongs to. A label column that
+      # happens to be called row_id / cluster / is_excluded (or shares a name with
+      # a variable) takes a .new suffix instead of colliding with the column that
+      # is already there.
+      if (!is.null(x$label_data)) {
+        label <- x$label_data
+        names(label) <- avoid_conflict(c(names(out), names(ids)), names(label))
+        out <- dplyr::bind_cols(label, out)
+      }
+      dplyr::bind_cols(out, ids)
     },
     .hclust_empty(type)
   )
