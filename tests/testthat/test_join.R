@@ -418,3 +418,11 @@ test_that("semi_join / anti_join with ignorecase still work (helper unchanged fo
 test_that("a stray unknown argument is still silently ignored (no wholesale dots forwarding)", {
   expect_equal(nrow(left_join(mx, my, by = "id", some_unknown_arg = 1)), 5)
 })
+
+test_that("a stray positional argument remains silently ignored", {
+  args <- list(mx, my, "id", FALSE, c(".x", ".y"), FALSE, NULL, FALSE, "never", "stray")
+  expect_equal(do.call(inner_join, args), do.call(inner_join, args[-10]))
+  expect_equal(do.call(left_join, args), do.call(left_join, args[-10]))
+  expect_equal(do.call(right_join, args), do.call(right_join, args[-10]))
+  expect_equal(do.call(full_join, args), do.call(full_join, args[-10]))
+})
