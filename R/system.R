@@ -4137,6 +4137,31 @@ read_delim_files <- function(files, forPreview = FALSE, delim, quote = '"',
 
 }
 
+# Appends api_key and user_name query parameters to the URL of a Data Catalog item (tam#32708).
+# A parameter the URL already has is not repeated; a NULL / NA / blank value is not added.
+# @param url The URL of the Data Catalog item.
+# @param token The API key.
+# @param user_name The display name of the user who downloads. Percent-encoded here.
+# @return The URL with the parameters.
+append_data_catalog_credentials <- function(url, token = NULL, user_name = NULL) {
+  has_param <- function(u, name) {
+    query <- stringr::str_match(u, "\\?([^#]*)")[, 2]
+    !is.na(query) && name %in% sub("=.*$", "", strsplit(query, "&", fixed = TRUE)[[1]])
+  }
+  add_param <- function(u, name, value) {
+    if (is.null(value) || length(value) != 1 || is.na(value) || trimws(value) == "" || has_param(u, name)) {
+      return(u)
+    }
+    separator <- if (stringr::str_detect(u, "\\?")) "&" else "?"
+    paste0(u, separator, name, "=", utils::URLencode(enc2utf8(as.character(value)), reserved = TRUE))
+  }
+  # A #fragment is never sent to the server, so the parameters must go before it.
+  fragment <- stringr::str_extract(url, "#.*$")
+  base <- if (is.na(fragment)) url else substr(url, 1, nchar(url) - nchar(fragment))
+  result <- add_param(add_param(base, "api_key", token), "user_name", user_name)
+  if (is.na(fragment)) result else paste0(result, fragment)
+}
+
 #'Wrapper for readr::read_delim to support remote file
 #'@export
 read_delim_file <- function(file, delim, quote = '"',
@@ -4158,14 +4183,10 @@ read_delim_file <- function(file, delim, quote = '"',
       stringr::str_detect(file, "^ftp://"))) {
     if(with_api_key){
       token <- exploratory::getTokenInfo("exploratory-data-catalog")
-      if(!is.null(token)) {
-        # append access_token to the URL
-        if(stringr::str_detect(file, "\\?") || stringr::str_detect(file, "\\&")) {
-          file <- stringr::str_c(file, "&api_key=", token)
-        } else {
-          file <- stringr::str_c(file, "?api_key=", token)
-        }
-      }
+      # The desktop app also stores the display name of the logged-in user (tam#32708),
+      # so that the server can show who downloaded the data.
+      user_name <- exploratory::getTokenInfo("exploratory-data-catalog-user-name")
+      file <- append_data_catalog_credentials(file, token, user_name)
     }
     tryCatch({
       tmp <- download_data_file(file, "csv")
