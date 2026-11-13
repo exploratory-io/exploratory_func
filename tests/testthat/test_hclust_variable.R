@@ -204,3 +204,33 @@ test_that('a variable alone in its cluster reports NA silhouette, but still coun
     expect_equal(sweep$n_singleton_clusters[sweep$center == k], sum(table(cut) == 1L))
   }
 })
+
+test_that('cor_distance = absolute uses 1 - abs(r) and the default stays 1 - r (tam#39999)', {
+  data <- mtcars[c('mpg', 'disp', 'hp', 'wt', 'qsec')]
+  for (method in c('pearson', 'spearman')) {
+    result <- data %>% exploratory:::exp_hclust_variable(
+      dplyr::everything(), centers = 2, cor_method = method, cor_distance = 'absolute',
+      linkage = 'average', elbow_method_mode = 'none'
+    )
+    model <- result$model[[1]]
+    expected <- stats::hclust(stats::as.dist(1 - abs(stats::cor(data, method = method))), method = 'average')
+    expect_equal(as.numeric(model$hclust$height), as.numeric(expected$height), tolerance = 1e-10)
+    expect_equal(model$hclust$merge, expected$merge)
+  }
+  absolute <- data %>% exploratory:::exp_hclust_variable(dplyr::everything(), centers = 2, cor_distance = 'absolute')
+  signed <- data %>% exploratory:::exp_hclust_variable(dplyr::everything(), centers = 2)
+  default <- data %>% exploratory:::exp_hclust_variable(dplyr::everything(), centers = 2, cor_distance = 'signed')
+  expect_equal(signed$model[[1]]$hclust$height, default$model[[1]]$hclust$height)
+  expect_true(max(absolute$model[[1]]$hclust$height) <= 1 + 1e-12)
+  expect_gt(max(signed$model[[1]]$hclust$height), max(absolute$model[[1]]$hclust$height))
+  # the cor heatmap stays signed
+  cor_tbl <- broom::tidy(absolute$model[[1]], type = 'cor')
+  expect_true(any(cor_tbl$correlation < 0))
+  conds <- broom::tidy(absolute$model[[1]], type = 'analysis_conditions')
+  expect_equal(conds$Value[conds$Metric == 'Distance'], '1 - |Correlation|')
+  conds_signed <- broom::tidy(signed$model[[1]], type = 'analysis_conditions')
+  expect_equal(conds_signed$Value[conds_signed$Metric == 'Distance'], '1 - Correlation')
+  meta <- jsonlite::fromJSON(broom::tidy(absolute$model[[1]], type = 'dendrogram_nodes')$metadata_json[[1]])
+  expect_equal(meta$metadata$corDistance, 'absolute')
+  expect_error(data %>% exploratory:::exp_hclust_variable(dplyr::everything(), cor_distance = 'bogus'))
+})
