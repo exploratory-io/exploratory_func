@@ -148,8 +148,17 @@
     other_means <- vapply(others, function(group) {
       .hclust_variable_mean_cor(x$cor_mat, index, which(ids == group))
     }, numeric(1))
-    nearest <- if (length(others) && any(is.finite(other_means))) {
-      which.max(other_means)
+    # Select the nearest cluster using the configured distance while keeping
+    # avg_cor_nearest signed for reporting.
+    nearest_scores <- if (identical(x$cor_distance, 'absolute')) {
+      vapply(others, function(group) {
+        .hclust_variable_mean_cor(abs(x$cor_mat), index, which(ids == group))
+      }, numeric(1))
+    } else {
+      other_means
+    }
+    nearest <- if (length(others) && any(is.finite(nearest_scores))) {
+      which.max(nearest_scores)
     } else {
       NA_integer_
     }
