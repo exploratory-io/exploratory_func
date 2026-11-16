@@ -555,9 +555,9 @@ exp_hclust <- function(df, ..., centers = 3, distance = 'euclidean', linkage = '
   source_labels <- if (is.null(label_col_name)) NULL else as.character(df[[label_col_name]])
   # tam#39997: the label column itself, sampled exactly like `df` (so it lines up
   # with source_data row for row), kept in its own type for tidy(type = 'data').
-  # A label that is also one of the clustered variables is already in
-  # source_data, so it is not carried a second time.
-  label_data <- if (is.null(label_col_name) || label_col_name %in% selected_cols) NULL else
+  # A label that is also a clustered variable is removed from the output's
+  # source columns below, so it appears only once in the Data table.
+  label_data <- if (is.null(label_col_name)) NULL else
     tibble::as_tibble(df[label_col_name], .name_repair = 'minimal')
   source_data <- df[selected_cols]
   source_mat <- as.matrix(source_data)
@@ -716,6 +716,7 @@ tidy.hclust_exploratory <- function(x, type = 'summary', with_excluded_rows = FA
       # is already there.
       if (!is.null(x$label_data)) {
         label <- x$label_data
+        out <- out[, names(out) != names(label), drop = FALSE]
         names(label) <- avoid_conflict(c(names(out), names(ids)), names(label))
         out <- dplyr::bind_cols(label, out)
       }

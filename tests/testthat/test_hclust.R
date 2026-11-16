@@ -449,4 +449,15 @@ test_that('Label column that collides with a result column, or is also a variabl
     df, v1, v2, centers = 2, max_interactive_k = 3, elbow_method_mode = 'none', label_col = v1
   )$model[[1]]
   expect_equal(names(broom::tidy(same, type = 'data')), c('v1', 'v2', 'row_id', 'cluster', 'is_excluded'))
+
+  # A selected numeric Label can itself have a result column's name.
+  numeric_cluster <- tibble::tibble(cluster = as.numeric(1:10), v2 = as.numeric(c(1:5, 21:25)))
+  selected_collision <- exploratory:::exp_hclust(
+    numeric_cluster, cluster, v2, centers = 2, max_interactive_k = 3,
+    elbow_method_mode = 'none', label_col = cluster
+  )$model[[1]]
+  selected_out <- broom::tidy(selected_collision, type = 'data')
+  expect_equal(names(selected_out), c('cluster.new', 'v2', 'row_id', 'cluster', 'is_excluded'))
+  expect_equal(selected_out$cluster.new, numeric_cluster$cluster)
+  expect_true(all(selected_out$cluster %in% 1:2))
 })
