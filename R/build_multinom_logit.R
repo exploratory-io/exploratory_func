@@ -1,4 +1,4 @@
-# Multinomial Logistic Regression for a 3+ level UNORDERED categorical target
+# Multinomial Logistic Regression for a 2+ level UNORDERED categorical target
 # (tam#37033). Estimates one set of slopes per non-reference category, so the
 # drivers of e.g. "Promoter vs Passive" and "Detractor vs Passive" can differ --
 # which Ordered Logistic Regression (build_polr()) constrains to one slope.
@@ -160,10 +160,10 @@ build_multinom_logit <- function(df,
   df[[target_col]] <- forcats::fct_drop(df[[target_col]])
   target_levels <- levels(df[[target_col]])
   n_target_levels <- length(target_levels)
-  if (n_target_levels < 3) {
+  if (n_target_levels < 2) {
     stop(paste0(
-      "Column to predict (", target_col, ") for Multinomial Logistic Regression must have 3 or more categories (it has ",
-      n_target_levels, "). For a 2-category outcome, use Logistic Regression instead."
+      "Column to predict (", target_col, ") for Multinomial Logistic Regression must have 2 or more categories (it has ",
+      n_target_levels, ")."
     ))
   }
   if (n_target_levels > MULTINOM_LOGIT_MAX_CATEGORIES) {
@@ -202,8 +202,8 @@ build_multinom_logit <- function(df,
         train_data[[col]] <- forcats::fct_drop(train_data[[col]])
       }
     }
-    if (length(levels(train_data[[target_col]])) < 3) {
-      stop("Fewer than 3 categories remain in the training data after sampling/splitting. Try lowering the test data rate.")
+    if (length(levels(train_data[[target_col]])) < 2) {
+      stop("Fewer than 2 categories remain in the training data after sampling/splitting. Try lowering the test data rate.")
     }
     if (!(reference_category %in% levels(train_data[[target_col]]))) {
       stop(paste0("Reference category (", reference_category, ") does not appear in the training data of this group."))
@@ -351,6 +351,8 @@ resolve_multinom_reference_category <- function(target_values, reference_categor
 
 # predict() for nnet::multinom that always returns the n x K probability matrix
 # (a 1-row newdata collapses to a vector) and drops the response column first.
+# With a 2-category target nnet returns a vector of P(lev[2]) for any number of
+# rows, so rebuild the n x 2 matrix as cbind(1 - p, p).
 multinom_logit_predict <- function(object, newdata = NULL, type = "probs") {
   if (!is.null(newdata) && !is.null(object$orig_target_col) &&
       object$orig_target_col %in% colnames(newdata)) {
@@ -362,7 +364,13 @@ multinom_logit_predict <- function(object, newdata = NULL, type = "probs") {
     stats::predict(object, newdata = newdata, type = type)
   }
   if (identical(type, "probs") && is.null(dim(res))) {
-    res <- matrix(res, nrow = 1, dimnames = list(NULL, names(res)))
+    if (length(object$lev) == 2) {
+      p <- as.numeric(res)
+      res <- cbind(1 - p, p)
+      colnames(res) <- object$lev
+    } else {
+      res <- matrix(res, nrow = 1, dimnames = list(NULL, names(res)))
+    }
   }
   res
 }
@@ -374,6 +382,13 @@ multinom_logit_vcov <- function(x) {
   if (is.null(h) || !is.matrix(h) || any(!is.finite(h))) return(NULL)
   v <- tryCatch(solve(h), error = function(e) NULL)
   if (is.null(v) || any(!is.finite(diag(v))) || any(diag(v) < 0)) return(NULL)
+  # With a 2-category target nnet drops the "<level>:" prefix from the dimnames.
+  # Restore it so lookups use the same "<category>:<term>" key as K >= 3.
+  # (Do not test for ":" -- a predictor name may contain it.)
+  if (length(x$lev) == 2 && "(Intercept)" %in% rownames(v)) {
+    rownames(v) <- paste0(x$lev[[2]], ":", rownames(v))
+    colnames(v) <- paste0(x$lev[[2]], ":", colnames(v))
+  }
   v
 }
 
@@ -479,7 +494,7 @@ tidy.multinom_logit_exploratory <- function(x, type = "coefficients", conf.int =
 
   coefs <- stats::coef(x)
   if (is.null(dim(coefs))) {
-    # A 2-level target collapses coef() to a vector; build_multinom_logit() forbids that, but be safe.
+    # A 2-category target collapses coef() to a vector; this is the normal path for K = 2.
     coefs <- matrix(coefs, nrow = 1, dimnames = list(x$lev[[2]], names(coefs)))
   }
   categories <- rownames(coefs)
