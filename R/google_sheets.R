@@ -82,6 +82,45 @@ updateGoogleSheet <- function(filepath, id, overwrite = FALSE) {
   return(sheet)
 }
 
+#' Whether an error from a googlesheets4 write call is a transient Google API
+#' error worth retrying: 409 ("ABORTED", a read-modify-write concurrency
+#' conflict when two writes land on the same spreadsheet around the same
+#' time), 429 ("RESOURCE_EXHAUSTED", a rate limit) or 503 ("UNAVAILABLE", a
+#' transient server error). Any other error (permission, missing sheet,
+#' invalid argument, ...) is not transient and must not be retried.
+#' @param e - the condition caught from the failing call
+.isRetryableGoogleSheetsWriteError <- function(e) {
+  grepl("\\((409|429|503)\\)", conditionMessage(e))
+}
+
+#' Run a Google Sheets write call, retrying with backoff when it fails with a
+#' transient/retryable Google API error (see .isRetryableGoogleSheetsWriteError).
+#' A non-retryable error, or a retryable one that is still failing once `waits`
+#' is exhausted, is re-thrown as-is. (#40864 -- googlesheets4::sheet_append had
+#' no retry at all, so a single concurrency conflict failed the whole
+#' scheduled writeback job.)
+#' @param writeFn - a zero-argument function that performs the write and
+#'   returns its result.
+#' @param waits - seconds to wait before each retry, in order (its length is
+#'   the max number of retries).
+.retryGoogleSheetsWrite <- function(writeFn, waits = c(1, 2, 4)) {
+  attempt <- 1L
+  repeat {
+    outcome <- tryCatch(
+      list(ok = TRUE, value = writeFn()),
+      error = function(e) list(ok = FALSE, error = e)
+    )
+    if (isTRUE(outcome$ok)) {
+      return(outcome$value)
+    }
+    if (attempt > length(waits) || !.isRetryableGoogleSheetsWriteError(outcome$error)) {
+      stop(outcome$error)
+    }
+    Sys.sleep(waits[attempt])
+    attempt <- attempt + 1L
+  }
+}
+
 #' API to upload data frame to Google Sheets.
 #'
 #' @export
@@ -114,16 +153,25 @@ uploadDataToGoogleSheets <- function(df, type = "newSpreadSheet", spreadSheetNam
   token <- getGoogleTokenForSheet("")
   googlesheets4::sheets_set_token(token)
 
-  # Perform actions based on the 'type' parameter
+  # Perform actions based on the 'type' parameter. Each write is wrapped with
+  # .retryGoogleSheetsWrite so a transient Google API conflict/rate-limit/
+  # server error (409/429/503) is retried with backoff instead of failing the
+  # whole job outright (#40864).
   if (type == "newSpreadSheet") {
     sheetsList <- list(df)
     names(sheetsList) <- c(workSheet)
-    return(googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList))
+    return(.retryGoogleSheetsWrite(function() {
+      googlesheets4::gs4_create(spreadSheetName, sheets = sheetsList)
+    }))
   } else if (type %in% c("overrideSpreadSheet", "newWorkSheet")) {
-    googlesheets4::sheet_write(df, spreadSheetName, sheet = workSheet)
+    .retryGoogleSheetsWrite(function() {
+      googlesheets4::sheet_write(df, spreadSheetName, sheet = workSheet)
+    })
     return(spreadSheetName)
   } else if (type == "appendToWorkSheet") {
-    googlesheets4::sheet_append(spreadSheetName, df, sheet = workSheet)
+    .retryGoogleSheetsWrite(function() {
+      googlesheets4::sheet_append(spreadSheetName, df, sheet = workSheet)
+    })
     return(spreadSheetName)
   } else {
     stop("Invalid 'type' parameter provided.")
