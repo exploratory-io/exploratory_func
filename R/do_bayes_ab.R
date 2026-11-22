@@ -169,6 +169,20 @@ exp_bayes_ab_aggregated <- function(df, a_b_identifier, conversion_rate, count, 
   count_col <- col_name(substitute(count))
   # Keep only necessary columns before pivot_longer to avoid unnecessary copies.
   df <- df %>% dplyr::select(!!rlang::sym(a_b_identifier_col), !!rlang::sym(conversion_rate_col), !!rlang::sym(count_col))
+
+  # Conversion Rate must be a proportion (0-1), same precondition do_bayes_ab()
+  # already enforces for its own conversion rate argument. Validate as early
+  # as possible, before the count*rate expansion below: an out-of-range value
+  # (e.g. an average, not a rate) makes the derived FALSE count negative,
+  # which fails deep inside exp_bayes_ab()'s rep() call with the cryptic
+  # "invalid 'times' argument" instead of a message the user can act on
+  # (tam#39621). NA values are dropped rather than flagged, matching
+  # do_bayes_ab()'s own filter-before-validate convention.
+  if (any(!is.na(df[[conversion_rate_col]]) &
+          (df[[conversion_rate_col]] < 0 | df[[conversion_rate_col]] > 1))) {
+    stop("Conversion Rate must be a proportion between 0 and 1. For comparing means such as averages, use a t-test or ANOVA instead.")
+  }
+
   df <- df %>% dplyr::mutate(`TRUE`=(!!rlang::sym(count_col))*(!!rlang::sym(conversion_rate_col)), `FALSE`=(!!rlang::sym(count_col))*((1-!!rlang::sym(conversion_rate_col)))) %>% dplyr::select(-!!rlang::sym(count_col), -!!rlang::sym(conversion_rate_col))
   df <- df %>% tidyr::pivot_longer(c(`TRUE`,`FALSE`), names_to="converted", values_to="n")
   df <- df %>% dplyr::mutate(converted=as.logical(converted))
