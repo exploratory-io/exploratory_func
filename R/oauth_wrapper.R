@@ -24,6 +24,10 @@ HttrOAuthToken2.0 <- R6::R6Class("HttrOAuthToken2.0", inherit = httr::Token2.0, 
       secret = secret
     )
     self$credentials <- credentials
+    # This initialize does not call httr::Token's, which normalizes cache_path via use_cache().
+    # Without this, the R6 default FALSE reaches httr's cache_token() on token refresh and
+    # file.exists(FALSE) fails with "invalid 'file' argument". NULL means "do not cache". (tam#39034)
+    self$cache_path <- NULL
     # this is needed to use this token in httr::GET function
     self$params$as_header <- TRUE
   }
@@ -55,6 +59,10 @@ HttrOAuthToken1.0 <- R6::R6Class("HttrOAuthToken1.0", inherit = httr::Token1.0, 
       secret = secret
     )
     self$credentials <- credentials
+    # This initialize does not call httr::Token's, which normalizes cache_path via use_cache().
+    # Without this, the R6 default FALSE reaches httr's cache_token() on token refresh and
+    # file.exists(FALSE) fails with "invalid 'file' argument". NULL means "do not cache". (tam#39034)
+    self$cache_path <- NULL
     # this is needed to use this token in httr::GET function
     self$params$as_header <- TRUE
   }
