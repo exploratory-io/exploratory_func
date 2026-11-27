@@ -58,7 +58,7 @@ boxRequest <- function(path, query = list(), token = NULL, ...) {
   url <- paste0(boxBaseUrl(), path)
   attempt <- 0
   repeat {
-    res <- httr::GET(url, query = query,
+    res <- httr::GET(url, query = to_api_query(query),
                      httr::add_headers(Authorization = paste("Bearer", accessToken)),
                      httr::config(http_version = 0), ...)
     status <- httr::status_code(res)
