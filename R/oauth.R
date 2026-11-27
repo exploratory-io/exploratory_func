@@ -52,6 +52,38 @@ getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, to
   token
 }
 
+#' Get the OAuth token for Box.
+#' The token is refreshed only by Exploratory (server / desktop), never from R. Box refresh tokens are single use,
+#' so the credentials deliberately do NOT contain refresh_token: only access_token, token_type and expires_in.
+#' @export
+getBoxToken <- function(tokenFileId = "", useCache=TRUE){
+  appName = "box"
+  # retrieve token info from environment
+  # main purpose is to enable server refresh
+  token_info <- getTokenInfo("box")
+  if(!is.null(token_info) && !is.null(token_info$access_token)){
+    HttrOAuthToken2.0$new(
+      authorize = "https://account.box.com/api/oauth2/authorize",
+      access = "https://api.box.com/oauth2/token",
+      revoke = "https://api.box.com/oauth2/revoke",
+      appname = appName,
+      credentials = list(
+        access_token = token_info$access_token,
+        token_type = token_info$token_type,
+        expires_in = token_info$expires_in
+      )
+    )
+  } else {
+    stop("OAuth token is not set for Box")
+  }
+}
+
+#' API to refresh token. R does not refresh Box tokens, it just re-reads the token set by Exploratory.
+#' @export
+refreshBoxToken <- function(tokenFileId = ""){
+  getBoxToken(tokenFileId = tokenFileId, FALSE)
+}
+
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
