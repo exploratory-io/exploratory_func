@@ -1117,6 +1117,40 @@ oracleOCINlsLang <- function(currentNlsLang = Sys.getenv("NLS_LANG")) {
   paste0(sub("\\.[^.]*$", "", value), ".AL32UTF8")
 }
 
+#' Build the Snowflake ODBC connection string.
+#' authMethod: "key-pair" -> SNOWFLAKE_JWT, "sso" -> externalbrowser (SAML/SSO via the OS browser, no password),
+#' anything else (""/"basic") -> username and password.
+#' @noRd
+snowflakeConnectionString <- function(driver, host, port, catalog, databaseName, username, password = "",
+                                       authMethod = "", secretKeyFile = "", secretKeyFilePassword = "",
+                                       role = "", additionalParams = "") {
+  # For Snowflake, map catalog argument to "WAREHOUSE".
+  connectionString <- stringr::str_c(
+    "Driver=", driver, ";Server=", host, ";Port=", port, ";WAREHOUSE=", catalog, ";Database=", databaseName,
+    ";UID=", username
+  )
+  if (authMethod == "key-pair") {
+    connectionString <- stringr::str_c(connectionString, ";AUTHENTICATOR=SNOWFLAKE_JWT")
+  } else if (authMethod == "sso") {
+    connectionString <- stringr::str_c(connectionString, ";AUTHENTICATOR=externalbrowser")
+  } else {
+    connectionString <- stringr::str_c(connectionString, ";PWD=", password)
+  }
+  if (secretKeyFile != "") {
+    connectionString <- stringr::str_c(connectionString, ";PRIV_KEY_FILE=", secretKeyFile)
+  }
+  if (secretKeyFilePassword != "") {
+    connectionString <- stringr::str_c(connectionString, ";PRIV_KEY_FILE_PWD=", secretKeyFilePassword)
+  }
+  if (role != "") {
+    connectionString <- stringr::str_c(connectionString, ";role=", role)
+  }
+  if (additionalParams != "") {
+    connectionString <- stringr::str_c(connectionString, ";", additionalParams)
+  }
+  connectionString
+}
+
 # Single source of truth for the Oracle (OCI) connection pool key so that getDBConnection
 # and clearDBConnection can never drift apart. Every component is normalized here because
 # paste() silently drops NULL, which would produce a key that no clear call can match.
@@ -1948,27 +1982,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # loc looks like "Japanese_Japan.932", so split it with dot ".".
       encoding <- stringr::str_split(loc, pattern = "\\.")
       # For Snowflake, map catalog argument to "WAREHOUSE".
-      connectionString <- stringr::str_c(
-        "Driver=", driver, ";Server=", host, ";Port=", port, ";WAREHOUSE=", catalog, ";Database=", databaseName,
-        ";UID=", username
-      );
-      if (authMethod == "key-pair") {
-        connectionString <- stringr::str_c(connectionString, ";AUTHENTICATOR=SNOWFLAKE_JWT");
-      } else {
-        connectionString <- stringr::str_c(connectionString, ";PWD=", password);
-      }
-      if (secretKeyFile != "") {
-        connectionString <- stringr::str_c(connectionString, ";PRIV_KEY_FILE=", secretKeyFile);
-      }
-      if (secretKeyFilePassword != "") {
-        connectionString <- stringr::str_c(connectionString, ";PRIV_KEY_FILE_PWD=", secretKeyFilePassword);
-      }
-      if (role != "") {
-        connectionString <- stringr::str_c(connectionString, ";role=", role);
-      }
-      if (additionalParams != "") {
-        connectionString <- stringr::str_c(connectionString, ";", additionalParams);
-      }
+      connectionString <- snowflakeConnectionString(driver, host, port, catalog, databaseName, username, password,
+                                                    authMethod, secretKeyFile, secretKeyFilePassword, role, additionalParams)
 
       if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2 && stringr::str_to_lower(encoding[[1]][[2]]) != "utf8") {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.

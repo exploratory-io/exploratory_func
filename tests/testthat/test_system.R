@@ -1576,3 +1576,20 @@ test_that("append_data_catalog_credentials puts the parameters before a #fragmen
   same <- paste0(base, "?api_key=OLD&user_name=Bob#x")
   expect_equal(exploratory:::append_data_catalog_credentials(same, "KEY", "Ann"), same)
 })
+
+test_that("snowflakeConnectionString selects the authenticator by authMethod", {
+  build <- function(...) exploratory:::snowflakeConnectionString("drv", "h.snowflakecomputing.com", 443, "WH", "DB", "user", ...)
+  base <- "Driver=drv;Server=h.snowflakecomputing.com;Port=443;WAREHOUSE=WH;Database=DB;UID=user"
+  # Username and password (default, and legacy connections with no authMethod).
+  expect_equal(build(password = "pw"), paste0(base, ";PWD=pw"))
+  expect_equal(build(password = "pw", authMethod = "basic"), paste0(base, ";PWD=pw"))
+  # Key-pair.
+  expect_equal(
+    build(authMethod = "key-pair", secretKeyFile = "/k.p8", secretKeyFilePassword = "kp"),
+    paste0(base, ";AUTHENTICATOR=SNOWFLAKE_JWT;PRIV_KEY_FILE=/k.p8;PRIV_KEY_FILE_PWD=kp")
+  )
+  # SSO: external browser, and never a PWD= entry.
+  sso <- build(authMethod = "sso", role = "R", additionalParams = "x=y")
+  expect_equal(sso, paste0(base, ";AUTHENTICATOR=externalbrowser;role=R;x=y"))
+  expect_false(grepl("PWD=", sso))
+})
