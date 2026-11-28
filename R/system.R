@@ -1151,6 +1151,26 @@ snowflakeConnectionString <- function(driver, host, port, catalog, databaseName,
   connectionString
 }
 
+# Single source of truth for the Snowflake connection pool key so that getDBConnection
+# and clearDBConnection distinguish authentication modes and cannot drift apart.
+snowflakePoolKey <- function(host, port, catalog, databaseName, username, timezone, additionalParams = "",
+                             role = "", authMethod = "", secretKeyFile = "", secretKeyFilePassword = "") {
+  normalize <- function(value) {
+    if (is.null(value) || length(value) == 0 || is.na(value[[1]])) "" else as.character(value[[1]])
+  }
+  port <- normalize(port)
+  if (port == "") {
+    port <- "443" # matches the default applied when connecting.
+  }
+  timezone <- normalize(timezone)
+  if (timezone == "") {
+    timezone <- "UTC" # matches the default applied when connecting.
+  }
+  paste("snowflake", normalize(host), port, normalize(catalog), normalize(databaseName), normalize(username),
+        timezone, normalize(additionalParams), normalize(role), normalize(authMethod), normalize(secretKeyFile),
+        normalize(secretKeyFilePassword), sep = ":")
+}
+
 # Single source of truth for the Oracle (OCI) connection pool key so that getDBConnection
 # and clearDBConnection can never drift apart. Every component is normalized here because
 # paste() silently drops NULL, which would produce a key that no clear call can match.
@@ -1944,7 +1964,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
 
-    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, additionalParams, role, secretKeyFile, secretKeyFilePassword, sep = ":")
+    key <- snowflakePoolKey(host, port, catalog, databaseName, username, timezone, additionalParams, role,
+                            authMethod, secretKeyFile, secretKeyFilePassword)
     # Only reuse a pooled connection when pooling is on; otherwise queryODBC() may have already closed
     # this connection, leaving a dead external pointer in the pool. (tam#36429)
     conn <- NULL
@@ -2194,7 +2215,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
                               sslClientCertKey = "", sslCA = "", subType = NULL, driver = "", sslMode = '', role = '',
-                              bulkRead = 200000) {
+                              bulkRead = 200000, authMethod = "", secretKeyFile = "", secretKeyFilePassword = "") {
   key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
@@ -2273,14 +2294,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     key <- paste("mssqlserver", host, port, databaseName, username, timezone, sep = ":")
   }
   else if (type %in% c("snowflake")) {
-    if (is.null(port) || port == "") {
-      # https://docs.snowflake.com/en/user-guide/odbc-parameters.html
-      port <- 443 # snowflake default port.
-    }
-    if (timezone == "") {
-      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
-    }
-    key <- paste("snowflake", host, port, catalog, databaseName, username, timezone, role, sep = ":")
+    key <- snowflakePoolKey(host, port, catalog, databaseName, username, timezone, additionalParams, role,
+                            authMethod, secretKeyFile, secretKeyFilePassword)
   } else if (type %in% c("oracle")) {
     key <- paste("oracle", host, port, databaseName, username, timezone, sep = ":")
   } else if (type %in% c("oracleoci")) {
@@ -2624,6 +2639,16 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   }
   conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone, connectionString = connectionString, subType = subType, role = role,
                           authMethod = authMethod, secretKeyFile = secretKeyFile, secretKeyFilePassword = secretKeyFilePassword)
+  clearConnection <- function() {
+    if (type == "snowflake") {
+      clearDBConnection(type, host, port, databaseName, username, catalog = catalog,
+                        additionalParams = additionalParams, timezone = timezone, role = role,
+                        authMethod = authMethod, secretKeyFile = secretKeyFile,
+                        secretKeyFilePassword = secretKeyFilePassword)
+    } else {
+      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams, role = role)
+    }
+  }
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -2643,7 +2668,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
-      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams, role = role)
+      clearConnection()
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
@@ -2661,7 +2686,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams, role = role)
+    clearConnection()
     stop(err)
   })
   # mssqlserver uses odbc package and DBI package
@@ -2673,7 +2698,7 @@ queryODBC <- function(dsn="", username="", password="", additionalParams="", num
   }
   if (type == "access") { # clear access connection so that lock file is removed.
     tryCatch({
-      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams, role = role)
+      clearConnection()
       odbc::dbDisconnect(conn)
     })
   }

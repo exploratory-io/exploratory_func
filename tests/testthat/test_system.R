@@ -1593,3 +1593,35 @@ test_that("snowflakeConnectionString selects the authenticator by authMethod", {
   expect_equal(sso, paste0(base, ";AUTHENTICATOR=externalbrowser;role=R;x=y"))
   expect_false(grepl("PWD=", sso))
 })
+
+test_that("Snowflake pool keys distinguish auth methods and cleanup uses the same key", {
+  pool <- exploratory:::connection_pool
+  key_args <- list(
+    host = "h.snowflakecomputing.com",
+    port = 443,
+    catalog = "WH",
+    databaseName = "DB",
+    username = "user",
+    timezone = "UTC",
+    role = "R",
+    additionalParams = "CLIENT_SESSION_KEEP_ALIVE=true"
+  )
+  basic_key <- do.call(exploratory:::snowflakePoolKey, c(key_args, authMethod = "basic"))
+  sso_key <- do.call(exploratory:::snowflakePoolKey, c(key_args, authMethod = "sso"))
+  pool[[basic_key]] <- "basic connection"
+  pool[[sso_key]] <- "sso connection"
+  on.exit({
+    keys <- intersect(c(basic_key, sso_key), ls(envir = pool))
+    if (length(keys) > 0) rm(list = keys, envir = pool)
+  }, add = TRUE)
+
+  expect_false(identical(basic_key, sso_key))
+  exploratory::clearDBConnection(
+    "snowflake", key_args$host, key_args$port, key_args$databaseName, key_args$username,
+    catalog = key_args$catalog, additionalParams = key_args$additionalParams,
+    timezone = key_args$timezone, role = key_args$role,
+    authMethod = "sso"
+  )
+  expect_false(exists(sso_key, envir = pool, inherits = FALSE))
+  expect_true(exists(basic_key, envir = pool, inherits = FALSE))
+})
